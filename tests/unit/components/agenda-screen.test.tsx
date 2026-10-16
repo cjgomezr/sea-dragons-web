@@ -766,7 +766,7 @@ function eventPath(event: AgendaEvent): string {
 }
 
 function openedResponse(event: AgendaEvent, extras: DetailExtras): Response {
-  return jsonResponse(200, { data: { ...event, ...extras } });
+  return jsonResponse(200, { data: { ...event, coverUrl: null, ...extras } });
 }
 
 /** La agenda de una página y el detalle de sus eventos con lo que se pase. */

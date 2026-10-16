@@ -89,6 +89,8 @@ const openedEventSchema = z.object({
   going: z.array(z.string()),
   maybe: z.array(z.string()),
   audience: audienceSchema.optional(),
+  // La grande firmada (#644). El diálogo de editar la enseña (#650).
+  coverUrl: z.url().nullable(),
 });
 
 const detailResponseSchema = z.object({
@@ -109,6 +111,7 @@ export type OpenedEvent = {
   readonly going: readonly string[];
   readonly maybe: readonly string[];
   readonly audience: NamedEventAudience | null;
+  readonly coverUrl: string | null;
 };
 
 export type AgendaFailure = ApiRequestFailure;

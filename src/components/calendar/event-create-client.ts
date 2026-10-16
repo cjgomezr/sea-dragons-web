@@ -5,7 +5,10 @@ import {
   readApiPayload,
   requestApi,
 } from "@/lib/api/request-api";
-import { EVENTS_MANAGE_API_PATH } from "@/lib/auth/routes";
+import {
+  EVENT_COVER_UPLOADS_API_PATH,
+  EVENTS_MANAGE_API_PATH,
+} from "@/lib/auth/routes";
 import {
   EVENT_LOCATION_MAX_LENGTH,
   EVENT_NOTES_MAX_LENGTH,
@@ -14,6 +17,7 @@ import {
   SERIES_MAX_DAYS,
 } from "@/lib/events/event-creation";
 import type { Translator } from "@/lib/i18n/translator";
+import { NEWS_ATTACHMENT_MAX_BYTES } from "@/lib/news/news-attachments";
 import {
   type EventFormIssue,
   type FieldIssueCode,
@@ -39,6 +43,34 @@ const createdResponseSchema = z.object({
     }),
   ]),
 });
+
+const uploadedCoverSchema = z.object({ data: z.object({ id: z.uuid() }) });
+
+const BYTES_PER_MEGABYTE = 1024 * 1024;
+/** El tope de una imagen de evento (#644) es el de una portada de noticias,
+ * que es el de un adjunto. Se lee de aquí porque `news-cover-uploads` es
+ * código de servidor. */
+const COVER_MAX_MEGABYTES = NEWS_ATTACHMENT_MAX_BYTES / BYTES_PER_MEGABYTE;
+
+export type EventCoverUpload =
+  | { readonly kind: "uploaded"; readonly coverUploadId: string }
+  | ApiRequestFailure;
+
+/** Sube la imagen de un evento (#644): los bytes tal cual, y el servidor
+ * mira el tipo en ellos. El id se manda después en `coverUploadId`. */
+export async function uploadEventCover(file: File): Promise<EventCoverUpload> {
+  const read = readApiPayload(
+    await requestApi(EVENT_COVER_UPLOADS_API_PATH, {
+      method: "POST",
+      headers: { "content-type": "application/octet-stream" },
+      body: file,
+    }),
+    uploadedCoverSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "uploaded", coverUploadId: read.value.data.id };
+}
 
 export type CreatedSummary =
   | { readonly repeat: "none" }
@@ -104,12 +136,22 @@ export function describeEventIssue(
       return translate("calendar.form.issue.series_range_too_long", {
         max: SERIES_MAX_DAYS,
       });
+    case "event_cover_too_large":
+      return translate("calendar.form.issue.event_cover_too_large", {
+        max: COVER_MAX_MEGABYTES,
+      });
     case "event_audience_empty":
     case "event_audience_foreign_group":
     case "event_in_past":
     case "series_weekdays_empty":
     case "series_range_inverted":
     case "series_without_sessions":
+    case "end_time_required":
+    case "end_before_start":
+    case "multi_day_series":
+    case "event_cover_empty":
+    case "event_cover_type_unsupported":
+    case "event_cover_upload_invalid":
       return translate(`calendar.form.issue.${code}`);
   }
 }

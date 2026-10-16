@@ -15,10 +15,13 @@ import {
   type EventFormField,
   type EventFormIssue,
   type EventFormLayout,
+  endScopeOf,
   issueFromApi,
   listMissingFields,
 } from "./event-form";
 import { describeManageFailure } from "./event-manage-client";
+import { type EventEndCheck, evaluateEventEnd } from "./event-end";
+import { EventCoverField, describeCoverIssue } from "./EventCoverField";
 import {
   type FieldProps,
   InputField,
@@ -27,6 +30,8 @@ import {
   TypeField,
   WeekdaysField,
 } from "./EventFormFields";
+import { EventWhenField } from "./EventWhenField";
+import { useEventCover } from "./use-event-cover";
 
 /**
  * El formulario del diálogo de evento (#313, RF-9 del PRD de E7). Un fallo
@@ -48,63 +53,41 @@ type Status =
   | { readonly kind: "sending" }
   | ApiRequestFailure;
 
-function ScheduleFields(
-  props: FieldProps & { readonly layout: EventFormLayout },
-): React.JSX.Element {
-  const { translate, form, layout } = props;
-  if (layout === "series") {
-    return (
-      <InputField
-        {...props}
-        field="startTime"
-        type="time"
-        label={translate("calendar.form.time")}
-      />
-    );
-  }
-  if (form.repeat === "none") {
-    return (
-      <div className="event-form-row">
-        <InputField
-          {...props}
-          field="startsOn"
-          type="date"
-          label={translate("calendar.form.date")}
-        />
-        <InputField
-          {...props}
-          field="startTime"
-          type="time"
-          label={translate("calendar.form.time")}
-        />
-      </div>
-    );
-  }
+/** Los días y el final de una serie nueva. La repetición se rehace en
+ * #651; aquí queda como estaba. */
+function WeeklyFields(props: FieldProps): React.JSX.Element {
   return (
     <>
       <WeekdaysField {...props} />
-      <div className="event-form-row">
-        <InputField
-          {...props}
-          field="startsOn"
-          type="date"
-          label={translate("calendar.form.startsOn")}
-        />
-        <InputField
-          {...props}
-          field="endsOn"
-          type="date"
-          label={translate("calendar.form.endsOn")}
-        />
-      </div>
       <InputField
         {...props}
-        field="startTime"
-        type="time"
-        label={translate("calendar.form.time")}
+        field="endsOn"
+        type="date"
+        label={props.translate("calendar.form.endsOn")}
       />
     </>
   );
+}
+
+/** El aviso de Termina: el del servidor manda; si no hay, el fin al revés o
+ * que un evento anterior a E24 ahora la necesita. */
+function describeEndIssue(
+  translate: Translator,
+  check: {
+    readonly serverIssue: string | null;
+    readonly endCheck: EventEndCheck;
+    readonly isEndNowRequired: boolean;
+  },
+): string | null {
+  if (check.serverIssue !== null) {
+    return check.serverIssue;
+  }
+  if (check.endCheck.kind === "invalid") {
+    return translate("calendar.form.issue.end_before_start");
+  }
+  return check.isEndNowRequired
+    ? translate("calendar.form.endTimeNowRequired")
+    : null;
 }
 
 function SubmitFailure({
@@ -151,6 +134,7 @@ export function EventForm({
   clubGroups,
   layout,
   initialForm,
+  currentCoverUrl,
   submit,
   onCancel,
   onSendingChange,
@@ -159,6 +143,8 @@ export function EventForm({
   readonly clubGroups: readonly Group[];
   readonly layout: EventFormLayout;
   readonly initialForm: EventFormValues;
+  /** La imagen que ya tiene el evento que se edita. */
+  readonly currentCoverUrl: string | null;
   readonly submit: (form: EventFormValues) => Promise<FormSubmission>;
   readonly onCancel: () => void;
   /** Mientras se guarda, el diálogo no se deja cerrar. */
@@ -168,6 +154,7 @@ export function EventForm({
   const [status, setStatus] = useState<Status>({ kind: "editing" });
   const [issues, setIssues] = useState<readonly EventFormIssue[]>([]);
   const titleRef = useRef<HTMLInputElement>(null);
+  const cover = useEventCover(currentCoverUrl);
   // El estado desactiva el botón en el siguiente pintado, pero un doble clic
   // llega antes. La referencia cambia en el acto.
   const isSendingRef = useRef(false);
@@ -201,7 +188,7 @@ export function EventForm({
     }
     markSending(true);
     setStatus({ kind: "sending" });
-    const result = await submit(form);
+    const result = await submit({ ...form, cover: cover.change });
     markSending(false);
     if (result.kind === "finished") {
       return;
@@ -215,7 +202,23 @@ export function EventForm({
     const issue = issues.find((candidate) => candidate.field === field);
     return issue === undefined ? null : describeEventIssue(translate, issue);
   };
+  // Otra imagen deja atrás lo que el servidor dijo de la anterior.
+  function chooseCover(file: File): void {
+    setIssues((current) => current.filter((issue) => issue.field !== "cover"));
+    cover.choose(file);
+  }
+
   const isSending = status.kind === "sending";
+  const scope = endScopeOf(layout, form);
+  const endCheck = evaluateEventEnd(form, scope);
+  // Lo anterior a E24 no tiene hora de fin (D5): guardarlo ahora la pide.
+  const isEndNowRequired =
+    layout !== "create" && initialForm.endTime === "" && form.endTime === "";
+  const isSubmitBlocked =
+    isSending ||
+    cover.isUploading ||
+    endCheck.kind === "invalid" ||
+    isEndNowRequired;
   const fieldProps: FieldProps = {
     translate,
     form,
@@ -231,6 +234,17 @@ export function EventForm({
         </p>
       ) : null}
       <fieldset className="event-form-fields" disabled={isSending}>
+        <EventCoverField
+          translate={translate}
+          eventType={form.eventType}
+          field={{ ...cover, choose: chooseCover }}
+          issueText={
+            cover.issue === null
+              ? issueTextFor("cover")
+              : describeCoverIssue(translate, cover.issue)
+          }
+        />
+        <TypeField {...fieldProps} />
         <InputField
           {...fieldProps}
           field="title"
@@ -239,9 +253,21 @@ export function EventForm({
           placeholder={translate("calendar.form.titlePlaceholder")}
           inputRef={titleRef}
         />
-        <TypeField {...fieldProps} />
+        <EventWhenField
+          {...fieldProps}
+          layout={layout}
+          scope={scope}
+          endCheck={endCheck}
+          endIssueText={describeEndIssue(translate, {
+            serverIssue: issueTextFor("endTime"),
+            endCheck,
+            isEndNowRequired,
+          })}
+        />
         {layout === "create" ? <RepeatField {...fieldProps} /> : null}
-        <ScheduleFields {...fieldProps} layout={layout} />
+        {layout === "create" && form.repeat === "weekly" ? (
+          <WeeklyFields {...fieldProps} />
+        ) : null}
         <InputField
           {...fieldProps}
           field="location"
@@ -269,7 +295,11 @@ export function EventForm({
         >
           {translate("calendar.form.cancel")}
         </button>
-        <button type="submit" className="auth-submit" disabled={isSending}>
+        <button
+          type="submit"
+          className="auth-submit"
+          disabled={isSubmitBlocked}
+        >
           {translate(
             isSending ? "calendar.form.sending" : SUBMIT_LABELS[layout],
           )}

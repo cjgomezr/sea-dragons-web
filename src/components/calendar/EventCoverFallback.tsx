@@ -16,6 +16,26 @@ const TYPE_GLYPHS: Readonly<Record<EventType, PhosphorGlyph>> = {
   meeting: UsersThree,
 };
 
+/** El icono de un tipo de evento. Es decorativo: el tipo lo nombra su
+ * texto. */
+export function EventTypeIcon({
+  eventType,
+  size,
+}: {
+  readonly eventType: EventType;
+  readonly size: number;
+}): React.JSX.Element {
+  const Glyph = TYPE_GLYPHS[eventType];
+  return (
+    <Glyph
+      aria-hidden="true"
+      focusable="false"
+      size={size}
+      color="currentColor"
+    />
+  );
+}
+
 /** El fondo de un evento sin imagen (#641, D4 del PRD de E24): un degradado
  * y un icono por tipo. Es decorativo; el tipo lo nombra su etiqueta. El
  * degradado y el color del icono los pone la hoja de estilos; el tamaño,
@@ -27,15 +47,9 @@ export function EventCoverFallback({
   readonly eventType: EventType;
   readonly iconSize: EventCoverIconSize;
 }): React.JSX.Element {
-  const Glyph = TYPE_GLYPHS[eventType];
   return (
     <div className={`event-cover-fallback event-cover-fallback-${eventType}`}>
-      <Glyph
-        aria-hidden="true"
-        focusable="false"
-        size={iconSize}
-        color="currentColor"
-      />
+      <EventTypeIcon eventType={eventType} size={iconSize} />
     </div>
   );
 }

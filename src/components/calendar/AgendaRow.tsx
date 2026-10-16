@@ -399,6 +399,7 @@ export function AgendaRow({
             details={{
               notes: detail.opened.notes,
               audience: detail.opened.audience,
+              coverUrl: detail.opened.coverUrl,
             }}
             goingCount={state.tally.goingCount}
             organizer={organizer}

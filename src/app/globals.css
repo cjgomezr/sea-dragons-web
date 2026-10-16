@@ -10947,7 +10947,7 @@ a.auth-brand-header:focus-visible {
 /* Lo que se desplaza es el cuerpo, no el diálogo: el título y su cierre se
    quedan arriba, y los botones abajo (ver `.event-form-actions`). */
 .event-dialog {
-  width: min(520px, calc(100% - 2 * var(--space-4)));
+  width: min(640px, calc(100% - 2 * var(--space-4)));
   max-width: 100%;
   max-height: calc(100dvh - 2 * var(--space-4));
   padding: 0;
@@ -11197,6 +11197,320 @@ a.auth-brand-header:focus-visible {
 .agenda-organizer-step .auth-error,
 .agenda-closed {
   margin: 0;
+}
+
+/* La imagen del evento (#650, punto 1 del "#1c" del handoff de E24): sin
+   ella, 120px del fondo del tipo con su icono a la derecha, y el texto y el
+   botón abajo; con ella, 160px de foto y "Quitar imagen" debajo. */
+.event-cover-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.event-cover-field legend,
+.event-form-when legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-weight: 700;
+}
+
+.event-form-optional {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.event-cover-banner {
+  position: relative;
+  display: flex;
+  min-height: 120px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.event-cover-banner .event-cover-fallback {
+  position: absolute;
+  inset: 0;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: var(--space-4) var(--space-6);
+}
+
+.event-cover-banner-content {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+}
+
+.event-cover-banner-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.event-cover-add {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: 0 var(--space-4);
+  font-size: 14px;
+}
+
+.event-cover-uploading {
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background);
+}
+
+.event-cover-uploading p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.event-cover-preview {
+  display: block;
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+/* "Quitar imagen" se lee como un enlace, pero es un botón: no lleva a
+   ningún sitio. */
+.event-cover-remove {
+  align-self: flex-start;
+  min-height: var(--touch-target-min);
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.event-cover-remove:focus-visible,
+.event-cover-add:focus-visible,
+.event-form-chip:focus-visible,
+.event-form-switch input:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+/* El tipo: cuatro botones de 38px con su icono. El radio queda encima,
+   transparente, y la etiqueta lo contiene: sin `position: relative` el radio
+   escondido ensancharía la página. */
+.event-form-types {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.event-form-type {
+  position: relative;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 var(--space-2);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.event-form-type input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.event-form-type svg {
+  flex: none;
+}
+
+.event-form-type span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-form-type:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.event-form-type-training svg {
+  color: var(--color-accent-text);
+}
+
+.event-form-type-competition svg {
+  color: var(--color-warning);
+}
+
+.event-form-type-social svg {
+  color: var(--color-success);
+}
+
+.event-form-type-meeting svg {
+  color: var(--color-type-meeting);
+}
+
+.event-form-type-training:has(input:checked) {
+  background: color-mix(in srgb, var(--color-accent) 24%, var(--color-panel));
+  border-color: var(--color-accent);
+}
+
+.event-form-type-competition:has(input:checked) {
+  background: color-mix(in srgb, var(--color-warning) 24%, var(--color-panel));
+  border-color: var(--color-warning);
+}
+
+.event-form-type-social:has(input:checked) {
+  background: color-mix(in srgb, var(--color-success) 24%, var(--color-panel));
+  border-color: var(--color-success);
+}
+
+.event-form-type-meeting:has(input:checked) {
+  background: color-mix(in srgb, var(--color-type-meeting) 24%, var(--color-panel));
+  border-color: var(--color-type-meeting);
+}
+
+@media (max-width: 559px) {
+  .event-form-types {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Cuándo: la fecha, el inicio y el fin en una fila desde que caben, y
+   debajo cuánto dura o por qué el fin no vale. */
+.event-form-when {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.event-form-when-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 560px) {
+  .event-form-when-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Con la fecha son tres; una serie que se edita no la enseña. */
+  .event-form-when-row:has(> :nth-child(3)) {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.event-form-when > .auth-field-error {
+  margin: 0;
+}
+
+.event-form-duration {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.event-form-switch {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.event-form-switch input {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 24px;
+  margin: 0;
+  appearance: none;
+  background: var(--color-text-secondary);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.event-form-switch input::before {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  content: "";
+  background: var(--color-panel);
+  border-radius: 999px;
+  transition: transform 0.15s ease;
+}
+
+.event-form-switch input:checked {
+  background: var(--color-accent);
+}
+
+.event-form-switch input:checked::before {
+  transform: translateX(16px);
+}
+
+.event-form-switch label {
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.event-form-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.event-form-chip {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.event-form-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /* Lo que va a pasar al guardar una serie: como `.member-record-warning`, una

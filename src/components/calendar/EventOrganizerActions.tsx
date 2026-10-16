@@ -200,6 +200,8 @@ export function EventOrganizerActions({
   readonly details: {
     readonly notes: string | null;
     readonly audience: NamedEventAudience;
+    /** La imagen grande firmada, o null sin imagen (#644). */
+    readonly coverUrl: string | null;
   };
   /** Los que van según la fila, que ya cuenta la respuesta propia. */
   readonly goingCount: number;
@@ -335,6 +337,7 @@ export function EventOrganizerActions({
           translate={translate}
           layout={step.target.scope}
           initialForm={step.initialForm}
+          currentCoverUrl={details.coverUrl}
           submit={(form) => submitEdit(step.target, step.initialForm, form)}
           onClosed={() => returnTo("edit")}
         />

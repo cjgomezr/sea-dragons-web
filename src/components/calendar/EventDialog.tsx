@@ -87,12 +87,15 @@ export function EventDialog({
   translate,
   layout,
   initialForm,
+  currentCoverUrl = null,
   submit,
   onClosed,
 }: {
   readonly translate: Translator;
   readonly layout: EventFormLayout;
   readonly initialForm: EventFormValues;
+  /** La imagen que ya tiene el evento que se edita; al crear no hay. */
+  readonly currentCoverUrl?: string | null;
   /** Guarda lo escrito. Si termina, el diálogo se cierra. */
   readonly submit: (form: EventFormValues) => Promise<FormSubmission>;
   /** Ya cerrado: quien lo abrió recupera el foco y lo desmonta. */
@@ -180,6 +183,7 @@ export function EventDialog({
               clubGroups={groups.groups}
               layout={layout}
               initialForm={initialForm}
+              currentCoverUrl={currentCoverUrl}
               submit={submitAndClose}
               onCancel={close}
               onSendingChange={(isSending) => {
