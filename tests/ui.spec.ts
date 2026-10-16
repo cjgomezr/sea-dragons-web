@@ -14861,7 +14861,14 @@ async function stubCalendarReads(
       const event = allEvents.find(
         (candidate) => pathname === calendarEventPath(candidate),
       );
-      return route.fulfill(jsonBody({ ...(event as object), ...opened }));
+      return route.fulfill(
+        jsonBody({
+          ...(event as object),
+          coverUrl: null,
+          series: null,
+          ...opened,
+        }),
+      );
     },
   );
   await page.route(
@@ -14912,14 +14919,17 @@ async function waitForEmptyAgenda(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
-/** Responde No al primer evento y espera el aviso del 422 en su fila. Los
- * botones están en la fila desplegada (#647). */
+/** Responde No puedo al primer evento y espera el aviso del 422 en su
+ * panel (#648). */
 async function showRsvpError(page: Page): Promise<void> {
-  await expandFirstRow(page);
-  const row = agendaRow(page, STUBBED_AGENDA_EVENTS[0].title);
-  await row.getByRole("group").getByRole("button", { name: "No" }).click();
-  // Sólo el de la fila: el anunciador de rutas de Next también es un alert.
-  await expect(row.getByRole("alert")).toBeVisible();
+  await openFirstPanel(page);
+  const panel = eventPanel(page, STUBBED_AGENDA_EVENTS[0].title);
+  await panel
+    .getByRole("group")
+    .getByRole("button", { name: /^(Can't go|No puedo)$/ })
+    .click();
+  // Sólo el del panel: el anunciador de rutas de Next también es un alert.
+  await expect(panel.getByRole("alert")).toBeVisible();
   await page.mouse.move(0, 0);
 }
 
@@ -14942,22 +14952,41 @@ function agendaRow(page: Page, title: string): Locator {
     .last();
 }
 
-/** Despliega el primer evento y espera a que su detalle esté pintado. */
-async function expandFirstRow(page: Page): Promise<void> {
-  await waitForAgendaRows(page);
-  const { title } = STUBBED_AGENDA_EVENTS[0];
-  const row = agendaRow(page, title);
-  await row.getByRole("button", { name: title }).click();
-  await expect(row.getByRole("term").first()).toBeVisible();
-  await page.mouse.move(0, 0);
+/** El panel del evento elegido (#648). */
+function eventPanel(page: Page, title: string): Locator {
+  return page.getByRole("complementary", { name: title });
 }
 
-/** Despliega el primer evento y espera a que sus equipos estén pintados. */
-async function expandFirstRowWithTeams(page: Page): Promise<void> {
-  await expandFirstRow(page);
-  const row = agendaRow(page, STUBBED_AGENDA_EVENTS[0].title);
+/** "Going · n", que sólo sale cuando el detalle ya llegó. */
+const PANEL_LOADED_HEADING = /^(Going|Van) · \d+$/;
+
+/** Elige la fila si no lo estaba y espera a que el panel tenga su detalle. */
+async function openPanelOf(page: Page, title: string): Promise<Locator> {
+  const toggle = agendaRow(page, title).getByRole("button", { name: title });
+  if ((await toggle.getAttribute("aria-current")) !== "true") {
+    await toggle.click();
+  }
+  const panel = eventPanel(page, title);
   await expect(
-    row.getByRole("list", { name: PUBLISHED_TEAMS.teams.b.name }),
+    panel.getByRole("heading", { name: PANEL_LOADED_HEADING }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+  return panel;
+}
+
+/** El primer evento llega elegido: espera a que su panel esté pintado. */
+async function openFirstPanel(page: Page): Promise<void> {
+  await waitForAgendaRows(page);
+  await openPanelOf(page, STUBBED_AGENDA_EVENTS[0].title);
+}
+
+/** Abre el primer evento y espera a que sus equipos estén pintados. */
+async function openFirstPanelWithTeams(page: Page): Promise<void> {
+  await openFirstPanel(page);
+  await expect(
+    eventPanel(page, STUBBED_AGENDA_EVENTS[0].title).getByRole("list", {
+      name: PUBLISHED_TEAMS.teams.b.name,
+    }),
   ).toBeVisible();
 }
 
@@ -14978,7 +15007,7 @@ const CALENDAR_EXPANDED_AS_PLAYER: CalendarState = {
   name: "calendario-desplegado-player",
   events: STUBBED_AGENDA_EVENTS,
   opened: PLAYER_OPENED_EVENT,
-  ready: expandFirstRow,
+  ready: openFirstPanel,
 };
 
 const CALENDAR_WITH_EVENTS: CalendarState = {
@@ -15065,27 +15094,27 @@ const CALENDAR_STATES: readonly CalendarState[] = [
     ...CALENDAR_EXPANDED_AS_PLAYER,
     name: "calendario-mi-equipo",
     teams: PUBLISHED_TEAMS,
-    ready: expandFirstRowWithTeams,
+    ready: openFirstPanelWithTeams,
   },
   {
     ...CALENDAR_EXPANDED_AS_PLAYER,
     name: "calendario-mi-equipo-es",
     teams: PUBLISHED_TEAMS,
     beforeVisit: chooseSpanish,
-    ready: expandFirstRowWithTeams,
+    ready: openFirstPanelWithTeams,
   },
   {
     ...CALENDAR_EXPANDED_AS_PLAYER,
     name: "calendario-equipos-sin-asignar",
     teams: UNASSIGNED_TEAMS,
-    ready: expandFirstRowWithTeams,
+    ready: openFirstPanelWithTeams,
   },
   {
     ...CALENDAR_EXPANDED_AS_PLAYER,
     name: "calendario-equipos-sin-asignar-es",
     teams: UNASSIGNED_TEAMS,
     beforeVisit: chooseSpanish,
-    ready: expandFirstRowWithTeams,
+    ready: openFirstPanelWithTeams,
   },
   {
     name: "calendario-sin-membresia",
@@ -15259,7 +15288,74 @@ async function filterRedesignedAgenda(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
 }
 
+// El panel del evento (#648, mockups calendar-redesign-agenda-dark.png y
+// calendar-redesign-series-edit-scope-dark.png): una cena con imagen, una
+// sesión de una serie y una competición de dos días.
+const PANEL_SOCIAL_EVENT = {
+  ...AGENDA_REDESIGN_EVENTS[1],
+  place: {
+    name: "Seadragons Clubhouse",
+    address: "12 Beach Rd, St Kilda VIC 3182",
+    lat: -37.8676,
+    lng: 144.9741,
+  },
+  location: "Seadragons Clubhouse",
+} as const;
+
+const PANEL_SERIES_EVENT = AGENDA_REDESIGN_EVENTS[0];
+
+const PANEL_MULTI_DAY_EVENT = {
+  ...AGENDA_REDESIGN_EVENTS[2],
+  title: "Winter skills camp",
+  startTime: "08:30",
+  endsOn: "2026-06-28",
+  endTime: "17:00",
+} as const;
+
+const PANEL_SERIES_OPENED = {
+  ...PLAYER_OPENED_EVENT,
+  series: { weekdays: [2, 4], endsOn: "2026-09-17", sessionsLeft: 25 },
+} as const;
+
+/** Elige el evento y espera su panel con la imagen ya cargada. */
+function choosePanelEvent(title: string): (page: Page) => Promise<void> {
+  return async (page) => {
+    await expect(
+      page.getByRole("heading", { level: 3, name: title }),
+    ).toBeVisible();
+    await openPanelOf(page, title);
+    for (const image of await page.locator(".agenda-columns img").all()) {
+      await expect(image).toHaveJSProperty("complete", true);
+    }
+  };
+}
+
+const EVENT_PANEL_STATES: readonly CalendarState[] = [
+  {
+    name: "calendario-panel-social",
+    events: [PANEL_SERIES_EVENT, PANEL_SOCIAL_EVENT],
+    opened: { ...PLAYER_OPENED_EVENT, coverUrl: STUBBED_COVER_URL },
+    beforeVisit: fixAgendaClock,
+    ready: choosePanelEvent(PANEL_SOCIAL_EVENT.title),
+  },
+  {
+    name: "calendario-panel-serie",
+    events: [PANEL_SERIES_EVENT, PANEL_SOCIAL_EVENT],
+    opened: PANEL_SERIES_OPENED,
+    beforeVisit: fixAgendaClock,
+    ready: choosePanelEvent(PANEL_SERIES_EVENT.title),
+  },
+  {
+    name: "calendario-panel-varios-dias",
+    events: [PANEL_SERIES_EVENT, PANEL_MULTI_DAY_EVENT],
+    opened: COMMITTEE_OPENED_EVENT,
+    beforeVisit: fixAgendaClock,
+    ready: choosePanelEvent(PANEL_MULTI_DAY_EVENT.title),
+  },
+];
+
 const AGENDA_REDESIGN_STATES: readonly CalendarState[] = [
+  ...EVENT_PANEL_STATES,
   {
     name: "calendario-agenda",
     events: AGENDA_REDESIGN_EVENTS,
@@ -15377,10 +15473,11 @@ test.describe("la puerta de quien no está al día (#453)", () => {
     await waitForAgendaRows(page);
 
     const { title } = STUBBED_AGENDA_EVENTS[1];
-    const row = agendaRow(page, title);
-    // Los botones están en la fila desplegada (#647).
-    await row.getByRole("button", { name: title }).click();
-    await expect(row.getByRole("button", { name: "Yes" })).toBeDisabled();
+    // Los botones están en el panel del evento elegido (#648).
+    await agendaRow(page, title).getByRole("button", { name: title }).click();
+    await expect(
+      eventPanel(page, title).getByRole("button", { name: "Going" }),
+    ).toBeDisabled();
     await expect(
       page.getByRole("link", { name: "Go to Payments" }),
     ).toBeVisible();
@@ -16648,6 +16745,8 @@ test.describe("calendario en el navegador", () => {
             myResponse: "maybe",
             goingCount: 13,
             maybeCount: 3,
+            coverUrl: null,
+            series: null,
             notes: null,
             going: [],
             maybe: [],
@@ -16664,7 +16763,9 @@ test.describe("calendario en el navegador", () => {
       "aria-pressed",
       "true",
     );
-    await expect(page.getByText("13 going · 3 maybe")).toBeVisible();
+    const panel = eventPanel(page, event.title);
+    await expect(panel.getByText("Going · 13")).toBeVisible();
+    await expect(panel.getByText("3 maybe")).toBeVisible();
     expect(sent).toEqual({ response: "maybe" });
   });
 
@@ -16715,7 +16816,7 @@ test.describe("calendario en el navegador", () => {
     await goToCalendar(page, CALENDAR_EXPANDED_AS_PLAYER);
 
     const heights = await page
-      .getByRole("button", { name: /^(Yes|Maybe|No)$/ })
+      .getByRole("button", { name: /^(Going|Maybe|Can't go)$/ })
       .evaluateAll((buttons) =>
         buttons.map((button) => button.getBoundingClientRect().height),
       );
@@ -16726,56 +16827,102 @@ test.describe("calendario en el navegador", () => {
     }
   });
 
-  test("con el teclado la fila se despliega con Enter, se pliega con Espacio y lo anuncia", async ({
+  test("con el teclado Enter elige una fila y Espacio otra, y el panel las sigue", async ({
     page,
   }) => {
-    await goToCalendar(page, CALENDAR_WITH_EVENTS);
-    const { title } = STUBBED_AGENDA_EVENTS[0];
-    const toggle = agendaRow(page, title).getByRole("button", { name: title });
-    await toggle.focus();
+    await goToCalendar(page, CALENDAR_EXPANDED_AS_PLAYER);
+    const [first, second] = STUBBED_AGENDA_EVENTS;
+    const firstToggle = agendaRow(page, first.title).getByRole("button", {
+      name: first.title,
+    });
+    const secondToggle = agendaRow(page, second.title).getByRole("button", {
+      name: second.title,
+    });
 
+    await secondToggle.focus();
     await page.keyboard.press("Enter");
 
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await expect(
-      agendaRow(page, title).getByText(PLAYER_OPENED_EVENT.going[0]),
-    ).toBeVisible();
+    await expect(secondToggle).toHaveAttribute("aria-current", "true");
+    await expect(eventPanel(page, second.title)).toBeVisible();
+    await firstToggle.focus();
     await page.keyboard.press("Space");
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(firstToggle).toHaveAttribute("aria-current", "true");
+    await expect(eventPanel(page, first.title)).toBeVisible();
   });
 
-  test("pulsar Sí en una fila desplegada no la pliega", async ({ page }) => {
+  test("al elegir otra fila la lista no se mueve", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 600 });
+    await goToCalendar(page, {
+      ...CALENDAR_EXPANDED_AS_PLAYER,
+      events: [...STUBBED_AGENDA_EVENTS, STUBBED_CANCELLED_EVENT],
+    });
+    const last = STUBBED_CANCELLED_EVENT.title;
+    const toggle = agendaRow(page, last).getByRole("button", { name: last });
+    await toggle.scrollIntoViewIfNeeded();
+    const scrolled = await page.evaluate(() => window.scrollY);
+
+    await toggle.click();
+
+    await expect(eventPanel(page, last)).toBeVisible();
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+  });
+
+  test("a 1440px el panel mide 380px y va a la derecha de la lista", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToCalendar(page, CALENDAR_EXPANDED_AS_PLAYER);
+    const panelBox = await eventPanel(
+      page,
+      STUBBED_AGENDA_EVENTS[0].title,
+    ).boundingBox();
+    const listBox = await page
+      .getByRole("list", { name: CALENDAR_HEADING })
+      .boundingBox();
+
+    expect(panelBox).not.toBeNull();
+    expect(listBox).not.toBeNull();
+    if (panelBox === null || listBox === null) {
+      return;
+    }
+    expect(panelBox.width).toBe(380);
+    expect(panelBox.x).toBeGreaterThan(listBox.x + listBox.width);
+  });
+
+  test("pulsar Voy en el panel no cambia la fila elegida", async ({ page }) => {
     await goToCalendar(page, CALENDAR_EXPANDED_AS_PLAYER);
     const { title } = STUBBED_AGENDA_EVENTS[0];
-    const row = agendaRow(page, title);
 
-    await row.getByRole("group").getByRole("button", { name: "Yes" }).click();
+    await eventPanel(page, title)
+      .getByRole("group")
+      .getByRole("button", { name: "Going" })
+      .click();
 
-    await expect(row.getByRole("button", { name: title })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
+    await expect(
+      agendaRow(page, title).getByRole("button", { name: title }),
+    ).toHaveAttribute("aria-current", "true");
   });
 
-  test("a 375px una lista de nombres larga se parte dentro de la fila", async ({
+  test("a 375px una lista de nombres larga se parte dentro del panel", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await goToCalendar(page, CALENDAR_EXPANDED_AS_PLAYER);
-    const row = agendaRow(page, STUBBED_AGENDA_EVENTS[0].title);
+    const panel = eventPanel(page, STUBBED_AGENDA_EVENTS[0].title);
+    await panel.getByRole("button", { name: "See all" }).click();
 
-    const rowBox = await row.boundingBox();
-    const namesBox = await row
+    const panelBox = await panel.boundingBox();
+    const namesBox = await panel
       .getByRole("list", { name: /^(Going|Van)$/ })
       .boundingBox();
 
-    expect(rowBox).not.toBeNull();
+    expect(panelBox).not.toBeNull();
     expect(namesBox).not.toBeNull();
-    if (rowBox === null || namesBox === null) {
+    if (panelBox === null || namesBox === null) {
       return;
     }
     expect(namesBox.x + namesBox.width).toBeLessThanOrEqual(
-      rowBox.x + rowBox.width,
+      panelBox.x + panelBox.width,
     );
     expect(namesBox.height).toBeGreaterThan(0);
   });
@@ -17070,6 +17217,11 @@ function firstAgendaRow(page: Page): Locator {
   return agendaRow(page, STUBBED_AGENDA_EVENTS[0].title);
 }
 
+/** Editar y Cancelar están en el panel del evento elegido (#648). */
+function firstEventPanel(page: Page): Locator {
+  return eventPanel(page, STUBBED_AGENDA_EVENTS[0].title);
+}
+
 async function stubEventGroups(page: Page): Promise<void> {
   await page.route(
     (url) => url.pathname === EVENT_DIALOG_GROUPS_ENDPOINT,
@@ -17079,8 +17231,8 @@ async function stubEventGroups(page: Page): Promise<void> {
 
 /** Despliega la ocurrencia y pulsa Editar: sale la elección de alcance. */
 async function showScopeChoice(page: Page): Promise<void> {
-  await expandFirstRow(page);
-  const row = firstAgendaRow(page);
+  await openFirstPanel(page);
+  const row = firstEventPanel(page);
   await row.getByRole("button", { name: ORGANIZER_EDIT }).click();
   await expect(
     row.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }),
@@ -17089,8 +17241,8 @@ async function showScopeChoice(page: Page): Promise<void> {
 }
 
 async function showSeriesCancelConfirmation(page: Page): Promise<void> {
-  await expandFirstRow(page);
-  const row = firstAgendaRow(page);
+  await openFirstPanel(page);
+  const row = firstEventPanel(page);
   await row.getByRole("button", { name: ORGANIZER_CANCEL }).click();
   await row.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }).click();
   await expect(
@@ -17101,8 +17253,8 @@ async function showSeriesCancelConfirmation(page: Page): Promise<void> {
 
 async function showEditSeriesDialog(page: Page): Promise<void> {
   await stubEventGroups(page);
-  await expandFirstRow(page);
-  const row = firstAgendaRow(page);
+  await openFirstPanel(page);
+  const row = firstEventPanel(page);
   await row.getByRole("button", { name: ORGANIZER_EDIT }).click();
   await row.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }).click();
   const dialog = page.getByRole("dialog", { name: EDIT_SERIES_DIALOG_NAME });
@@ -17129,7 +17281,7 @@ function organizerStates(
 
 const ORGANIZER_ACTIONS_STATES = organizerStates(
   "calendario-organizador-acciones",
-  expandFirstRow,
+  openFirstPanel,
 );
 const ORGANIZER_CONFIRM_STATES = organizerStates(
   "calendario-organizador-confirmar-cancelar",
@@ -17240,7 +17392,7 @@ test.describe("editar y cancelar en el navegador", () => {
         ),
     );
 
-    await firstAgendaRow(page)
+    await firstEventPanel(page)
       .getByRole("button", { name: ORGANIZER_CONFIRM_SERIES })
       .click();
 
@@ -17258,7 +17410,7 @@ test.describe("editar y cancelar en el navegador", () => {
   }) => {
     await stubEventGroups(page);
     await goToCalendar(page, ACTIONS);
-    const row = firstAgendaRow(page);
+    const row = firstEventPanel(page);
     await row.getByRole("button", { name: ORGANIZER_EDIT }).click();
     await row.getByRole("button", { name: "Only this one" }).click();
     const dialog = page.getByRole("dialog", { name: EDIT_EVENT_DIALOG_NAME });
@@ -17278,7 +17430,7 @@ test.describe("editar y cancelar en el navegador", () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await goToCalendar(page, CONFIRM);
 
-    const heights = await firstAgendaRow(page)
+    const heights = await firstEventPanel(page)
       .getByRole("group", { name: /said they're going|dijo que va|dijeron/ })
       .getByRole("button")
       .evaluateAll((buttons) =>
@@ -19214,6 +19366,13 @@ type RealNextTraining =
 
 const RSVP_BUTTON_NAMES = { yes: "Yes", maybe: "Maybe", no: "No" } as const;
 
+/** En el panel del calendario los botones dicen la respuesta entera (#648). */
+const PANEL_RSVP_BUTTON_NAMES = {
+  yes: "Going",
+  maybe: "Maybe",
+  no: "Can't go",
+} as const;
+
 test.describe("el RSVP del inicio con los datos de verdad", () => {
   skipWithoutSession();
   quietNotificationBell();
@@ -19253,15 +19412,15 @@ test.describe("el RSVP del inicio con los datos de verdad", () => {
       ).toHaveAttribute("aria-pressed", "true");
 
       await page.goto(`${APP_URL}${CALENDAR_SCREEN_PATH}`);
-      const row = page.getByRole("listitem").filter({
-        has: page.locator(`time[datetime="${training.startsOn}"]`),
-        hasText: training.title,
-      });
+      // El primero con ese título es el próximo: la agenda va por fecha.
+      await page
+        .getByRole("button", { name: training.title, exact: true })
+        .first()
+        .click();
       await expect(
-        row
-          .first()
+        eventPanel(page, training.title)
           .getByRole("group", { name: `RSVP: ${training.title}` })
-          .getByRole("button", { name: RSVP_BUTTON_NAMES[answer] }),
+          .getByRole("button", { name: PANEL_RSVP_BUTTON_NAMES[answer] }),
       ).toHaveAttribute("aria-pressed", "true");
     } finally {
       // Deja la respuesta que tenía, para que la próxima corrida parta igual.
