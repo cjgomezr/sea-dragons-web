@@ -28,6 +28,11 @@ import {
  *
  * El club sale de la fila de quien llama (NFR-009): una serie de otro club
  * no se encuentra, igual que una que no existe.
+ *
+ * Desde una sesión ("esta y las siguientes", #653, D2 del PRD de E24) la
+ * serie se parte en esa fecha: la original termina el día anterior y nace
+ * otra con los cambios. Las sesiones anteriores no cambian, aunque sean
+ * futuras.
  */
 
 /** Una serie como la ve quien la organiza. */
@@ -50,6 +55,17 @@ export type SeriesEditDraft = Omit<SeriesEdit, "place"> & {
   readonly place?: PlaceDraft | null;
 };
 
+/** Cómo terminó partir una serie desde una sesión. `edited` es la serie
+ * entera, cuando la elegida es su primera sesión; `split`, la serie nueva. */
+export type SeriesSplit =
+  | {
+      readonly kind: "edited" | "split";
+      readonly seriesId: string;
+      readonly updatedOccurrences: number;
+    }
+  | { readonly kind: "occurrence_started" }
+  | { readonly kind: "session_not_in_series" };
+
 export type ManagedSeriesGateway = {
   /** La serie, si es de ese club. */
   findSeries(query: {
@@ -64,6 +80,15 @@ export type ManagedSeriesGateway = {
     readonly seriesId: string;
     readonly changes: SeriesEdit;
   }): Promise<number>;
+  /** Parte la serie desde una sesión y aplica los cambios a la parte nueva,
+   * todo o nada, con la serie bloqueada. Con cero ocurrencias por cambiar no
+   * escribe nada. Que la sesión ya empezó lo decide la hora de la base. */
+  splitSeries(split: {
+    readonly clubId: string;
+    readonly seriesId: string;
+    readonly fromOccurrenceId: string;
+    readonly changes: SeriesEdit;
+  }): Promise<SeriesSplit>;
   /** Cancela las ocurrencias que no empezaron antes de `cancelledAt` y dice
    * cuántas. */
   cancelSeries(cancellation: {
@@ -96,6 +121,17 @@ export class SeriesNotFoundError extends Error {
   constructor() {
     super("La serie no existe.");
     this.name = "SeriesNotFoundError";
+  }
+}
+
+/** La sesión ya no es de esa serie: no lo fue nunca, o otra partición se la
+ * llevó antes. Quien edita tiene que recargar. */
+export class SessionNotInSeriesError extends Error {
+  readonly code = "session_not_in_series";
+
+  constructor() {
+    super("La sesión ya no es de esta serie: recarga y vuelve a intentarlo.");
+    this.name = "SessionNotInSeriesError";
   }
 }
 
@@ -135,6 +171,46 @@ function assertSomethingChanged(changedOccurrences: number): void {
   }
 }
 
+type WrittenSeries = {
+  readonly seriesId: string;
+  readonly updatedOccurrences: number;
+};
+
+async function splitFromOccurrence(
+  gateways: Pick<SeriesManagementGateways, "managedSeries">,
+  split: SeriesTarget & {
+    readonly fromOccurrenceId: string;
+    readonly changes: SeriesEdit;
+  },
+): Promise<WrittenSeries> {
+  const outcome = await gateways.managedSeries.splitSeries(split);
+  switch (outcome.kind) {
+    case "occurrence_started":
+      throw new EventValidationError("occurrence_started");
+    case "session_not_in_series":
+      throw new SessionNotInSeriesError();
+    default:
+      return outcome;
+  }
+}
+
+async function writeSeriesChanges(
+  gateways: Pick<SeriesManagementGateways, "managedSeries">,
+  write: SeriesTarget & {
+    readonly fromOccurrenceId: string | undefined;
+    readonly changes: SeriesEdit;
+  },
+): Promise<WrittenSeries> {
+  const { fromOccurrenceId, ...update } = write;
+  if (fromOccurrenceId !== undefined) {
+    return splitFromOccurrence(gateways, { ...update, fromOccurrenceId });
+  }
+  return {
+    seriesId: update.seriesId,
+    updatedOccurrences: await gateways.managedSeries.updateSeries(update),
+  };
+}
+
 /** Cambia la serie y sus ocurrencias futuras no canceladas, o dice por qué
  * no. Si dos organizadores guardan a la vez, queda lo del último.
  *
@@ -143,12 +219,18 @@ function assertSomethingChanged(changedOccurrences: number): void {
  * queda en una hora ya pasada. Editar una sola ocurrencia (#314) lo rechaza;
  * aquí no, porque la serie no tiene una fecha que validar.
  *
- * Si cambió la hora o el lugar, la audiencia recibe un solo aviso (#317). */
+ * Con `fromOccurrenceId` parte la serie desde esa sesión (#653) y devuelve
+ * la serie nueva; si es la primera, edita la entera. Una sesión que ya
+ * empezó es un 422 y una que ya no es de la serie, un conflicto.
+ *
+ * Si cambió la hora o el lugar, la audiencia recibe un solo aviso (#317): al
+ * partir, la de la serie nueva. */
 export async function editSeries(
   gateways: SeriesManagementGateways,
   request: {
     readonly callerId: string;
     readonly seriesId: string;
+    readonly fromOccurrenceId?: string;
     readonly changes: SeriesEditDraft;
   },
 ): Promise<EditedSeries> {
@@ -161,19 +243,23 @@ export async function editSeries(
     request.changes,
   );
   assertValidEnd(before, changes);
-  const updatedOccurrences = await gateways.managedSeries.updateSeries({
+  const written = await writeSeriesChanges(gateways, {
     ...target,
+    fromOccurrenceId: request.fromOccurrenceId,
     changes,
   });
-  assertSomethingChanged(updatedOccurrences);
-  const series = await findExistingSeries(gateways, target);
+  assertSomethingChanged(written.updatedOccurrences);
+  const series = await findExistingSeries(gateways, {
+    clubId: caller.clubId,
+    seriesId: written.seriesId,
+  });
   await announceSeriesChange(gateways, {
     clubId: caller.clubId,
     authorId: request.callerId,
     before,
     after: series,
   });
-  return { series, updatedOccurrences };
+  return { series, updatedOccurrences: written.updatedOccurrences };
 }
 
 /** Cancela las ocurrencias futuras de una serie, con la hora, sin borrar sus

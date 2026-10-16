@@ -8,6 +8,7 @@ import type {
   ManagedSeries,
   SeriesEdit,
   SeriesManagementGateways,
+  SeriesSplit,
 } from "./series-management";
 import {
   createEventManagementGateways,
@@ -27,7 +28,9 @@ import {
  * Va por la llave de servicio, como editar un evento (#314): `authenticated`
  * no puede escribir en las tablas de eventos (`0034_events.sql`). Editar pasa
  * por `update_series` (`0041_update_series.sql`), que cambia la serie, sus
- * ocurrencias futuras y sus audiencias en una sola transacción. Cancelar es
+ * ocurrencias futuras y sus audiencias en una sola transacción. Partir desde
+ * una sesión (#653) pasa por `split_series` (`0073_split_series.sql`), que
+ * hace lo mismo sobre la serie nueva en la misma transacción. Cancelar es
  * un solo `update` sobre las ocurrencias, atómico por sí mismo, y va directo
  * por PostgREST.
  */
@@ -35,6 +38,7 @@ import {
 const EVENT_SERIES_TABLE = "event_series";
 const EVENTS_TABLE = "events";
 const UPDATE_SERIES_FUNCTION = "update_series";
+const SPLIT_SERIES_FUNCTION = "split_series";
 
 const MANAGED_SERIES_COLUMNS = `id, title, event_type, start_time, end_time, location, ${PLACE_COLUMNS}, notes, audience, weekdays, starts_on, ends_on, event_series_groups(group_id)`;
 
@@ -123,6 +127,50 @@ async function updateSeries(
   return z.number().int().nonnegative().parse(data);
 }
 
+const seriesSplitSchema = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.enum(["edited", "split"]),
+    series_id: z.string(),
+    updated_occurrences: z.number().int().nonnegative(),
+  }),
+  z.object({ outcome: z.literal("occurrence_started") }),
+  z.object({ outcome: z.literal("session_not_in_series") }),
+]);
+
+function toSeriesSplit(row: z.infer<typeof seriesSplitSchema>): SeriesSplit {
+  if (row.outcome === "edited" || row.outcome === "split") {
+    return {
+      kind: row.outcome,
+      seriesId: row.series_id,
+      updatedOccurrences: row.updated_occurrences,
+    };
+  }
+  return { kind: row.outcome };
+}
+
+async function splitSeries(
+  serviceClient: SupabaseClient,
+  split: {
+    readonly clubId: string;
+    readonly seriesId: string;
+    readonly fromOccurrenceId: string;
+    readonly changes: SeriesEdit;
+  },
+): Promise<SeriesSplit> {
+  const { data, error } = await serviceClient.rpc(SPLIT_SERIES_FUNCTION, {
+    acting_club_id: split.clubId,
+    target_series_id: split.seriesId,
+    from_event_id: split.fromOccurrenceId,
+    changes: toChangesArgument(split.changes),
+  });
+  if (error) {
+    throw new Error(
+      `No se pudo partir la serie ${split.seriesId} del club ${split.clubId}: ${error.message}`,
+    );
+  }
+  return toSeriesSplit(seriesSplitSchema.parse(data));
+}
+
 async function cancelSeries(
   serviceClient: SupabaseClient,
   cancellation: {
@@ -162,6 +210,7 @@ export function createSeriesManagementGateways(
     managedSeries: {
       findSeries: (query) => findSeries(serviceClient, query),
       updateSeries: (update) => updateSeries(serviceClient, update),
+      splitSeries: (split) => splitSeries(serviceClient, split),
       cancelSeries: (cancellation) => cancelSeries(serviceClient, cancellation),
     },
   };

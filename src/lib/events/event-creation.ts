@@ -189,6 +189,7 @@ export const EVENT_ISSUE_CODES = [
   "series_without_sessions",
   "event_started",
   "event_cancelled",
+  "occurrence_started",
   "series_without_upcoming",
   "end_time_required",
   "end_before_start",
@@ -219,6 +220,8 @@ const ISSUE_MESSAGES: Readonly<Record<EventIssueCode, string>> = {
     "Con esos días y esas fechas no saldría ninguna sesión.",
   event_started: "El evento ya empezó: ya no se puede cambiar.",
   event_cancelled: "El evento está cancelado: ya no se puede cambiar.",
+  occurrence_started:
+    "La sesión ya empezó: la serie sólo se puede partir desde una sesión futura.",
   series_without_upcoming:
     "La serie no tiene sesiones futuras sin cancelar: no queda nada que cambiar.",
   end_time_required: "Indica la hora de fin del evento.",

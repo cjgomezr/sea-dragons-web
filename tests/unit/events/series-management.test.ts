@@ -5,6 +5,7 @@ import {
 } from "@/lib/events/event-creation";
 import {
   SeriesNotFoundError,
+  SessionNotInSeriesError,
   cancelSeries,
   editSeries,
 } from "@/lib/events/series-management";
@@ -12,17 +13,29 @@ import {
   CALLER_ID,
   CANCELLED_OCCURRENCE_ID,
   EDITED_OCCURRENCE_ID,
+  FRESH_FIRST_OCCURRENCE_ID,
+  FRESH_SECOND_OCCURRENCE_ID,
+  FRESH_SERIES_ID,
   type FakeManagedSeriesClubOptions,
   LEGACY_OCCURRENCE_ID,
   LEGACY_SERIES_ID,
   MASTERS_SQUAD_ID,
   MISSING_SERIES_ID,
+  NEW_SERIES_ID,
   NOW,
   PAST_OCCURRENCE_ID,
   SERIES,
   SERIES_ID,
   SPENT_OCCURRENCE_ID,
   SPENT_SERIES_ID,
+  SPLIT_CANCELLED_OCCURRENCE_ID,
+  SPLIT_EARLIER_OCCURRENCE_ID,
+  SPLIT_EDITED_OCCURRENCE_ID,
+  SPLIT_FROM_OCCURRENCE_ID,
+  SPLIT_LATER_OCCURRENCE_ID,
+  SPLIT_PAST_OCCURRENCE_ID,
+  SPLIT_SERIES,
+  SPLIT_SERIES_ID,
   UPCOMING_OCCURRENCE_ID,
   fakeManagedSeriesClub,
 } from "../helpers/managed-series-club";
@@ -476,6 +489,233 @@ describe("editar una serie: imagen (#644)", () => {
     await expect(attempt).rejects.toMatchObject({
       code: "event_cover_upload_invalid",
     });
+    expect(club.writeCount()).toBe(0);
+  });
+});
+
+const CLUB_MEMBER_ID = "a1000000-0000-4000-8000-000000000001";
+
+describe("editar una serie desde una sesión (#653)", () => {
+  const fromSession = {
+    callerId: CALLER_ID,
+    seriesId: SPLIT_SERIES_ID,
+    fromOccurrenceId: SPLIT_FROM_OCCURRENCE_ID,
+  } as const;
+
+  it("acorta la serie al día anterior y crea otra hasta el final con los cambios", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const edited = await editSeries(club.gateways, {
+      ...fromSession,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    const newSeries = {
+      ...SPLIT_SERIES,
+      id: NEW_SERIES_ID,
+      startsOn: "2027-06-22",
+      startTime: "20:00",
+      location: "Aquatic Centre",
+    };
+    expect(edited).toEqual({ series: newSeries, updatedOccurrences: 3 });
+    expect(club.series(SPLIT_SERIES_ID)).toEqual({
+      ...SPLIT_SERIES,
+      endsOn: "2027-06-21",
+    });
+    expect(club.series(NEW_SERIES_ID)).toEqual(newSeries);
+  });
+
+  it("pasa las sesiones desde la elegida a la serie nueva, con su id y los cambios", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    expect(club.occurrence(SPLIT_FROM_OCCURRENCE_ID)).toMatchObject({
+      id: SPLIT_FROM_OCCURRENCE_ID,
+      seriesId: NEW_SERIES_ID,
+      startTime: "20:00",
+      location: "Aquatic Centre",
+    });
+    expect(club.occurrence(SPLIT_LATER_OCCURRENCE_ID)).toMatchObject({
+      seriesId: NEW_SERIES_ID,
+      startTime: "20:00",
+    });
+  });
+
+  it("aplica los cambios a una sesión movida que se había editado sola", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    expect(club.occurrence(SPLIT_EDITED_OCCURRENCE_ID)).toMatchObject({
+      seriesId: NEW_SERIES_ID,
+      startTime: "20:00",
+      location: "Aquatic Centre",
+      notes: "Piscina 2",
+    });
+  });
+
+  it("deja cancelada una sesión movida que estaba cancelada", async () => {
+    const club = fakeManagedSeriesClub();
+    const cancelled = club.occurrence(SPLIT_CANCELLED_OCCURRENCE_ID);
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    expect(club.occurrence(SPLIT_CANCELLED_OCCURRENCE_ID)).toEqual({
+      ...cancelled,
+      seriesId: NEW_SERIES_ID,
+    });
+  });
+
+  it("no toca las sesiones anteriores a la elegida, futuras ni pasadas", async () => {
+    const club = fakeManagedSeriesClub();
+    const past = club.occurrence(SPLIT_PAST_OCCURRENCE_ID);
+    const earlier = club.occurrence(SPLIT_EARLIER_OCCURRENCE_ID);
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    expect(club.occurrence(SPLIT_PAST_OCCURRENCE_ID)).toEqual(past);
+    expect(club.occurrence(SPLIT_EARLIER_OCCURRENCE_ID)).toEqual(earlier);
+  });
+
+  it("conserva las respuestas de las sesiones movidas", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    expect(club.rsvps.get(SPLIT_FROM_OCCURRENCE_ID)).toEqual(["yes", "no"]);
+  });
+
+  it("edita la serie entera sin crear otra si la elegida es la primera", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const edited = await editSeries(club.gateways, {
+      callerId: CALLER_ID,
+      seriesId: FRESH_SERIES_ID,
+      fromOccurrenceId: FRESH_FIRST_OCCURRENCE_ID,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    expect(edited.series.id).toBe(FRESH_SERIES_ID);
+    expect(edited.updatedOccurrences).toBe(2);
+    expect(club.series(NEW_SERIES_ID)).toBeUndefined();
+    expect(club.occurrence(FRESH_SECOND_OCCURRENCE_ID)).toMatchObject({
+      seriesId: FRESH_SERIES_ID,
+      startTime: "20:00",
+    });
+  });
+
+  it("rechaza con 422 partir desde una sesión que ya empezó", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const attempt = editSeries(club.gateways, {
+      ...fromSession,
+      fromOccurrenceId: SPLIT_PAST_OCCURRENCE_ID,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(EventValidationError);
+    await expect(attempt).rejects.toMatchObject({ code: "occurrence_started" });
+    expect(club.series(SPLIT_SERIES_ID)).toEqual(SPLIT_SERIES);
+    expect(club.notices).toEqual([]);
+  });
+
+  it("rechaza una sesión que no es de esa serie", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const attempt = editSeries(club.gateways, {
+      ...fromSession,
+      fromOccurrenceId: UPCOMING_OCCURRENCE_ID,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(SessionNotInSeriesError);
+    expect(club.series(SPLIT_SERIES_ID)).toEqual(SPLIT_SERIES);
+  });
+
+  it("rechaza la segunda partición desde la misma sesión", async () => {
+    const club = fakeManagedSeriesClub();
+    await editSeries(club.gateways, {
+      ...fromSession,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    const attempt = editSeries(club.gateways, {
+      ...fromSession,
+      changes: { title: "Otro título" },
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(SessionNotInSeriesError);
+  });
+
+  it("parte también desde una sesión cancelada si detrás quedan sesiones por cambiar", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const attempt = editSeries(club.gateways, {
+      ...fromSession,
+      fromOccurrenceId: SPLIT_CANCELLED_OCCURRENCE_ID,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    await expect(attempt).resolves.toMatchObject({
+      series: { id: NEW_SERIES_ID },
+    });
+  });
+
+  it("avisa una sola vez a la audiencia de la serie nueva", async () => {
+    const club = fakeManagedSeriesClub({
+      clubMembers: { [CLUB_MEMBER_ID]: "active" },
+    });
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    expect(club.noticeBatches).toHaveLength(1);
+    expect(club.notices[0]).toMatchObject({
+      type: "event_series_changed",
+      data: { seriesId: NEW_SERIES_ID, startTime: "20:00" },
+    });
+  });
+
+  it("no deja partir a quien no organiza eventos, sin escribir nada", async () => {
+    const club = fakeManagedSeriesClub({ callerRole: "Player" });
+
+    const attempt = editSeries(club.gateways, {
+      ...fromSession,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(EventsForbiddenError);
+    expect(club.writeCount()).toBe(0);
+  });
+
+  it("responde que no existe a una serie que no es del club", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const attempt = editSeries(club.gateways, {
+      ...fromSession,
+      seriesId: MISSING_SERIES_ID,
+      changes: NEW_TIME_AND_PLACE,
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(SeriesNotFoundError);
     expect(club.writeCount()).toBe(0);
   });
 });
