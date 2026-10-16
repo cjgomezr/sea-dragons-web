@@ -17,8 +17,10 @@ import { eventPlaceSchema } from "@/lib/events/event-place";
 import type {
   AgendaPage,
   AgendaPeriod,
+  EventSeriesSummary,
   NamedEventAudience,
 } from "@/lib/events/event-agenda";
+import { ISO_WEEKDAYS } from "@/lib/events/event-occurrences";
 import { RSVP_RESPONSES, type RsvpResponse } from "@/lib/events/event-rsvp";
 import type { Translator } from "@/lib/i18n/translator";
 
@@ -82,9 +84,18 @@ const audienceSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
+const seriesSummarySchema = z.object({
+  weekdays: z.array(z.union(ISO_WEEKDAYS.map((day) => z.literal(day)))),
+  endsOn: z.iso.date(),
+  sessionsLeft: z.number().int().nonnegative(),
+});
+
 // La audiencia sólo le llega a Admin y Committee (RF-8): a los demás el
 // servidor no la manda.
 const openedEventSchema = z.object({
+  // La grande firmada (#644) y la repetición (#648), para el panel.
+  coverUrl: z.string().nullable(),
+  series: seriesSummarySchema.nullable(),
   notes: z.string().nullable(),
   going: z.array(z.string()),
   maybe: z.array(z.string()),
@@ -102,9 +113,11 @@ const savedRsvpResponseSchema = z.object({
 /** Lo que cambia en una fila al responder. */
 export type EventTally = z.infer<typeof tallySchema>;
 
-/** Lo que enseña una fila desplegada (#312). `audience` es nula para quien
- * no organiza: no la puede ver. */
+/** Lo que enseña el panel de un evento (#312, #648) además de lo que trae la
+ * agenda. `audience` es nula para quien no organiza: no la puede ver. */
 export type OpenedEvent = {
+  readonly coverUrl: string | null;
+  readonly series: EventSeriesSummary | null;
   readonly notes: string | null;
   readonly going: readonly string[];
   readonly maybe: readonly string[];

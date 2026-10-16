@@ -1546,7 +1546,6 @@ export const englishMessages = {
   "calendar.panel.goingHeading": "Going · {count}",
   "calendar.panel.moreGoing": "+{count} more",
   "calendar.panel.seeAll": "See all",
-  "calendar.panel.hideAll": "Hide names",
   "calendar.teams.heading": "Teams",
   "calendar.teams.playingIn":
     "You're playing in {team}, colour {color}, as {position}.",

@@ -6,10 +6,10 @@ import {
 } from "./agenda-client";
 
 /**
- * Si una fila de la agenda está desplegada y qué enseña (#312, RF-8). El
- * detalle se pide la primera vez que se despliega, no con la agenda: traer el
- * de los 50 eventos de golpe sería pedir 50 veces lo que casi nadie abre. Una
- * vez traído se guarda, y plegar y volver a desplegar no pide otra vez.
+ * El detalle de un evento de la agenda (#312, RF-8), que enseña su panel
+ * (#648). Se pide la primera vez que se elige su fila, no con la agenda:
+ * traer el de los 50 eventos de golpe sería pedir 50 veces lo que casi nadie
+ * abre. Una vez traído se guarda, y volver a elegir la fila no pide otra vez.
  */
 
 export type EventDetailState =
@@ -19,17 +19,16 @@ export type EventDetailState =
   | { readonly kind: "loaded"; readonly opened: OpenedEvent };
 
 export function useEventDetail(eventId: string): {
-  readonly isExpanded: boolean;
   readonly detail: EventDetailState;
-  readonly toggle: () => void;
+  /** Pide el detalle si todavía no se pidió. */
+  readonly open: () => void;
   readonly retry: () => void;
   /** Un detalle más nuevo que llegó por otro camino, como tras responder. */
   readonly receive: (opened: OpenedEvent) => void;
 } {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [detail, setDetail] = useState<EventDetailState>({ kind: "idle" });
-  // Como en el RSVP: el estado tarda un render, la ref corta ya el segundo
-  // despliegue mientras el primero sigue pidiendo.
+  // Como en el RSVP: el estado tarda un render, la ref corta ya la segunda
+  // petición mientras la primera sigue en curso.
   const isLoadingRef = useRef(false);
   // Sube con cada detalle que llega por otro camino: una petición que sale
   // antes y vuelve después trae nombres más viejos y no se pinta.
@@ -54,18 +53,13 @@ export function useEventDetail(eventId: string): {
     );
   }
 
-  function toggle(): void {
-    const willExpand = !isExpanded;
-    setIsExpanded(willExpand);
-    if (willExpand && detail.kind === "idle") {
-      void load();
-    }
-  }
-
   return {
-    isExpanded,
     detail,
-    toggle,
+    open: () => {
+      if (detail.kind === "idle") {
+        void load();
+      }
+    },
     retry: () => void load(),
     receive: (opened) => {
       versionRef.current += 1;

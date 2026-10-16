@@ -1552,7 +1552,6 @@ export const spanishMessages: MessageCatalog = {
   "calendar.panel.goingHeading": "Van · {count}",
   "calendar.panel.moreGoing": "+{count} más",
   "calendar.panel.seeAll": "Ver todos",
-  "calendar.panel.hideAll": "Ocultar nombres",
   "calendar.teams.heading": "Equipos",
   "calendar.teams.playingIn":
     "Juegas en {team}, de color {color}, como {position}.",

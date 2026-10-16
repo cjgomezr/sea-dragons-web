@@ -7,7 +7,7 @@ import type { Locale } from "@/lib/i18n/locale";
 import type { MyTeam } from "@/lib/teams/my-team";
 
 /**
- * El equipo de quien mira dentro del evento desplegado (#403, RF-8 del PRD de
+ * El equipo de quien mira dentro del panel del evento (#403, RF-8 del PRD de
  * E10, FR-048, AC-020): la tarjeta "Juegas en {equipo}" y la alineación de
  * los dos equipos, sin un OVR (D3). Quién juega dónde lo decide el servidor
  * (#401); aquí se prueba que la pantalla pinta lo que responde.
@@ -120,20 +120,27 @@ function detailOf(event: AgendaEvent): MemberEventDetail {
   };
 }
 
-/** La agenda con un evento, su detalle y lo que responda su equipo. */
-function stubEvent(event: AgendaEvent, team: TeamReply): void {
+/** La agenda con un evento, su detalle y lo que responda su equipo. Los
+ * eventos de `others` van detrás en la agenda y sólo sirven su detalle. */
+function stubEvent(
+  event: AgendaEvent,
+  team: TeamReply,
+  others: readonly AgendaEvent[] = [],
+): void {
+  const events = [event, ...others];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string) => {
       const { pathname } = new URL(input, "http://localhost");
       requestedPaths.push(pathname);
       if (pathname === AGENDA_PATH) {
-        return jsonResponse(200, {
-          data: { events: [event], nextCursor: null },
-        });
+        return jsonResponse(200, { data: { events, nextCursor: null } });
       }
-      if (pathname === `${AGENDA_PATH}/${event.id}`) {
-        return jsonResponse(200, { data: detailOf(event) });
+      const opened = events.find(
+        (candidate) => pathname === `${AGENDA_PATH}/${candidate.id}`,
+      );
+      if (opened !== undefined) {
+        return jsonResponse(200, { data: detailOf(opened) });
       }
       if (pathname === `${AGENDA_PATH}/${event.id}/team`) {
         return team === "fails"
@@ -147,10 +154,7 @@ function stubEvent(event: AgendaEvent, team: TeamReply): void {
   );
 }
 
-async function expandEvent(
-  event: AgendaEvent,
-  locale: Locale = "en",
-): Promise<HTMLElement> {
+function renderAgenda(locale: Locale = "en"): void {
   render(
     <AgendaScreen
       locale={locale}
@@ -159,13 +163,36 @@ async function expandEvent(
       canRespond
     />,
   );
-  const heading = await screen.findByRole("heading", { name: event.title });
-  await userEvent.click(within(heading).getByRole("button"));
-  const row = heading.closest("li");
-  if (row === null) {
-    throw new Error(`La fila de ${event.title} no es un elemento de la lista.`);
+}
+
+/** Elige la fila del evento si no lo está ya (la primera se elige sola al
+ * cargar) y devuelve su panel con el detalle llegado: los que van sólo se
+ * pintan con el detalle, en inglés y en español. */
+async function selectEvent(event: AgendaEvent): Promise<HTMLElement> {
+  const heading = await screen.findByRole("heading", {
+    level: 3,
+    name: event.title,
+  });
+  const button = within(heading).getByRole("button");
+  if (button.getAttribute("aria-current") !== "true") {
+    await userEvent.click(button);
   }
-  return row;
+  const panel = await screen.findByRole("complementary", {
+    name: event.title,
+  });
+  await within(panel).findByRole("heading", {
+    level: 3,
+    name: /^(Going|Van) · \d+$/,
+  });
+  return panel;
+}
+
+async function openPanel(
+  event: AgendaEvent,
+  locale: Locale = "en",
+): Promise<HTMLElement> {
+  renderAgenda(locale);
+  return selectEvent(event);
 }
 
 afterEach(() => {
@@ -173,14 +200,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("el equipo en el evento desplegado", () => {
+describe("el equipo en el panel del evento", () => {
   it("dice en qué equipo juega quien mira, con su color y su posición, como una frase", async () => {
     stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
 
-    const row = await expandEvent(SCRIMMAGE);
+    const panel = await openPanel(SCRIMMAGE);
 
     expect(
-      await within(row).findByText(
+      await within(panel).findByText(
         "You're playing in Team Kelp, colour blue, as Forward.",
       ),
     ).toBeInTheDocument();
@@ -189,9 +216,9 @@ describe("el equipo en el evento desplegado", () => {
   it("pinta la tarjeta con el color del equipo", async () => {
     stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
 
-    const row = await expandEvent(SCRIMMAGE);
+    const panel = await openPanel(SCRIMMAGE);
 
-    const sentence = await within(row).findByText(
+    const sentence = await within(panel).findByText(
       "You're playing in Team Kelp, colour blue, as Forward.",
     );
     const card = sentence.closest(".event-my-team");
@@ -201,10 +228,10 @@ describe("el equipo en el evento desplegado", () => {
   it("pone la alineación de los dos equipos con el nombre y la posición de cada uno", async () => {
     stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
 
-    const row = await expandEvent(SCRIMMAGE);
+    const panel = await openPanel(SCRIMMAGE);
 
-    const kelp = await within(row).findByRole("list", { name: "Team Kelp" });
-    const tide = within(row).getByRole("list", { name: "Team Tide" });
+    const kelp = await within(panel).findByRole("list", { name: "Team Kelp" });
+    const tide = within(panel).getByRole("list", { name: "Team Tide" });
     expect(
       within(kelp)
         .getAllByRole("listitem")
@@ -220,69 +247,69 @@ describe("el equipo en el evento desplegado", () => {
   it("no enseña ningún OVR ni marca de sin evaluar", async () => {
     stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
 
-    const row = await expandEvent(SCRIMMAGE);
+    const panel = await openPanel(SCRIMMAGE);
 
-    await within(row).findByRole("list", { name: "Team Kelp" });
-    expect(row).not.toHaveTextContent(/OVR|unrated|not rated|\d\.\d/i);
+    await within(panel).findByRole("list", { name: "Team Kelp" });
+    expect(panel).not.toHaveTextContent(/OVR|unrated|not rated|\d\.\d/i);
   });
 
   it("a quien no está en ningún equipo le enseña la alineación y se lo dice", async () => {
     stubEvent(SCRIMMAGE, NOT_ASSIGNED);
 
-    const row = await expandEvent(SCRIMMAGE);
+    const panel = await openPanel(SCRIMMAGE);
 
     expect(
-      await within(row).findByText("You're not in either team for this event."),
+      await within(panel).findByText(
+        "You're not in either team for this event.",
+      ),
     ).toBeInTheDocument();
-    expect(within(row).queryByText(/^You're playing in/)).toBeNull();
+    expect(within(panel).queryByText(/^You're playing in/)).toBeNull();
     expect(
-      within(row).getByRole("list", { name: "Team Kelp" }),
+      within(panel).getByRole("list", { name: "Team Kelp" }),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole("list", { name: "Team Tide" }),
+      within(panel).getByRole("list", { name: "Team Tide" }),
     ).toBeInTheDocument();
   });
 
   it("no enseña nada de equipos si el reparto no está publicado", async () => {
     stubEvent(SCRIMMAGE, NOT_PUBLISHED);
 
-    const row = await expandEvent(SCRIMMAGE);
+    const panel = await openPanel(SCRIMMAGE);
 
-    await within(row).findByText("This event has no notes.");
     await vi.waitFor(() =>
       expect(requestedPaths).toContain(`${AGENDA_PATH}/${SCRIMMAGE.id}/team`),
     );
-    expect(within(row).queryByRole("heading", { name: "Teams" })).toBeNull();
-    expect(within(row).queryByText(/playing in|either team/)).toBeNull();
+    expect(within(panel).queryByRole("heading", { name: "Teams" })).toBeNull();
+    expect(within(panel).queryByText(/playing in|either team/)).toBeNull();
   });
 
   it("marca la alineación de un evento cancelado", async () => {
     stubEvent(CANCELLED_SCRIMMAGE, PLAYING_IN_KELP);
 
-    const row = await expandEvent(CANCELLED_SCRIMMAGE);
+    const panel = await openPanel(CANCELLED_SCRIMMAGE);
 
-    const teams = await within(row).findByRole("region", { name: "Teams" });
+    const teams = await within(panel).findByRole("region", { name: "Teams" });
     expect(within(teams).getByText("Cancelled")).toBeInTheDocument();
   });
 
   it("no pide equipos de un evento que no se arma, como un social", async () => {
     stubEvent(SOCIAL, PLAYING_IN_KELP);
 
-    const row = await expandEvent(SOCIAL);
+    await openPanel(SOCIAL);
 
-    await within(row).findByText("This event has no notes.");
     expect(requestedPaths).not.toContain(`${AGENDA_PATH}/${SOCIAL.id}/team`);
   });
 
-  it("pide los equipos una sola vez aunque se pliegue y se vuelva a desplegar", async () => {
-    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
-    const row = await expandEvent(SCRIMMAGE);
-    await within(row).findByRole("list", { name: "Team Kelp" });
-    const toggle = within(row).getByRole("button", { name: SCRIMMAGE.title });
+  it("pide los equipos una sola vez aunque se elija otro evento y se vuelva a elegir", async () => {
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP, [SOCIAL]);
+    const panel = await openPanel(SCRIMMAGE);
+    await within(panel).findByRole("list", { name: "Team Kelp" });
 
-    await userEvent.click(toggle);
-    await userEvent.click(toggle);
+    await selectEvent(SOCIAL);
+    const again = await selectEvent(SCRIMMAGE);
 
+    await within(again).findByRole("list", { name: "Team Kelp" });
     expect(
       requestedPaths.filter(
         (path) => path === `${AGENDA_PATH}/${SCRIMMAGE.id}/team`,
@@ -292,36 +319,36 @@ describe("el equipo en el evento desplegado", () => {
 
   it("si los equipos no llegan lo dice y deja reintentar", async () => {
     stubEvent(SCRIMMAGE, "fails");
-    const row = await expandEvent(SCRIMMAGE);
+    const panel = await openPanel(SCRIMMAGE);
     expect(
-      await within(row).findByText("The teams could not be loaded."),
+      await within(panel).findByText("The teams could not be loaded."),
     ).toBeInTheDocument();
     stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
 
     await userEvent.click(
-      within(row).getByRole("button", { name: "Load the teams again" }),
+      within(panel).getByRole("button", { name: "Load the teams again" }),
     );
 
     expect(
-      await within(row).findByRole("list", { name: "Team Kelp" }),
+      await within(panel).findByRole("list", { name: "Team Kelp" }),
     ).toBeInTheDocument();
   });
 
   it("lo cuenta en español", async () => {
     stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
 
-    const row = await expandEvent(SCRIMMAGE, "es");
+    const panel = await openPanel(SCRIMMAGE, "es");
 
     expect(
-      await within(row).findByText(
+      await within(panel).findByText(
         "Juegas en Team Kelp, de color azul, como Delantero.",
       ),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole("region", { name: "Equipos" }),
+      within(panel).getByRole("region", { name: "Equipos" }),
     ).toBeInTheDocument();
     expect(
-      within(within(row).getByRole("list", { name: "Team Tide" }))
+      within(within(panel).getByRole("list", { name: "Team Tide" }))
         .getAllByRole("listitem")
         .map((item) => item.textContent),
     ).toEqual(["Ethan BrownSin posición", "Valentina GómezPortero"]);
@@ -330,10 +357,10 @@ describe("el equipo en el evento desplegado", () => {
   it("dice en español que no está en ningún equipo", async () => {
     stubEvent(SCRIMMAGE, NOT_ASSIGNED);
 
-    const row = await expandEvent(SCRIMMAGE, "es");
+    const panel = await openPanel(SCRIMMAGE, "es");
 
     expect(
-      await within(row).findByText(
+      await within(panel).findByText(
         "No estás en ninguno de los equipos de este evento.",
       ),
     ).toBeInTheDocument();
@@ -345,10 +372,10 @@ describe("el equipo en el evento desplegado", () => {
       me: { team: "b", position: null },
     });
 
-    const row = await expandEvent(SCRIMMAGE);
+    const panel = await openPanel(SCRIMMAGE);
 
     expect(
-      await within(row).findByText(
+      await within(panel).findByText(
         "You're playing in Team Tide, colour yellow, with no position.",
       ),
     ).toBeInTheDocument();
