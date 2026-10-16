@@ -291,8 +291,8 @@ describeRls("el levy por el webhook contra la base", () => {
           quantity,
           card: null,
         });
-        const first = purchaseOf(3, "M", "2026-10-15T09:00:00.000Z");
-        const second = purchaseOf(2, null, "2026-10-16T09:00:00.000Z");
+        const first = purchaseOf(3, "M", "2026-10-16T09:00:00.000Z");
+        const second = purchaseOf(2, null, "2026-10-15T09:00:00.000Z");
         try {
           await gateway.applyLevyPayment(first);
           await gateway.applyLevyPayment(second);
