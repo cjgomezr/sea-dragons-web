@@ -198,18 +198,18 @@ describe("?nuevo= desde el inicio (#426)", () => {
     await renderAs("Admin", { nuevo: "training" });
 
     const dialog = await screen.findByRole("dialog", { name: "New event" });
-    expect(within(dialog).getByRole("combobox", { name: "Type" })).toHaveValue(
-      "training",
-    );
+    expect(
+      await within(dialog).findByRole("radio", { name: "Training" }),
+    ).toBeChecked();
   });
 
   it("elige el tipo que nombra el parámetro", async () => {
     await renderAs("Committee", { nuevo: "meeting" });
 
     const dialog = await screen.findByRole("dialog", { name: "New event" });
-    expect(within(dialog).getByRole("combobox", { name: "Type" })).toHaveValue(
-      "meeting",
-    );
+    expect(
+      await within(dialog).findByRole("radio", { name: "Meeting" }),
+    ).toBeChecked();
   });
 
   it("no abre nada a quien no puede crear eventos", async () => {

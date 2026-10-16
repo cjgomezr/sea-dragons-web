@@ -11391,7 +11391,11 @@ a.auth-brand-header:focus-visible {
 }
 
 .event-form-type-meeting:has(input:checked) {
-  background: color-mix(in srgb, var(--color-type-meeting) 24%, var(--color-panel));
+  background: color-mix(
+    in srgb,
+    var(--color-type-meeting) 24%,
+    var(--color-panel)
+  );
   border-color: var(--color-type-meeting);
 }
 
