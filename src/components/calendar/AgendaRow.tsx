@@ -303,7 +303,7 @@ export function AgendaRow({
             aria-controls={detailId}
             onClick={toggleRow}
           >
-            {event.title}
+            <span className="agenda-title-text">{event.title}</span>
             <span className="agenda-chevron" aria-hidden="true" />
           </button>
         </h3>
