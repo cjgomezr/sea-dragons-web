@@ -5,6 +5,7 @@ import type {
   ManagedSeries,
   SeriesEdit,
   SeriesManagementGateways,
+  SeriesReschedule,
   SeriesSplit,
 } from "@/lib/events/series-management";
 import { clubMoment } from "@/lib/time/club-calendar";
@@ -56,6 +57,10 @@ export const SPLIT_CANCELLED_OCCURRENCE_ID =
 export const SPLIT_EDITED_OCCURRENCE_ID =
   "f5f5f5f5-0000-4000-8000-00000000000f";
 export const SPLIT_LATER_OCCURRENCE_ID = "f6f6f6f6-0000-4000-8000-00000000000f";
+/** Un viernes cancelado cuando la serie dejó de ir los viernes (#654), con
+ * una hora vieja: si vuelve, vuelve con la de la serie. */
+export const SPLIT_DROPPED_FRIDAY_OCCURRENCE_ID =
+  "f9f9f9f9-0000-4000-8000-00000000000f";
 /** El id que recibe la serie que nace al partir. */
 export const NEW_SERIES_ID = "c7c7c7c7-0000-4000-8000-00000000000c";
 /** Una serie que todavía no empezó: partir desde su primera sesión la edita
@@ -201,6 +206,15 @@ function splitOccurrences(): readonly ManagedEvent[] {
       id: SPLIT_LATER_OCCURRENCE_ID,
       startsOn: "2027-07-01",
     }),
+    {
+      ...occurrenceOf(SPLIT_SERIES, {
+        id: SPLIT_DROPPED_FRIDAY_OCCURRENCE_ID,
+        startsOn: "2027-07-02",
+      }),
+      startTime: "18:00",
+      status: "cancelled",
+      cancelledAt: "2027-06-01T00:00:00.000Z",
+    },
     occurrenceOf(FRESH_SERIES, {
       id: FRESH_FIRST_OCCURRENCE_ID,
       startsOn: "2027-06-22",
@@ -223,6 +237,8 @@ export type FakeManagedSeriesClub = FakeNotices & {
   readonly gateways: SeriesManagementGateways;
   series(id: string): ManagedSeries | undefined;
   occurrence(id: string): ManagedEvent | undefined;
+  /** Las sesiones de una serie, por fecha. */
+  occurrencesOf(seriesId: string): readonly ManagedEvent[];
   /** Las respuestas de cada ocurrencia, que editar y cancelar no tocan. */
   readonly rsvps: ReadonlyMap<string, readonly string[]>;
   /** Cuántas escrituras llegaron al adaptador. */
@@ -271,17 +287,78 @@ function dayBefore(day: string): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** Lo que hace `split_series` con días o fecha final nuevos (#654): cancela
+ * las sesiones que ya no encajan, reactiva las canceladas de una fecha nueva
+ * con los campos de la serie y crea las que faltan. Dice cuántas canceló. */
+function rescheduleStoredSeries(
+  store: SeriesStore,
+  reschedule: SeriesReschedule & {
+    readonly seriesId: string;
+    readonly fromDay: string;
+  },
+): number {
+  const series = store.allSeries.get(reschedule.seriesId);
+  if (series === undefined) {
+    return 0;
+  }
+  const { weekdays, endsOn, sessionDates, addedDates } = reschedule;
+  store.allSeries.set(series.id, { ...series, weekdays, endsOn });
+  const following = [...store.occurrences.values()].filter(
+    (event) =>
+      event.seriesId === series.id && event.startsOn >= reschedule.fromDay,
+  );
+  const leaving = following.filter(
+    (event) => isOpen(event, NOW) && !sessionDates.includes(event.startsOn),
+  );
+  for (const event of leaving) {
+    store.occurrences.set(event.id, {
+      ...event,
+      status: "cancelled",
+      cancelledAt: NOW.toISOString(),
+    });
+  }
+  for (const startsOn of addedDates) {
+    const existing = following.find((event) => event.startsOn === startsOn);
+    if (existing === undefined || existing.status === "cancelled") {
+      const id = existing?.id ?? crypto.randomUUID();
+      store.occurrences.set(id, occurrenceOf(series, { id, startsOn }));
+    }
+  }
+  return leaving.length;
+}
+
+type StoredSplit = {
+  readonly clubId: string;
+  readonly seriesId: string;
+  readonly fromOccurrenceId: string;
+  readonly changes: SeriesEdit;
+  readonly schedule: SeriesReschedule | null;
+};
+
+/** Reprograma si hace falta y aplica los cambios a las abiertas. */
+function writeStoredSplit(
+  store: SeriesStore,
+  split: StoredSplit & { readonly fromDay: string },
+): number {
+  const cancelled =
+    split.schedule === null
+      ? 0
+      : rescheduleStoredSeries(store, {
+          ...split.schedule,
+          seriesId: split.seriesId,
+          fromDay: split.fromDay,
+        });
+  return (
+    cancelled + applyToOpenOccurrences(store, split.seriesId, split.changes)
+  );
+}
+
 /** Lo que hace `split_series` (#653): mueve a una serie nueva las ocurrencias
  * desde la elegida y le aplica los cambios, o edita la entera si la elegida
  * es la primera. */
 function splitStoredSeries(
   store: SeriesStore,
-  split: {
-    readonly clubId: string;
-    readonly seriesId: string;
-    readonly fromOccurrenceId: string;
-    readonly changes: SeriesEdit;
-  },
+  split: StoredSplit,
 ): SeriesSplit {
   const series = store.allSeries.get(split.seriesId);
   const from = store.occurrences.get(split.fromOccurrenceId);
@@ -308,14 +385,14 @@ function splitStoredSeries(
     return {
       kind: "edited",
       seriesId: split.seriesId,
-      updatedOccurrences: applyToOpenOccurrences(
-        store,
-        split.seriesId,
-        split.changes,
-      ),
+      updatedOccurrences: writeStoredSplit(store, {
+        ...split,
+        fromDay: from.startsOn,
+      }),
     };
   }
-  if (!moved.some((event) => isOpen(event, NOW))) {
+  const isAddingSessions = (split.schedule?.addedDates.length ?? 0) > 0;
+  if (!isAddingSessions && !moved.some((event) => isOpen(event, NOW))) {
     return { kind: "edited", seriesId: split.seriesId, updatedOccurrences: 0 };
   }
   store.allSeries.set(split.seriesId, {
@@ -333,11 +410,11 @@ function splitStoredSeries(
   return {
     kind: "split",
     seriesId: NEW_SERIES_ID,
-    updatedOccurrences: applyToOpenOccurrences(
-      store,
-      NEW_SERIES_ID,
-      split.changes,
-    ),
+    updatedOccurrences: writeStoredSplit(store, {
+      ...split,
+      seriesId: NEW_SERIES_ID,
+      fromDay: from.startsOn,
+    }),
   };
 }
 
@@ -399,6 +476,12 @@ export function fakeManagedSeriesClub(
     managedSeries: {
       findSeries: async ({ clubId, seriesId }) =>
         (clubId === CLUB_ID ? allSeries.get(seriesId) : undefined) ?? null,
+      findSessionDay: async ({ clubId, seriesId, occurrenceId }) => {
+        const session = occurrences.get(occurrenceId);
+        return clubId === CLUB_ID && session?.seriesId === seriesId
+          ? session.startsOn
+          : null;
+      },
       updateSeries: async ({ seriesId, changes }) => {
         startWrite();
         return applyToOpenOccurrences(store, seriesId, changes);
@@ -425,6 +508,10 @@ export function fakeManagedSeriesClub(
     gateways,
     series: (id) => allSeries.get(id),
     occurrence: (id) => occurrences.get(id),
+    occurrencesOf: (seriesId) =>
+      [...occurrences.values()]
+        .filter((event) => event.seriesId === seriesId)
+        .sort((first, second) => first.startsOn.localeCompare(second.startsOn)),
     rsvps,
     writeCount: () => writes,
     notices,

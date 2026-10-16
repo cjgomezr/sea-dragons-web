@@ -131,6 +131,8 @@ const eventSeriesChangedData = z.object({
   seriesId: z.uuid(),
   title: z.string().min(1),
   weekdays: seriesWeekdays,
+  // Los avisos guardados antes de #654 no lo traen.
+  endsOn,
   startTime: clockTime,
   endTime,
   location: z.string().min(1),
@@ -163,6 +165,25 @@ const membershipRenewalUpcomingData = z.object({
     .object({ brand: z.string().min(1), last4: z.string().regex(/^\d{4}$/) })
     .nullable(),
 });
+
+function describeSeriesChangedBody(
+  translate: Translator,
+  series: z.infer<typeof eventSeriesChangedData>,
+): string {
+  const { locale } = translate;
+  const params = {
+    title: series.title,
+    weekdays: formatWeekdays(locale, series.weekdays),
+    time: formatClockRange(locale, series.startTime, series.endTime),
+    location: describeWhere(series.location, series.address),
+  };
+  return series.endsOn === null
+    ? translate("notifications.event_series_changed.body", params)
+    : translate("notifications.event_series_changed.bodyWithEnd", {
+        ...params,
+        endsOn: formatCalendarDay(locale, series.endsOn),
+      });
+}
 
 function describeSeriesCreatedBody(
   translate: Translator,
@@ -310,16 +331,9 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
       if (!parsed.success) {
         return null;
       }
-      const series = parsed.data;
-      const { locale } = translate;
       return {
         title: translate("notifications.event_series_changed.title"),
-        body: translate("notifications.event_series_changed.body", {
-          title: series.title,
-          weekdays: formatWeekdays(locale, series.weekdays),
-          time: formatClockRange(locale, series.startTime, series.endTime),
-          location: describeWhere(series.location, series.address),
-        }),
+        body: describeSeriesChangedBody(translate, parsed.data),
       };
     },
     event_series_cancelled: (translate, data) => {

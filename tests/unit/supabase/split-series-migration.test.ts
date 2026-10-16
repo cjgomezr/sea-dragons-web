@@ -149,8 +149,22 @@ type SplitTarget = {
   readonly fromId: string;
 };
 
-function splitSeriesCall(target: SplitTarget, changes: object): string {
-  return `select public.split_series('${target.clubId}', '${target.seriesId}', '${target.fromId}', '${JSON.stringify(changes)}'::jsonb)`;
+/** Los días y la fecha final nuevos, como los manda el servidor (#654). */
+type ScheduleArgument = {
+  readonly weekdays: readonly number[];
+  readonly ends_on: string;
+  readonly session_dates: readonly string[];
+  readonly added_dates: readonly string[];
+};
+
+function splitSeriesCall(
+  target: SplitTarget,
+  changes: object,
+  schedule?: ScheduleArgument,
+): string {
+  const scheduleArgument =
+    schedule === undefined ? "" : `, '${JSON.stringify(schedule)}'::jsonb`;
+  return `select public.split_series('${target.clubId}', '${target.seriesId}', '${target.fromId}', '${JSON.stringify(changes)}'::jsonb${scheduleArgument})`;
 }
 
 type SplitOutcome = {
@@ -163,9 +177,10 @@ async function splitSeries(
   database: TemporaryDatabase,
   target: SplitTarget,
   changes: object,
+  schedule?: ScheduleArgument,
 ): Promise<SplitOutcome> {
   return JSON.parse(
-    await database.query(splitSeriesCall(target, changes)),
+    await database.query(splitSeriesCall(target, changes, schedule)),
   ) as SplitOutcome;
 }
 
@@ -532,9 +547,399 @@ describeConPostgres("quién puede partir series en la base", () => {
         where r.rolname in ('anon', 'authenticated', 'service_role')
           and has_function_privilege(
                 r.rolname,
-                'public.split_series(uuid, uuid, uuid, jsonb)', 'execute')`,
+                'public.split_series(uuid, uuid, uuid, jsonb, jsonb)', 'execute')`,
     );
 
     expect(grantees).toBe("service_role");
   });
+
+  it("nadie ejecuta reschedule_series_sessions desde fuera", async () => {
+    const database = await migratedDatabase();
+
+    const grantees = await database.query(
+      `select count(*)
+         from pg_roles r
+        where r.rolname in ('anon', 'authenticated', 'service_role')
+          and has_function_privilege(
+                r.rolname,
+                'public.reschedule_series_sessions(uuid, uuid, date, jsonb)',
+                'execute')`,
+    );
+
+    expect(grantees).toBe("0");
+  });
+
+  it("no deja la versión de cuatro argumentos al lado de la nueva", async () => {
+    const database = await migratedDatabase();
+
+    const versions = await database.query(
+      `select count(*) from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'split_series'`,
+    );
+
+    expect(versions).toBe("1");
+  });
 });
+
+/** La fecha de dentro de tantos días, en `YYYY-MM-DD`. */
+function dayFromToday(
+  database: TemporaryDatabase,
+  daysFromToday: number,
+): Promise<string> {
+  return database.query(`select (current_date + ${daysFromToday})::text`);
+}
+
+async function daysFromToday(
+  database: TemporaryDatabase,
+  offsets: readonly number[],
+): Promise<readonly string[]> {
+  return Promise.all(offsets.map((offset) => dayFromToday(database, offset)));
+}
+
+/** El horario nuevo desde la elegida (en 7 días), con fechas en días desde
+ * hoy. */
+async function scheduleOf(
+  database: TemporaryDatabase,
+  plan: {
+    readonly weekdays: readonly number[];
+    readonly endsIn: number;
+    readonly sessions: readonly number[];
+    readonly added: readonly number[];
+  },
+): Promise<ScheduleArgument> {
+  return {
+    weekdays: plan.weekdays,
+    ends_on: await dayFromToday(database, plan.endsIn),
+    session_dates: await daysFromToday(database, plan.sessions),
+    added_dates: await daysFromToday(database, plan.added),
+  };
+}
+
+function rsvpCount(
+  database: TemporaryDatabase,
+  eventId: string,
+): Promise<string> {
+  return database.query(
+    `select count(*) from public.event_rsvps where event_id = '${eventId}'`,
+  );
+}
+
+/** Las sesiones de una serie en una fecha, con su estado. */
+function sessionsOn(
+  database: TemporaryDatabase,
+  seriesId: string,
+  daysFromNow: number,
+): Promise<string> {
+  return database.query(
+    `select coalesce(string_agg(status, ','), '')
+       from public.events
+      where series_id = '${seriesId}'
+        and starts_on = current_date + ${daysFromNow}`,
+  );
+}
+
+describeConPostgres(
+  "partir una serie con otros días o fecha final (#654)",
+  () => {
+    it("cancela las sesiones movidas que ya no caen en las fechas, sin borrarlas ni sus respuestas", async () => {
+      const database = await migratedDatabase();
+      const world = await seedWorld(database);
+      const schedule = await scheduleOf(database, {
+        weekdays: [1, 2],
+        endsIn: 60,
+        sessions: [7, 21],
+        added: [],
+      });
+
+      const split = await splitSeries(
+        database,
+        fromChosen(world),
+        {},
+        schedule,
+      );
+
+      const newId = String(split.series_id);
+      expect(split).toMatchObject({ outcome: "split", updated_occurrences: 3 });
+      await expect(describeOccurrence(database, world.editedId)).resolves.toBe(
+        `${newId}|Entrenamiento|18:30:00|MSAC|Piscina 2|cancelled|${world.seniorSquad}`,
+      );
+      await expect(rsvpCount(database, world.editedId)).resolves.toBe("1");
+      await expect(sessionsOn(database, newId, 21)).resolves.toBe("scheduled");
+    });
+
+    it("guarda los días y la fecha final nuevos en la serie nueva, no en la original", async () => {
+      const database = await migratedDatabase();
+      const world = await seedWorld(database);
+      const schedule = await scheduleOf(database, {
+        weekdays: [1, 4],
+        endsIn: 40,
+        sessions: [7, 14, 21],
+        added: [],
+      });
+
+      const split = await splitSeries(
+        database,
+        fromChosen(world),
+        {},
+        schedule,
+      );
+
+      await expect(
+        describeSeries(database, String(split.series_id)),
+      ).resolves.toBe(
+        `Entrenamiento|19:00:00|MSAC|{1,4}|7|40|${world.seniorSquad}`,
+      );
+      await expect(describeSeries(database, world.seriesId)).resolves.toBe(
+        `Entrenamiento|19:00:00|MSAC|{1,2,3,4,5,6,7}|-30|6|${world.seniorSquad}`,
+      );
+    });
+
+    it("crea las sesiones de las fechas añadidas sin respuestas, con la audiencia y los cambios", async () => {
+      const database = await migratedDatabase();
+      const world = await seedWorld(database);
+      const schedule = await scheduleOf(database, {
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        endsIn: 70,
+        sessions: [7, 8, 14, 21, 70],
+        added: [8, 70],
+      });
+
+      const split = await splitSeries(
+        database,
+        fromChosen(world),
+        {
+          start_time: "20:00",
+          audience: "groups",
+          group_ids: [world.mastersSquad],
+        },
+        schedule,
+      );
+
+      const newId = String(split.series_id);
+      const createdId = await database.query(
+        `select id from public.events
+        where series_id = '${newId}' and starts_on = current_date + 70`,
+      );
+      await expect(describeOccurrence(database, createdId)).resolves.toBe(
+        `${newId}|Entrenamiento|20:00:00|MSAC|sin notas|scheduled|${world.mastersSquad}`,
+      );
+      await expect(rsvpCount(database, createdId)).resolves.toBe("0");
+      await expect(sessionsOn(database, newId, 8)).resolves.toBe("scheduled");
+    });
+
+    it("reactiva la cancelada de una fecha añadida, sin duplicarla, con sus respuestas y los campos de la serie", async () => {
+      const database = await migratedDatabase();
+      const world = await seedWorld(database);
+      await database.query(
+        `update public.events set start_time = '17:00', notes = 'Vieja'
+        where id = '${world.cancelledId}'`,
+      );
+      const schedule = await scheduleOf(database, {
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        endsIn: 60,
+        sessions: [7, 10, 14, 21],
+        added: [10],
+      });
+
+      const split = await splitSeries(
+        database,
+        fromChosen(world),
+        {},
+        schedule,
+      );
+
+      const newId = String(split.series_id);
+      await expect(
+        describeOccurrence(database, world.cancelledId),
+      ).resolves.toBe(
+        `${newId}|Entrenamiento|19:00:00|MSAC|sin notas|scheduled|${world.seniorSquad}`,
+      );
+      await expect(sessionsOn(database, newId, 10)).resolves.toBe("scheduled");
+      await expect(rsvpCount(database, world.cancelledId)).resolves.toBe("1");
+    });
+
+    it("deja cancelada la de una fecha que la serie ya tenía", async () => {
+      const database = await migratedDatabase();
+      const world = await seedWorld(database);
+      const schedule = await scheduleOf(database, {
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        endsIn: 60,
+        sessions: [7, 10, 14, 21],
+        added: [],
+      });
+
+      const split = await splitSeries(
+        database,
+        fromChosen(world),
+        {},
+        schedule,
+      );
+
+      await expect(
+        sessionsOn(database, String(split.series_id), 10),
+      ).resolves.toBe("cancelled");
+    });
+
+    it("al acortar cancela las sesiones posteriores a la fecha final", async () => {
+      const database = await migratedDatabase();
+      const world = await seedWorld(database);
+      const schedule = await scheduleOf(database, {
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        endsIn: 15,
+        sessions: [7, 14],
+        added: [],
+      });
+
+      const split = await splitSeries(
+        database,
+        fromChosen(world),
+        {},
+        schedule,
+      );
+
+      await expect(
+        sessionsOn(database, String(split.series_id), 21),
+      ).resolves.toBe("cancelled");
+      await expect(
+        sessionsOn(database, String(split.series_id), 14),
+      ).resolves.toBe("scheduled");
+    });
+
+    it("no toca las sesiones anteriores a la elegida", async () => {
+      const database = await migratedDatabase();
+      const world = await seedWorld(database);
+      const untouched = `${world.seriesId}|Entrenamiento|19:00:00|MSAC|sin notas|scheduled|${world.seniorSquad}`;
+      const schedule = await scheduleOf(database, {
+        weekdays: [1],
+        endsIn: 60,
+        sessions: [7],
+        added: [],
+      });
+
+      await splitSeries(database, fromChosen(world), {}, schedule);
+
+      await expect(describeOccurrence(database, world.pastId)).resolves.toBe(
+        untouched,
+      );
+      await expect(describeOccurrence(database, world.earlierId)).resolves.toBe(
+        untouched,
+      );
+    });
+
+    it("desde la primera sesión cambia los días de la serie entera, sin crear otra", async () => {
+      const database = await migratedDatabase();
+      const seeded = await seedSeries(database, 3);
+      const firstId = await seedOccurrence(database, seeded, {
+        daysFromToday: 3,
+      });
+      await seedOccurrence(database, seeded, { daysFromToday: 10 });
+      const schedule = await scheduleOf(database, {
+        weekdays: [2, 5],
+        endsIn: 30,
+        sessions: [3, 5, 10],
+        added: [5],
+      });
+
+      const split = await splitSeries(
+        database,
+        { clubId: seeded.clubId, seriesId: seeded.seriesId, fromId: firstId },
+        {},
+        schedule,
+      );
+
+      expect(split).toEqual({
+        outcome: "edited",
+        series_id: seeded.seriesId,
+        updated_occurrences: 3,
+      });
+      await expect(describeSeries(database, seeded.seriesId)).resolves.toBe(
+        `Entrenamiento|19:00:00|MSAC|{2,5}|3|30|${seeded.seniorSquad}`,
+      );
+      await expect(sessionsOn(database, seeded.seriesId, 5)).resolves.toBe(
+        "scheduled",
+      );
+    });
+
+    it("parte aunque desde la elegida estén todas canceladas si hay fechas que añadir", async () => {
+      const database = await migratedDatabase();
+      const world = await seedWorld(database);
+      await database.query(
+        `update public.events set status = 'cancelled', cancelled_at = now()
+        where id in ('${world.chosenId}', '${world.editedId}',
+                     '${world.upcomingId}')`,
+      );
+      const schedule = await scheduleOf(database, {
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        endsIn: 60,
+        sessions: [8],
+        added: [8],
+      });
+
+      const split = await splitSeries(
+        database,
+        fromChosen(world),
+        {},
+        schedule,
+      );
+
+      expect(split).toMatchObject({ outcome: "split", updated_occurrences: 1 });
+      await expect(
+        sessionsOn(database, String(split.series_id), 8),
+      ).resolves.toBe("scheduled");
+    });
+
+    it("rechaza fechas anteriores a la elegida, sin cambiar nada", async () => {
+      const database = await migratedDatabase();
+      const world = await seedWorld(database);
+      const before = await snapshotAll(database, world);
+      const schedule = await scheduleOf(database, {
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        endsIn: 60,
+        sessions: [4, 7],
+        added: [4],
+      });
+
+      const attempt = await database.attempt(
+        splitSeriesCall(fromChosen(world), {}, schedule),
+      );
+
+      expect(attempt.code).not.toBe(0);
+      await expect(snapshotAll(database, world)).resolves.toEqual(before);
+    });
+
+    it("no cambia nada si falla a medias, ni cancela ni crea sesiones", async () => {
+      const database = await migratedDatabase();
+      const world = await seedWorld(database);
+      const before = await snapshotAll(database, world);
+      const otherClub = await database.query(
+        `insert into public.clubs (name, slug)
+       values ('Otro club', 'otro-club-' || gen_random_uuid())
+       returning id`,
+      );
+      const foreignGroup = await seedGroup(database, otherClub, "Ajeno");
+      const schedule = await scheduleOf(database, {
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        endsIn: 60,
+        sessions: [7, 8],
+        added: [8],
+      });
+
+      const attempt = await database.attempt(
+        splitSeriesCall(
+          fromChosen(world),
+          { audience: "groups", group_ids: [foreignGroup] },
+          schedule,
+        ),
+      );
+
+      expect(attempt.code).not.toBe(0);
+      await expect(snapshotAll(database, world)).resolves.toEqual(before);
+      await expect(
+        database.query(
+          `select count(*) from public.events where club_id = '${world.clubId}'`,
+        ),
+      ).resolves.toBe("6");
+    });
+  },
+);

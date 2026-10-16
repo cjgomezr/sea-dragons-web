@@ -8,6 +8,7 @@ import type {
   ManagedSeries,
   SeriesEdit,
   SeriesManagementGateways,
+  SeriesReschedule,
   SeriesSplit,
 } from "./series-management";
 import {
@@ -30,7 +31,9 @@ import {
  * por `update_series` (`0041_update_series.sql`), que cambia la serie, sus
  * ocurrencias futuras y sus audiencias en una sola transacción. Partir desde
  * una sesión (#653) pasa por `split_series` (`0073_split_series.sql`), que
- * hace lo mismo sobre la serie nueva en la misma transacción. Cancelar es
+ * hace lo mismo sobre la serie nueva en la misma transacción, y con días o
+ * fecha final nuevos (#654, `0074_split_series_schedule.sql`) cancela, reactiva
+ * y crea sus sesiones antes de aplicar los cambios. Cancelar es
  * un solo `update` sobre las ocurrencias, atómico por sí mismo, y va directo
  * por PostgREST.
  */
@@ -106,6 +109,31 @@ async function findSeries(
     : toManagedSeries(managedSeriesRowSchema.parse(data));
 }
 
+async function findSessionDay(
+  serviceClient: SupabaseClient,
+  query: {
+    readonly clubId: string;
+    readonly seriesId: string;
+    readonly occurrenceId: string;
+  },
+): Promise<string | null> {
+  const { data, error } = await serviceClient
+    .from(EVENTS_TABLE)
+    .select("starts_on")
+    .eq("club_id", query.clubId)
+    .eq("series_id", query.seriesId)
+    .eq("id", query.occurrenceId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo leer la sesión ${query.occurrenceId} de la serie ${query.seriesId} del club ${query.clubId}: ${error.message}`,
+    );
+  }
+  return data === null
+    ? null
+    : z.object({ starts_on: z.string() }).parse(data).starts_on;
+}
+
 async function updateSeries(
   serviceClient: SupabaseClient,
   update: {
@@ -148,6 +176,27 @@ function toSeriesSplit(row: z.infer<typeof seriesSplitSchema>): SeriesSplit {
   return { kind: row.outcome };
 }
 
+/** El horario nuevo en las claves que lee `split_series`. */
+type ScheduleArgument = {
+  readonly weekdays: SeriesReschedule["weekdays"];
+  readonly ends_on: string;
+  readonly session_dates: readonly string[];
+  readonly added_dates: readonly string[];
+};
+
+function toScheduleArgument(
+  schedule: SeriesReschedule | null,
+): ScheduleArgument | null {
+  return schedule === null
+    ? null
+    : {
+        weekdays: schedule.weekdays,
+        ends_on: schedule.endsOn,
+        session_dates: schedule.sessionDates,
+        added_dates: schedule.addedDates,
+      };
+}
+
 async function splitSeries(
   serviceClient: SupabaseClient,
   split: {
@@ -155,6 +204,7 @@ async function splitSeries(
     readonly seriesId: string;
     readonly fromOccurrenceId: string;
     readonly changes: SeriesEdit;
+    readonly schedule: SeriesReschedule | null;
   },
 ): Promise<SeriesSplit> {
   const { data, error } = await serviceClient.rpc(SPLIT_SERIES_FUNCTION, {
@@ -162,6 +212,7 @@ async function splitSeries(
     target_series_id: split.seriesId,
     from_event_id: split.fromOccurrenceId,
     changes: toChangesArgument(split.changes),
+    schedule: toScheduleArgument(split.schedule),
   });
   if (error) {
     throw new Error(
@@ -209,6 +260,7 @@ export function createSeriesManagementGateways(
     notifications,
     managedSeries: {
       findSeries: (query) => findSeries(serviceClient, query),
+      findSessionDay: (query) => findSessionDay(serviceClient, query),
       updateSeries: (update) => updateSeries(serviceClient, update),
       splitSeries: (split) => splitSeries(serviceClient, split),
       cancelSeries: (cancellation) => cancelSeries(serviceClient, cancellation),
