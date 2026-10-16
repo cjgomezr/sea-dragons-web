@@ -269,9 +269,13 @@ begin
          cover_upload_id = case when changes ? 'cover_upload_id'
                                 then (changes ->> 'cover_upload_id')::uuid
                                 else e.cover_upload_id end,
+         -- Sólo si la cambia de verdad: un cliente que manda el objeto entero
+         -- no debe separar la sesión de su serie sin querer.
          cover_overridden = e.cover_overridden
                             or (changes ? 'cover_upload_id'
-                                and e.series_id is not null)
+                                and e.series_id is not null
+                                and (changes ->> 'cover_upload_id')::uuid
+                                    is distinct from e.cover_upload_id)
    where e.id = target_event_id
      and e.club_id = acting_club_id
      and e.status = 'scheduled'

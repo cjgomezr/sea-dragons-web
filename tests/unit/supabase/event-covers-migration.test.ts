@@ -287,6 +287,28 @@ describeConPostgres("la imagen de los eventos en la base", () => {
     ).resolves.toBe([ownCover, NO_COVER, newCover].join(","));
   });
 
+  it("no separa de la serie una sesión a la que se le manda la misma imagen", async () => {
+    const database = await migratedDatabase();
+    const author = await seededAuthor(database);
+    const seriesCover = await insertCover(database, author);
+    const newCover = await insertCover(database, author);
+    const saved = await createEvents(database, author, {
+      ...WEEKLY,
+      cover_upload_id: seriesCover,
+    });
+    await updateEvent(database, author, firstId(saved), {
+      cover_upload_id: seriesCover,
+    });
+
+    await updateSeries(database, author, seriesIdOf(saved), {
+      cover_upload_id: newCover,
+    });
+
+    await expect(
+      describeSessionCovers(database, seriesIdOf(saved)),
+    ).resolves.toBe([newCover, newCover, newCover].join(","));
+  });
+
   it("deja la imagen de la serie y sus sesiones al editar otra cosa", async () => {
     const database = await migratedDatabase();
     const author = await seededAuthor(database);
