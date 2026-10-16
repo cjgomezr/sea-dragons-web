@@ -130,7 +130,7 @@ export function EventDialog({
   return (
     <dialog
       ref={dialogRef}
-      className="event-dialog"
+      className="event-dialog event-dialog-form"
       aria-labelledby={titleId}
       onClose={onClosed}
       // El `preventDefault` del keydown es la defensa real contra Escape
