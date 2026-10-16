@@ -6,6 +6,7 @@ import {
 import {
   SeriesNotFoundError,
   SessionNotInSeriesError,
+  type SeriesScheduleEdit,
   cancelSeries,
   editSeries,
 } from "@/lib/events/series-management";
@@ -29,6 +30,7 @@ import {
   SPENT_OCCURRENCE_ID,
   SPENT_SERIES_ID,
   SPLIT_CANCELLED_OCCURRENCE_ID,
+  SPLIT_DROPPED_FRIDAY_OCCURRENCE_ID,
   SPLIT_EARLIER_OCCURRENCE_ID,
   SPLIT_EDITED_OCCURRENCE_ID,
   SPLIT_FROM_OCCURRENCE_ID,
@@ -56,6 +58,7 @@ describe("editar una serie", () => {
     const club = fakeManagedSeriesClub();
 
     const edited = await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -74,6 +77,7 @@ describe("editar una serie", () => {
     const club = fakeManagedSeriesClub({ callerRole: "Admin" });
 
     const edited = await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: { title: "Entrenamiento de verano" },
@@ -86,6 +90,7 @@ describe("editar una serie", () => {
     const club = fakeManagedSeriesClub();
 
     await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -104,6 +109,7 @@ describe("editar una serie", () => {
     const cancelled = club.occurrence(CANCELLED_OCCURRENCE_ID);
 
     await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -117,6 +123,7 @@ describe("editar una serie", () => {
     const club = fakeManagedSeriesClub();
 
     await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -129,6 +136,7 @@ describe("editar una serie", () => {
     const club = fakeManagedSeriesClub();
 
     const edited = await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: {
@@ -148,6 +156,7 @@ describe("editar una serie", () => {
     const club = fakeManagedSeriesClub();
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: { title: "   " },
@@ -164,6 +173,7 @@ describe("editar una serie", () => {
     const club = fakeManagedSeriesClub({ clubGroupIds: [] });
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: { audience: { kind: "groups", groupIds: [MASTERS_SQUAD_ID] } },
@@ -180,6 +190,7 @@ describe("editar una serie", () => {
     const before = club.series(SPENT_SERIES_ID);
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SPENT_SERIES_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -196,6 +207,7 @@ describe("editar una serie", () => {
     const club = fakeManagedSeriesClub({ failingWrites: true });
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -211,6 +223,7 @@ describe("editar una serie: hora de fin", () => {
     const club = fakeManagedSeriesClub();
 
     await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: { endTime: "21:00" },
@@ -224,6 +237,7 @@ describe("editar una serie: hora de fin", () => {
     const club = fakeManagedSeriesClub();
 
     await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: { location: "Aquatic Centre" },
@@ -239,6 +253,7 @@ describe("editar una serie: hora de fin", () => {
     const club = fakeManagedSeriesClub();
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: { startTime: "21:00" },
@@ -252,6 +267,7 @@ describe("editar una serie: hora de fin", () => {
     const club = fakeManagedSeriesClub();
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: LEGACY_SERIES_ID,
       changes: { title: "Entrenamiento de verano" },
@@ -266,6 +282,7 @@ describe("editar una serie: hora de fin", () => {
     const club = fakeManagedSeriesClub();
 
     await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: LEGACY_SERIES_ID,
       changes: { endTime: "20:00" },
@@ -339,6 +356,7 @@ describe("quién puede editar y cancelar una serie", () => {
     const club = fakeManagedSeriesClub({ callerRole });
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -365,6 +383,7 @@ describe("quién puede editar y cancelar una serie", () => {
     const club = fakeManagedSeriesClub();
 
     const edit = editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: MISSING_SERIES_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -393,6 +412,7 @@ describe("editar una serie: lugar estructurado", () => {
     const club = fakeManagedSeriesClub();
 
     await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: { place: MSAC_PLACE, placeDetail: "Piscina de buceo" },
@@ -413,11 +433,13 @@ describe("editar una serie: lugar estructurado", () => {
     const club = fakeManagedSeriesClub();
     const request = { callerId: CALLER_ID, seriesId: SERIES_ID };
     await editSeries(club.gateways, {
+      now: NOW,
       ...request,
       changes: { place: MSAC_PLACE, placeDetail: "Piscina de buceo" },
     });
 
     await editSeries(club.gateways, {
+      now: NOW,
       ...request,
       changes: { location: "Piscina de Box Hill" },
     });
@@ -435,6 +457,7 @@ describe("editar una serie: lugar estructurado", () => {
     const club = fakeManagedSeriesClub();
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: { place: { name: "MSAC", lng: 144.9601 } },
@@ -452,6 +475,7 @@ describe("editar una serie: imagen (#644)", () => {
     const club = fakeManagedSeriesClub();
 
     await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: { coverUploadId: OWN_COVER_ID },
@@ -469,6 +493,7 @@ describe("editar una serie: imagen (#644)", () => {
     const club = fakeManagedSeriesClub();
 
     await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: { coverUploadId: null },
@@ -481,6 +506,7 @@ describe("editar una serie: imagen (#644)", () => {
     const club = fakeManagedSeriesClub();
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: SERIES_ID,
       changes: { coverUploadId: FOREIGN_COVER_ID },
@@ -506,6 +532,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const club = fakeManagedSeriesClub();
 
     const edited = await editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       changes: NEW_TIME_AND_PLACE,
     });
@@ -529,6 +556,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const club = fakeManagedSeriesClub();
 
     await editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       changes: NEW_TIME_AND_PLACE,
     });
@@ -549,6 +577,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const club = fakeManagedSeriesClub();
 
     await editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       changes: NEW_TIME_AND_PLACE,
     });
@@ -566,6 +595,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const cancelled = club.occurrence(SPLIT_CANCELLED_OCCURRENCE_ID);
 
     await editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       changes: NEW_TIME_AND_PLACE,
     });
@@ -582,6 +612,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const earlier = club.occurrence(SPLIT_EARLIER_OCCURRENCE_ID);
 
     await editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       changes: NEW_TIME_AND_PLACE,
     });
@@ -594,6 +625,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const club = fakeManagedSeriesClub();
 
     await editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       changes: NEW_TIME_AND_PLACE,
     });
@@ -605,6 +637,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const club = fakeManagedSeriesClub();
 
     const edited = await editSeries(club.gateways, {
+      now: NOW,
       callerId: CALLER_ID,
       seriesId: FRESH_SERIES_ID,
       fromOccurrenceId: FRESH_FIRST_OCCURRENCE_ID,
@@ -624,6 +657,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const club = fakeManagedSeriesClub();
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       fromOccurrenceId: SPLIT_PAST_OCCURRENCE_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -639,6 +673,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const club = fakeManagedSeriesClub();
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       fromOccurrenceId: UPCOMING_OCCURRENCE_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -651,11 +686,13 @@ describe("editar una serie desde una sesión (#653)", () => {
   it("rechaza la segunda partición desde la misma sesión", async () => {
     const club = fakeManagedSeriesClub();
     await editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       changes: NEW_TIME_AND_PLACE,
     });
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       changes: { title: "Otro título" },
     });
@@ -667,6 +704,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const club = fakeManagedSeriesClub();
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       fromOccurrenceId: SPLIT_CANCELLED_OCCURRENCE_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -683,6 +721,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     });
 
     await editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       changes: NEW_TIME_AND_PLACE,
     });
@@ -698,6 +737,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const club = fakeManagedSeriesClub({ callerRole: "Player" });
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       changes: NEW_TIME_AND_PLACE,
     });
@@ -710,6 +750,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     const club = fakeManagedSeriesClub();
 
     const attempt = editSeries(club.gateways, {
+      now: NOW,
       ...fromSession,
       seriesId: MISSING_SERIES_ID,
       changes: NEW_TIME_AND_PLACE,
@@ -717,5 +758,302 @@ describe("editar una serie desde una sesión (#653)", () => {
 
     await expect(attempt).rejects.toBeInstanceOf(SeriesNotFoundError);
     expect(club.writeCount()).toBe(0);
+  });
+});
+describe("partir una serie con otros días o otra fecha final (#654)", () => {
+  const fromSession = {
+    callerId: CALLER_ID,
+    seriesId: SPLIT_SERIES_ID,
+    fromOccurrenceId: SPLIT_FROM_OCCURRENCE_ID,
+    now: NOW,
+    changes: {},
+  } as const;
+
+  const FRIDAY = 5;
+
+  function isFriday(date: string): boolean {
+    return new Date(`${date}T00:00:00Z`).getUTCDay() === FRIDAY;
+  }
+
+  it("añadir un día crea sus sesiones desde la elegida hasta el final, sin respuestas", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const edited = await editSeries(club.gateways, {
+      ...fromSession,
+      schedule: { weekdays: [2, 4, 5] } satisfies SeriesScheduleEdit,
+    });
+
+    const fridays = club
+      .occurrencesOf(NEW_SERIES_ID)
+      .filter((event) => isFriday(event.startsOn));
+    expect(fridays.map((event) => [event.startsOn, event.status])).toEqual([
+      ["2027-06-25", "scheduled"],
+      ["2027-07-02", "scheduled"],
+      ["2027-07-09", "scheduled"],
+      ["2027-07-16", "scheduled"],
+      ["2027-07-23", "scheduled"],
+    ]);
+    expect(fridays.some((event) => club.rsvps.has(event.id))).toBe(false);
+    expect(edited.series).toMatchObject({
+      id: NEW_SERIES_ID,
+      weekdays: [2, 4, 5],
+      endsOn: "2027-07-29",
+    });
+    expect(edited.updatedOccurrences).toBe(8);
+  });
+
+  it("las sesiones nuevas nacen con los cambios de la partición", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      changes: NEW_TIME_AND_PLACE,
+      schedule: { weekdays: [2, 4, 5] } satisfies SeriesScheduleEdit,
+    });
+
+    const firstFriday = club
+      .occurrencesOf(NEW_SERIES_ID)
+      .find((event) => event.startsOn === "2027-06-25");
+    expect(firstFriday).toMatchObject({
+      startTime: "20:00",
+      location: "Aquatic Centre",
+      status: "scheduled",
+    });
+  });
+
+  it("quitar un día cancela sus sesiones movidas sin borrarlas ni sus respuestas", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      schedule: { weekdays: [4] } satisfies SeriesScheduleEdit,
+    });
+
+    expect(club.occurrence(SPLIT_FROM_OCCURRENCE_ID)).toMatchObject({
+      seriesId: NEW_SERIES_ID,
+      status: "cancelled",
+    });
+    expect(club.occurrence(SPLIT_EDITED_OCCURRENCE_ID)).toMatchObject({
+      status: "cancelled",
+    });
+    expect(club.occurrence(SPLIT_LATER_OCCURRENCE_ID)).toMatchObject({
+      status: "scheduled",
+    });
+    expect(club.rsvps.get(SPLIT_FROM_OCCURRENCE_ID)).toEqual(["yes", "no"]);
+  });
+
+  it("no toca las sesiones anteriores a la elegida aunque caigan en el día quitado", async () => {
+    const club = fakeManagedSeriesClub();
+    const earlier = club.occurrence(SPLIT_EARLIER_OCCURRENCE_ID);
+    const past = club.occurrence(SPLIT_PAST_OCCURRENCE_ID);
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      schedule: { weekdays: [2] } satisfies SeriesScheduleEdit,
+    });
+
+    expect(club.occurrence(SPLIT_EARLIER_OCCURRENCE_ID)).toEqual(earlier);
+    expect(club.occurrence(SPLIT_PAST_OCCURRENCE_ID)).toEqual(past);
+    expect(club.series(SPLIT_SERIES_ID)).toEqual({
+      ...SPLIT_SERIES,
+      endsOn: "2027-06-21",
+    });
+  });
+
+  it("alargar la fecha final crea las sesiones hasta la nueva fecha", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const edited = await editSeries(club.gateways, {
+      ...fromSession,
+      schedule: { endsOn: "2027-08-12" },
+    });
+
+    expect(
+      club
+        .occurrencesOf(NEW_SERIES_ID)
+        .filter((event) => event.startsOn > "2027-07-29")
+        .map((event) => [event.startsOn, event.status]),
+    ).toEqual([
+      ["2027-08-03", "scheduled"],
+      ["2027-08-05", "scheduled"],
+      ["2027-08-10", "scheduled"],
+      ["2027-08-12", "scheduled"],
+    ]);
+    expect(edited.series).toMatchObject({
+      weekdays: [2, 4],
+      endsOn: "2027-08-12",
+    });
+  });
+
+  it("acortar la fecha final cancela las sesiones posteriores a la nueva fecha", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const edited = await editSeries(club.gateways, {
+      ...fromSession,
+      schedule: { endsOn: "2027-06-30" },
+    });
+
+    expect(club.occurrence(SPLIT_LATER_OCCURRENCE_ID)).toMatchObject({
+      status: "cancelled",
+    });
+    expect(club.occurrence(SPLIT_EDITED_OCCURRENCE_ID)).toMatchObject({
+      status: "scheduled",
+    });
+    expect(edited.series.endsOn).toBe("2027-06-30");
+    expect(edited.updatedOccurrences).toBe(3);
+  });
+
+  it("reactiva una sesión cancelada que vuelve a caer en los días, con los campos de la serie y sin duplicarla", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      schedule: { weekdays: [2, 4, 5] } satisfies SeriesScheduleEdit,
+    });
+
+    const reactivated = club.occurrence(SPLIT_DROPPED_FRIDAY_OCCURRENCE_ID);
+    expect(reactivated).toMatchObject({
+      seriesId: NEW_SERIES_ID,
+      status: "scheduled",
+      startTime: "19:00",
+    });
+    expect(reactivated).not.toHaveProperty("cancelledAt");
+    expect(
+      club
+        .occurrencesOf(NEW_SERIES_ID)
+        .filter((event) => event.startsOn === "2027-07-02"),
+    ).toHaveLength(1);
+  });
+
+  it("deja cancelada una sesión que se canceló en un día que la serie ya tenía", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      schedule: { weekdays: [2, 4, 5] } satisfies SeriesScheduleEdit,
+    });
+
+    expect(club.occurrence(SPLIT_CANCELLED_OCCURRENCE_ID)).toMatchObject({
+      status: "cancelled",
+    });
+  });
+
+  it("guarda los días ordenados y sin repetir", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const edited = await editSeries(club.gateways, {
+      ...fromSession,
+      schedule: { weekdays: [5, 2, 4, 2] } satisfies SeriesScheduleEdit,
+    });
+
+    expect(edited.series.weekdays).toEqual([2, 4, 5]);
+  });
+
+  it.each([
+    ["una fecha final anterior a la sesión elegida", { endsOn: "2027-06-21" }],
+    [
+      "días que no caen antes de la fecha final",
+      { weekdays: [5], endsOn: "2027-06-24" },
+    ],
+  ] as const)(
+    "rechaza con 422 %s, sin escribir nada",
+    async (_case, schedule) => {
+      const club = fakeManagedSeriesClub();
+
+      const attempt = editSeries(club.gateways, { ...fromSession, schedule });
+
+      await expect(attempt).rejects.toMatchObject({
+        code: "series_without_sessions",
+      });
+      expect(club.writeCount()).toBe(0);
+    },
+  );
+
+  it("rechaza con 422 una partición sin días, sin escribir nada", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const attempt = editSeries(club.gateways, {
+      ...fromSession,
+      schedule: { weekdays: [] } satisfies SeriesScheduleEdit,
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(EventValidationError);
+    await expect(attempt).rejects.toMatchObject({
+      code: "series_weekdays_empty",
+    });
+    expect(club.writeCount()).toBe(0);
+  });
+
+  it("rechaza con 422 una parte nueva de más de un año, sin escribir nada", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const attempt = editSeries(club.gateways, {
+      ...fromSession,
+      schedule: { endsOn: "2028-06-30" },
+    });
+
+    await expect(attempt).rejects.toMatchObject({
+      code: "series_range_too_long",
+    });
+    expect(club.writeCount()).toBe(0);
+  });
+
+  it("rechaza una sesión que no es de esa serie antes de escribir", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const attempt = editSeries(club.gateways, {
+      ...fromSession,
+      fromOccurrenceId: UPCOMING_OCCURRENCE_ID,
+      schedule: { weekdays: [2, 4, 5] } satisfies SeriesScheduleEdit,
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(SessionNotInSeriesError);
+    expect(club.writeCount()).toBe(0);
+  });
+
+  it("desde la primera sesión cambia los días de la serie entera", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const edited = await editSeries(club.gateways, {
+      ...fromSession,
+      seriesId: FRESH_SERIES_ID,
+      fromOccurrenceId: FRESH_FIRST_OCCURRENCE_ID,
+      schedule: { weekdays: [2, 4, 5] } satisfies SeriesScheduleEdit,
+    });
+
+    expect(edited.series).toMatchObject({
+      id: FRESH_SERIES_ID,
+      weekdays: [2, 4, 5],
+    });
+    expect(club.series(NEW_SERIES_ID)).toBeUndefined();
+    expect(
+      club
+        .occurrencesOf(FRESH_SERIES_ID)
+        .filter((event) => isFriday(event.startsOn)),
+    ).toHaveLength(5);
+  });
+
+  it("avisa una sola vez con los días y la fecha final nuevos", async () => {
+    const club = fakeManagedSeriesClub({
+      clubMembers: { [CLUB_MEMBER_ID]: "active" },
+    });
+
+    await editSeries(club.gateways, {
+      ...fromSession,
+      schedule: {
+        weekdays: [1, 4],
+        endsOn: "2027-12-16",
+      } satisfies SeriesScheduleEdit,
+    });
+
+    expect(club.noticeBatches).toHaveLength(1);
+    expect(club.notices[0]).toMatchObject({
+      type: "event_series_changed",
+      data: {
+        seriesId: NEW_SERIES_ID,
+        weekdays: [1, 4],
+        endsOn: "2027-12-16",
+      },
+    });
   });
 });

@@ -43,12 +43,25 @@ export function isNoticeworthyChange(
 }
 
 /** Un evento suelto, además, avisa si cambia el día en que termina. En una
- * serie, `endsOn` es el último día de la serie, que aquí no se edita. */
+ * serie, `endsOn` es su último día y cuenta aparte, con los días. */
 function isNoticeworthyEventChange(
   before: ManagedEvent,
   after: ManagedEvent,
 ): boolean {
   return isNoticeworthyChange(before, after) || before.endsOn !== after.endsOn;
+}
+
+/** Una serie, además, avisa si cambian sus días o su fecha final, que sólo
+ * cambian al partirla (#654). */
+function isNoticeworthySeriesChange(
+  before: ManagedSeries,
+  after: ManagedSeries,
+): boolean {
+  return (
+    isNoticeworthyChange(before, after) ||
+    before.weekdays.join() !== after.weekdays.join() ||
+    before.endsOn !== after.endsOn
+  );
 }
 
 type Change<Subject> = {
@@ -116,7 +129,7 @@ export async function announceSeriesChange(
   change: Change<ManagedSeries>,
 ): Promise<void> {
   const { before, after } = change;
-  if (!isNoticeworthyChange(before, after)) {
+  if (!isNoticeworthySeriesChange(before, after)) {
     return;
   }
   await notifyEventAudience(gateways, {
@@ -128,6 +141,7 @@ export async function announceSeriesChange(
         seriesId: after.id,
         title: after.title,
         weekdays: after.weekdays,
+        endsOn: after.endsOn,
         startTime: after.startTime,
         endTime: after.endTime,
         location: after.location,

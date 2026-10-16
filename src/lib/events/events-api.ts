@@ -105,13 +105,21 @@ export const eventEditSchema = eventFieldsSchema
   });
 
 /** Lo que cambia de una serie: los mismos campos que al crear salvo la
- * fecha, todos opcionales, y al menos uno. Los días y las fechas de la serie
- * no se editan (#315), así que mandarlos es un 400 y no se ignoran en
- * silencio. `fromOccurrenceId` no es un cambio: dice desde qué sesión se
- * parte la serie (#653); sin él cambian todas las futuras desde hoy. */
+ * fecha, todos opcionales, y al menos uno. `fromOccurrenceId` no es un
+ * cambio: dice desde qué sesión se parte la serie (#653); sin él cambian
+ * todas las futuras desde hoy. Los días y la fecha final sólo cambian al
+ * partir (#654): sin `fromOccurrenceId` son un 400 y no se ignoran en
+ * silencio. La fecha de inicio no se edita nunca. Unos días vacíos tienen la
+ * forma debida: los rechaza el dominio con 422. */
 export const seriesEditSchema = eventFieldsSchema
   .partial()
-  .extend({ fromOccurrenceId: z.uuid().optional() })
+  .extend({
+    fromOccurrenceId: z.uuid().optional(),
+    weekdays: z
+      .array(z.union(ISO_WEEKDAYS.map((day) => z.literal(day))))
+      .optional(),
+    endsOn: z.iso.date().optional(),
+  })
   .strict()
   .refine(
     (edit) =>
@@ -119,6 +127,15 @@ export const seriesEditSchema = eventFieldsSchema
         ([field, value]) => field !== "fromOccurrenceId" && value !== undefined,
       ),
     { message: "Envía al menos un campo que cambiar." },
+  )
+  .refine(
+    (edit) =>
+      edit.fromOccurrenceId !== undefined ||
+      (edit.weekdays === undefined && edit.endsOn === undefined),
+    {
+      message:
+        "Los días y la fecha final sólo cambian al editar desde una sesión.",
+    },
   );
 
 export function requireSeriesManagementGateways(): SeriesManagementGateways {

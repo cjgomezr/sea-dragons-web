@@ -452,6 +452,36 @@ describe("texto de los avisos con hora de fin", () => {
     );
   });
 
+  // #654: al partir una serie pueden cambiar sus días y su fecha final.
+  it.each([
+    [
+      "es",
+      "Entrenamiento: ahora lunes y jueves hasta el 17 de diciembre de 2026, 18:00 – 19:30, en Aquatic Centre",
+    ],
+    [
+      "en",
+      "Entrenamiento: now Monday and Thursday until 17 December 2026 at 6:00 pm – 7:30 pm, at Aquatic Centre",
+    ],
+  ] as const)(
+    "dice hasta cuándo va una serie cambiada (%s)",
+    (locale, body) => {
+      const text = describeNotification(createTranslator(locale), {
+        type: "event_series_changed",
+        data: {
+          seriesId: SERIES_ID,
+          title: "Entrenamiento",
+          weekdays: [1, 4],
+          endsOn: "2026-12-17",
+          startTime: "18:00",
+          endTime: "19:30",
+          location: "Aquatic Centre",
+        },
+      });
+
+      expect(text.body).toBe(body);
+    },
+  );
+
   it("da sólo el inicio de un evento sin hora de fin, como antes de E24", () => {
     const text = describeNotification(createTranslator("en"), {
       type: "event_created",

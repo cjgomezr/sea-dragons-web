@@ -2,11 +2,17 @@ import {
   announceSeriesCancellation,
   announceSeriesChange,
 } from "./event-change-notice";
-import type { IsoWeekday } from "./event-occurrences";
+import { clubMoment } from "@/lib/time/club-calendar";
+import {
+  type IsoWeekday,
+  countRangeDays,
+  generateWeeklyOccurrences,
+} from "./event-occurrences";
 import type { PlaceDraft } from "./event-place";
 import {
   type EventFields,
   EventValidationError,
+  SERIES_MAX_DAYS,
   findEventOrganizer,
   resolveEventEnd,
 } from "./event-creation";
@@ -23,8 +29,7 @@ import {
  * habían editado solas; lo que ya ocurrió no se toca nunca. "Futura" es la
  * que todavía no empezó según la hora de la base, la misma regla que el RSVP
  * (#308), y por eso la decide el adaptador al escribir y no el dominio al
- * leer. Los días y las fechas de la serie no se editan: para eso se cancela
- * el resto y se crea otra.
+ * leer. Los días y las fechas de la serie sólo cambian al partirla.
  *
  * El club sale de la fila de quien llama (NFR-009): una serie de otro club
  * no se encuentra, igual que una que no existe.
@@ -32,7 +37,9 @@ import {
  * Desde una sesión ("esta y las siguientes", #653, D2 del PRD de E24) la
  * serie se parte en esa fecha: la original termina el día anterior y nace
  * otra con los cambios. Las sesiones anteriores no cambian, aunque sean
- * futuras.
+ * futuras. Al partir también se pueden cambiar los días y la fecha final
+ * de la parte nueva (#654): lo que ya no encaja se cancela y lo que falta se
+ * crea.
  */
 
 /** Una serie como la ve quien la organiza. */
@@ -55,6 +62,26 @@ export type SeriesEditDraft = Omit<SeriesEdit, "place"> & {
   readonly place?: PlaceDraft | null;
 };
 
+/** Los días y la fecha final nuevos de la parte nueva (#654); lo que no
+ * viene se queda como en la serie. */
+export type SeriesScheduleEdit = {
+  readonly weekdays?: readonly IsoWeekday[];
+  readonly endsOn?: string;
+};
+
+/** Lo que el adaptador escribe al cambiar los días o la fecha final:
+ * `sessionDates` son las fechas futuras de la parte nueva desde la sesión
+ * elegida, y `addedDates`, las que la serie no tenía. Lo que no cae en
+ * `sessionDates` se cancela; en `addedDates` se reactiva la cancelada de esa
+ * fecha o se crea una sesión nueva. Una sesión cancelada en una fecha que la
+ * serie ya tenía sigue cancelada: alguien la canceló a propósito. */
+export type SeriesReschedule = {
+  readonly weekdays: readonly IsoWeekday[];
+  readonly endsOn: string;
+  readonly sessionDates: readonly string[];
+  readonly addedDates: readonly string[];
+};
+
 /** Cómo terminó partir una serie desde una sesión. `edited` es la serie
  * entera, cuando la elegida es su primera sesión; `split`, la serie nueva.
  * Con `updatedOccurrences` a 0 no se escribió nada: desde la elegida no
@@ -74,6 +101,12 @@ export type ManagedSeriesGateway = {
     readonly clubId: string;
     readonly seriesId: string;
   }): Promise<ManagedSeries | null>;
+  /** El día de una sesión, si es de esa serie y de ese club. */
+  findSessionDay(query: {
+    readonly clubId: string;
+    readonly seriesId: string;
+    readonly occurrenceId: string;
+  }): Promise<string | null>;
   /** Escribe los cambios en la serie y en sus ocurrencias futuras no
    * canceladas, todo o nada, y dice cuántas ocurrencias cambió. Con cero no
    * escribe nada, ni siquiera la serie. */
@@ -84,12 +117,15 @@ export type ManagedSeriesGateway = {
   }): Promise<number>;
   /** Parte la serie desde una sesión y aplica los cambios a la parte nueva,
    * todo o nada, con la serie bloqueada. Con cero ocurrencias por cambiar no
-   * escribe nada. Que la sesión ya empezó lo decide la hora de la base. */
+   * escribe nada. Que la sesión ya empezó lo decide la hora de la base. Con
+   * `schedule` también cambia los días y la fecha final de la parte nueva,
+   * en la misma transacción, y cuenta las sesiones que cancela. */
   splitSeries(split: {
     readonly clubId: string;
     readonly seriesId: string;
     readonly fromOccurrenceId: string;
     readonly changes: SeriesEdit;
+    readonly schedule: SeriesReschedule | null;
   }): Promise<SeriesSplit>;
   /** Cancela las ocurrencias que no empezaron antes de `cancelledAt` y dice
    * cuántas. */
@@ -178,14 +214,102 @@ type WrittenSeries = {
   readonly updatedOccurrences: number;
 };
 
+/** Una sola vez cada día, en orden. */
+function normalizeWeekdays(
+  weekdays: readonly IsoWeekday[],
+): readonly IsoWeekday[] {
+  const normalized = [...new Set(weekdays)].sort(
+    (first, second) => first - second,
+  );
+  if (normalized.length === 0) {
+    throw new EventValidationError("series_weekdays_empty");
+  }
+  return normalized;
+}
+
+/** Qué fechas tiene la parte nueva desde `fromDay` y cuáles no tenía, o por
+ * qué no vale. Las dos cuentas usan la hora de inicio que va a quedar. */
+function planReschedule(plan: {
+  readonly before: ManagedSeries;
+  readonly schedule: SeriesScheduleEdit;
+  readonly fromDay: string;
+  readonly startTime: string;
+  readonly now: Date;
+}): SeriesReschedule {
+  const { before, schedule, fromDay, startTime } = plan;
+  const weekdays = normalizeWeekdays(schedule.weekdays ?? before.weekdays);
+  const endsOn = schedule.endsOn ?? before.endsOn;
+  if (countRangeDays(fromDay, endsOn) > SERIES_MAX_DAYS) {
+    throw new EventValidationError("series_range_too_long");
+  }
+  const moment = clubMoment(plan.now);
+  const sessionDates = generateWeeklyOccurrences(
+    { weekdays, startsOn: fromDay, endsOn, startTime },
+    moment,
+  );
+  if (sessionDates.length === 0) {
+    throw new EventValidationError("series_without_sessions");
+  }
+  const currentDates = new Set(
+    generateWeeklyOccurrences(
+      { ...before, startsOn: fromDay, startTime },
+      moment,
+    ),
+  );
+  return {
+    weekdays,
+    endsOn,
+    sessionDates,
+    addedDates: sessionDates.filter((date) => !currentDates.has(date)),
+  };
+}
+
+type SplitRequest = SeriesTarget & {
+  readonly fromOccurrenceId: string;
+  readonly changes: SeriesEdit;
+  readonly schedule: SeriesScheduleEdit | undefined;
+  readonly before: ManagedSeries;
+  readonly now: Date;
+};
+
+/** Lo que cambia de los días y la fecha final, con el día de la sesión
+ * elegida; nada si no cambian. */
+async function resolveReschedule(
+  gateways: Pick<SeriesManagementGateways, "managedSeries">,
+  request: SplitRequest,
+): Promise<SeriesReschedule | null> {
+  const { schedule, before, changes } = request;
+  if (schedule === undefined) {
+    return null;
+  }
+  const fromDay = await gateways.managedSeries.findSessionDay({
+    clubId: request.clubId,
+    seriesId: request.seriesId,
+    occurrenceId: request.fromOccurrenceId,
+  });
+  if (fromDay === null) {
+    throw new SessionNotInSeriesError();
+  }
+  return planReschedule({
+    before,
+    schedule,
+    fromDay,
+    startTime: changes.startTime ?? before.startTime,
+    now: request.now,
+  });
+}
+
 async function splitFromOccurrence(
   gateways: Pick<SeriesManagementGateways, "managedSeries">,
-  split: SeriesTarget & {
-    readonly fromOccurrenceId: string;
-    readonly changes: SeriesEdit;
-  },
+  request: SplitRequest,
 ): Promise<WrittenSeries> {
-  const outcome = await gateways.managedSeries.splitSeries(split);
+  const outcome = await gateways.managedSeries.splitSeries({
+    clubId: request.clubId,
+    seriesId: request.seriesId,
+    fromOccurrenceId: request.fromOccurrenceId,
+    changes: request.changes,
+    schedule: await resolveReschedule(gateways, request),
+  });
   switch (outcome.kind) {
     case "occurrence_started":
       throw new EventValidationError("occurrence_started");
@@ -196,20 +320,38 @@ async function splitFromOccurrence(
   }
 }
 
+/** Desde dónde se edita: la serie entera de hoy en adelante, o desde una
+ * sesión, con días o fecha final nuevos si vienen (#654). */
+export type SeriesEditScope =
+  | { readonly fromOccurrenceId?: undefined }
+  | {
+      readonly fromOccurrenceId: string;
+      readonly schedule?: SeriesScheduleEdit;
+    };
+
 async function writeSeriesChanges(
   gateways: Pick<SeriesManagementGateways, "managedSeries">,
-  write: SeriesTarget & {
-    readonly fromOccurrenceId: string | undefined;
-    readonly changes: SeriesEdit;
-  },
+  write: SeriesTarget &
+    SeriesEditScope & {
+      readonly changes: SeriesEdit;
+      readonly before: ManagedSeries;
+      readonly now: Date;
+    },
 ): Promise<WrittenSeries> {
-  const { fromOccurrenceId, ...update } = write;
-  if (fromOccurrenceId !== undefined) {
-    return splitFromOccurrence(gateways, { ...update, fromOccurrenceId });
+  if (write.fromOccurrenceId !== undefined) {
+    return splitFromOccurrence(gateways, {
+      ...write,
+      fromOccurrenceId: write.fromOccurrenceId,
+      schedule: write.schedule,
+    });
   }
   return {
-    seriesId: update.seriesId,
-    updatedOccurrences: await gateways.managedSeries.updateSeries(update),
+    seriesId: write.seriesId,
+    updatedOccurrences: await gateways.managedSeries.updateSeries({
+      clubId: write.clubId,
+      seriesId: write.seriesId,
+      changes: write.changes,
+    }),
   };
 }
 
@@ -223,17 +365,19 @@ async function writeSeriesChanges(
  *
  * Con `fromOccurrenceId` parte la serie desde esa sesión (#653) y devuelve
  * la serie nueva; si es la primera, edita la entera. Una sesión que ya
- * empezó es un 422 y una que ya no es de la serie, un conflicto.
+ * empezó es un 422 y una que ya no es de la serie, un conflicto. Con
+ * `schedule` cambian también los días o la fecha final desde esa sesión
+ * (#654); `now` decide qué fechas quedan por delante.
  *
- * Si cambió la hora o el lugar, la audiencia recibe un solo aviso (#317): al
- * partir, la de la serie nueva. */
+ * Si cambió la hora, el lugar, los días o la fecha final, la audiencia
+ * recibe un solo aviso (#317): al partir, la de la serie nueva. */
 export async function editSeries(
   gateways: SeriesManagementGateways,
-  request: {
+  request: SeriesEditScope & {
     readonly callerId: string;
     readonly seriesId: string;
-    readonly fromOccurrenceId?: string;
     readonly changes: SeriesEditDraft;
+    readonly now: Date;
   },
 ): Promise<EditedSeries> {
   const caller = await findEventOrganizer(gateways, request.callerId);
@@ -246,9 +390,10 @@ export async function editSeries(
   );
   assertValidEnd(before, changes);
   const written = await writeSeriesChanges(gateways, {
+    ...request,
     ...target,
-    fromOccurrenceId: request.fromOccurrenceId,
     changes,
+    before,
   });
   assertSomethingChanged(written.updatedOccurrences);
   const series = await findExistingSeries(gateways, {

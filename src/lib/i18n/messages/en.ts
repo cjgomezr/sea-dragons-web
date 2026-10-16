@@ -1111,6 +1111,8 @@ export const englishMessages = {
   "notifications.event_series_changed.title": "Series changed",
   "notifications.event_series_changed.body":
     "{title}: now {weekdays} at {time}, at {location}",
+  "notifications.event_series_changed.bodyWithEnd":
+    "{title}: now {weekdays} until {endsOn} at {time}, at {location}",
   "notifications.event_series_cancelled.title": "Series cancelled",
   "notifications.event_series_cancelled.body":
     "{title}: {weekdays} at {time}, from today on",

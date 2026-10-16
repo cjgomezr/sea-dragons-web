@@ -108,11 +108,13 @@ type NotificationDataByType = DataForEveryType<{
     readonly startsOn: string;
     readonly startTime: string;
   };
-  /** #317. Un aviso por serie; sus días y fechas no se editan. */
+  /** #317. Un aviso por serie. Al partirla cambian también sus días y su
+   * fecha final (#654). */
   readonly event_series_changed: {
     readonly seriesId: string;
     readonly title: string;
     readonly weekdays: readonly IsoWeekday[];
+    readonly endsOn: string;
     readonly startTime: string;
     readonly endTime: string | null;
     readonly location: string;

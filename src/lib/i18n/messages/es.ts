@@ -1112,6 +1112,8 @@ export const spanishMessages: MessageCatalog = {
   "notifications.event_series_changed.title": "Serie cambiada",
   "notifications.event_series_changed.body":
     "{title}: ahora {weekdays}, {time}, en {location}",
+  "notifications.event_series_changed.bodyWithEnd":
+    "{title}: ahora {weekdays} hasta el {endsOn}, {time}, en {location}",
   "notifications.event_series_cancelled.title": "Serie cancelada",
   "notifications.event_series_cancelled.body":
     "{title}: {weekdays}, {time}, de hoy en adelante",

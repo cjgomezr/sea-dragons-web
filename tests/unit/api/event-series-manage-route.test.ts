@@ -342,6 +342,63 @@ describe("endpoint de editar una serie desde una sesión (#653)", () => {
   });
 });
 
+describe("endpoint de partir una serie con otros días o fecha final (#654)", () => {
+  const fromSession = { fromOccurrenceId: SPLIT_FROM_OCCURRENCE_ID } as const;
+
+  it("responde 200 con los días nuevos de la serie nueva, sin otros cambios", async () => {
+    mockWiring();
+
+    const response = await editSeries(SPLIT_SERIES_ID, {
+      ...fromSession,
+      weekdays: [2, 4, 5],
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { series: { id: NEW_SERIES_ID, weekdays: [2, 4, 5] } },
+    });
+  });
+
+  it("responde 200 con la fecha final nueva", async () => {
+    mockWiring();
+
+    const response = await editSeries(SPLIT_SERIES_ID, {
+      ...fromSession,
+      endsOn: "2027-08-12",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { series: { endsOn: "2027-08-12" } },
+    });
+  });
+
+  it.each([
+    ["series_weekdays_empty", { weekdays: [] }],
+    ["series_without_sessions", { endsOn: "2027-06-21" }],
+  ] as const)("responde 422 con %s", async (reason, schedule) => {
+    mockWiring();
+
+    const response = await editSeries(SPLIT_SERIES_ID, {
+      ...fromSession,
+      ...schedule,
+    });
+
+    await expectError(response, 422, { code: "business_rule", reason });
+  });
+
+  it("responde 400 a un día que no existe", async () => {
+    mockWiring();
+
+    const response = await editSeries(SPLIT_SERIES_ID, {
+      ...fromSession,
+      weekdays: [8],
+    });
+
+    await expectError(response, 400, { code: "validation_error" });
+  });
+});
+
 describe("endpoint de cancelar una serie", () => {
   it("responde 200 con la hora y cuántas ocurrencias canceló", async () => {
     mockWiring({ callerRole: "Admin" });

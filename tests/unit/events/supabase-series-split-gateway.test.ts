@@ -38,6 +38,7 @@ const SPLIT = {
   seriesId: SERIES_ID,
   fromOccurrenceId: FROM_ID,
   changes: { location: "Aquatic Centre" },
+  schedule: null,
 } as const;
 
 describe("partir una serie contra Supabase", () => {
@@ -69,9 +70,40 @@ describe("partir una serie contra Supabase", () => {
           target_series_id: SERIES_ID,
           from_event_id: FROM_ID,
           changes: { location: "Aquatic Centre" },
+          schedule: null,
         },
       },
     ]);
+  });
+
+  it("pasa los días y las fechas nuevos en columnas (#654)", async () => {
+    const { client, rpcs } = fakeClient({
+      data: {
+        outcome: "split",
+        series_id: NEW_SERIES_ID,
+        updated_occurrences: 4,
+      },
+      error: null,
+    });
+
+    await createSeriesManagementGateways(client).managedSeries.splitSeries({
+      ...SPLIT,
+      schedule: {
+        weekdays: [1, 4],
+        endsOn: "2027-07-29",
+        sessionDates: ["2027-06-24", "2027-06-28"],
+        addedDates: ["2027-06-28"],
+      },
+    });
+
+    expect(rpcs[0]?.args).toMatchObject({
+      schedule: {
+        weekdays: [1, 4],
+        ends_on: "2027-07-29",
+        session_dates: ["2027-06-24", "2027-06-28"],
+        added_dates: ["2027-06-28"],
+      },
+    });
   });
 
   it("lee la serie editada entera cuando la sesión era la primera", async () => {
@@ -134,5 +166,80 @@ describe("partir una serie contra Supabase", () => {
       createSeriesManagementGateways(client).managedSeries.splitSeries(SPLIT);
 
     await expect(attempt).rejects.toThrow();
+  });
+});
+
+type RecordedFilter = readonly [string, string];
+
+/** Un cliente que responde a una sola lectura de `events` y apunta sus
+ * filtros. */
+function fakeReadClient(answer: Answer): {
+  readonly client: SupabaseClient;
+  readonly filters: RecordedFilter[];
+} {
+  const filters: RecordedFilter[] = [];
+  const query = {
+    select: () => query,
+    eq: (column: string, value: string) => {
+      filters.push([column, value]);
+      return query;
+    },
+    maybeSingle: async () => answer,
+  };
+  const client = { from: () => query, storage: { from: () => ({}) } };
+  return { client: client as unknown as SupabaseClient, filters };
+}
+
+const SESSION_QUERY = {
+  clubId: CLUB_ID,
+  seriesId: SERIES_ID,
+  occurrenceId: FROM_ID,
+} as const;
+
+describe("el día de una sesión de una serie contra Supabase (#654)", () => {
+  it("lo busca sólo en esa serie y en ese club", async () => {
+    const { client, filters } = fakeReadClient({
+      data: { starts_on: "2027-06-22" },
+      error: null,
+    });
+
+    const day =
+      await createSeriesManagementGateways(client).managedSeries.findSessionDay(
+        SESSION_QUERY,
+      );
+
+    expect(day).toBe("2027-06-22");
+    expect(filters).toEqual([
+      ["club_id", CLUB_ID],
+      ["series_id", SERIES_ID],
+      ["id", FROM_ID],
+    ]);
+  });
+
+  it("no encuentra una sesión de otra serie", async () => {
+    const { client } = fakeReadClient({ data: null, error: null });
+
+    const day =
+      await createSeriesManagementGateways(client).managedSeries.findSessionDay(
+        SESSION_QUERY,
+      );
+
+    expect(day).toBeNull();
+  });
+
+  it("sube el error de la base con la sesión y el club", async () => {
+    const { client } = fakeReadClient({
+      data: null,
+      error: { message: "timeout" },
+    });
+
+    const attempt =
+      createSeriesManagementGateways(client).managedSeries.findSessionDay(
+        SESSION_QUERY,
+      );
+
+    await expect(attempt).rejects.toThrow(
+      `No se pudo leer la sesión ${FROM_ID} de la serie ${SERIES_ID} del club ${CLUB_ID}: timeout`,
+    );
   });
 });

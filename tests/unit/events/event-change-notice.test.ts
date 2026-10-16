@@ -83,6 +83,7 @@ async function editSeriesAs(
 ): Promise<FakeManagedSeriesClub> {
   const club = fakeManagedSeriesClub(options);
   await editSeries(club.gateways, {
+    now: NOW,
     callerId: CALLER_ID,
     seriesId: SERIES_ID,
     changes,
@@ -327,6 +328,7 @@ describe("avisos de cambio y cancelación", () => {
           seriesId: SERIES_ID,
           title: "Entrenamiento",
           weekdays: [2, 4],
+          endsOn: "2027-07-29",
           startTime: "18:00",
           endTime: "20:30",
           location: "MSAC",
