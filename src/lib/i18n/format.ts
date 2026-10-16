@@ -234,10 +234,8 @@ export function formatAgendaDayLabel(
   isoDate: string,
   { withYear }: { readonly withYear: boolean },
 ): string {
-  const { weekday, day, month } = formatCalendarDayParts(locale, isoDate);
-  const dayNumber = String(Number(day));
-  const date =
-    locale === "es" ? `${dayNumber} ${month}` : `${month} ${dayNumber}`;
+  const { weekday } = formatCalendarDayParts(locale, isoDate);
+  const date = formatShortMonthDay(locale, isoDate);
   const parts = [weekday, date, ...(withYear ? [calendarYearOf(isoDate)] : [])];
   return parts
     .join(AGENDA_DAY_SEPARATOR)
@@ -377,16 +375,55 @@ export function formatWeekdayName(
   return formatters[locale].format(dayOfWeek(weekday));
 }
 
+/** El plural de un día en español: "sábados", y "lunes" igual. En inglés
+ * "Every Monday" va en singular. */
+function pluralWeekdayName(locale: Locale, name: string): string {
+  return locale === "es" && !name.endsWith("s") ? `${name}s` : name;
+}
+
 /** Los días de una serie semanal ("Tuesday and Thursday", "martes y
- * jueves"), en el orden en que llegan. */
+ * jueves"), en el orden en que llegan. En plural, para "Todos los sábados"
+ * (#648). */
 export function formatWeekdays(
   locale: Locale,
   weekdays: readonly IsoWeekday[],
+  form: "singular" | "plural" = "singular",
 ): string {
-  const names = weekdays.map((weekday) =>
-    formatWeekdayName(locale, weekday, "long"),
-  );
+  const names = weekdays.map((weekday) => {
+    const name = formatWeekdayName(locale, weekday, "long");
+    return form === "plural" ? pluralWeekdayName(locale, name) : name;
+  });
   return WEEKDAY_LIST_FORMATTERS[locale].format(names);
+}
+
+const LONG_MONTH_FORMATTERS = calendarDayPartFormatters({ month: "long" });
+
+/** El mes y el día en corto, como el diseño del panel (#648): "Dec 16" en
+ * inglés, "16 dic" en español. El mes va recortado como en la agenda. */
+export function formatShortMonthDay(locale: Locale, isoDate: string): string {
+  const { day, month } = formatCalendarDayParts(locale, isoDate);
+  const dayNumber = String(Number(day));
+  return locale === "es" ? `${dayNumber} ${month}` : `${month} ${dayNumber}`;
+}
+
+/** Un día del panel del evento (#648) con su día de la semana y sin el año:
+ * "Wednesday, October 14", "miércoles, 14 de octubre". El orden es el del
+ * diseño, como la etiqueta de los días de la agenda. */
+export function formatPanelDay(locale: Locale, isoDate: string): string {
+  const midnightUtc = parseCalendarDay(isoDate);
+  const weekday = WEEKDAY_FORMATTERS[locale].format(midnightUtc);
+  const month = LONG_MONTH_FORMATTERS[locale].format(midnightUtc);
+  const dayNumber = midnightUtc.getUTCDate();
+  return locale === "es"
+    ? `${weekday}, ${dayNumber} de ${month}`
+    : `${weekday}, ${month} ${dayNumber}`;
+}
+
+/** Un extremo de un evento de varios días en el panel: "Sat, Oct 24",
+ * "sáb, 24 oct". */
+export function formatPanelShortDay(locale: Locale, isoDate: string): string {
+  const { weekday } = formatCalendarDayParts(locale, isoDate);
+  return `${weekday}, ${formatShortMonthDay(locale, isoDate)}`;
 }
 
 const RELATIVE_TIME_FORMATTERS = formattersByLocale(
