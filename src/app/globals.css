@@ -9003,12 +9003,17 @@ a.auth-brand-header:focus-visible {
   color: var(--color-accent-text);
 }
 
+/* Más alto que la franja y centrado en ella: el recorte esconde los botones
+   de zoom de arriba y la barra de créditos de abajo, que a este ancho ocupa
+   dos líneas. Los créditos los pone la tarjeta, más pequeños. */
 .agenda-place-map-frame {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 0;
   width: 100%;
-  height: 100%;
+  height: 260px;
   border: 0;
+  transform: translateY(-50%);
 }
 
 .agenda-place-map-cover {

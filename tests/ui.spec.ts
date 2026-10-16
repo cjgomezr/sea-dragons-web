@@ -11695,6 +11695,29 @@ async function stubNewsCovers(page: Page): Promise<void> {
   }
 }
 
+// El mapa de la tarjeta del lugar (#658) nunca sale a OpenStreetMap en los
+// tests: una página fija hace de mapa, igual en cada corrida.
+const PLACE_MAP_URL = "https://www.openstreetmap.org/export/embed.html**";
+
+const STUBBED_PLACE_MAP_PAGE = `<!doctype html>
+<html><body style="margin:0;height:100vh;background:
+linear-gradient(90deg,transparent 48%,#fff 48%,#fff 52%,transparent 52%),
+linear-gradient(0deg,transparent 45%,#fff 45%,#fff 55%,transparent 55%),
+#e6eedd;">
+<div style="position:absolute;left:50%;top:50%;width:14px;height:14px;
+margin:-7px;border-radius:50%;background:#2a7fd4;border:2px solid #fff"></div>
+</body></html>`;
+
+async function stubPlaceMap(page: Page): Promise<void> {
+  await page.route(PLACE_MAP_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: STUBBED_PLACE_MAP_PAGE,
+    }),
+  );
+}
+
 /** El feed y las publicaciones, con el mismo contrato que #327. La de otro
  * grupo responde 404, como la que no existe. Con más de una publicación hay
  * página siguiente, para que se vea "Cargar más". */
@@ -14830,6 +14853,7 @@ async function stubCalendarReads(
   reads: CalendarReads,
 ): Promise<void> {
   const pastEvents = reads.pastEvents ?? [];
+  await stubPlaceMap(page);
   await page.route(
     (url) => url.pathname === CALENDAR_AGENDA_ENDPOINT,
     (route, request) => {
@@ -15420,6 +15444,160 @@ for (const state of AGENDA_REDESIGN_STATES) {
     }
   });
 }
+
+// El mapa de la tarjeta del lugar (#658, RF-15 y D3 del PRD de E24; la zona
+// "MAP PREVIEW" de calendar-redesign-agenda-dark.png). El panel de la cena
+// del club, que tiene coordenadas, a 1440 y a 375.
+const PLACE_MAP_VIEWPORTS = viewports.filter((vp) => vp.name !== "tablet");
+
+const PLACE_MAP_SELECTOR =
+  'iframe[src^="https://www.openstreetmap.org/export/embed.html"]';
+
+/** Elige la cena, lleva su tarjeta a la vista (el iframe es perezoso) y
+ * espera a que el mapa haya cargado. */
+async function showPlaceMap(page: Page): Promise<void> {
+  await choosePanelEvent(PANEL_SOCIAL_EVENT.title)(page);
+  const map = eventPanel(page, PANEL_SOCIAL_EVENT.title).locator(
+    PLACE_MAP_SELECTOR,
+  );
+  await map.scrollIntoViewIfNeeded();
+  await expect(
+    page.frameLocator(PLACE_MAP_SELECTOR).locator("body"),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+const PLACE_MAP_STATE: CalendarState = {
+  name: "calendario-panel-mapa",
+  events: [PANEL_SERIES_EVENT, PANEL_SOCIAL_EVENT],
+  opened: { ...PLAYER_OPENED_EVENT, coverUrl: STUBBED_COVER_URL },
+  beforeVisit: fixAgendaClock,
+  ready: showPlaceMap,
+};
+
+const PLACE_MAP_CAPTURES = {
+  desktop: "calendario-panel-mapa",
+  mobile: "calendario-movil-mapa",
+} as const;
+
+test.describe("mapa de la tarjeta del lugar", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const vp of PLACE_MAP_VIEWPORTS) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+      const capture =
+        PLACE_MAP_CAPTURES[vp.name as keyof typeof PLACE_MAP_CAPTURES];
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToCalendar(page, PLACE_MAP_STATE, theme);
+          const snapshot = `${capture}-${theme}.png`;
+          const card = eventPanel(page, PANEL_SOCIAL_EVENT.title);
+          await createMissingLocalBaseline(snapshot, () =>
+            card.screenshot(SCREENSHOT_OPTIONS),
+          );
+          await expect(card).toHaveScreenshot(snapshot, SCREENSHOT_OPTIONS);
+        });
+
+        test(`has no accessibility violations (axe-core, ${theme})`, async ({
+          page,
+        }) => {
+          await goToCalendar(page, PLACE_MAP_STATE, theme);
+          await expectNoAxeViolations(page);
+        });
+      }
+    });
+  }
+
+  test("tocar el mapa abre Google Maps en otra pestaña", async ({ page }) => {
+    await goToCalendar(page, PLACE_MAP_STATE);
+    const map = eventPanel(page, PANEL_SOCIAL_EVENT.title).locator(
+      PLACE_MAP_SELECTOR,
+    );
+    const box = await map.boundingBox();
+    if (box === null) {
+      throw new Error("El mapa no está a la vista.");
+    }
+
+    const [popup] = await Promise.all([
+      page.waitForEvent("popup"),
+      page.mouse.click(box.x + box.width / 4, box.y + box.height / 2),
+    ]);
+
+    expect(popup.url()).toContain(
+      "https://www.google.com/maps/search/?api=1&query=-37.8676,144.9741",
+    );
+    await popup.close();
+  });
+
+  test("el mapa no mueve nada al aparecer", async ({ page }) => {
+    let releaseMap: () => void = () => undefined;
+    const mapReleased = new Promise<void>((resolve) => {
+      releaseMap = resolve;
+    });
+    await goToCalendar(page, {
+      ...PLACE_MAP_STATE,
+      beforeVisit: async (visited) => {
+        await fixAgendaClock(visited);
+        await visited.route(PLACE_MAP_URL, async (route) => {
+          await mapReleased;
+          await route.fulfill({
+            status: 200,
+            contentType: "text/html",
+            body: STUBBED_PLACE_MAP_PAGE,
+          });
+        });
+      },
+      ready: choosePanelEvent(PANEL_SOCIAL_EVENT.title),
+    });
+    await page.evaluate(() => {
+      const shifts: number[] = [];
+      Reflect.set(window, "placeMapShifts", shifts);
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          shifts.push((entry as unknown as { value: number }).value);
+        }
+      }).observe({ type: "layout-shift" });
+    });
+
+    releaseMap();
+    await expect(
+      page.frameLocator(PLACE_MAP_SELECTOR).locator("body"),
+    ).toBeVisible();
+
+    const shifts = await page.evaluate(
+      () => Reflect.get(window, "placeMapShifts") as number[],
+    );
+    expect(shifts).toEqual([]);
+  });
+
+  test("sin red se ve el fondo con el pin y Directions sigue", async ({
+    page,
+  }) => {
+    await goToCalendar(page, {
+      ...PLACE_MAP_STATE,
+      beforeVisit: async (visited) => {
+        await fixAgendaClock(visited);
+        await visited.route(PLACE_MAP_URL, (route) =>
+          route.abort("internetdisconnected"),
+        );
+      },
+      ready: choosePanelEvent(PANEL_SOCIAL_EVENT.title),
+    });
+    const panel = eventPanel(page, PANEL_SOCIAL_EVENT.title);
+
+    await expect(panel.locator(".agenda-place-map-fallback svg")).toBeVisible();
+    await expect(
+      panel.getByRole("link", { name: /Directions/ }),
+    ).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/search/?api=1&query=-37.8676,144.9741",
+    );
+  });
+});
 
 // #641: el texto de cada etiqueta de tipo cumple AA también en oscuro.
 test.describe("calendario-cada-tipo en tema oscuro", () => {
