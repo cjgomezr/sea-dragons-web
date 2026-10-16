@@ -8,8 +8,9 @@ import {
 import {
   CLUB_SESSION_PACKS_API_PATH,
   LEVIES_API_PATH,
+  LEVY_BUYERS_API_PATH,
   LEVY_CHECKOUT_API_PATH,
-  LEVY_PAYERS_API_PATH,
+  LEVY_SALES_API_PATH,
   MEMBERSHIP_API_PATH,
   MEMBERSHIP_CARD_API_PATH,
   MEMBERSHIP_CHECKOUT_API_PATH,
@@ -30,7 +31,7 @@ import {
   PAYMENT_STATUSES,
 } from "@/lib/membership/membership-view";
 import type { Levy } from "@/lib/membership/levies";
-import type { LevyPayersReport } from "@/lib/membership/levy-payers";
+import type { LevyBuyer, LevySale } from "@/lib/membership/levy-sales";
 import type { ClubPrice } from "@/lib/membership/stripe-prices";
 
 /**
@@ -292,52 +293,77 @@ export async function loadLevies(): Promise<LeviesLoad> {
     : { kind: "loaded", levies: read.value.data.levies };
 }
 
-const levyMemberSchema = {
-  userId: z.string(),
-  fullName: z.string(),
-  email: z.string(),
-};
-
-const levyPayersResponseSchema = z.object({
-  data: z.object({
-    levy: z.object({
-      id: z.string(),
-      name: z.string(),
-      amountCents: z.number().int(),
-    }),
-    summary: z.object({
-      paidCount: z.number().int(),
-      missingCount: z.number().int(),
-      collectedCents: z.number().int(),
-    }),
-    payers: z.array(
-      z.object({
-        ...levyMemberSchema,
-        quantity: z.number().int(),
-        paidAt: isoInstantSchema,
-        amountCents: z.number().int(),
-      }),
-    ),
-    missing: z.array(z.object(levyMemberSchema)),
-  }),
+const levySaleSchema = z.object({
+  productId: z.string(),
+  priceId: z.string().nullable(),
+  name: z.string(),
+  description: z.string().nullable(),
+  amountCents: z.number().int(),
+  status: z.enum(["open", "closed"]),
+  soldQuantity: z.number().int().nonnegative(),
+  buyerCount: z.number().int().nonnegative(),
+  soldByOption: z.array(
+    z.object({ option: z.string(), quantity: z.number().int() }),
+  ),
 });
 
-export type LevyPayersLoad =
-  | { readonly kind: "loaded"; readonly report: LevyPayersReport }
+const levySalesResponseSchema = z.object({
+  data: z.object({ sales: z.array(levySaleSchema) }),
+});
+
+export type LevySalesLoad =
+  | { readonly kind: "loaded"; readonly sales: readonly LevySale[] }
   | PaymentsFailure;
 
-/** Quién pagó el levy del precio `priceId` y quién falta (#531). Sólo lo
+/** Qué se vendió de cada extra, abierto o cerrado (#634, #635). Sólo lo
  * responde a un Admin o a un Committee. */
-export async function loadLevyPayers(priceId: string): Promise<LevyPayersLoad> {
+export async function loadLevySales(): Promise<LevySalesLoad> {
   const read = readApiPayload(
-    await requestApi(
-      LEVY_PAYERS_API_PATH.replace("[priceId]", encodeURIComponent(priceId)),
-    ),
-    levyPayersResponseSchema,
+    await requestApi(LEVY_SALES_API_PATH),
+    levySalesResponseSchema,
   );
   return read.kind === "failed"
     ? read
-    : { kind: "loaded", report: read.value.data };
+    : { kind: "loaded", sales: read.value.data.sales };
+}
+
+const levyBuyersResponseSchema = z.object({
+  data: z.object({
+    buyers: z.array(
+      z.object({
+        userId: z.string(),
+        fullName: z.string(),
+        email: z.string(),
+        quantity: z.number().int().positive(),
+        paidAt: isoInstantSchema,
+        amountCents: z.number().int(),
+        option: z.string().nullable(),
+      }),
+    ),
+  }),
+});
+
+export type LevyBuyersLoad =
+  | { readonly kind: "loaded"; readonly buyers: readonly LevyBuyer[] }
+  | PaymentsFailure;
+
+/** Quién compró el extra del producto `productId`, una fila por compra
+ * (#634, #635). Sólo lo responde a un Admin o a un Committee. */
+export async function loadLevyBuyers(
+  productId: string,
+): Promise<LevyBuyersLoad> {
+  const read = readApiPayload(
+    await requestApi(
+      LEVY_BUYERS_API_PATH.replace(
+        "[productId]",
+        encodeURIComponent(productId),
+      ),
+    ),
+    levyBuyersResponseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "loaded", buyers: read.value.data.buyers };
 }
 
 /** Abre Checkout para pagar el levy del precio `priceId` (#473). */

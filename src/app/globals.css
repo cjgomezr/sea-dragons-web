@@ -3469,7 +3469,8 @@ a.auth-brand-header:focus-visible {
 .directory-sheet-avatar,
 .directory-overview-avatar,
 .directory-request-avatar,
-.news-post-avatar {
+.news-post-avatar,
+.payments-buyer-avatar {
   display: flex;
   flex: none;
   align-items: center;
@@ -9601,10 +9602,6 @@ a.auth-brand-header:focus-visible {
   color: color-mix(in srgb, var(--color-success) 65%, var(--color-text));
 }
 
-.payments-extra .payments-levy-payers-open {
-  grid-column: 1 / -1;
-}
-
 /* Estrecho (el móvil #2a, y la tableta junto al menú, como el historial):
    nombre y precio a la izquierda, Comprar o Comprado a la derecha, en filas
    de al menos 56px. La descripción no cabe y se va; lo comprado queda bajo
@@ -9660,97 +9657,296 @@ a.auth-brand-header:focus-visible {
   justify-items: start;
 }
 
-/* Quién pagó cada levy (#531), sólo para Admin y Committee: el botón y la
-   lista ocupan la fila entera del levy, bajo su nombre y su acción. La tabla
-   es `.payments-table`, que en el móvil ya se apila en tarjetas. */
-.payments-levy-payers-open {
+/* La pestaña Extras del club de un Admin o un Committee (#635, RF-9 del PRD
+   de E23; "Tab: Club extras" del handoff de pagos): la tabla a la izquierda
+   y el detalle del elegido en una columna de 360px. Sin la columna ni la
+   ficha de Revenue (D3). Cuando el contenido no deja sitio a las dos
+   columnas (la tableta junto al menú), el detalle va debajo de la lista; el
+   móvil propio es #636. */
+.payments-club-extras {
+  container: payments-club-extras / inline-size;
+  margin-top: var(--space-4);
+}
+
+.payments-sales {
   display: grid;
-  flex: 1 1 100%;
-  gap: var(--space-3);
-  justify-items: start;
+  gap: var(--space-6);
   min-width: 0;
 }
 
-.payments-levy-payers {
+@container payments-club-extras (width >= 720px) {
+  .payments-sales {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    align-items: start;
+  }
+}
+
+.payments-sales-list {
   display: grid;
-  gap: var(--space-4);
-  justify-self: stretch;
+  gap: var(--space-3);
   min-width: 0;
-  padding-top: var(--space-3);
+}
+
+.payments-sales-lead {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
+}
+
+.payments-sales-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.payments-sales-table th,
+.payments-sales-table td {
+  box-sizing: border-box;
+  padding: 12px var(--space-4);
+  text-align: left;
+}
+
+.payments-sales-table th {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  background: var(--color-editor-bar);
+}
+
+.payments-sales-table th:nth-child(2) {
+  width: 116px;
+}
+
+.payments-sales-table th:nth-child(3) {
+  width: 96px;
+}
+
+.payments-sales-table th:not(:first-child) {
+  text-align: right;
+}
+
+.payments-sale-row {
+  position: relative;
+}
+
+.payments-sale-row td {
   border-top: 1px solid var(--color-border);
 }
 
-.payments-levy-payers p {
-  margin: 0;
+.payments-sale-row:hover {
+  background: color-mix(in srgb, var(--color-panel) 60%, transparent);
 }
 
-/* La acción va a su tamaño, como las demás de Pagos, no a lo ancho. */
-.payments-levy-export {
-  justify-self: start;
+.payments-sale-row:has(.payments-sale-select[aria-current="true"]) {
+  background: var(--color-panel);
+  box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
-.payments-levy-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-6);
-  margin: 0;
+.payments-sale-extra {
+  display: grid;
+  gap: 2px;
+}
+
+/* El botón ocupa la fila entera con su `::after`, y el foco se dibuja ahí:
+   alrededor de la fila y no sólo del nombre. */
+.payments-sale-select {
   padding: 0;
-  list-style: none;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: left;
+  overflow-wrap: anywhere;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
-.payments-levy-summary-label {
+.payments-sale-select::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+
+.payments-sale-select:focus-visible {
+  outline: none;
+}
+
+.payments-sale-select:focus-visible::after {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
+.payments-sale-description {
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payments-sale-number {
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  color: var(--color-text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.payments-sales-closed {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.payments-sales-closed-title,
+.payments-buyers-title {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-text-secondary);
 }
 
-.payments-levy-summary-value {
+.payments-sale-detail {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: 20px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.payments-sale-detail p {
+  margin: 0;
+}
+
+.payments-sale-detail-header {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.payments-sale-detail-name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.payments-sale-detail-description {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.payments-sale-detail-price {
+  font-size: 13px;
+  color: var(--color-text-soft);
+}
+
+.payments-sale-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+/* El número va arriba y la etiqueta debajo, como en el handoff; en el DOM la
+   etiqueta va primero para que se lea "Vendidos: 14". */
+.payments-sale-tile {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  padding: 10px 14px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.payments-sale-tile dt {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.payments-sale-tile dd {
+  margin: 0;
   font-family: var(--font-family-mono);
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--color-text);
 }
 
-.payments-levy-group {
+.payments-buyers-group {
   display: grid;
   gap: var(--space-2);
   min-width: 0;
 }
 
-.payments-levy-group h4 {
+/* Sólo scroll vertical: el nombre se parte y la fecha nunca se corta. */
+.payments-buyers {
+  max-height: 360px;
   margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.payments-levy-group .payments-table th:first-child,
-.payments-levy-group .payments-table td:first-child {
-  padding-left: 0;
-}
-
-/* En el móvil la tarjeta del pago ya está dentro de la del levy: sin el
-   margen lateral de la tabla, y con el nombre en la fila entera sobre la
-   fecha y el importe. Fuera del móvil ninguna de las dos cosas aplica. */
-.payments-levy-group .payments-table tbody {
   padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  list-style: none;
 }
 
-.payments-table .payments-levy-payer {
-  grid-column: 1 / -1;
+.payments-buyer {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.payments-buyer-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 10px;
+}
+
+.payments-buyer-name {
+  font-size: 13.5px;
   color: var(--color-text);
   overflow-wrap: anywhere;
 }
 
-.payments-levy-missing {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0;
-  padding-left: var(--space-6);
-  overflow-wrap: anywhere;
+.payments-buyer-units,
+.payments-buyer-date {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* La cantidad sólo sale con más de una unidad: sin ella, la fecha toma su
+   columna y queda igual de pegada al borde. */
+.payments-buyer-date {
+  grid-column: 4;
+}
+
+.payments-sale-export {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-size: 14px;
 }
 
 .payments-offer {

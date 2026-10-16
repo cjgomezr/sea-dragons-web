@@ -1232,24 +1232,33 @@ export const englishMessages = {
   "payments.levies.paid": "Bought",
   "payments.levies.boughtOn": "Bought {date}",
   "payments.levies.boughtCount": "Bought × {count}",
-  // Quién pagó cada levy (#531), sólo para Admin y Committee.
-  "payments.levyPayers.toggle": "Who paid",
-  "payments.levyPayers.loading": "Loading who paid…",
+  // Quién compró cada extra (#531, #635), sólo para Admin y Committee.
+  "payments.levyPayers.loading": "Loading buyers…",
   "payments.levyPayers.loadFailed":
-    "We couldn't load who paid this charge. Try again in a moment.",
+    "We couldn't load who bought this extra. Try again in a moment.",
   "payments.levyPayers.retry": "Try again",
-  "payments.levyPayers.summary.title": "Summary",
-  "payments.levyPayers.summary.paid": "Paid",
-  "payments.levyPayers.summary.missing": "Still to pay",
-  "payments.levyPayers.summary.collected": "Collected",
-  "payments.levyPayers.paidTitle": "Paid",
-  "payments.levyPayers.missingTitle": "Still to pay",
-  "payments.levyPayers.noPayments": "Nobody has paid this charge yet.",
-  "payments.levyPayers.noneMissing": "Every active member has paid it.",
-  "payments.levyPayers.column.name": "Name",
-  "payments.levyPayers.column.date": "Date",
-  "payments.levyPayers.column.amount": "Amount",
+  "payments.levyPayers.sold": "Sold",
+  "payments.levyPayers.buyers": "Buyers",
+  "payments.levyPayers.units": "× {count}",
+  "payments.levyPayers.noPayments": "Nobody has bought this extra yet.",
   "payments.levyPayers.export": "Export CSV",
+  // La pestaña Extras del club de un Admin o un Committee (#635, RF-9 del
+  // PRD de E23): lo vendido de cada extra, sin cifras de dinero (D3).
+  "payments.levySales.lead": {
+    one: "{count} extra on sale · created by the committee in Stripe",
+    other: "{count} extras on sale · created by the committee in Stripe",
+  },
+  "payments.levySales.column.extra": "Extra",
+  "payments.levySales.column.price": "Price",
+  "payments.levySales.column.sold": "Sold",
+  "payments.levySales.closedTitle": "Closed",
+  "payments.levySales.loading": "Loading the club extras…",
+  "payments.levySales.loadFailed":
+    "We couldn't load the club extras. Try again in a moment.",
+  "payments.levySales.empty":
+    "There are no club extras yet. The committee creates them in Stripe, and they show up here.",
+  "payments.levySales.notConfigured":
+    "Payments aren't set up yet. Club extras show up here once the club connects Stripe.",
   "payments.levyPayers.csv.column.name": "Name",
   "payments.levyPayers.csv.column.email": "Email",
   "payments.levyPayers.csv.column.units": "Units",
