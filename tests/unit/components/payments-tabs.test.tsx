@@ -49,6 +49,7 @@ const ACTIVE_FULL: MembershipView = {
 function levy(id: string, name: string): object {
   return {
     id,
+    productId: id.replace("price_", "prod_"),
     name,
     description: null,
     amountCents: 8000,

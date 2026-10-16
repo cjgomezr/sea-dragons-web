@@ -13,6 +13,11 @@ export const CARD_RETURN_QUERY_PARAM = "tarjeta";
 export const PACK_RETURN_QUERY_PARAM = "pack";
 /** La vuelta del pago de un levy (#473), otra sesión en modo `payment`. */
 export const LEVY_RETURN_QUERY_PARAM = "levy";
+/** Con `levy=ok` vuelven también el producto del extra pagado y cuántas
+ * unidades tenía el socio al abrir Checkout (#692): la pantalla espera hasta
+ * verlas subir. */
+export const LEVY_PRODUCT_QUERY_PARAM = "extra";
+export const LEVY_PURCHASED_BEFORE_QUERY_PARAM = "antes";
 export const CHECKOUT_RETURN_VALUES = ["ok", "cancelado"] as const;
 export type CheckoutReturn = (typeof CHECKOUT_RETURN_VALUES)[number];
 

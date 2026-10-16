@@ -265,6 +265,7 @@ const leviesResponseSchema = z.object({
     levies: z.array(
       z.object({
         id: z.string(),
+        productId: z.string(),
         name: z.string(),
         description: z.string().nullable(),
         amountCents: z.number().int(),

@@ -1893,6 +1893,7 @@ describe("PaymentsScreen: saldo de sesiones (#472)", () => {
 describe("PaymentsScreen: los extras del club del socio (#473, #633)", () => {
   const NATIONALS = {
     id: LEVY_PRICE,
+    productId: "prod_nationals",
     name: "Nationals 2026",
     description: "Entry for the national championship",
     amountCents: 8000,
@@ -1903,6 +1904,7 @@ describe("PaymentsScreen: los extras del club del socio (#473, #633)", () => {
   };
   const CAMP = {
     id: "price_camp",
+    productId: "prod_camp",
     name: "Winter camp",
     description: null,
     amountCents: 12000,
@@ -1913,6 +1915,7 @@ describe("PaymentsScreen: los extras del club del socio (#473, #633)", () => {
   };
   const JERSEY = {
     id: "price_jersey",
+    productId: "prod_jersey",
     name: "2026 club jersey",
     description: "Home and away jersey with your number",
     amountCents: 6000,

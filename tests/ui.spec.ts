@@ -15539,6 +15539,7 @@ const LEVIES_ENDPOINT = "/api/v1/levies";
 
 const NATIONALS_LEVY = {
   id: "price_levy_nationals",
+  productId: "prod_levy_nationals",
   name: "Australian Underwater Rugby Nationals 2026 entry",
   description: "Team entry for the national championship in Perth.",
   amountCents: 8000,
@@ -15550,6 +15551,7 @@ const NATIONALS_LEVY = {
 
 const POOL_HIRE_LEVY = {
   id: "price_levy_pool",
+  productId: "prod_levy_pool",
   name: "Extra pool hire",
   description: null,
   amountCents: 1250,
@@ -15575,6 +15577,7 @@ const ONE_PAID_LEVY: readonly object[] = [
  * venta. */
 const JERSEY_LEVY = {
   id: "price_levy_jersey",
+  productId: "prod_levy_jersey",
   name: "2026 club jersey",
   description: "Home and away jersey with your number, in the club colours.",
   amountCents: 6000,
