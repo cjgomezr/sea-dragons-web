@@ -18,7 +18,7 @@ import type { RsvpResponse } from "@/lib/events/event-rsvp";
  */
 
 const AGENDA_PATH = "/api/v1/events";
-const RSVP_CHOICE = /^(Yes|Maybe|No)$/;
+const RSVP_CHOICE = /^(Going|Maybe|Can't go)$/;
 
 const POOL_TRAINING: AgendaEvent = {
   id: "aaaaaaaa-0000-4000-8000-00000000000a",
@@ -107,6 +107,7 @@ function detailResponse(
     ...event,
     ...changes,
     coverUrl: null,
+    series: null,
     notes: null,
     going: [],
     maybe: [],
@@ -137,7 +138,7 @@ function stubApi(respond: Respond): void {
       const url = new URL(input, "http://localhost");
       const method = init?.method ?? "GET";
       requests.push({ method, path: `${url.pathname}${url.search}` });
-      // Los equipos de la fila desplegada (#403) tienen su propio test: aquí
+      // Los equipos del panel (#403) tienen su propio test: aquí
       // nunca hay reparto publicado.
       if (url.pathname.endsWith("/team")) {
         return jsonResponse(200, { data: { status: "not_published" } });
@@ -172,6 +173,14 @@ function agendaOrDetail(url: URL, events: readonly AgendaEvent[]): Response {
     : detailResponse(opened, {});
 }
 
+/** Las páginas de la agenda, sin el detalle ni los equipos que pide el
+ * evento elegido (#648). */
+function agendaPageRequests(): RecordedRequest[] {
+  return requests.filter(
+    (request) => request.path.split("?")[0] === AGENDA_PATH,
+  );
+}
+
 function rsvpPath(event: AgendaEvent): string {
   return `${AGENDA_PATH}/${event.id}/rsvp`;
 }
@@ -183,7 +192,10 @@ function rsvpRequests(event: AgendaEvent): RecordedRequest[] {
 }
 
 async function findRow(title: string): Promise<HTMLElement> {
-  const heading = await screen.findByRole("heading", { name: title });
+  const heading = await screen.findByRole("heading", {
+    level: 3,
+    name: title,
+  });
   const row = heading.closest("li");
   if (row === null) {
     throw new Error(`La fila de ${title} no es un elemento de la lista.`);
@@ -255,7 +267,9 @@ describe("agenda", () => {
     );
 
     await findRow(POOL_TRAINING.title);
-    expect(requests).toEqual([{ method: "GET", path: AGENDA_PATH }]);
+    expect(agendaPageRequests()).toEqual([
+      { method: "GET", path: AGENDA_PATH },
+    ]);
   });
 
   it("marca el evento cancelado y no le pone botones de RSVP", async () => {
@@ -270,9 +284,11 @@ describe("agenda", () => {
       />,
     );
 
-    const row = await expandRow(CANCELLED_SOCIAL.title);
-    expect(within(row).getByText("Cancelled")).toBeInTheDocument();
-    expect(within(row).queryByRole("button", { name: RSVP_CHOICE })).toBeNull();
+    const panel = await openPanel(CANCELLED_SOCIAL.title);
+    expect(within(panel).getByText("Cancelled")).toBeInTheDocument();
+    expect(
+      within(panel).queryByRole("button", { name: RSVP_CHOICE }),
+    ).toBeNull();
   });
 
   it("no le pone botones de RSVP a un evento fuera de la audiencia de quien organiza", async () => {
@@ -287,9 +303,11 @@ describe("agenda", () => {
       />,
     );
 
-    const row = await expandRow(COMMITTEE_ONLY.title);
-    expect(within(row).queryByRole("button", { name: RSVP_CHOICE })).toBeNull();
-    expect(within(row).getByText("18 going · 1 maybe")).toBeInTheDocument();
+    const panel = await openPanel(COMMITTEE_ONLY.title);
+    expect(
+      within(panel).queryByRole("button", { name: RSVP_CHOICE }),
+    ).toBeNull();
+    expectCounts(panel, { going: "Going · 18", maybe: "1 maybe" });
   });
 
   it("dice con una frase que no hay eventos", async () => {
@@ -330,7 +348,7 @@ describe("agenda", () => {
 
     await findRow(SCRIMMAGE.title);
     expect(await findRow(POOL_TRAINING.title)).toBeInTheDocument();
-    expect(requests.at(-1)).toEqual({
+    expect(agendaPageRequests().at(-1)).toEqual({
       method: "GET",
       path: `${AGENDA_PATH}?cursor=pagina-2`,
     });
@@ -355,14 +373,14 @@ describe("agenda", () => {
     );
     await findRow(POOL_TRAINING.title);
     expect(
-      screen.getByRole("heading", { name: POOL_TRAINING.title }),
+      screen.getByRole("heading", { level: 3, name: POOL_TRAINING.title }),
     ).not.toHaveFocus();
 
     await userEvent.click(screen.getByRole("button", { name: "See more" }));
 
     await waitFor(() =>
       expect(
-        screen.getByRole("heading", { name: SCRIMMAGE.title }),
+        screen.getByRole("heading", { level: 3, name: SCRIMMAGE.title }),
       ).toHaveFocus(),
     );
   });
@@ -423,7 +441,8 @@ describe("agenda", () => {
       />,
     );
 
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
+    const row = await findRow(POOL_TRAINING.title);
     expect(
       screen.getByRole("heading", { level: 1, name: "Próximos eventos" }),
     ).toBeInTheDocument();
@@ -431,9 +450,9 @@ describe("agenda", () => {
     expect(within(row).getByText("Entrenamiento")).toBeInTheDocument();
     expect(within(row).getByText("19:00")).toBeInTheDocument();
     expect(within(row).getByText("14 van")).toBeInTheDocument();
-    expect(within(row).getByText("14 van · 2 quizás")).toBeInTheDocument();
-    expect(rsvpButton(row, "Sí")).toBeInTheDocument();
-    expect(rsvpButton(row, "Quizás")).toBeInTheDocument();
+    expectCounts(panel, { going: "Van · 14", maybe: "2 quizás" });
+    expect(rsvpButton(panel, "Voy")).toBeInTheDocument();
+    expect(rsvpButton(panel, "Quizás")).toBeInTheDocument();
     const cancelled = await findRow(CANCELLED_SOCIAL.title);
     expect(within(cancelled).getByText("Cancelado")).toBeInTheDocument();
   });
@@ -472,7 +491,7 @@ describe("agenda", () => {
   });
 });
 
-describe("RSVP en la fila", () => {
+describe("RSVP en el panel", () => {
   it("anuncia qué respuesta está elegida", async () => {
     stubAgenda([POOL_TRAINING]);
 
@@ -485,21 +504,19 @@ describe("RSVP en la fila", () => {
       />,
     );
 
-    const row = await expandRow(POOL_TRAINING.title);
-    const group = within(row).getByRole("group", {
+    const panel = await openPanel(POOL_TRAINING.title);
+    const group = within(panel).getByRole("group", {
       name: `RSVP: ${POOL_TRAINING.title}`,
     });
-    expect(within(group).getByRole("button", { name: "Yes" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(
+      within(group).getByRole("button", { name: "Going" }),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(
       within(group).getByRole("button", { name: "Maybe" }),
     ).toHaveAttribute("aria-pressed", "false");
-    expect(within(group).getByRole("button", { name: "No" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    expect(
+      within(group).getByRole("button", { name: "Can't go" }),
+    ).toHaveAttribute("aria-pressed", "false");
   });
 
   it("guarda la respuesta con un toque, la marca y pone los conteos que devuelve la API", async () => {
@@ -526,15 +543,18 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await expandRow(SCRIMMAGE.title);
+    const panel = await openPanel(SCRIMMAGE.title);
 
-    await userEvent.click(rsvpButton(row, "Maybe"));
+    await userEvent.click(rsvpButton(panel, "Maybe"));
 
     await waitFor(() =>
-      expect(rsvpButton(row, "Maybe")).toHaveAttribute("aria-pressed", "true"),
+      expect(rsvpButton(panel, "Maybe")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
     );
-    expect(within(row).getByText("20 going · 4 maybe")).toBeInTheDocument();
-    expect(rsvpButton(row, "Yes")).toHaveAttribute("aria-pressed", "false");
+    expectCounts(panel, { going: "Going · 20", maybe: "4 maybe" });
+    expect(rsvpButton(panel, "Going")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("si la respuesta se guardó pero los conteos no llegan, los recuenta con la respuesta anterior", async () => {
@@ -559,15 +579,18 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    await userEvent.click(rsvpButton(row, "Maybe"));
+    await userEvent.click(rsvpButton(panel, "Maybe"));
 
     await waitFor(() =>
-      expect(rsvpButton(row, "Maybe")).toHaveAttribute("aria-pressed", "true"),
+      expect(rsvpButton(panel, "Maybe")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
     );
-    expect(within(row).getByText("13 going · 3 maybe")).toBeInTheDocument();
-    expect(within(row).queryByRole("alert")).not.toBeInTheDocument();
+    expectCounts(panel, { going: "Going · 13", maybe: "3 maybe" });
+    expect(within(panel).queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("no manda una segunda petición si se toca otra vez mientras guarda", async () => {
@@ -591,21 +614,24 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await expandRow(SCRIMMAGE.title);
+    const panel = await openPanel(SCRIMMAGE.title);
 
-    await userEvent.click(rsvpButton(row, "Yes"));
-    await userEvent.click(rsvpButton(row, "Yes"));
-    await userEvent.click(rsvpButton(row, "No"));
+    await userEvent.click(rsvpButton(panel, "Going"));
+    await userEvent.click(rsvpButton(panel, "Going"));
+    await userEvent.click(rsvpButton(panel, "Can't go"));
 
     expect(rsvpRequests(SCRIMMAGE)).toHaveLength(1);
     finishSaving(savedResponse(SCRIMMAGE.id, "yes"));
     await waitFor(() =>
-      expect(rsvpButton(row, "Yes")).toHaveAttribute("aria-pressed", "true"),
+      expect(rsvpButton(panel, "Going")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
     );
     expect(rsvpRequests(SCRIMMAGE)).toHaveLength(1);
   });
 
-  it("con un fallo de red lo dice en la fila, no marca el botón y deja reintentar", async () => {
+  it("con un fallo de red lo dice en el panel, no marca el botón y deja reintentar", async () => {
     let attempts = 0;
     stubApi(({ method, url }) => {
       if (method === "PUT") {
@@ -628,26 +654,29 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await expandRow(SCRIMMAGE.title);
+    const panel = await openPanel(SCRIMMAGE.title);
 
-    await userEvent.click(rsvpButton(row, "Yes"));
+    await userEvent.click(rsvpButton(panel, "Going"));
 
-    expect(await within(row).findByRole("alert")).toHaveTextContent(
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
       "We couldn't save your answer. Check your connection and try again.",
     );
-    expect(rsvpButton(row, "Yes")).toHaveAttribute("aria-pressed", "false");
-    expect(within(row).getByText("18 going · 1 maybe")).toBeInTheDocument();
+    expect(rsvpButton(panel, "Going")).toHaveAttribute("aria-pressed", "false");
+    expectCounts(panel, { going: "Going · 18", maybe: "1 maybe" });
 
-    await userEvent.click(rsvpButton(row, "Yes"));
+    await userEvent.click(rsvpButton(panel, "Going"));
 
     await waitFor(() =>
-      expect(rsvpButton(row, "Yes")).toHaveAttribute("aria-pressed", "true"),
+      expect(rsvpButton(panel, "Going")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
     );
-    expect(within(row).queryByRole("alert")).not.toBeInTheDocument();
-    expect(within(row).getByText("19 going · 1 maybe")).toBeInTheDocument();
+    expect(within(panel).queryByRole("alert")).not.toBeInTheDocument();
+    expectCounts(panel, { going: "Going · 19", maybe: "1 maybe" });
   });
 
-  it("con un 422 de evento empezado lo dice en la fila y deja la respuesta que había", async () => {
+  it("con un 422 de evento empezado lo dice en el panel y deja la respuesta que había", async () => {
     stubApi(({ method, url }) =>
       method === "PUT"
         ? startedResponse()
@@ -661,16 +690,19 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    await userEvent.click(rsvpButton(row, "No"));
+    await userEvent.click(rsvpButton(panel, "Can't go"));
 
-    expect(await within(row).findByRole("alert")).toHaveTextContent(
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
       "This event has already started, so you can't answer anymore.",
     );
-    expect(rsvpButton(row, "No")).toHaveAttribute("aria-pressed", "false");
-    expect(rsvpButton(row, "Yes")).toHaveAttribute("aria-pressed", "true");
-    expect(within(row).getByText("14 going · 2 maybe")).toBeInTheDocument();
+    expect(rsvpButton(panel, "Can't go")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(rsvpButton(panel, "Going")).toHaveAttribute("aria-pressed", "true");
+    expectCounts(panel, { going: "Going · 14", maybe: "2 maybe" });
   });
 
   it("tras un 422 se puede volver a intentar y manda otra petición", async () => {
@@ -687,11 +719,11 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await expandRow(POOL_TRAINING.title);
-    await userEvent.click(rsvpButton(row, "No"));
-    await within(row).findByRole("alert");
+    const panel = await openPanel(POOL_TRAINING.title);
+    await userEvent.click(rsvpButton(panel, "Can't go"));
+    await within(panel).findByRole("alert");
 
-    await userEvent.click(rsvpButton(row, "No"));
+    await userEvent.click(rsvpButton(panel, "Can't go"));
 
     await waitFor(() => expect(rsvpRequests(POOL_TRAINING)).toHaveLength(2));
   });
@@ -716,14 +748,14 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await expandRow(SCRIMMAGE.title);
+    const panel = await openPanel(SCRIMMAGE.title);
 
-    await userEvent.click(rsvpButton(row, "Yes"));
+    await userEvent.click(rsvpButton(panel, "Going"));
 
-    expect(await within(row).findByRole("alert")).toHaveTextContent(
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
       "This event was cancelled, so you can't answer anymore.",
     );
-    expect(rsvpButton(row, "Yes")).toHaveAttribute("aria-pressed", "false");
+    expect(rsvpButton(panel, "Going")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("dice el error de RSVP en español", async () => {
@@ -740,11 +772,11 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    await userEvent.click(rsvpButton(row, "No"));
+    await userEvent.click(rsvpButton(panel, "No puedo"));
 
-    expect(await within(row).findByRole("alert")).toHaveTextContent(
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
       "Este evento ya empezó: ya no se puede responder.",
     );
   });
@@ -766,7 +798,9 @@ function eventPath(event: AgendaEvent): string {
 }
 
 function openedResponse(event: AgendaEvent, extras: DetailExtras): Response {
-  return jsonResponse(200, { data: { ...event, ...extras } });
+  return jsonResponse(200, {
+    data: { ...event, coverUrl: null, series: null, ...extras },
+  });
 }
 
 /** La agenda de una página y el detalle de sus eventos con lo que se pase. */
@@ -792,15 +826,37 @@ function rowToggle(row: HTMLElement, title: string): HTMLElement {
   return within(row).getByRole("button", { name: title });
 }
 
-async function expandRow(title: string): Promise<HTMLElement> {
+const LOADING_DETAIL = /Loading the details|Cargando el detalle/;
+
+/** Elige la fila si no lo estaba (la primera ya llega elegida) y devuelve el
+ * panel del evento (#648) cuando su detalle ya llegó o falló. */
+async function openPanel(title: string): Promise<HTMLElement> {
   const row = await findRow(title);
-  await userEvent.click(rowToggle(row, title));
-  return row;
+  const toggle = rowToggle(row, title);
+  if (toggle.getAttribute("aria-current") !== "true") {
+    await userEvent.click(toggle);
+  }
+  const panel = await screen.findByRole("complementary", { name: title });
+  await waitFor(() =>
+    expect(within(panel).queryByText(LOADING_DETAIL)).toBeNull(),
+  );
+  return panel;
 }
 
-describe("fila desplegable", () => {
-  it("empieza plegada y sin pedir el detalle", async () => {
-    stubAgendaWithDetail([POOL_TRAINING], WITH_RESPONSES);
+/** Los conteos del panel: "Going · 18" y "1 maybe". */
+function expectCounts(
+  panel: HTMLElement,
+  counts: { readonly going: string; readonly maybe: string },
+): void {
+  expect(within(panel).getByText(counts.going)).toBeInTheDocument();
+  expect(within(panel).getByText(counts.maybe)).toBeInTheDocument();
+}
+
+// #648: lo que enseñaba el acordeón de la fila (#312) lo enseña ahora el panel
+// del evento elegido.
+describe("detalle en el panel", () => {
+  it("al abrir pide sólo el detalle del primer evento, que llega elegido", async () => {
+    stubAgendaWithDetail([POOL_TRAINING, SCRIMMAGE], WITH_RESPONSES);
 
     render(
       <AgendaScreen
@@ -811,16 +867,12 @@ describe("fila desplegable", () => {
       />,
     );
 
-    const row = await findRow(POOL_TRAINING.title);
-    expect(rowToggle(row, POOL_TRAINING.title)).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-    expect(within(row).queryByText(TRAINING_NOTES)).not.toBeInTheDocument();
-    expect(detailRequests(POOL_TRAINING)).toEqual([]);
+    await openPanel(POOL_TRAINING.title);
+    expect(detailRequests(POOL_TRAINING)).toHaveLength(1);
+    expect(detailRequests(SCRIMMAGE)).toEqual([]);
   });
 
-  it("al pulsarla se despliega con las notas y los nombres de quienes van y quizás", async () => {
+  it("enseña las notas y, con Ver todos, los nombres de quienes van y quizás", async () => {
     stubAgendaWithDetail([POOL_TRAINING], WITH_RESPONSES);
     render(
       <AgendaScreen
@@ -830,25 +882,24 @@ describe("fila desplegable", () => {
         canRespond
       />,
     );
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    const row = await expandRow(POOL_TRAINING.title);
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "See all" }),
+    );
 
-    expect(await within(row).findByText(TRAINING_NOTES)).toBeInTheDocument();
-    const going = within(row).getByRole("list", { name: "Going" });
+    expect(within(panel).getByText(TRAINING_NOTES)).toBeInTheDocument();
+    const going = within(panel).getByRole("list", { name: "Going" });
     expect(
       within(going)
         .getAllByRole("listitem")
         .map((item) => item.textContent),
     ).toEqual(["Ana Ruiz", "Liam O'Connor"]);
-    const maybe = within(row).getByRole("list", { name: "Maybe" });
+    const maybe = within(panel).getByRole("list", { name: "Maybe" });
     expect(within(maybe).getByText("Mia Chen")).toBeInTheDocument();
-    expect(rowToggle(row, POOL_TRAINING.title)).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
   });
 
-  it("pide sólo el detalle del evento que se despliega", async () => {
+  it("pide el detalle del evento que se elige", async () => {
     stubAgendaWithDetail([POOL_TRAINING, SCRIMMAGE], WITH_RESPONSES);
     render(
       <AgendaScreen
@@ -859,15 +910,14 @@ describe("fila desplegable", () => {
       />,
     );
 
-    const row = await expandRow(SCRIMMAGE.title);
+    const panel = await openPanel(SCRIMMAGE.title);
 
-    await within(row).findByText(TRAINING_NOTES);
+    expect(within(panel).getByText(TRAINING_NOTES)).toBeInTheDocument();
     expect(detailRequests(SCRIMMAGE)).toHaveLength(1);
-    expect(detailRequests(POOL_TRAINING)).toEqual([]);
   });
 
-  it("al pulsarla otra vez se pliega y al volver a abrirla no pide de nuevo", async () => {
-    stubAgendaWithDetail([POOL_TRAINING], WITH_RESPONSES);
+  it("al volver a elegir un evento no pide su detalle otra vez", async () => {
+    stubAgendaWithDetail([POOL_TRAINING, SCRIMMAGE], WITH_RESPONSES);
     render(
       <AgendaScreen
         locale="en"
@@ -876,22 +926,18 @@ describe("fila desplegable", () => {
         canRespond
       />,
     );
-    const row = await expandRow(POOL_TRAINING.title);
-    await within(row).findByText(TRAINING_NOTES);
+    await openPanel(POOL_TRAINING.title);
+    await openPanel(SCRIMMAGE.title);
 
-    await userEvent.click(rowToggle(row, POOL_TRAINING.title));
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    expect(rowToggle(row, POOL_TRAINING.title)).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-    expect(within(row).queryByText(TRAINING_NOTES)).not.toBeInTheDocument();
-    await userEvent.click(rowToggle(row, POOL_TRAINING.title));
-    expect(within(row).getByText(TRAINING_NOTES)).toBeInTheDocument();
+    expect(within(panel).getByText(TRAINING_NOTES)).toBeInTheDocument();
     expect(detailRequests(POOL_TRAINING)).toHaveLength(1);
   });
 
-  it("dice con una frase que el evento no tiene notas", async () => {
+  // El diseño de E24 sólo pinta NOTES cuando las hay (#648): la frase de
+  // "no tiene notas" del acordeón ya no sale.
+  it("sin notas no pinta el apartado de notas", async () => {
     stubAgendaWithDetail([POOL_TRAINING], { ...WITH_RESPONSES, notes: null });
     render(
       <AgendaScreen
@@ -902,11 +948,10 @@ describe("fila desplegable", () => {
       />,
     );
 
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    expect(
-      await within(row).findByText("This event has no notes."),
-    ).toBeInTheDocument();
+    expect(within(panel).queryByRole("heading", { name: "Notes" })).toBeNull();
+    expect(within(panel).queryByText("This event has no notes.")).toBeNull();
   });
 
   it("dice con una frase que nadie ha respondido todavía", async () => {
@@ -924,12 +969,12 @@ describe("fila desplegable", () => {
       />,
     );
 
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
     expect(
-      await within(row).findByText("Nobody has answered yet."),
+      within(panel).getByText("Nobody has answered yet."),
     ).toBeInTheDocument();
-    expect(within(row).queryByRole("list")).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("list")).not.toBeInTheDocument();
   });
 
   it("dice que nadie va todavía si sólo hay quizás", async () => {
@@ -946,11 +991,14 @@ describe("fila desplegable", () => {
         canRespond
       />,
     );
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    const row = await expandRow(POOL_TRAINING.title);
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "See all" }),
+    );
 
-    expect(await within(row).findByText("Nobody yet.")).toBeInTheDocument();
-    expect(within(row).getByText("Mia Chen")).toBeInTheDocument();
+    expect(within(panel).getByText("Nobody yet.")).toBeInTheDocument();
+    expect(within(panel).getByText("Mia Chen")).toBeInTheDocument();
   });
 
   it("a quien organiza le enseña que el evento va a todo el club", async () => {
@@ -967,10 +1015,9 @@ describe("fila desplegable", () => {
       />,
     );
 
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    expect(await within(row).findByText("Audience")).toBeInTheDocument();
-    expect(within(row).getByText("The whole club")).toBeInTheDocument();
+    expect(within(panel).getByText("The whole club")).toBeInTheDocument();
   });
 
   it("a quien organiza le enseña los nombres de los grupos de la audiencia", async () => {
@@ -993,11 +1040,9 @@ describe("fila desplegable", () => {
       />,
     );
 
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    expect(
-      await within(row).findByText("Juniors, Masters"),
-    ).toBeInTheDocument();
+    expect(within(panel).getByText("Juniors · Masters")).toBeInTheDocument();
   });
 
   it("dice que la audiencia se quedó sin grupos", async () => {
@@ -1014,10 +1059,10 @@ describe("fila desplegable", () => {
       />,
     );
 
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
     expect(
-      await within(row).findByText(
+      within(panel).getByText(
         "No groups: only Admins and the Committee see it.",
       ),
     ).toBeInTheDocument();
@@ -1034,13 +1079,13 @@ describe("fila desplegable", () => {
       />,
     );
 
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    await within(row).findByText(TRAINING_NOTES);
-    expect(within(row).queryByText("Audience")).not.toBeInTheDocument();
+    expect(within(panel).getByText(TRAINING_NOTES)).toBeInTheDocument();
+    expect(within(panel).queryByText("The whole club")).not.toBeInTheDocument();
   });
 
-  it("si el detalle no carga lo dice en la fila y deja reintentar", async () => {
+  it("si el detalle no carga lo dice en el panel y deja reintentar", async () => {
     let attempts = 0;
     stubApi(({ url }) => {
       if (url.pathname === eventPath(POOL_TRAINING)) {
@@ -1060,21 +1105,21 @@ describe("fila desplegable", () => {
         canRespond
       />,
     );
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    expect(await within(row).findByRole("alert")).toHaveTextContent(
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
       /couldn't reach the server/i,
     );
     await userEvent.click(
-      within(row).getByRole("button", { name: "Try again" }),
+      within(panel).getByRole("button", { name: "Try again" }),
     );
 
-    expect(await within(row).findByText(TRAINING_NOTES)).toBeInTheDocument();
-    expect(within(row).queryByRole("alert")).not.toBeInTheDocument();
+    expect(await within(panel).findByText(TRAINING_NOTES)).toBeInTheDocument();
+    expect(within(panel).queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("se despliega y se pliega con Enter y con Espacio", async () => {
-    stubAgendaWithDetail([POOL_TRAINING], WITH_RESPONSES);
+  it("elige una fila con Enter y otra con Espacio", async () => {
+    stubAgendaWithDetail([POOL_TRAINING, SCRIMMAGE], WITH_RESPONSES);
     render(
       <AgendaScreen
         locale="en"
@@ -1083,19 +1128,32 @@ describe("fila desplegable", () => {
         canRespond
       />,
     );
-    const row = await findRow(POOL_TRAINING.title);
-    const toggle = rowToggle(row, POOL_TRAINING.title);
-    toggle.focus();
+    await openPanel(POOL_TRAINING.title);
+    const scrimmage = rowToggle(
+      await findRow(SCRIMMAGE.title),
+      SCRIMMAGE.title,
+    );
+    const training = rowToggle(
+      await findRow(POOL_TRAINING.title),
+      POOL_TRAINING.title,
+    );
 
+    scrimmage.focus();
     await userEvent.keyboard("{Enter}");
-    expect(await within(row).findByText(TRAINING_NOTES)).toBeInTheDocument();
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(
+      await screen.findByRole("complementary", { name: SCRIMMAGE.title }),
+    ).toBeInTheDocument();
+    expect(scrimmage).toHaveAttribute("aria-current", "true");
 
+    training.focus();
     await userEvent.keyboard(" ");
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(
+      await screen.findByRole("complementary", { name: POOL_TRAINING.title }),
+    ).toBeInTheDocument();
+    expect(scrimmage).not.toHaveAttribute("aria-current");
   });
 
-  it("el botón de la fila apunta a la zona que despliega", async () => {
+  it("el botón de la fila apunta al panel que llena", async () => {
     stubAgendaWithDetail([POOL_TRAINING], WITH_RESPONSES);
     render(
       <AgendaScreen
@@ -1105,20 +1163,19 @@ describe("fila desplegable", () => {
         canRespond
       />,
     );
-    const row = await expandRow(POOL_TRAINING.title);
-    await within(row).findByText(TRAINING_NOTES);
+    const panel = await openPanel(POOL_TRAINING.title);
+    const row = await findRow(POOL_TRAINING.title);
 
     const controlled = rowToggle(row, POOL_TRAINING.title).getAttribute(
       "aria-controls",
     );
 
     expect(controlled).not.toBeNull();
-    expect(document.getElementById(controlled ?? "")).toHaveTextContent(
-      TRAINING_NOTES,
-    );
+    expect(document.getElementById(controlled ?? "")).toBe(panel);
+    expect(panel).toHaveTextContent(TRAINING_NOTES);
   });
 
-  it("al responder con la fila desplegada pone los nombres que devuelve la API", async () => {
+  it("al responder en el panel pone los nombres que devuelve la API", async () => {
     stubApi(({ method, url }) => {
       if (method === "PUT") {
         return savedResponse(SCRIMMAGE.id, "yes");
@@ -1144,14 +1201,15 @@ describe("fila desplegable", () => {
         canRespond
       />,
     );
-    const row = await expandRow(SCRIMMAGE.title);
-    await within(row).findByText("Liam O'Connor");
+    const panel = await openPanel(SCRIMMAGE.title);
+    await within(panel).findByText("Liam O'Connor");
 
-    await userEvent.click(rsvpButton(row, "Yes"));
+    await userEvent.click(rsvpButton(panel, "Going"));
 
-    expect(await within(row).findByText("Zoe Park")).toBeInTheDocument();
-    expect(within(row).queryByText("Liam O'Connor")).not.toBeInTheDocument();
+    expect(await within(panel).findByText("Zoe Park")).toBeInTheDocument();
+    expect(within(panel).queryByText("Liam O'Connor")).not.toBeInTheDocument();
   });
+
   it("un detalle que llega tarde no pisa los nombres que trajo una respuesta", async () => {
     let finishFirstOpening: (response: Response) => void = () => undefined;
     let openings = 0;
@@ -1181,17 +1239,21 @@ describe("fila desplegable", () => {
         canRespond
       />,
     );
-    const row = await expandRow(SCRIMMAGE.title);
-    await userEvent.click(rsvpButton(row, "Yes"));
-    await within(row).findByText("Zoe Park");
+    // El primer detalle no llega: el panel sigue cargando mientras responde.
+    const panel = await screen.findByRole("complementary", {
+      name: SCRIMMAGE.title,
+    });
+    await userEvent.click(rsvpButton(panel, "Going"));
+    await within(panel).findByText("Zoe Park");
 
     finishFirstOpening(openedResponse(SCRIMMAGE, WITH_RESPONSES));
 
     await waitFor(() => expect(openings).toBe(2));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(within(row).getByText("Zoe Park")).toBeInTheDocument();
-    expect(within(row).queryByText("Liam O'Connor")).not.toBeInTheDocument();
+    expect(within(panel).getByText("Zoe Park")).toBeInTheDocument();
+    expect(within(panel).queryByText("Liam O'Connor")).not.toBeInTheDocument();
   });
+
   it("escribe el detalle en español", async () => {
     stubAgendaWithDetail([POOL_TRAINING], {
       notes: null,
@@ -1208,19 +1270,15 @@ describe("fila desplegable", () => {
       />,
     );
 
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
     expect(
-      await within(row).findByText("Este evento no tiene notas."),
+      within(panel).getByText("Todavía no ha respondido nadie."),
     ).toBeInTheDocument();
-    expect(
-      within(row).getByText("Todavía no ha respondido nadie."),
-    ).toBeInTheDocument();
-    expect(within(row).getByText("Audiencia")).toBeInTheDocument();
-    expect(within(row).getByText("Todo el club")).toBeInTheDocument();
+    expect(within(panel).getByText("Todo el club")).toBeInTheDocument();
+    expect(within(panel).queryByRole("heading", { name: "Notas" })).toBeNull();
   });
 });
-
 const PAST_MATCH: AgendaEvent = {
   ...SCRIMMAGE,
   id: "eeeeeeee-0000-4000-8000-00000000000e",
@@ -1287,7 +1345,7 @@ describe("próximos y pasados", () => {
         .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent),
     ).toEqual([PAST_MATCH.title, OLDER_PAST_TRAINING.title]);
-    expect(requests.at(-1)).toEqual({
+    expect(agendaPageRequests().at(-1)).toEqual({
       method: "GET",
       path: `${AGENDA_PATH}?period=past`,
     });
@@ -1311,12 +1369,14 @@ describe("próximos y pasados", () => {
 
     await userEvent.click(periodButton("Past"));
 
-    const row = await expandRow(PAST_MATCH.title);
-    expect(within(row).queryByRole("button", { name: RSVP_CHOICE })).toBeNull();
-    expect(within(row).getByText("18 going · 1 maybe")).toBeInTheDocument();
+    const panel = await openPanel(PAST_MATCH.title);
+    expect(
+      within(panel).queryByRole("button", { name: RSVP_CHOICE }),
+    ).toBeNull();
+    expectCounts(panel, { going: "Going · 18", maybe: "1 maybe" });
   });
 
-  it("un pasado también se despliega", async () => {
+  it("un pasado también se abre en el panel", async () => {
     stubApi(({ url }) => {
       if (url.pathname === eventPath(PAST_MATCH)) {
         return openedResponse(PAST_MATCH, WITH_RESPONSES);
@@ -1336,9 +1396,9 @@ describe("próximos y pasados", () => {
     await findRow(POOL_TRAINING.title);
     await userEvent.click(periodButton("Past"));
 
-    const row = await expandRow(PAST_MATCH.title);
+    const panel = await openPanel(PAST_MATCH.title);
 
-    expect(await within(row).findByText(TRAINING_NOTES)).toBeInTheDocument();
+    expect(await within(panel).findByText(TRAINING_NOTES)).toBeInTheDocument();
   });
 
   it("trae más pasados con el cursor y el periodo", async () => {
@@ -1365,7 +1425,7 @@ describe("próximos y pasados", () => {
     await userEvent.click(screen.getByRole("button", { name: "See more" }));
 
     expect(await findRow(OLDER_PAST_TRAINING.title)).toBeInTheDocument();
-    expect(requests.at(-1)).toEqual({
+    expect(agendaPageRequests().at(-1)).toEqual({
       method: "GET",
       path: `${AGENDA_PATH}?period=past&cursor=pasados-2`,
     });
@@ -1400,14 +1460,16 @@ describe("próximos y pasados", () => {
         canRespond
       />,
     );
-    const row = await expandRow(POOL_TRAINING.title);
-    await within(row).findByText(TRAINING_NOTES);
+    const panel = await openPanel(POOL_TRAINING.title);
+    await within(panel).findByText(TRAINING_NOTES);
     await userEvent.click(periodButton("Past"));
     await screen.findByRole("list", { name: "Past events" });
 
     await userEvent.click(periodButton("Upcoming"));
 
-    const again = await findRow(POOL_TRAINING.title);
+    const again = await screen.findByRole("complementary", {
+      name: POOL_TRAINING.title,
+    });
     expect(within(again).getByText(TRAINING_NOTES)).toBeInTheDocument();
     expect(
       requests.filter((request) => request.path === AGENDA_PATH),
@@ -1443,7 +1505,7 @@ describe("próximos y pasados", () => {
 
 // "Pasar lista" (#395): lleva a Asistencia con la sesión abierta, sólo a
 // quien registra asistencia y sólo en un entrenamiento que ya empezó.
-describe("pasar lista desde la fila", () => {
+describe("pasar lista desde el panel", () => {
   // El martes 23 de junio de 2026 a las 20:00 de Melbourne: el entrenamiento
   // de las 19:00 ya empezó.
   const TRAINING_EVENING = new Date("2026-06-23T10:00:00Z");
@@ -1457,11 +1519,11 @@ describe("pasar lista desde la fila", () => {
     vi.useRealTimers();
   });
 
-  function takeAttendanceLink(row: HTMLElement): HTMLElement | null {
-    return within(row).queryByRole("link", { name: "Take attendance" });
+  function takeAttendanceLink(panel: HTMLElement): HTMLElement | null {
+    return within(panel).queryByRole("link", { name: "Take attendance" });
   }
 
-  async function expandedRow(
+  async function panelOf(
     event: AgendaEvent,
     canTakeAttendance: boolean,
   ): Promise<HTMLElement> {
@@ -1474,51 +1536,48 @@ describe("pasar lista desde la fila", () => {
         canRespond
       />,
     );
-    const row = await expandRow(event.title);
-    await within(row).findByText(TRAINING_NOTES);
-    return row;
+    const panel = await openPanel(event.title);
+    await within(panel).findByText(TRAINING_NOTES);
+    return panel;
   }
 
   it("a quien pasa lista le ofrece Pasar lista en un entrenamiento empezado, con la sesión en la dirección", async () => {
-    const row = await expandedRow(POOL_TRAINING, true);
+    const panel = await panelOf(POOL_TRAINING, true);
 
-    expect(takeAttendanceLink(row)).toHaveAttribute(
+    expect(takeAttendanceLink(panel)).toHaveAttribute(
       "href",
       `/asistencia?sesion=${POOL_TRAINING.id}`,
     );
   });
 
   it("no lo ofrece antes de que el entrenamiento empiece", async () => {
-    const row = await expandedRow(
-      { ...POOL_TRAINING, startTime: "21:00" },
-      true,
-    );
+    const panel = await panelOf({ ...POOL_TRAINING, startTime: "21:00" }, true);
 
-    expect(takeAttendanceLink(row)).toBeNull();
+    expect(takeAttendanceLink(panel)).toBeNull();
   });
 
   it("no lo ofrece en un evento que no es de entrenamiento", async () => {
-    const row = await expandedRow(
+    const panel = await panelOf(
       { ...POOL_TRAINING, eventType: "competition" },
       true,
     );
 
-    expect(takeAttendanceLink(row)).toBeNull();
+    expect(takeAttendanceLink(panel)).toBeNull();
   });
 
   it("no lo ofrece en un entrenamiento cancelado", async () => {
-    const row = await expandedRow(
+    const panel = await panelOf(
       { ...POOL_TRAINING, status: "cancelled" },
       true,
     );
 
-    expect(takeAttendanceLink(row)).toBeNull();
+    expect(takeAttendanceLink(panel)).toBeNull();
   });
 
   it("no se lo ofrece a quien no pasa lista", async () => {
-    const row = await expandedRow(POOL_TRAINING, false);
+    const panel = await panelOf(POOL_TRAINING, false);
 
-    expect(takeAttendanceLink(row)).toBeNull();
+    expect(takeAttendanceLink(panel)).toBeNull();
   });
 
   it("también lo ofrece en un entrenamiento de los pasados", async () => {
@@ -1542,10 +1601,10 @@ describe("pasar lista desde la fila", () => {
       await screen.findByRole("button", { name: "Pasados" }),
     );
 
-    const row = await expandRow(OLDER_PAST_TRAINING.title);
+    const panel = await openPanel(OLDER_PAST_TRAINING.title);
 
     expect(
-      await within(row).findByRole("link", { name: "Pasar lista" }),
+      await within(panel).findByRole("link", { name: "Pasar lista" }),
     ).toHaveAttribute("href", `/asistencia?sesion=${OLDER_PAST_TRAINING.id}`);
   });
 });
@@ -1566,6 +1625,7 @@ describe("llegar a un evento desde la búsqueda", () => {
     );
 
     const title = await screen.findByRole("heading", {
+      level: 3,
       name: SCRIMMAGE.title,
     });
     await waitFor(() => expect(title).toHaveFocus());
@@ -1588,12 +1648,12 @@ describe("llegar a un evento desde la búsqueda", () => {
     expect(
       await screen.findByRole("list", { name: "Past events" }),
     ).toBeInTheDocument();
-    expect(requests).toEqual([
+    expect(agendaPageRequests()).toEqual([
       { method: "GET", path: `${AGENDA_PATH}?period=past` },
     ]);
     await waitFor(() =>
       expect(
-        screen.getByRole("heading", { name: POOL_TRAINING.title }),
+        screen.getByRole("heading", { level: 3, name: POOL_TRAINING.title }),
       ).toHaveFocus(),
     );
   });
@@ -1616,10 +1676,11 @@ describe("llegar a un evento desde la búsqueda", () => {
     );
 
     const title = await screen.findByRole("heading", {
+      level: 3,
       name: SCRIMMAGE.title,
     });
     await waitFor(() => expect(title).toHaveFocus());
-    expect(requests.map((request) => request.path)).toEqual([
+    expect(agendaPageRequests().map((request) => request.path)).toEqual([
       AGENDA_PATH,
       `${AGENDA_PATH}?cursor=pagina-2`,
     ]);
@@ -1630,7 +1691,12 @@ describe("llegar a un evento desde la búsqueda", () => {
 
   it("deja de buscar el evento tras unas pocas páginas", async () => {
     let page = 0;
-    stubApi(() => {
+    stubApi(({ url }) => {
+      if (url.pathname !== AGENDA_PATH) {
+        return jsonResponse(404, {
+          error: { code: "not_found", message: "No está." },
+        });
+      }
       page += 1;
       return pageResponse({
         events: [
@@ -1653,10 +1719,13 @@ describe("llegar a un evento desde la búsqueda", () => {
       />,
     );
 
-    await screen.findAllByRole("heading", { name: POOL_TRAINING.title });
-    await waitFor(() => expect(requests).toHaveLength(4));
+    await screen.findAllByRole("heading", {
+      level: 3,
+      name: POOL_TRAINING.title,
+    });
+    await waitFor(() => expect(agendaPageRequests()).toHaveLength(4));
     expect(
-      screen.getAllByRole("heading", { name: POOL_TRAINING.title }),
+      screen.getAllByRole("heading", { level: 3, name: POOL_TRAINING.title }),
     ).toHaveLength(4);
   });
 
@@ -1673,6 +1742,7 @@ describe("llegar a un evento desde la búsqueda", () => {
     );
 
     const title = await screen.findByRole("heading", {
+      level: 3,
       name: POOL_TRAINING.title,
     });
     expect(title).not.toHaveFocus();
@@ -1702,14 +1772,14 @@ describe("quien no tiene la membresía al día (#453)", () => {
       />,
     );
 
-    const row = await expandRow(POOL_TRAINING.title);
-    for (const name of ["Yes", "Maybe", "No"]) {
-      expect(rsvpButton(row, name)).toBeDisabled();
+    const panel = await openPanel(POOL_TRAINING.title);
+    for (const name of ["Going", "Maybe", "Can't go"]) {
+      expect(rsvpButton(panel, name)).toBeDisabled();
     }
-    expect(within(row).getByText("14 going · 2 maybe")).toBeInTheDocument();
+    expectCounts(panel, { going: "Going · 14", maybe: "2 maybe" });
   });
 
-  it("no pide los equipos al desplegar un entrenamiento: son de socio", async () => {
+  it("no pide los equipos al elegir un entrenamiento: son de socio", async () => {
     stubAgenda([POOL_TRAINING]);
     render(
       <AgendaScreen
@@ -1719,11 +1789,8 @@ describe("quien no tiene la membresía al día (#453)", () => {
         canRespond={false}
       />,
     );
-    const row = await findRow(POOL_TRAINING.title);
 
-    await userEvent.click(
-      within(row).getByRole("button", { name: POOL_TRAINING.title }),
-    );
+    await openPanel(POOL_TRAINING.title);
 
     expect(requests.some((request) => request.path.endsWith("/team"))).toBe(
       false,
@@ -1763,9 +1830,9 @@ describe("quien no tiene la membresía al día (#453)", () => {
       />,
     );
 
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
     expect(
-      within(row).getByRole("group", { name: /^RSVP:/ }),
+      within(panel).getByRole("group", { name: /^RSVP:/ }),
     ).toHaveAccessibleDescription(/Your membership isn't up to date/);
   });
 
@@ -1779,9 +1846,9 @@ describe("quien no tiene la membresía al día (#453)", () => {
         canRespond={false}
       />,
     );
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    await userEvent.click(rsvpButton(row, "Yes"));
+    await userEvent.click(rsvpButton(panel, "Going"));
 
     expect(rsvpRequests(POOL_TRAINING)).toEqual([]);
   });
@@ -1798,7 +1865,7 @@ describe("quien no tiene la membresía al día (#453)", () => {
       />,
     );
 
-    await screen.findByRole("heading", { name: POOL_TRAINING.title });
+    await findRow(POOL_TRAINING.title);
     expect(screen.getByText(/Tu membresía no está al día/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ir a Pagos" })).toHaveAttribute(
       "href",
@@ -1839,11 +1906,11 @@ describe("quien no tiene la membresía al día (#453)", () => {
         canRespond
       />,
     );
-    const row = await expandRow(POOL_TRAINING.title);
+    const panel = await openPanel(POOL_TRAINING.title);
 
-    await userEvent.click(rsvpButton(row, "Yes"));
+    await userEvent.click(rsvpButton(panel, "Going"));
 
-    expect(await within(row).findByRole("alert")).toHaveTextContent(
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
       "Your membership isn't up to date. Sort it out in Payments to answer.",
     );
   });
@@ -1859,10 +1926,6 @@ describe("chips de tipo", () => {
   function chip(name: string): HTMLElement {
     const chips = screen.getByRole("group", { name: "Event types" });
     return within(chips).getByRole("button", { name });
-  }
-
-  function agendaRequests(): RecordedRequest[] {
-    return requests.filter((request) => request.path.startsWith(AGENDA_PATH));
   }
 
   it("enseña los cuatro tipos encendidos como botones con aria-pressed", async () => {
@@ -1899,7 +1962,7 @@ describe("chips de tipo", () => {
 
     expect(chip("Meeting")).toHaveAttribute("aria-pressed", "false");
     await waitFor(() =>
-      expect(agendaRequests().at(-1)).toEqual({
+      expect(agendaPageRequests().at(-1)).toEqual({
         method: "GET",
         path: `${AGENDA_PATH}?types=training%2Ccompetition%2Csocial`,
       }),
@@ -1927,7 +1990,7 @@ describe("chips de tipo", () => {
     await userEvent.click(chip("Meeting"));
 
     await waitFor(() =>
-      expect(agendaRequests().at(-1)).toEqual({
+      expect(agendaPageRequests().at(-1)).toEqual({
         method: "GET",
         path: AGENDA_PATH,
       }),
@@ -1949,7 +2012,7 @@ describe("chips de tipo", () => {
     );
 
     await findRow(POOL_TRAINING.title);
-    expect(agendaRequests()).toEqual([
+    expect(agendaPageRequests()).toEqual([
       { method: "GET", path: `${AGENDA_PATH}?types=training%2Csocial` },
     ]);
     expect(chip("Competition")).toHaveAttribute("aria-pressed", "false");
@@ -1988,7 +2051,7 @@ describe("chips de tipo", () => {
       />,
     );
     await screen.findByText("TUE · JUN 23");
-    const before = agendaRequests().length;
+    const before = agendaPageRequests().length;
 
     await userEvent.click(chip("Meeting"));
 
@@ -1996,7 +2059,7 @@ describe("chips de tipo", () => {
       screen.getByText("There are no events of the chosen types."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    expect(agendaRequests()).toHaveLength(before);
+    expect(agendaPageRequests()).toHaveLength(before);
     expect(window.location.search).toBe("?types=");
 
     await userEvent.click(
@@ -2005,7 +2068,7 @@ describe("chips de tipo", () => {
 
     expect(await findRow(POOL_TRAINING.title)).toBeInTheDocument();
     expect(chip("Meeting")).toHaveAttribute("aria-pressed", "true");
-    expect(agendaRequests().at(-1)).toEqual({
+    expect(agendaPageRequests().at(-1)).toEqual({
       method: "GET",
       path: AGENDA_PATH,
     });
@@ -2027,7 +2090,7 @@ describe("chips de tipo", () => {
     expect(
       await screen.findByText("There are no events of the chosen types."),
     ).toBeInTheDocument();
-    expect(agendaRequests()).toEqual([]);
+    expect(agendaPageRequests()).toEqual([]);
   });
 
   it("conserva el filtro al pasar a los pasados", async () => {
@@ -2046,7 +2109,7 @@ describe("chips de tipo", () => {
     await userEvent.click(periodButton("Past"));
 
     await findRow(PAST_MATCH.title);
-    expect(agendaRequests().at(-1)).toEqual({
+    expect(agendaPageRequests().at(-1)).toEqual({
       method: "GET",
       path: `${AGENDA_PATH}?period=past&types=training%2Ccompetition%2Cmeeting`,
     });
@@ -2117,7 +2180,7 @@ describe("grupos por día", () => {
     );
 
     await findRow(TODAY_TRAINING.title);
-    const days = screen
+    const days = within(screen.getByRole("list", { name: "Upcoming events" }))
       .getAllByRole("heading", { level: 2 })
       .map((heading) => heading.textContent);
     expect(days).toEqual([
@@ -2352,8 +2415,8 @@ describe("fila de la agenda", () => {
     );
   });
 
-  it("pulsar el lugar no despliega la fila", async () => {
-    stubAgenda([POOL_TRAINING]);
+  it("pulsar el lugar no elige la fila", async () => {
+    stubAgenda([SCRIMMAGE, POOL_TRAINING]);
     render(
       <AgendaScreen
         locale="en"
@@ -2362,13 +2425,13 @@ describe("fila de la agenda", () => {
         canRespond
       />,
     );
+    await openPanel(SCRIMMAGE.title);
     const row = await findRow(POOL_TRAINING.title);
 
     await userEvent.click(within(row).getByRole("link", { name: /MSAC/ }));
 
-    expect(rowToggle(row, POOL_TRAINING.title)).toHaveAttribute(
-      "aria-expanded",
-      "false",
+    expect(rowToggle(row, POOL_TRAINING.title)).not.toHaveAttribute(
+      "aria-current",
     );
     expect(detailRequests(POOL_TRAINING)).toEqual([]);
   });
@@ -2461,9 +2524,10 @@ describe("fila de la agenda", () => {
         canRespond
       />,
     );
-    const row = await expandRow(SCRIMMAGE.title);
+    const panel = await openPanel(SCRIMMAGE.title);
+    const row = await findRow(SCRIMMAGE.title);
 
-    await userEvent.click(rsvpButton(row, "Yes"));
+    await userEvent.click(rsvpButton(panel, "Going"));
 
     expect(
       await within(row).findByText("Going", { selector: PILL }),

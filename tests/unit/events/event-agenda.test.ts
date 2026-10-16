@@ -308,6 +308,7 @@ function open(options: FakeAgendaClubOptions, eventId: string) {
   return openEvent(fakeAgendaClub(options).gateways, {
     callerId: AGENDA_CALLER_ID,
     eventId,
+    now: AGENDA_NOW,
   });
 }
 
@@ -362,6 +363,7 @@ describe("detalle de un evento", () => {
       inAudience: true,
       coverThumbUrl: null,
       coverUrl: null,
+      series: null,
       notes: "Traed aletas.",
       going: ["Ana", "Zoe"],
       maybe: ["Bea"],
@@ -443,6 +445,55 @@ describe("detalle de un evento", () => {
     await expect(
       open({ callerIsMember: false, events: [event] }, event.id),
     ).rejects.toBeInstanceOf(MemberNotFoundError);
+  });
+});
+
+describe("serie de un evento en el detalle (#648)", () => {
+  const SERIES_ID = "5e5e5e5e-0000-4000-8000-000000000005";
+  const WEDNESDAYS = { weekdays: [3], endsOn: "2027-12-15" } as const;
+
+  it("trae los días de la serie, su fecha final y las sesiones que quedan desde hoy", async () => {
+    const past = clubEvent("2027-06-09", { seriesId: SERIES_ID });
+    const today = clubEvent(TODAY, { seriesId: SERIES_ID });
+    const next = clubEvent("2027-06-22", { seriesId: SERIES_ID });
+    const later = clubEvent("2027-06-29", { seriesId: SERIES_ID });
+
+    const detail = await open(
+      {
+        events: [past, today, next, later],
+        series: { [SERIES_ID]: WEDNESDAYS },
+      },
+      next.id,
+    );
+
+    expect(detail.series).toEqual({
+      weekdays: [3],
+      endsOn: "2027-12-15",
+      sessionsLeft: 3,
+    });
+  });
+
+  it("no cuenta las sesiones canceladas", async () => {
+    const next = clubEvent("2027-06-22", { seriesId: SERIES_ID });
+    const cancelled = clubEvent("2027-06-29", {
+      seriesId: SERIES_ID,
+      status: "cancelled",
+    });
+
+    const detail = await open(
+      { events: [next, cancelled], series: { [SERIES_ID]: WEDNESDAYS } },
+      next.id,
+    );
+
+    expect(detail.series).toMatchObject({ sessionsLeft: 1 });
+  });
+
+  it("no trae serie para un evento suelto", async () => {
+    const event = clubEvent("2027-06-22");
+
+    const detail = await open({ events: [event] }, event.id);
+
+    expect(detail.series).toBeNull();
   });
 });
 
@@ -543,6 +594,7 @@ describe("imagen de los eventos (#644)", () => {
     const detail = await openEvent(club.gateways, {
       callerId: AGENDA_CALLER_ID,
       eventId: event.id,
+      now: AGENDA_NOW,
     });
 
     expect(page.events[0]?.coverThumbUrl).toBeNull();

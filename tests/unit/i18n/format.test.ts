@@ -19,7 +19,10 @@ import {
   formatFileSize,
   formatNumber,
   formatOverallRating,
+  formatPanelDay,
+  formatPanelShortDay,
   formatPercent,
+  formatShortMonthDay,
 } from "@/lib/i18n/format";
 import { createTranslator } from "@/lib/i18n/translator";
 
@@ -255,6 +258,16 @@ describe("días de la semana", () => {
     expect(formatWeekdays("es", [7])).toBe("domingo");
   });
 
+  it("pone en plural los días del fin de semana en español cuando se pide", () => {
+    expect(formatWeekdays("es", [3, 6, 7], "plural")).toBe(
+      "miércoles, sábados y domingos",
+    );
+  });
+
+  it("deja los días en inglés igual en plural", () => {
+    expect(formatWeekdays("en", [1, 4], "plural")).toBe("Monday and Thursday");
+  });
+
   it("da el nombre entero de un solo día", () => {
     expect(formatWeekdayName("en", 2, "long")).toBe("Tuesday");
   });
@@ -365,5 +378,31 @@ describe("día corto de una fila del historial", () => {
     expect(
       formatClubCompactDay("en", new Date("2026-09-30T15:00:00.000Z")),
     ).toBe("1 Oct");
+  });
+});
+
+describe("días del panel del evento (#648)", () => {
+  it("escribe el día entero con el mes delante en inglés", () => {
+    expect(formatPanelDay("en", "2026-10-14")).toBe("Wednesday, October 14");
+  });
+
+  it("escribe el día entero con el día delante en español", () => {
+    expect(formatPanelDay("es", "2026-10-14")).toBe("miércoles, 14 de octubre");
+  });
+
+  it("escribe el día corto con su día de la semana", () => {
+    expect(formatPanelShortDay("en", "2026-10-24")).toBe("Sat, Oct 24");
+  });
+
+  it("escribe el día corto en español", () => {
+    expect(formatPanelShortDay("es", "2026-10-24")).toBe("sáb, 24 oct");
+  });
+
+  it("escribe el mes y el día sin el día de la semana", () => {
+    expect(formatShortMonthDay("en", "2026-12-06")).toBe("Dec 6");
+  });
+
+  it("escribe el día y el mes en español", () => {
+    expect(formatShortMonthDay("es", "2026-12-16")).toBe("16 dic");
   });
 });

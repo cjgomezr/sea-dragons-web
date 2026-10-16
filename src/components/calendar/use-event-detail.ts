@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   type AgendaFailure,
   type OpenedEvent,
@@ -6,10 +6,10 @@ import {
 } from "./agenda-client";
 
 /**
- * Si una fila de la agenda está desplegada y qué enseña (#312, RF-8). El
- * detalle se pide la primera vez que se despliega, no con la agenda: traer el
- * de los 50 eventos de golpe sería pedir 50 veces lo que casi nadie abre. Una
- * vez traído se guarda, y plegar y volver a desplegar no pide otra vez.
+ * El detalle de un evento de la agenda (#312, RF-8), que enseña su panel
+ * (#648). Se pide la primera vez que se elige su fila, no con la agenda:
+ * traer el de los 50 eventos de golpe sería pedir 50 veces lo que casi nadie
+ * abre. Una vez traído se guarda, y volver a elegir la fila no pide otra vez.
  */
 
 export type EventDetailState =
@@ -19,23 +19,22 @@ export type EventDetailState =
   | { readonly kind: "loaded"; readonly opened: OpenedEvent };
 
 export function useEventDetail(eventId: string): {
-  readonly isExpanded: boolean;
   readonly detail: EventDetailState;
-  readonly toggle: () => void;
+  /** Pide el detalle si todavía no se pidió. */
+  readonly open: () => void;
   readonly retry: () => void;
   /** Un detalle más nuevo que llegó por otro camino, como tras responder. */
   readonly receive: (opened: OpenedEvent) => void;
 } {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [detail, setDetail] = useState<EventDetailState>({ kind: "idle" });
-  // Como en el RSVP: el estado tarda un render, la ref corta ya el segundo
-  // despliegue mientras el primero sigue pidiendo.
+  // Como en el RSVP: el estado tarda un render, la ref corta ya la segunda
+  // petición mientras la primera sigue en curso.
   const isLoadingRef = useRef(false);
   // Sube con cada detalle que llega por otro camino: una petición que sale
   // antes y vuelve después trae nombres más viejos y no se pinta.
   const versionRef = useRef(0);
 
-  async function load(): Promise<void> {
+  const load = useCallback(async (): Promise<void> => {
     if (isLoadingRef.current) {
       return;
     }
@@ -52,20 +51,19 @@ export function useEventDetail(eventId: string): {
         ? { kind: "loaded", opened: outcome.opened }
         : { kind: "failed", failure: outcome },
     );
-  }
+  }, [eventId]);
 
-  function toggle(): void {
-    const willExpand = !isExpanded;
-    setIsExpanded(willExpand);
-    if (willExpand && detail.kind === "idle") {
+  // Estable mientras no cambie el estado: el efecto que la llama al elegir
+  // la fila no se repite en cada pintado.
+  const open = useCallback(() => {
+    if (detail.kind === "idle") {
       void load();
     }
-  }
+  }, [detail.kind, load]);
 
   return {
-    isExpanded,
     detail,
-    toggle,
+    open,
     retry: () => void load(),
     receive: (opened) => {
       versionRef.current += 1;

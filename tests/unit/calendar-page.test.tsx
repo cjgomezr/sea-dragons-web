@@ -1,5 +1,4 @@
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Role } from "@/lib/auth/roles";
 
@@ -271,12 +270,13 @@ describe("el calendario de quien no tiene la membresía al día", () => {
     );
 
     render(await CalendarioPage({ searchParams: Promise.resolve({}) }));
-    // Los botones del RSVP están en la fila desplegada (#647).
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Pool training" }),
-    );
+    // Los botones del RSVP están en el panel del evento, que llega elegido
+    // (#648).
+    const panel = await screen.findByRole("complementary", {
+      name: "Pool training",
+    });
 
-    expect(screen.getByRole("button", { name: "Yes" })).toBeDisabled();
+    expect(within(panel).getByRole("button", { name: "Going" })).toBeDisabled();
     expect(
       screen.getByRole("link", { name: "Go to Payments" }),
     ).toBeInTheDocument();

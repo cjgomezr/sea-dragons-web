@@ -8234,12 +8234,13 @@ a.auth-brand-header:focus-visible {
 /* La agenda del Calendario (#311), con la forma de E24 (#647, "#1a Agenda +
    panel" del handoff): los eventos agrupados por día, una fila por evento con
    la barra del color del tipo, la hora, la miniatura, el cuerpo y mi
-   respuesta. El panel de la derecha llega con #648; el móvil, con #656. */
+   respuesta, y a la derecha el panel del evento elegido (#648). El móvil
+   llega con #656. */
 .agenda {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  max-width: 880px;
+  max-width: 1280px;
 }
 
 .agenda-header h1 {
@@ -8631,13 +8632,6 @@ a.auth-brand-header:focus-visible {
   border-radius: var(--radius);
 }
 
-.agenda-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-4);
-}
-
 .agenda-rsvp {
   display: grid;
   flex: 1 1 100%;
@@ -8702,12 +8696,6 @@ a.auth-brand-header:focus-visible {
   border-color: var(--color-accent);
 }
 
-.agenda-counts {
-  margin: 0;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
 .agenda-rsvp-status:empty {
   display: none;
 }
@@ -8722,17 +8710,22 @@ a.auth-brand-header:focus-visible {
   margin: 0;
 }
 
-/* La fila desplegable (#312). El título es el botón, y su ::after cubre la
+/* La fila que se elige (#648). El título es el botón, y su ::after cubre la
    tarjeta entera, como el enlace de una noticia: se pulsa en cualquier punto.
-   Lo que se toca dentro (el RSVP, el aviso, el detalle) queda por encima, así
-   un Sí no pliega la fila y el texto del detalle se puede seleccionar. */
+   El enlace del lugar queda por encima y abre el mapa sin elegir la fila. La
+   elegida conserva el fondo del panel, y una raya del acento por dentro la
+   marca también sin depender del tono del fondo. */
 .agenda-row {
   position: relative;
 }
 
-.agenda-row:hover,
-.agenda-row:has(.agenda-toggle[aria-expanded="true"]) {
+.agenda-row:hover {
   background: var(--color-panel);
+}
+
+.agenda-row.is-selected {
+  background: var(--color-panel);
+  box-shadow: inset 0 0 0 1px var(--color-border);
 }
 
 .agenda-row:has(.agenda-toggle:focus-visible) {
@@ -8760,46 +8753,6 @@ a.auth-brand-header:focus-visible {
   position: absolute;
   inset: 0;
   border-radius: var(--radius);
-}
-
-/* Un chevrón hecho con dos bordes: apunta abajo plegada y arriba desplegada.
-   Lo que se anuncia es aria-expanded; esto es sólo para la vista. */
-.agenda-chevron {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-inline-start: var(--space-2);
-  vertical-align: 0.2em;
-  border-right: 2px solid var(--color-text-secondary);
-  border-bottom: 2px solid var(--color-text-secondary);
-  transform: rotate(45deg);
-}
-
-.agenda-toggle[aria-expanded="true"] .agenda-chevron {
-  vertical-align: -0.1em;
-  transform: rotate(-135deg);
-}
-
-.agenda-rsvp,
-.agenda-rsvp-error,
-.agenda-detail {
-  position: relative;
-  z-index: 1;
-}
-
-.agenda-detail {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  grid-column: 2 / -1;
-  margin-top: var(--space-3);
-  padding: var(--space-3) 0 var(--space-2) var(--space-3);
-  border-top: 1px solid var(--color-border);
-  cursor: auto;
-}
-
-.agenda-detail[hidden] {
-  display: none;
 }
 
 .agenda-detail-list {
@@ -8866,6 +8819,442 @@ a.auth-brand-header:focus-visible {
 
 .agenda-detail-failure .auth-error {
   margin: 0;
+}
+
+/* El panel del evento (#648, "#1a · Panel" del handoff de E24). Por debajo
+   de 1024px, con la barra lateral, no caben los 380px al lado de una lista
+   que se pueda leer: va debajo, y elegir una fila lo trae a la vista
+   (`STACKED_PANEL_QUERY` en AgendaScreen). Al lado se queda pegado arriba
+   mientras la lista corre, así cambiar de fila no mueve la lista. */
+.agenda-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.agenda-list-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .agenda-columns {
+    grid-template-columns: minmax(0, 1fr) 380px;
+  }
+
+  .agenda-panel-slot {
+    position: sticky;
+    top: var(--space-4);
+  }
+
+  .agenda-panel {
+    max-height: calc(100vh - 2 * var(--space-4));
+    overflow-y: auto;
+  }
+}
+
+.agenda-panel-slot {
+  min-width: 0;
+  scroll-margin-top: var(--space-4);
+}
+
+.agenda-panel {
+  position: relative;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+/* La imagen de 190px o el fondo del tipo, con la barra de 4px del color del
+   tipo en el borde de abajo. */
+/* El radio de arriba recorta la imagen: el panel no lleva `overflow:
+   hidden`, que le quitaría el scroll de escritorio. */
+.agenda-panel-cover {
+  height: 190px;
+  overflow: hidden;
+  border-bottom: 4px solid var(--color-accent);
+  border-radius: 9px 9px 0 0;
+}
+
+.agenda-panel-competition .agenda-panel-cover {
+  border-bottom-color: var(--color-warning);
+}
+
+.agenda-panel-social .agenda-panel-cover {
+  border-bottom-color: var(--color-success);
+}
+
+.agenda-panel-meeting .agenda-panel-cover {
+  border-bottom-color: var(--color-type-meeting);
+}
+
+.agenda-panel-cover > * {
+  width: 100%;
+  height: 100%;
+}
+
+.agenda-panel-cover .event-cover-image {
+  display: block;
+  object-fit: cover;
+}
+
+.agenda-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-6);
+}
+
+.agenda-panel-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.agenda-panel-audience {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.agenda-panel-title {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  font-size: 21px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+/* La hora y la repetición: el icono en un cuadro de 36px y dos líneas. */
+.agenda-panel-block {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.agenda-panel-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-accent-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.agenda-panel-competition .agenda-panel-icon {
+  color: var(--color-warning);
+}
+
+.agenda-panel-social .agenda-panel-icon {
+  color: var(--color-success);
+}
+
+.agenda-panel-meeting .agenda-panel-icon {
+  color: var(--color-type-meeting);
+}
+
+.agenda-panel-block-text p {
+  margin: 0;
+}
+
+.agenda-panel-block-first {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.agenda-panel-block-second {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* La tarjeta del lugar: el nombre y la dirección con Copiar, y "Cómo llegar"
+   a todo el ancho debajo de una raya. */
+.agenda-place-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.agenda-place-card-body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.agenda-place-card-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.agenda-place-card-text p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.agenda-place-card-name {
+  font-weight: 650;
+}
+
+.agenda-place-card-address {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.agenda-place-card-status {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-2);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.agenda-place-card-status.is-failed {
+  color: var(--color-danger);
+}
+
+.agenda-place-card-status:empty {
+  display: none;
+}
+
+.agenda-icon-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.agenda-icon-button:hover {
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.agenda-icon-button:focus-visible,
+.agenda-directions:focus-visible,
+.agenda-see-all:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.agenda-directions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target-min);
+  font-weight: 700;
+  color: var(--color-accent-text);
+  text-decoration: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.agenda-directions:hover {
+  text-decoration: underline;
+}
+
+/* Los apartados de abajo llevan su título en mono de 11px, como los días. */
+.agenda-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.agenda-panel-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.agenda-panel-eyebrow,
+.agenda-rsvp-panel .agenda-rsvp-label {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.agenda-panel-section .agenda-detail-notes {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.agenda-going-maybe {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* "¿Vas?": la etiqueta encima y los tres botones de 38px debajo. El elegido
+   toma el tinte de su respuesta, como la píldora de la fila, con el texto en
+   el color del texto para que llegue a AA en los dos temas. */
+.agenda-rsvp.agenda-rsvp-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.agenda-rsvp-panel .agenda-rsvp-label {
+  display: block;
+  grid-column: 1 / -1;
+}
+
+.agenda-rsvp-panel .agenda-rsvp-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: 0 var(--space-2);
+}
+
+/* Los 38px del diseño son de escritorio: en un teléfono siguen los 44px del
+   objetivo táctil. */
+@media (min-width: 768px) {
+  .agenda-rsvp-panel .agenda-rsvp-choice {
+    min-height: 38px;
+  }
+}
+
+.agenda-rsvp-choice-yes[aria-pressed="true"],
+.agenda-rsvp-choice-yes[aria-pressed="true"]:disabled {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-success) 24%, var(--color-panel));
+  border-color: var(--color-success);
+}
+
+.agenda-rsvp-choice-maybe[aria-pressed="true"],
+.agenda-rsvp-choice-maybe[aria-pressed="true"]:disabled {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-warning) 24%, var(--color-panel));
+  border-color: var(--color-warning);
+}
+
+.agenda-rsvp-choice-no[aria-pressed="true"],
+.agenda-rsvp-choice-no[aria-pressed="true"]:disabled {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-danger) 24%, var(--color-panel));
+  border-color: var(--color-danger);
+}
+
+/* Hasta siete avatares de 30px montados unos sobre otros. */
+.agenda-going-people {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.agenda-avatars-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.agenda-avatars {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agenda-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-accent) 24%, var(--color-panel));
+  border: 2px solid var(--color-panel);
+  border-radius: 50%;
+}
+
+.agenda-avatar + .agenda-avatar {
+  margin-inline-start: -6px;
+}
+
+.agenda-avatars-more {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.agenda-see-all {
+  min-height: var(--touch-target-min);
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* La fila de acciones: Pasar lista, y Editar y Cancelar con su paso
+   siguiente debajo. */
+.agenda-panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* "Volver a la lista" sólo se ve cuando el teclado llega a él. */
+.agenda-panel-back:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.agenda-panel-back {
+  align-self: flex-start;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-weight: 700;
+  color: var(--color-accent-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.agenda-panel-back:focus-visible,
+.agenda-panel-title:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.agenda-panel-actions .agenda-organizer {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 /* Los equipos del reparto publicado en la fila desplegada (#403), como en
@@ -11605,8 +11994,7 @@ a.agenda-take-attendance {
 }
 
 a.agenda-take-attendance {
-  align-self: flex-start;
-  margin-top: var(--space-3);
+  justify-content: center;
 }
 
 /* Equipos (#402, RF-9 del PRD de E10), siguiendo docs/mockups/team-light.png:

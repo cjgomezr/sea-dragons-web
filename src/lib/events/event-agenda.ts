@@ -13,6 +13,7 @@ import {
   signEventCover,
   signEventCoverThumbnails,
 } from "./event-covers";
+import type { IsoWeekday } from "./event-occurrences";
 import type { EventPlace } from "./event-place";
 import {
   EventNotFoundError,
@@ -126,6 +127,12 @@ export type EventAgendaGateway = {
   countResponses(eventIds: readonly string[]): Promise<readonly RsvpTally[]>;
   /** Quienes van o quizás y cuentan, con su nombre y nada más. */
   listResponders(eventId: string): Promise<readonly Responder[]>;
+  /** Los días y la fecha final de la serie, y cuántas de sus sesiones siguen
+   * en pie de `today` en adelante. Nula si la serie no existe. */
+  summarizeSeries(query: {
+    readonly seriesId: string;
+    readonly today: string;
+  }): Promise<EventSeriesSummary | null>;
 };
 
 export type EventAgendaGateways = {
@@ -164,9 +171,20 @@ export type AgendaPage = {
   readonly nextCursor: string | null;
 };
 
+/** La repetición de una sesión de una serie, como la enseña el panel
+ * (#648): "Every Wednesday" y "Until Dec 16 · 10 sessions left". */
+export type EventSeriesSummary = {
+  readonly weekdays: readonly IsoWeekday[];
+  readonly endsOn: string;
+  /** Las sesiones que siguen en pie de hoy en adelante. */
+  readonly sessionsLeft: number;
+};
+
 export type MemberEventDetail = AgendaEvent & {
   /** La grande firmada (#644), con la misma regla que la miniatura. */
   readonly coverUrl: string | null;
+  /** Nula en un evento suelto. */
+  readonly series: EventSeriesSummary | null;
   readonly notes: string | null;
   readonly going: readonly string[];
   readonly maybe: readonly string[];
@@ -420,11 +438,30 @@ async function signDetailCover(
     : signEventCover(gateways.eventCovers, cover);
 }
 
+/** La repetición de una sesión de una serie (#648); nula en uno suelto. */
+function summarizeSeriesOf(
+  gateways: EventAgendaGateways,
+  row: EventRow,
+  now: Date,
+): Promise<EventSeriesSummary | null> {
+  return row.seriesId === null
+    ? Promise.resolve(null)
+    : gateways.agenda.summarizeSeries({
+        seriesId: row.seriesId,
+        today: clubCalendarDate(now),
+      });
+}
+
 /** Un evento abierto: lo de la agenda más las notas y quién va. Quien no lo
  * puede ver recibe lo mismo que con uno que no existe. */
 export async function openEvent(
   gateways: EventAgendaGateways,
-  request: { readonly callerId: string; readonly eventId: string },
+  request: {
+    readonly callerId: string;
+    readonly eventId: string;
+    /** Desde cuándo se cuentan las sesiones que le quedan a la serie. */
+    readonly now: Date;
+  },
 ): Promise<EventDetail> {
   const viewer = await findViewer(gateways, request.callerId);
   const row = await gateways.agenda.findEvent({
@@ -440,9 +477,10 @@ export async function openEvent(
   if (!inAudience && !isOrganizer) {
     throw new EventNotFoundError();
   }
-  const [responders, cover] = await Promise.all([
+  const [responders, cover, series] = await Promise.all([
     gateways.agenda.listResponders(row.id),
     signDetailCover(gateways, row, viewer),
+    summarizeSeriesOf(gateways, row, request.now),
   ]);
   const going = namesWith(responders, "yes");
   const maybe = namesWith(responders, "maybe");
@@ -454,6 +492,7 @@ export async function openEvent(
       coverThumbUrl: cover.coverThumbUrl,
     }),
     coverUrl: cover.coverUrl,
+    series,
     notes: row.notes,
     going,
     maybe,
