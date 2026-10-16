@@ -19,7 +19,7 @@ import type {
 } from "@/lib/stripe/stripe-webhook";
 import type { MemberEmailGateway } from "./checkout";
 import type { PlanChoiceGateway } from "./choose-plan";
-import type { LevyGateways } from "./levies";
+import type { LevyGateways, LevyPurchases } from "./levies";
 import type { PaymentReceiptGateway, ReceiptSource } from "./payment-receipt";
 import type { ScheduledPlanChangeGateway } from "./plan-change";
 import type {
@@ -328,7 +328,37 @@ export function createPaymentHistoryGateway(
 const purchasedProductRowSchema = z.object({
   stripe_product_id: z.string(),
   quantity: z.number().int().positive(),
+  paid_at: z.string().nullable(),
+  created_at: z.string(),
 });
+
+type PurchasedProductRow = z.infer<typeof purchasedProductRowSchema>;
+
+/** `paid_at` puede faltar en una fila escrita a mano; entonces vale cuándo
+ * se apuntó. */
+function purchasedAtOf(row: PurchasedProductRow): string {
+  return new Date(row.paid_at ?? row.created_at).toISOString();
+}
+
+/** Suma las unidades de cada producto y se queda con su compra más reciente
+ * (las ISO 8601 en UTC se comparan como texto). */
+function summarizePurchases(
+  rows: readonly PurchasedProductRow[],
+): ReadonlyMap<string, LevyPurchases> {
+  const purchases = new Map<string, LevyPurchases>();
+  for (const row of rows) {
+    const previous = purchases.get(row.stripe_product_id);
+    const purchasedAt = purchasedAtOf(row);
+    purchases.set(row.stripe_product_id, {
+      quantity: (previous?.quantity ?? 0) + row.quantity,
+      lastPurchasedAt:
+        previous !== undefined && previous.lastPurchasedAt > purchasedAt
+          ? previous.lastPurchasedAt
+          : purchasedAt,
+    });
+  }
+  return purchases;
+}
 
 const receiptPaymentRowSchema = z.object({
   status: z.enum(PAYMENT_STATUSES),
@@ -377,16 +407,17 @@ export function createPaymentReceiptGateway(
 }
 
 /** Las unidades que un socio ya pagó de cada producto de Stripe (#473,
- * #632): qué levies le salen como pagados y cuántos lleva de un extra. Un
- * pago fallido o pendiente no cuenta. */
+ * #632) y cuándo compró por última vez (#633): qué levies le salen como
+ * pagados, cuántos lleva de un extra y desde cuándo. Un pago fallido o
+ * pendiente no cuenta. */
 export function createLevyPurchasesGateway(
   client: SupabaseClient,
 ): LevyGateways["purchases"] {
   return {
-    async findPurchasedQuantities(userId) {
+    async findPurchases(userId) {
       const { data, error } = await client
         .from(PAYMENTS_TABLE)
-        .select("stripe_product_id, quantity")
+        .select("stripe_product_id, quantity, paid_at, created_at")
         .eq("user_id", userId)
         .eq("status", "paid")
         .not("stripe_product_id", "is", null);
@@ -395,12 +426,7 @@ export function createLevyPurchasesGateway(
           `No se pudieron leer los productos pagados de ${userId}: ${error.message}`,
         );
       }
-      const rows = z.array(purchasedProductRowSchema).parse(data);
-      const quantities = new Map<string, number>();
-      for (const { stripe_product_id: productId, quantity } of rows) {
-        quantities.set(productId, (quantities.get(productId) ?? 0) + quantity);
-      }
-      return quantities;
+      return summarizePurchases(z.array(purchasedProductRowSchema).parse(data));
     },
   };
 }

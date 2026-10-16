@@ -15495,6 +15495,7 @@ const NATIONALS_LEVY = {
   amountCents: 8000,
   maxQuantity: 1,
   purchasedQuantity: 0,
+  lastPurchasedAt: null,
   isPaid: false,
 } as const;
 
@@ -15505,16 +15506,47 @@ const POOL_HIRE_LEVY = {
   amountCents: 1250,
   maxQuantity: 1,
   purchasedQuantity: 0,
+  lastPurchasedAt: null,
   isPaid: false,
 } as const;
 
 const UNPAID_LEVIES: readonly object[] = [NATIONALS_LEVY, POOL_HIRE_LEVY];
 const ONE_PAID_LEVY: readonly object[] = [
-  { ...NATIONALS_LEVY, purchasedQuantity: 1, isPaid: true },
+  {
+    ...NATIONALS_LEVY,
+    purchasedQuantity: 1,
+    lastPurchasedAt: "2026-09-18T02:30:00.000Z",
+    isPaid: true,
+  },
   POOL_HIRE_LEVY,
 ];
 
-const LEVIES_HEADING = /^(Club charges|Cobros del club)$/;
+/** Los extras del socio en filas (#633): uno por comprar, uno de una unidad
+ * comprado y uno de varias unidades con tres compradas, que sigue a la
+ * venta. */
+const JERSEY_LEVY = {
+  id: "price_levy_jersey",
+  name: "2026 club jersey",
+  description: "Home and away jersey with your number, in the club colours.",
+  amountCents: 6000,
+  maxQuantity: 10,
+  purchasedQuantity: 3,
+  lastPurchasedAt: "2026-09-18T02:30:00.000Z",
+  isPaid: true,
+} as const;
+
+const MEMBER_EXTRAS: readonly object[] = [
+  POOL_HIRE_LEVY,
+  {
+    ...NATIONALS_LEVY,
+    purchasedQuantity: 1,
+    lastPurchasedAt: "2026-09-18T02:30:00.000Z",
+    isPaid: true,
+  },
+  JERSEY_LEVY,
+];
+
+const LEVIES_HEADING = /^(Club extras|Extras del club)$/;
 
 async function stubLevies(
   page: Page,
@@ -15697,6 +15729,17 @@ const PENDING_PLAN_MEMBERSHIP_VIEW = membershipView(
   [],
 );
 
+/** Los extras del socio en filas (#633), con su axe también en oscuro. */
+function memberExtrasStates(
+  name: string,
+  levies: readonly object[],
+): readonly PaymentsScreenState[] {
+  return paymentsStates(name, ACTIVE_MEMBERSHIP_VIEW, levies).map((state) => ({
+    ...state,
+    checksDarkAxe: true,
+  }));
+}
+
 /** Los estados de la tira del plan (#628), con su axe también en oscuro. */
 function planStripStates(
   name: string,
@@ -15739,6 +15782,7 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ...paymentsStates("pagos-full-congelado", FROZEN_BALANCE_MEMBERSHIP_VIEW),
   ...paymentsStates("pagos-levies", ACTIVE_MEMBERSHIP_VIEW, UNPAID_LEVIES),
   ...paymentsStates("pagos-levy-pagado", ACTIVE_MEMBERSHIP_VIEW, ONE_PAID_LEVY),
+  ...memberExtrasStates("pagos-extras-socio", MEMBER_EXTRAS),
   ...levyPayersStates("pagos-levy-pagadores", NATIONALS_PAYERS),
   ...levyPayersStates("pagos-levy-sin-pagos", NATIONALS_WITHOUT_PAYERS),
   ...planStripStates("pagos-plan-activo", PLAN_CHANGE_MEMBERSHIP_VIEW),

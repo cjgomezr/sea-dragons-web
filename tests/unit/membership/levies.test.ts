@@ -24,6 +24,7 @@ const CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_levy";
 const NATIONALS_PRODUCT = "prod_nationals";
 const NATIONALS_PRICE = "price_nationals";
 const NATIONALS_CENTS = 8000;
+const LAST_PURCHASED_AT = "2026-09-18T02:30:00.000Z";
 
 type PriceShape = Partial<
   Pick<Stripe.Price, "active" | "type" | "currency" | "unit_amount">
@@ -131,8 +132,15 @@ function gateways(
     },
     memberEmails: { findEmail: async () => EMAIL },
     purchases: {
-      findPurchasedQuantities: async () =>
-        new Map(Object.entries(input.purchasedQuantities ?? {})),
+      findPurchases: async () =>
+        new Map(
+          Object.entries(input.purchasedQuantities ?? {}).map(
+            ([productId, quantity]) => [
+              productId,
+              { quantity, lastPurchasedAt: LAST_PURCHASED_AT },
+            ],
+          ),
+        ),
     },
     stripe: {
       kind: "configured",
@@ -170,6 +178,7 @@ describe("listLevies", () => {
           amountCents: NATIONALS_CENTS,
           maxQuantity: 1,
           purchasedQuantity: 0,
+          lastPurchasedAt: null,
           isPaid: false,
         },
       ],
@@ -187,6 +196,20 @@ describe("listLevies", () => {
 
     expect(listing).toMatchObject({
       levies: [{ isPaid: true, purchasedQuantity: 1 }],
+    });
+  });
+
+  it("dice cuándo compró el socio el extra por última vez", async () => {
+    const listing = await listLevies(
+      gateways({
+        products: [NATIONALS],
+        purchasedQuantities: { [NATIONALS_PRODUCT]: 1 },
+      }),
+      { userId: USER_ID },
+    );
+
+    expect(listing).toMatchObject({
+      levies: [{ lastPurchasedAt: LAST_PURCHASED_AT }],
     });
   });
 
@@ -302,11 +325,11 @@ describe("listLevies", () => {
   });
 
   it("dice que Stripe no está configurado sin leer los pagos", async () => {
-    const findPurchasedQuantities = vi.fn();
+    const findPurchases = vi.fn();
 
     const listing = await listLevies(
       {
-        purchases: { findPurchasedQuantities },
+        purchases: { findPurchases },
         stripe: { kind: "unconfigured" },
       },
       { userId: USER_ID },
@@ -316,7 +339,7 @@ describe("listLevies", () => {
       kind: "refused",
       reason: "stripe_not_configured",
     });
-    expect(findPurchasedQuantities).not.toHaveBeenCalled();
+    expect(findPurchases).not.toHaveBeenCalled();
   });
 });
 

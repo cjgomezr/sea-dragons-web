@@ -1890,7 +1890,7 @@ describe("PaymentsScreen: saldo de sesiones (#472)", () => {
   });
 });
 
-describe("PaymentsScreen: cobros del club (#473)", () => {
+describe("PaymentsScreen: los extras del club del socio (#473, #633)", () => {
   const NATIONALS = {
     id: LEVY_PRICE,
     name: "Nationals 2026",
@@ -1898,6 +1898,7 @@ describe("PaymentsScreen: cobros del club (#473)", () => {
     amountCents: 8000,
     maxQuantity: 1,
     purchasedQuantity: 0,
+    lastPurchasedAt: null,
     isPaid: false,
   };
   const CAMP = {
@@ -1907,44 +1908,93 @@ describe("PaymentsScreen: cobros del club (#473)", () => {
     amountCents: 12000,
     maxQuantity: 1,
     purchasedQuantity: 1,
+    lastPurchasedAt: "2026-09-18T02:30:00.000Z",
+    isPaid: true,
+  };
+  const JERSEY = {
+    id: "price_jersey",
+    name: "2026 club jersey",
+    description: "Home and away jersey with your number",
+    amountCents: 6000,
+    maxQuantity: 10,
+    purchasedQuantity: 3,
+    lastPurchasedAt: "2026-09-20T02:30:00.000Z",
     isPaid: true,
   };
 
   function leviesResponse(): Response {
-    return jsonResponse({ data: { levies: [NATIONALS, CAMP] } });
+    return jsonResponse({ data: { levies: [NATIONALS, CAMP, JERSEY] } });
   }
 
   function leviesSection(): HTMLElement {
     return screen.getByRole("region", {
-      name: /^(Club charges|Cobros del club)$/,
+      name: /^(Club extras|Extras del club)$/,
     });
   }
 
-  it("pinta cada levy con su nombre, su descripción, su importe y un botón Pagar", async () => {
+  /** La fila del extra que se llama `name`. */
+  function extraRow(name: string): HTMLElement {
+    const row = within(leviesSection())
+      .getByRole("heading", { level: 3, name })
+      .closest("li");
+    if (row === null) {
+      throw new Error(`"${name}" no está en la lista de extras`);
+    }
+    return row;
+  }
+
+  it("titula el apartado Extras del club y dice que son opcionales", async () => {
     await renderLoaded(ACTIVE_FULL, { routes: { levies: leviesResponse } });
 
     const section = await waitFor(leviesSection);
-    expect(section).toHaveTextContent("Nationals 2026");
-    expect(section).toHaveTextContent("Entry for the national championship");
-    expect(section).toHaveTextContent("$80.00");
     expect(
-      within(section).getByRole("button", {
-        name: "Pay",
+      within(section).getByRole("heading", { level: 2, name: "Club extras" }),
+    ).toBeInTheDocument();
+    expect(section).toHaveTextContent("Optional · buy what you need");
+    expect(within(section).getAllByRole("listitem")).toHaveLength(3);
+  });
+
+  it("pinta un extra no comprado con su nombre, su descripción, su importe y Comprar", async () => {
+    await renderLoaded(ACTIVE_FULL, { routes: { levies: leviesResponse } });
+
+    await waitFor(leviesSection);
+    const row = extraRow("Nationals 2026");
+    expect(row).toHaveTextContent("Entry for the national championship");
+    expect(row).toHaveTextContent("$80.00");
+    expect(row).not.toHaveTextContent("Bought");
+    expect(
+      within(row).getByRole("button", {
+        name: "Buy",
         description: "Nationals 2026",
       }),
     ).toBeInTheDocument();
   });
 
-  it("dice Pagado del levy que ya pagó, sin botón", async () => {
+  it("dice Comprado y la fecha de un extra de una unidad ya comprado, sin botón", async () => {
     await renderLoaded(ACTIVE_FULL, { routes: { levies: leviesResponse } });
 
-    const section = await waitFor(leviesSection);
-    expect(section).toHaveTextContent("Winter camp");
-    expect(within(section).getByText("Paid")).toBeInTheDocument();
-    expect(within(section).getAllByRole("button")).toHaveLength(1);
+    await waitFor(leviesSection);
+    const row = extraRow("Winter camp");
+    expect(row).toHaveTextContent("Bought 18 Sept");
+    expect(within(row).getByText("Bought")).toBeInTheDocument();
+    expect(within(row).queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("lleva a Checkout del levy que se toca", async () => {
+  it("dice cuántas lleva de un extra de varias unidades y deja comprar más", async () => {
+    await renderLoaded(ACTIVE_FULL, { routes: { levies: leviesResponse } });
+
+    await waitFor(leviesSection);
+    const row = extraRow("2026 club jersey");
+    expect(row).toHaveTextContent("Bought × 3");
+    expect(
+      within(row).getByRole("button", {
+        name: "Buy",
+        description: "2026 club jersey",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("lleva a Checkout del extra que se toca", async () => {
     const fetchDouble = await renderLoaded(ACTIVE_FULL, {
       routes: {
         levies: leviesResponse,
@@ -1952,7 +2002,12 @@ describe("PaymentsScreen: cobros del club (#473)", () => {
       },
     });
 
-    await userEvent.click(await screen.findByRole("button", { name: "Pay" }));
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Buy",
+        description: "Nationals 2026",
+      }),
+    );
 
     expect(openCheckout).toHaveBeenCalledWith(LEVY_CHECKOUT_URL);
     const [, init] =
@@ -1967,7 +2022,12 @@ describe("PaymentsScreen: cobros del club (#473)", () => {
       routes: { levies: leviesResponse, levyCheckout: serviceUnavailable },
     });
 
-    await userEvent.click(await screen.findByRole("button", { name: "Pay" }));
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Buy",
+        description: "Nationals 2026",
+      }),
+    );
 
     expect(await within(leviesSection()).findByRole("alert")).toHaveTextContent(
       "We couldn't open Stripe",
@@ -1979,42 +2039,69 @@ describe("PaymentsScreen: cobros del club (#473)", () => {
     await renderLoaded(PAST_DUE_FULL, { routes: { levies: leviesResponse } });
 
     expect(
-      await screen.findByRole("button", { name: "Pay" }),
+      await screen.findByRole("button", {
+        name: "Buy",
+        description: "Nationals 2026",
+      }),
     ).toBeInTheDocument();
   });
 
-  it("sin levies no pinta la sección", async () => {
+  it("sin extras a la venta no pinta el apartado", async () => {
     const fetchDouble = await renderLoaded(ACTIVE_FULL);
 
     await waitFor(() => expect(countCalls(fetchDouble, LEVIES_PATH)).toBe(1));
     expect(
-      screen.queryByRole("region", { name: "Club charges" }),
+      screen.queryByRole("region", { name: "Club extras" }),
     ).not.toBeInTheDocument();
   });
 
-  it("dice que no pudo cargar los levies sin romper el resto de Pagos", async () => {
+  it("dice que no pudo cargar los extras sin romper el resto de Pagos", async () => {
     await renderLoaded(ACTIVE_FULL, { routes: { levies: serviceUnavailable } });
 
     expect(
-      await within(await waitFor(leviesSection)).findByText(
-        /couldn't load the club charges/,
-      ),
-    ).toBeInTheDocument();
+      await within(await waitFor(leviesSection)).findByRole("alert"),
+    ).toHaveTextContent("We couldn't load the club extras");
     expect(statusChip()).toHaveTextContent("Active");
   });
 
-  it("cambia sus textos con el idioma, pero no el nombre del levy", async () => {
+  it("con Stripe sin configurar da el mismo aviso", async () => {
+    await renderLoaded(ACTIVE_FULL, {
+      routes: {
+        levies: () =>
+          jsonResponse(
+            {
+              error: {
+                code: "service_unavailable",
+                message: "Los pagos no están configurados.",
+                reason: "stripe_not_configured",
+              },
+            },
+            503,
+          ),
+      },
+    });
+
+    expect(
+      await within(await waitFor(leviesSection)).findByRole("alert"),
+    ).toHaveTextContent("We couldn't load the club extras");
+  });
+
+  it("cambia sus textos con el idioma, pero no el nombre del extra", async () => {
     await renderLoaded(ACTIVE_FULL, {
       locale: "es",
       routes: { levies: leviesResponse },
     });
 
     const section = await waitFor(leviesSection);
-    expect(section).toHaveAccessibleName("Cobros del club");
-    expect(section).toHaveTextContent("Nationals 2026");
-    expect(within(section).getByText("Pagado")).toBeInTheDocument();
+    expect(section).toHaveAccessibleName("Extras del club");
+    expect(section).toHaveTextContent("Opcional · compra lo que necesites");
+    expect(extraRow("Winter camp")).toHaveTextContent("Comprado el 18 sept");
+    expect(within(extraRow("Winter camp")).getByText("Comprado")).toBeVisible();
+    expect(extraRow("2026 club jersey")).toHaveTextContent("Comprado × 3");
     expect(
-      within(section).getByRole("button", { name: "Pagar" }),
+      within(extraRow("Nationals 2026")).getByRole("button", {
+        name: "Comprar",
+      }),
     ).toBeInTheDocument();
   });
 

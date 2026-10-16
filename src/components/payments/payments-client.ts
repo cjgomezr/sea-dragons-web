@@ -270,6 +270,7 @@ const leviesResponseSchema = z.object({
         amountCents: z.number().int(),
         maxQuantity: z.number().int().positive(),
         purchasedQuantity: z.number().int().nonnegative(),
+        lastPurchasedAt: z.string().nullable(),
         isPaid: z.boolean(),
       }),
     ),
