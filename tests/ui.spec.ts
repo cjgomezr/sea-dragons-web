@@ -15901,6 +15901,13 @@ async function waitForClubExtras(
     await expect(page.getByText(NO_CLUB_EXTRAS_TEXT)).toBeVisible();
     return;
   }
+  if (isPhoneViewport(page)) {
+    // En el móvil (#636) son filas, y los compradores esperan a la hoja.
+    await expect(
+      page.getByRole("list", { name: SALES_TABLE_NAME }),
+    ).toBeVisible();
+    return;
+  }
   await expect(
     page.getByRole("table", { name: SALES_TABLE_NAME }),
   ).toBeVisible();
@@ -16312,6 +16319,178 @@ for (const state of PAYMENTS_STATES) {
     }
   });
 }
+
+/* La pestaña Extras del club en el móvil (#636, RF-10 del PRD de E23): la
+   lista de filas, y la hoja del detalle de un extra sobre la lista atenuada.
+   Sin lo recaudado (D3). */
+
+const MOBILE_PAYMENTS_VIEWPORT = { width: 375, height: 812 } as const;
+const EXTRA_SHEET_NAME = "Island Cup entry fee";
+
+async function openExtraSheet(page: Page): Promise<Locator> {
+  await page
+    .getByRole("button", { name: new RegExp(`^${EXTRA_SHEET_NAME}`) })
+    .click();
+  const sheet = page.getByRole("dialog", { name: EXTRA_SHEET_NAME });
+  await expect(
+    sheet.getByRole("list", { name: BUYERS_LIST_NAME }),
+  ).toBeVisible();
+  await sheet.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished)),
+  );
+  return sheet;
+}
+
+type MobileExtrasState = {
+  readonly name: string;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+  readonly opensSheet: boolean;
+};
+
+const MOBILE_EXTRAS_STATES: readonly MobileExtrasState[] = [
+  { name: "pagos-extras-admin-movil", opensSheet: false },
+  {
+    name: "pagos-extras-admin-movil-es",
+    beforeVisit: chooseSpanish,
+    opensSheet: false,
+  },
+  { name: "pagos-extras-admin-movil-detalle", opensSheet: true },
+  {
+    name: "pagos-extras-admin-movil-detalle-es",
+    beforeVisit: chooseSpanish,
+    opensSheet: true,
+  },
+];
+
+async function goToMobileExtras(
+  page: Page,
+  state: MobileExtrasState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await goToPayments(
+    page,
+    {
+      view: ACTIVE_MEMBERSHIP_VIEW,
+      levies: leviesOnSale(CLOSED_LEVY_SALES),
+      sales: CLOSED_LEVY_SALES,
+      tab: "extras",
+      beforeVisit: state.beforeVisit,
+    },
+    theme,
+  );
+  if (state.opensSheet) {
+    await openExtraSheet(page);
+  }
+}
+
+test.describe("la pestaña Extras del club en el móvil (#636)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: MOBILE_PAYMENTS_VIEWPORT,
+  });
+
+  for (const state of MOBILE_EXTRAS_STATES) {
+    test.describe(state.name, () => {
+      for (const theme of themes) {
+        if (isStatePhotographed(state.name)) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToMobileExtras(page, state, theme);
+            const snapshot = `${state.name}-mobile-${theme}.png`;
+            const fullPage = !state.opensSheet;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+
+        test(`has no accessibility violations (${theme})`, async ({ page }) => {
+          await goToMobileExtras(page, state, theme);
+          await expectNoAxeViolations(page);
+        });
+      }
+
+      test("has no horizontal scroll", async ({ page }) => {
+        await goToMobileExtras(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    });
+  }
+
+  test("las filas miden al menos 64px y la hoja lleva sus medidas", async ({
+    page,
+  }) => {
+    await goToMobileExtras(page, MOBILE_EXTRAS_STATES[0]!);
+    const row = page.getByRole("button", {
+      name: new RegExp(`^${EXTRA_SHEET_NAME}`),
+    });
+    expect((await row.boundingBox())?.height).toBeGreaterThanOrEqual(64);
+
+    const sheet = await openExtraSheet(page);
+
+    await expect(sheet).toHaveCSS("border-top-left-radius", "20px");
+    await expect(
+      sheet.getByRole("heading", { name: EXTRA_SHEET_NAME }),
+    ).toHaveCSS("font-size", "18px");
+    const buyer = sheet
+      .getByRole("list", { name: BUYERS_LIST_NAME })
+      .getByRole("listitem")
+      .first();
+    expect((await buyer.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    expect(
+      (await buyer.locator(".payments-buyer-avatar").boundingBox())?.width,
+    ).toBe(32);
+    const exportButton = sheet.getByRole("button", { name: "Export CSV" });
+    expect((await exportButton.boundingBox())?.height).toBeGreaterThanOrEqual(
+      46,
+    );
+  });
+
+  test("la hoja atrapa el foco y Escape lo devuelve a la fila", async ({
+    page,
+  }) => {
+    await goToMobileExtras(page, MOBILE_EXTRAS_STATES[0]!);
+    const row = page.getByRole("button", {
+      name: new RegExp(`^${EXTRA_SHEET_NAME}`),
+    });
+    await row.focus();
+    await page.keyboard.press("Enter");
+    const sheet = page.getByRole("dialog", { name: EXTRA_SHEET_NAME });
+    await expect(sheet).toBeVisible();
+    expect(
+      await sheet.evaluate((dialog) => dialog.contains(document.activeElement)),
+    ).toBe(true);
+
+    for (let press = 0; press < 6; press += 1) {
+      await page.keyboard.press("Tab");
+      expect(
+        await sheet.evaluate((dialog) =>
+          dialog.contains(document.activeElement),
+        ),
+      ).toBe(true);
+    }
+
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expect(row).toBeFocused();
+  });
+
+  test("a 768px sigue la tabla de escritorio, sin hoja", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await goToMobileExtras(page, MOBILE_EXTRAS_STATES[0]!);
+
+    await expect(
+      page.getByRole("table", { name: SALES_TABLE_NAME }),
+    ).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+});
 
 // Las pestañas de Pagos de un Admin (#627) con el router de verdad: la
 // pestaña va en la dirección sin recargar y el atrás la devuelve.
