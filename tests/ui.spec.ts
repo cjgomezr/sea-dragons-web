@@ -16596,6 +16596,12 @@ test.describe("calendario en el navegador", () => {
     await expect(
       chips.getByRole("button", { name: "Training" }),
     ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByRole("heading", {
+        level: 3,
+        name: STUBBED_AGENDA_EVENTS[3].title,
+      }),
+    ).toHaveCount(0);
   });
 
   test("recargar deja el mismo filtro (#647)", async ({ page }) => {

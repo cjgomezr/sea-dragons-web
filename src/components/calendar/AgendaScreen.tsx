@@ -446,6 +446,15 @@ function NoTypesChosen({
   );
 }
 
+/** Los tipos de la dirección. Un parámetro repetido no dice cuál de los dos
+ * y enciende todos, como lo lee la página en el servidor. */
+function readAddressTypes(searchParams: URLSearchParams): readonly EventType[] {
+  const values = searchParams.getAll(AGENDA_TYPES_QUERY_PARAM);
+  return values.length > 1
+    ? AGENDA_TYPE_CHIPS
+    : readAgendaTypeFilter(values.at(0) ?? null);
+}
+
 /** Escribe el filtro en la dirección sin pedir la página otra vez. Se
  * reemplaza la entrada del historial: volver atrás sale del calendario, y al
  * volver a él la dirección trae el mismo filtro. Next la sincroniza con su
@@ -641,9 +650,7 @@ export function AgendaScreen({
   // router no hay dirección y valen los props.
   const searchParams = useSearchParams();
   const [chosenTypes, setChosenTypes] = useState<readonly EventType[]>(() =>
-    searchParams === null
-      ? initialTypes
-      : readAgendaTypeFilter(searchParams.get(AGENDA_TYPES_QUERY_PARAM)),
+    searchParams === null ? initialTypes : readAddressTypes(searchParams),
   );
   // Cambia con cada evento creado, editado o cancelado: la clave nueva vuelve
   // a montar las vistas.
