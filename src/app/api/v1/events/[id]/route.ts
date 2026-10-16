@@ -11,7 +11,8 @@ import {
 /**
  * Un evento desplegado (#309, RF-6 y RF-8 del PRD de E7): lo de la agenda
  * más las notas y los nombres de quién va y quién quizás. A Admin y
- * Committee les llega además la audiencia.
+ * Committee les llega además la audiencia. Una sesión de una serie trae sus
+ * días, su fecha final y las sesiones que le quedan (#648).
  *
  * Quien no es su audiencia recibe 404, no 403, igual que con uno de otro
  * club o que no existe (AC-052): con un 403 distinto se podrían recorrer ids
@@ -43,6 +44,7 @@ export function GET(
           data: await openEvent(requireEventAgendaGateways(), {
             callerId,
             eventId,
+            now: new Date(),
           }),
         };
       } catch (error) {

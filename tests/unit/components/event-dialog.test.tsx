@@ -393,7 +393,10 @@ describe("diálogo de evento", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(
-      await screen.findByRole("heading", { name: CREATED_EVENT.title }),
+      await screen.findByRole("heading", {
+        level: 3,
+        name: CREATED_EVENT.title,
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Event created. We let the members know."),
@@ -449,7 +452,10 @@ describe("diálogo de evento", () => {
     await submit(dialog);
 
     expect(
-      await screen.findAllByRole("heading", { name: CREATED_EVENT.title }),
+      await screen.findAllByRole("heading", {
+        level: 3,
+        name: CREATED_EVENT.title,
+      }),
     ).toHaveLength(2);
     expect(
       screen.getByText("Created 8 sessions. We let the members know."),

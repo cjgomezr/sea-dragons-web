@@ -1,82 +1,56 @@
-import type { NamedEventAudience } from "@/lib/events/event-agenda";
+import { Clock } from "@phosphor-icons/react/dist/ssr/Clock";
+import { Repeat } from "@phosphor-icons/react/dist/ssr/Repeat";
+import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types";
+import { useEffect, useId, useRef } from "react";
+import type {
+  AgendaEvent,
+  NamedEventAudience,
+} from "@/lib/events/event-agenda";
 import type { Translator } from "@/lib/i18n/translator";
-import { type OpenedEvent, describeOpeningFailure } from "./agenda-client";
+import {
+  type EventTally,
+  type OpenedEvent,
+  describeOpeningFailure,
+} from "./agenda-client";
+import { EventCover } from "./EventCover";
+import { EventGoing } from "./EventGoing";
+import { EventPlaceCard } from "./EventPlaceCard";
+import { EventTypeTag } from "./EventTypeTag";
+import { describeEventWhen, describeSeriesRepeat } from "./event-panel-text";
 import type { EventDetailState } from "./use-event-detail";
 
 /**
- * Lo que enseña una fila desplegada de la agenda (#312, RF-6 y RF-8): las
- * notas, quién va y quién quizás, y a quien organiza también la audiencia.
- * Ningún apartado se queda en blanco: si no hay nada, una frase lo dice.
+ * El panel del evento elegido en la agenda (#648, RF-7 del PRD de E24), que
+ * sustituye al acordeón de #312. De arriba abajo: la imagen o el fondo del
+ * tipo con su barra, la etiqueta y la audiencia, el título, la hora, la
+ * repetición de una serie, el lugar, "¿Vas?", los que van, las notas, los
+ * equipos y las acciones.
+ *
+ * Lo que trae la agenda se pinta en cuanto se elige la fila; lo del detalle
+ * (la imagen grande, la repetición, los nombres, las notas y la audiencia)
+ * llega después. Mientras, la miniatura hace de imagen. El RSVP, los equipos
+ * y las acciones los pone la fila, que es dueña de su estado.
  */
+
+/** Cómo entra y sale el foco del panel (#648, RNF de accesibilidad del PRD
+ * de E24): al elegir una fila con un gesto va al título; Escape o "Volver a
+ * la lista" lo devuelven a la fila. */
+export type PanelFocus = {
+  readonly shouldTakeFocus: boolean;
+  readonly onReturn: () => void;
+};
+
+/** Lo que la fila pone en su sitio del panel. */
+export type PanelSlots = {
+  readonly rsvp: React.ReactNode;
+  readonly teams: React.ReactNode;
+  readonly actions: React.ReactNode;
+};
+
+const AUDIENCE_SEPARATOR = " · ";
 
 function hasNotes(notes: string | null): notes is string {
   return notes !== null && notes.trim() !== "";
-}
-
-function NameList({
-  label,
-  names,
-  whenEmpty,
-}: {
-  readonly label: string;
-  readonly names: readonly string[];
-  readonly whenEmpty: string;
-}): React.JSX.Element {
-  if (names.length === 0) {
-    return <p className="agenda-detail-empty">{whenEmpty}</p>;
-  }
-  return (
-    <ul className="agenda-names" aria-label={label}>
-      {names.map((name, index) => (
-        // Dos socios pueden llamarse igual: el nombre solo no es una clave.
-        <li key={`${index}-${name}`}>{name}</li>
-      ))}
-    </ul>
-  );
-}
-
-function Responses({
-  translate,
-  opened,
-}: {
-  readonly translate: Translator;
-  readonly opened: OpenedEvent;
-}): React.JSX.Element {
-  if (opened.going.length === 0 && opened.maybe.length === 0) {
-    return (
-      <div className="agenda-detail-item">
-        <dt>{translate("calendar.detail.responses")}</dt>
-        <dd className="agenda-detail-empty">
-          {translate("calendar.detail.noResponses")}
-        </dd>
-      </div>
-    );
-  }
-  const nobodyYet = translate("calendar.detail.nobodyYet");
-  return (
-    <>
-      <div className="agenda-detail-item">
-        <dt>{translate("calendar.detail.going")}</dt>
-        <dd>
-          <NameList
-            label={translate("calendar.detail.going")}
-            names={opened.going}
-            whenEmpty={nobodyYet}
-          />
-        </dd>
-      </div>
-      <div className="agenda-detail-item">
-        <dt>{translate("calendar.detail.maybe")}</dt>
-        <dd>
-          <NameList
-            label={translate("calendar.detail.maybe")}
-            names={opened.maybe}
-            whenEmpty={nobodyYet}
-          />
-        </dd>
-      </div>
-    </>
-  );
 }
 
 function describeAudience(
@@ -89,46 +63,100 @@ function describeAudience(
   if (audience.groups.length === 0) {
     return translate("calendar.detail.audience.noGroups");
   }
-  return audience.groups.map((group) => group.name).join(", ");
+  return audience.groups.map((group) => group.name).join(AUDIENCE_SEPARATOR);
 }
 
-function OpenedDetail({
-  translate,
-  opened,
+function openedOf(detail: EventDetailState): OpenedEvent | null {
+  return detail.kind === "loaded" ? detail.opened : null;
+}
+
+/** Un bloque con su icono en un cuadro y dos líneas, como la hora. */
+function PanelBlock({
+  Glyph,
+  lines,
 }: {
-  readonly translate: Translator;
-  readonly opened: OpenedEvent;
+  readonly Glyph: PhosphorGlyph;
+  readonly lines: { readonly first: string; readonly second: string };
 }): React.JSX.Element {
   return (
-    <dl className="agenda-detail-list">
-      <div className="agenda-detail-item">
-        <dt>{translate("calendar.detail.notes")}</dt>
-        {hasNotes(opened.notes) ? (
-          <dd className="agenda-detail-notes">{opened.notes}</dd>
-        ) : (
-          <dd className="agenda-detail-empty">
-            {translate("calendar.detail.noNotes")}
-          </dd>
-        )}
+    <div className="agenda-panel-block">
+      <span className="agenda-panel-icon" aria-hidden="true">
+        <Glyph focusable="false" size={18} />
+      </span>
+      <div className="agenda-panel-block-text">
+        <p className="agenda-panel-block-first">{lines.first}</p>
+        <p className="agenda-panel-block-second">{lines.second}</p>
       </div>
-      <Responses translate={translate} opened={opened} />
-      {opened.audience === null ? null : (
-        <div className="agenda-detail-item">
-          <dt>{translate("calendar.detail.audience")}</dt>
-          <dd>{describeAudience(translate, opened.audience)}</dd>
-        </div>
-      )}
-    </dl>
+    </div>
   );
 }
 
-export function EventDetailPanel({
+function PanelTags({
+  translate,
+  event,
+  opened,
+}: {
+  readonly translate: Translator;
+  readonly event: AgendaEvent;
+  readonly opened: OpenedEvent | null;
+}): React.JSX.Element {
+  const audience = opened === null ? null : opened.audience;
+  return (
+    <div className="agenda-panel-tags">
+      <EventTypeTag translate={translate} eventType={event.eventType} />
+      {event.status === "cancelled" ? (
+        <span className="agenda-cancelled">
+          {translate("calendar.event.cancelled")}
+        </span>
+      ) : null}
+      {audience === null ? null : (
+        <span className="agenda-panel-audience">
+          {describeAudience(translate, audience)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function WhenBlocks({
+  translate,
+  event,
+  opened,
+}: {
+  readonly translate: Translator;
+  readonly event: AgendaEvent;
+  readonly opened: OpenedEvent | null;
+}): React.JSX.Element {
+  const when = describeEventWhen(translate, event);
+  const series = opened === null ? null : opened.series;
+  const repeat =
+    series === null ? null : describeSeriesRepeat(translate, series);
+  return (
+    <>
+      <PanelBlock
+        Glyph={Clock}
+        lines={{ first: when.day, second: when.hours }}
+      />
+      {repeat === null ? null : (
+        <PanelBlock
+          Glyph={Repeat}
+          lines={{ first: repeat.days, second: repeat.until }}
+        />
+      )}
+    </>
+  );
+}
+
+/** Los que van y las notas, que llegan con el detalle. */
+function OpenedSections({
   translate,
   detail,
+  tally,
   onRetry,
 }: {
   readonly translate: Translator;
   readonly detail: EventDetailState;
+  readonly tally: EventTally;
   readonly onRetry: () => void;
 }): React.JSX.Element | null {
   switch (detail.kind) {
@@ -152,6 +180,105 @@ export function EventDetailPanel({
         </div>
       );
     case "loaded":
-      return <OpenedDetail translate={translate} opened={detail.opened} />;
+      return (
+        <>
+          <EventGoing
+            translate={translate}
+            tally={tally}
+            opened={detail.opened}
+          />
+          {hasNotes(detail.opened.notes) ? (
+            <section className="agenda-panel-section">
+              <h3 className="agenda-panel-eyebrow">
+                {translate("calendar.detail.notes")}
+              </h3>
+              <p className="agenda-detail-notes">{detail.opened.notes}</p>
+            </section>
+          ) : null}
+        </>
+      );
   }
+}
+
+export function EventDetailPanel({
+  id,
+  translate,
+  event,
+  detail,
+  tally,
+  onRetry,
+  slots,
+  focus,
+}: {
+  readonly id: string;
+  readonly translate: Translator;
+  readonly event: AgendaEvent;
+  readonly detail: EventDetailState;
+  /** Los conteos de la fila, que ya cuentan la respuesta propia. */
+  readonly tally: EventTally;
+  readonly onRetry: () => void;
+  readonly slots: PanelSlots;
+  readonly focus: PanelFocus;
+}): React.JSX.Element {
+  const titleId = useId();
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const opened = openedOf(detail);
+  const { shouldTakeFocus, onReturn } = focus;
+
+  useEffect(() => {
+    if (shouldTakeFocus) {
+      titleRef.current?.focus();
+    }
+  }, [shouldTakeFocus]);
+
+  // Escape dentro de un diálogo (editar) lo cierra a él, no al panel.
+  function returnOnEscape(keyDown: React.KeyboardEvent<HTMLElement>): void {
+    const target = keyDown.target;
+    const isInDialog = target instanceof Element && target.closest("dialog");
+    if (keyDown.key === "Escape" && !isInDialog) {
+      onReturn();
+    }
+  }
+
+  return (
+    <aside
+      id={id}
+      className={`agenda-panel agenda-panel-${event.eventType}`}
+      aria-labelledby={titleId}
+      onKeyDown={returnOnEscape}
+    >
+      <div className="agenda-panel-cover">
+        <EventCover
+          url={opened === null ? event.coverThumbUrl : opened.coverUrl}
+          eventType={event.eventType}
+          iconSize={76}
+        />
+      </div>
+      <div className="agenda-panel-body">
+        <PanelTags translate={translate} event={event} opened={opened} />
+        <h2
+          ref={titleRef}
+          id={titleId}
+          className="agenda-panel-title"
+          tabIndex={-1}
+        >
+          {event.title}
+        </h2>
+        <WhenBlocks translate={translate} event={event} opened={opened} />
+        <EventPlaceCard translate={translate} event={event} />
+        {slots.rsvp}
+        <OpenedSections
+          translate={translate}
+          detail={detail}
+          tally={tally}
+          onRetry={onRetry}
+        />
+        {slots.teams}
+        {slots.actions}
+        <button type="button" className="agenda-panel-back" onClick={onReturn}>
+          {translate("calendar.panel.backToList")}
+        </button>
+      </div>
+    </aside>
+  );
 }

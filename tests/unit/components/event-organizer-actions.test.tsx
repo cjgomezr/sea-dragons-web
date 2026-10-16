@@ -89,6 +89,7 @@ const CANCELLED_SOCIAL: AgendaEvent = {
 const SCRIMMAGE_DETAIL: OrganizerEventDetail = {
   ...SCRIMMAGE,
   coverUrl: null,
+  series: null,
   notes: "Bring both caps",
   going: ["Ana Pérez", "Liam Chen", "Mia Rossi"],
   maybe: ["Noah Park"],
@@ -133,6 +134,7 @@ function detailOf(event: AgendaEvent): OrganizerEventDetail {
     ...event,
     // La grande no hace falta distinguirla de la miniatura aquí.
     coverUrl: event.coverThumbUrl,
+    series: null,
     notes: null,
     going: ["Ana Pérez"],
     maybe: [],
@@ -239,11 +241,15 @@ function stubApi(options: {
   );
 }
 
-/** El aviso de la agenda; cada fila que admite respuesta tiene el suyo. */
+/** El aviso de la agenda; el panel del evento tiene los suyos (¿Vas? y
+ * copiar la dirección). */
 function agendaNotice(): HTMLElement {
   const notice = screen
     .getAllByRole("status")
-    .find((region) => region.closest("li") === null);
+    .find(
+      (region) =>
+        region.closest("li") === null && region.closest("aside") === null,
+    );
   if (notice === undefined) {
     throw new Error("La agenda no tiene su región de avisos.");
   }
@@ -261,7 +267,10 @@ function agendaCalls(): Call[] {
 }
 
 async function findRow(title: string): Promise<HTMLElement> {
-  const heading = await screen.findByRole("heading", { name: title });
+  const heading = await screen.findByRole("heading", {
+    level: 3,
+    name: title,
+  });
   const row = heading.closest("li");
   if (row === null) {
     throw new Error(`La fila de ${title} no es un elemento de la lista.`);
@@ -269,12 +278,33 @@ async function findRow(title: string): Promise<HTMLElement> {
   return row;
 }
 
-/** Despliega la fila y espera a que su detalle llegue. */
-async function expandRow(title: string): Promise<HTMLElement> {
-  const row = await findRow(title);
-  await userEvent.click(within(row).getByRole("button", { name: title }));
-  await within(row).findByText("Notes");
-  return row;
+function eventList(): HTMLElement {
+  return screen.getByRole("list", { name: "Upcoming events" });
+}
+
+/** Elige la fila si no lo está ya: la primera se elige sola al cargar. */
+async function selectRow(row: HTMLElement, title: string): Promise<void> {
+  const button = within(row).getByRole("button", { name: title });
+  if (button.getAttribute("aria-current") !== "true") {
+    await userEvent.click(button);
+  }
+}
+
+/** El panel del evento con su detalle ya llegado: los que van sólo se pintan
+ * con el detalle, en inglés y en español. */
+async function findLoadedPanel(title: string): Promise<HTMLElement> {
+  const panel = await screen.findByRole("complementary", { name: title });
+  await within(panel).findByRole("heading", {
+    level: 3,
+    name: /^(Going|Van) · \d+$/,
+  });
+  return panel;
+}
+
+/** Elige la fila del evento y devuelve su panel con el detalle llegado. */
+async function openPanel(title: string): Promise<HTMLElement> {
+  await selectRow(await findRow(title), title);
+  return findLoadedPanel(title);
 }
 
 function renderAgenda(
@@ -295,8 +325,8 @@ async function openEditDialog(
   title: string,
   dialogName: string,
 ): Promise<HTMLElement> {
-  const row = await expandRow(title);
-  await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+  const panel = await openPanel(title);
+  await userEvent.click(within(panel).getByRole("button", { name: "Edit" }));
   return openDialogNamed(dialogName);
 }
 
@@ -307,12 +337,12 @@ async function openDialogNamed(name: string): Promise<HTMLElement> {
 }
 
 async function chooseScope(
-  row: HTMLElement,
+  panel: HTMLElement,
   action: "Edit" | "Cancel",
   scope: "Only this one" | "The whole series from today on",
 ): Promise<void> {
-  await userEvent.click(within(row).getByRole("button", { name: action }));
-  await userEvent.click(within(row).getByRole("button", { name: scope }));
+  await userEvent.click(within(panel).getByRole("button", { name: action }));
+  await userEvent.click(within(panel).getByRole("button", { name: scope }));
 }
 
 function setValue(dialog: HTMLElement, label: string, value: string): void {
@@ -333,17 +363,17 @@ afterEach(() => {
 });
 
 describe("acciones del organizador", () => {
-  it("un Admin o un Committee ve Editar y Cancelar al desplegar un evento futuro", async () => {
+  it("un Admin o un Committee ve Editar y Cancelar al elegir un evento futuro", async () => {
     stubApi({ events: [SCRIMMAGE] });
     renderAgenda();
 
-    const row = await expandRow(SCRIMMAGE.title);
+    const panel = await openPanel(SCRIMMAGE.title);
 
     expect(
-      within(row).getByRole("button", { name: "Edit" }),
+      within(panel).getByRole("button", { name: "Edit" }),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole("button", { name: "Cancel" }),
+      within(panel).getByRole("button", { name: "Cancel" }),
     ).toBeInTheDocument();
   });
 
@@ -351,13 +381,13 @@ describe("acciones del organizador", () => {
     stubApi({ events: [SCRIMMAGE] });
     renderAgenda({ canManage: false });
 
-    const row = await expandRow(SCRIMMAGE.title);
+    const panel = await openPanel(SCRIMMAGE.title);
 
     expect(
-      within(row).queryByRole("button", { name: "Edit" }),
+      within(panel).queryByRole("button", { name: "Edit" }),
     ).not.toBeInTheDocument();
     expect(
-      within(row).queryByRole("button", { name: "Cancel" }),
+      within(panel).queryByRole("button", { name: "Cancel" }),
     ).not.toBeInTheDocument();
   });
 
@@ -365,10 +395,10 @@ describe("acciones del organizador", () => {
     stubApi({ events: [CANCELLED_SOCIAL] });
     renderAgenda();
 
-    const row = await expandRow(CANCELLED_SOCIAL.title);
+    const panel = await openPanel(CANCELLED_SOCIAL.title);
 
     expect(
-      within(row).queryByRole("button", { name: "Edit" }),
+      within(panel).queryByRole("button", { name: "Edit" }),
     ).not.toBeInTheDocument();
   });
 
@@ -389,10 +419,10 @@ describe("acciones del organizador", () => {
     renderAgenda();
     await userEvent.click(await screen.findByRole("button", { name: "Past" }));
 
-    const row = await expandRow(SCRIMMAGE.title);
+    const panel = await openPanel(SCRIMMAGE.title);
 
     expect(
-      within(row).queryByRole("button", { name: "Edit" }),
+      within(panel).queryByRole("button", { name: "Edit" }),
     ).not.toBeInTheDocument();
   });
 
@@ -400,17 +430,13 @@ describe("acciones del organizador", () => {
     stubApi({ events: [SCRIMMAGE] });
     renderAgenda({ locale: "es" });
 
-    const row = await findRow(SCRIMMAGE.title);
-    await userEvent.click(
-      within(row).getByRole("button", { name: SCRIMMAGE.title }),
-    );
-    await within(row).findByText("Notas");
+    const panel = await openPanel(SCRIMMAGE.title);
 
     expect(
-      within(row).getByRole("button", { name: "Editar" }),
+      within(panel).getByRole("button", { name: "Editar" }),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole("button", { name: "Cancelar" }),
+      within(panel).getByRole("button", { name: "Cancelar" }),
     ).toBeInTheDocument();
   });
 });
@@ -514,15 +540,15 @@ describe("editar desde el calendario", () => {
   it("en una ocurrencia pregunta si es solo esta o toda la serie", async () => {
     stubApi({ events: [TRAINING_OCCURRENCE] });
     renderAgenda();
-    const row = await expandRow(TRAINING_OCCURRENCE.title);
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
 
-    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    await userEvent.click(within(panel).getByRole("button", { name: "Edit" }));
 
     expect(
-      within(row).getByRole("button", { name: "Only this one" }),
+      within(panel).getByRole("button", { name: "Only this one" }),
     ).toBeInTheDocument();
     expect(
-      within(row).getByRole("button", {
+      within(panel).getByRole("button", {
         name: "The whole series from today on",
       }),
     ).toBeInTheDocument();
@@ -535,8 +561,8 @@ describe("editar desde el calendario", () => {
       respond: () => managedEvent(TRAINING_OCCURRENCE, { startTime: "19:30" }),
     });
     renderAgenda();
-    const row = await expandRow(TRAINING_OCCURRENCE.title);
-    await chooseScope(row, "Edit", "Only this one");
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+    await chooseScope(panel, "Edit", "Only this one");
     const dialog = await openDialogNamed("Edit event");
 
     expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-10-06");
@@ -558,9 +584,9 @@ describe("editar desde el calendario", () => {
   it("con Toda la serie no deja cambiar la fecha ni los días y advierte que pisa las editadas", async () => {
     stubApi({ events: [TRAINING_OCCURRENCE] });
     renderAgenda();
-    const row = await expandRow(TRAINING_OCCURRENCE.title);
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
 
-    await chooseScope(row, "Edit", "The whole series from today on");
+    await chooseScope(panel, "Edit", "The whole series from today on");
     const dialog = await openDialogNamed("Edit series");
 
     expect(within(dialog).queryByLabelText("Date")).not.toBeInTheDocument();
@@ -584,8 +610,8 @@ describe("editar desde el calendario", () => {
       respond: () => editedSeries(8),
     });
     renderAgenda();
-    const row = await expandRow(TRAINING_OCCURRENCE.title);
-    await chooseScope(row, "Edit", "The whole series from today on");
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+    await chooseScope(panel, "Edit", "The whole series from today on");
     const dialog = await openDialogNamed("Edit series");
 
     setValue(dialog, "Starts", "19:30");
@@ -649,14 +675,12 @@ describe("editar desde el calendario", () => {
       respond: () => businessRule("series_without_upcoming"),
     });
     renderAgenda({ locale: "es" });
-    const row = await findRow(TRAINING_OCCURRENCE.title);
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
     await userEvent.click(
-      within(row).getByRole("button", { name: TRAINING_OCCURRENCE.title }),
+      within(panel).getByRole("button", { name: "Editar" }),
     );
-    await within(row).findByText("Notas");
-    await userEvent.click(within(row).getByRole("button", { name: "Editar" }));
     await userEvent.click(
-      within(row).getByRole("button", {
+      within(panel).getByRole("button", {
         name: "Toda la serie de hoy en adelante",
       }),
     );
@@ -738,12 +762,14 @@ describe("cancelar desde el calendario", () => {
   it("pide confirmación diciendo cuántos habían dicho que van", async () => {
     stubApi({ events: [SCRIMMAGE] });
     renderAgenda();
-    const row = await expandRow(SCRIMMAGE.title);
+    const panel = await openPanel(SCRIMMAGE.title);
 
-    await userEvent.click(within(row).getByRole("button", { name: "Cancel" }));
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Cancel" }),
+    );
 
     expect(
-      within(row).getByText(
+      within(panel).getByText(
         "3 people said they're going. We'll let the audience know it's cancelled.",
       ),
     ).toBeInTheDocument();
@@ -761,11 +787,13 @@ describe("cancelar desde el calendario", () => {
         }),
     });
     renderAgenda();
-    const row = await expandRow(SCRIMMAGE.title);
-    await userEvent.click(within(row).getByRole("button", { name: "Cancel" }));
+    const panel = await openPanel(SCRIMMAGE.title);
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Cancel" }),
+    );
 
     await userEvent.click(
-      within(row).getByRole("button", { name: "Cancel event" }),
+      within(panel).getByRole("button", { name: "Cancel event" }),
     );
 
     const refreshed = await findRow(SCRIMMAGE.title);
@@ -784,13 +812,17 @@ describe("cancelar desde el calendario", () => {
   it("deja volver atrás sin cancelar nada", async () => {
     stubApi({ events: [SCRIMMAGE] });
     renderAgenda();
-    const row = await expandRow(SCRIMMAGE.title);
-    await userEvent.click(within(row).getByRole("button", { name: "Cancel" }));
+    const panel = await openPanel(SCRIMMAGE.title);
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Cancel" }),
+    );
 
-    await userEvent.click(within(row).getByRole("button", { name: "Keep it" }));
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Keep it" }),
+    );
 
     expect(
-      within(row).queryByRole("button", { name: "Cancel event" }),
+      within(panel).queryByRole("button", { name: "Cancel event" }),
     ).not.toBeInTheDocument();
     expect(manageCalls()).toEqual([]);
   });
@@ -810,27 +842,29 @@ describe("cancelar desde el calendario", () => {
       respond: () => cancelledSeries(2),
     });
     renderAgenda();
-    const [row] = await screen.findAllByRole("listitem");
+    await screen.findAllByRole("heading", {
+      level: 3,
+      name: TRAINING_OCCURRENCE.title,
+    });
+    const [row] = within(eventList()).getAllByRole("listitem");
     if (row === undefined) {
       throw new Error("La agenda no pintó ninguna fila.");
     }
-    await userEvent.click(
-      within(row).getByRole("button", { name: TRAINING_OCCURRENCE.title }),
-    );
-    await within(row).findByText("Notes");
-    await chooseScope(row, "Cancel", "The whole series from today on");
+    await selectRow(row, TRAINING_OCCURRENCE.title);
+    const panel = await findLoadedPanel(TRAINING_OCCURRENCE.title);
+    await chooseScope(panel, "Cancel", "The whole series from today on");
 
     expect(
-      within(row).getByText(
+      within(panel).getByText(
         "Every session from today on will be cancelled. 1 person said they're going to this one.",
       ),
     ).toBeInTheDocument();
     await userEvent.click(
-      within(row).getByRole("button", { name: "Cancel series" }),
+      within(panel).getByRole("button", { name: "Cancel series" }),
     );
 
     await waitFor(() => {
-      expect(screen.getAllByText("Cancelled")).toHaveLength(2);
+      expect(within(eventList()).getAllByText("Cancelled")).toHaveLength(2);
     });
     expect(manageCalls()).toEqual([
       expect.objectContaining({
@@ -853,11 +887,11 @@ describe("cancelar desde el calendario", () => {
         }),
     });
     renderAgenda();
-    const row = await expandRow(TRAINING_OCCURRENCE.title);
-    await chooseScope(row, "Cancel", "Only this one");
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+    await chooseScope(panel, "Cancel", "Only this one");
 
     await userEvent.click(
-      within(row).getByRole("button", { name: "Cancel event" }),
+      within(panel).getByRole("button", { name: "Cancel event" }),
     );
 
     await waitFor(() => {
@@ -878,9 +912,11 @@ describe("cancelar desde el calendario", () => {
         }),
     });
     renderAgenda();
-    const row = await expandRow(SCRIMMAGE.title);
-    await userEvent.click(within(row).getByRole("button", { name: "Cancel" }));
-    const confirm = within(row).getByRole("button", { name: "Cancel event" });
+    const panel = await openPanel(SCRIMMAGE.title);
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Cancel" }),
+    );
+    const confirm = within(panel).getByRole("button", { name: "Cancel event" });
 
     fireEvent.click(confirm);
     fireEvent.click(confirm);
@@ -916,17 +952,19 @@ describe("cancelar desde el calendario", () => {
       },
     });
     renderAgenda();
-    const row = await expandRow(SCRIMMAGE.title);
-    await userEvent.click(within(row).getByRole("button", { name: "Cancel" }));
+    const panel = await openPanel(SCRIMMAGE.title);
     await userEvent.click(
-      within(row).getByRole("button", { name: "Cancel event" }),
+      within(panel).getByRole("button", { name: "Cancel" }),
+    );
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Cancel event" }),
     );
 
-    expect(await within(row).findByRole("alert")).toHaveTextContent(
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
       "We couldn't reach the server. Check your connection and try again.",
     );
     await userEvent.click(
-      within(row).getByRole("button", { name: "Cancel event" }),
+      within(panel).getByRole("button", { name: "Cancel event" }),
     );
 
     await waitFor(() => {
@@ -941,12 +979,14 @@ describe("cancelar desde el calendario", () => {
       respond: () => businessRule("event_cancelled"),
     });
     renderAgenda();
-    const row = await expandRow(SCRIMMAGE.title);
+    const panel = await openPanel(SCRIMMAGE.title);
     const agendaLoadsBefore = agendaCalls().length;
-    await userEvent.click(within(row).getByRole("button", { name: "Cancel" }));
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Cancel" }),
+    );
 
     await userEvent.click(
-      within(row).getByRole("button", { name: "Cancel event" }),
+      within(panel).getByRole("button", { name: "Cancel event" }),
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -960,11 +1000,13 @@ describe("cancelar desde el calendario", () => {
   it("si el evento ya no existe, lo dice y refresca la agenda", async () => {
     stubApi({ events: [SCRIMMAGE], respond: notFound });
     renderAgenda();
-    const row = await expandRow(SCRIMMAGE.title);
-    await userEvent.click(within(row).getByRole("button", { name: "Cancel" }));
+    const panel = await openPanel(SCRIMMAGE.title);
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Cancel" }),
+    );
 
     await userEvent.click(
-      within(row).getByRole("button", { name: "Cancel event" }),
+      within(panel).getByRole("button", { name: "Cancel event" }),
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -1025,12 +1067,10 @@ describe("el fin y la imagen al editar (#650)", () => {
   it("en un evento anterior a E24 lo dice en español", async () => {
     stubApi({ events: [BEFORE_E24] });
     renderAgenda({ locale: "es" });
-    const row = await findRow(BEFORE_E24.title);
+    const panel = await openPanel(BEFORE_E24.title);
     await userEvent.click(
-      within(row).getByRole("button", { name: BEFORE_E24.title }),
+      within(panel).getByRole("button", { name: "Editar" }),
     );
-    await within(row).findByText("Notas");
-    await userEvent.click(within(row).getByRole("button", { name: "Editar" }));
     const dialog = await screen.findByRole("dialog", { name: "Editar evento" });
     await within(dialog).findByRole("radio", { name: "Todo el club" });
 
@@ -1066,9 +1106,9 @@ describe("el fin y la imagen al editar (#650)", () => {
   it("en toda la serie no ofrece Termina otro día", async () => {
     stubApi({ events: [TRAINING_OCCURRENCE] });
     renderAgenda();
-    const row = await expandRow(TRAINING_OCCURRENCE.title);
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
 
-    await chooseScope(row, "Edit", "The whole series from today on");
+    await chooseScope(panel, "Edit", "The whole series from today on");
     const dialog = await openDialogNamed("Edit series");
 
     expect(within(dialog).getByLabelText("Ends")).toHaveValue("20:30");

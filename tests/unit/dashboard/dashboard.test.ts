@@ -235,6 +235,7 @@ function gateways(): DashboardGateways {
         findEvent: async () => null,
         countResponses: async () => [],
         listResponders: async () => [],
+        summarizeSeries: async () => null,
       },
       eventCovers: { signUrls: async () => new Map() },
     },

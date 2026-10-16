@@ -20,7 +20,7 @@ import {
   loadAgenda,
 } from "./agenda-client";
 import { classifyAgendaDay, groupAgendaByDay } from "./agenda-days";
-import { AgendaRow } from "./AgendaRow";
+import { AgendaRow, type PanelTarget } from "./AgendaRow";
 import {
   AGENDA_TYPES_QUERY_PARAM,
   AGENDA_TYPE_CHIPS,
@@ -104,6 +104,24 @@ type AgendaState =
     };
 
 const TITLE_ID = "calendario-titulo";
+
+/** Por debajo de este ancho el panel va debajo de la lista y no al lado:
+ * con la barra lateral no caben los 380px del panel junto a una lista que se
+ * pueda leer. El mismo corte que `.agenda-columns` en la hoja de estilos. */
+const STACKED_PANEL_QUERY = "(width < 1024px)";
+
+/** El evento elegido y si lo eligió quien mira (#648). */
+type EventChoice = {
+  readonly eventId: string | null;
+  readonly isByGesture: boolean;
+};
+
+/** Qué fila enseña el panel y dónde lo pinta (#648). */
+type AgendaSelection = {
+  readonly selectedEventId: string | null;
+  readonly onSelect: (eventId: string) => void;
+  readonly panel: PanelTarget;
+};
 
 // En el orden del control. No se importa `AGENDA_PERIODS`: vive junto a la
 // lógica de servidor de la agenda, que no tiene por qué llegar al navegador.
@@ -258,6 +276,7 @@ function AgendaList({
   period,
   events,
   focusEventId,
+  selection,
   organizer,
   canTakeAttendance,
   rsvpDisabledReasonId,
@@ -266,15 +285,11 @@ function AgendaList({
   readonly period: AgendaPeriod;
   readonly events: readonly AgendaEvent[];
   readonly focusEventId: string | null;
+  readonly selection: AgendaSelection;
   readonly organizer: EventOrganizer | null;
   readonly canTakeAttendance: boolean;
   readonly rsvpDisabledReasonId: string | null;
 }): React.JSX.Element {
-  if (events.length === 0) {
-    return (
-      <p className="admin-empty">{translate(PERIOD_TEXTS[period].empty)}</p>
-    );
-  }
   const today = clubCalendarDate(new Date());
   return (
     <ul className="agenda-list" aria-labelledby={TITLE_ID}>
@@ -293,6 +308,9 @@ function AgendaList({
                 event={event}
                 period={period}
                 shouldTakeFocus={event.id === focusEventId}
+                isSelected={event.id === selection.selectedEventId}
+                onSelect={() => selection.onSelect(event.id)}
+                panel={selection.panel}
                 organizer={organizer}
                 canTakeAttendance={canTakeAttendance}
                 rsvpDisabledReasonId={rsvpDisabledReasonId}
@@ -491,6 +509,15 @@ function AgendaView({
 }): React.JSX.Element {
   const [state, setState] = useState<AgendaState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
+  // El evento al que se llega (de la búsqueda o tras editarlo) es el elegido;
+  // si no está en la agenda, el primero. Sólo el que elige un gesto se lleva
+  // el foco al panel.
+  const [choice, setChoice] = useState<EventChoice>({
+    eventId: focusOnLoad,
+    isByGesture: false,
+  });
+  const [panelSlot, setPanelSlot] = useState<HTMLElement | null>(null);
+  const panelId = useId();
 
   useEffect(() => {
     let isCurrent = true;
@@ -545,6 +572,11 @@ function AgendaView({
     });
   }
 
+  function selectEvent(eventId: string): void {
+    setChoice({ eventId, isByGesture: true });
+    revealStackedPanel(panelSlot);
+  }
+
   const nextCursor = state.kind === "ready" ? state.nextCursor : null;
 
   return (
@@ -559,26 +591,62 @@ function AgendaView({
           onRetry={reloadAgenda}
         />
       ) : null}
-      {state.kind === "ready" ? (
-        <AgendaList
-          translate={translate}
-          period={period}
-          events={state.events}
-          focusEventId={state.focusEventId}
-          organizer={organizer}
-          canTakeAttendance={canTakeAttendance}
-          rsvpDisabledReasonId={rsvpDisabledReasonId}
-        />
+      {state.kind === "ready" && state.events.length === 0 ? (
+        <p className="admin-empty">{translate(PERIOD_TEXTS[period].empty)}</p>
       ) : null}
-      {state.kind === "ready" && nextCursor !== null ? (
-        <LoadMore
-          translate={translate}
-          more={state.more}
-          onLoadMore={() => void loadMore(nextCursor)}
-        />
+      {state.kind === "ready" && state.events.length > 0 ? (
+        <div className="agenda-columns">
+          <div className="agenda-list-column">
+            <AgendaList
+              translate={translate}
+              period={period}
+              events={state.events}
+              focusEventId={state.focusEventId}
+              selection={{
+                selectedEventId: selectedEventOf(state.events, choice.eventId),
+                onSelect: selectEvent,
+                panel: {
+                  slot: panelSlot,
+                  id: panelId,
+                  shouldTakeFocus: choice.isByGesture,
+                },
+              }}
+              organizer={organizer}
+              canTakeAttendance={canTakeAttendance}
+              rsvpDisabledReasonId={rsvpDisabledReasonId}
+            />
+            {nextCursor === null ? null : (
+              <LoadMore
+                translate={translate}
+                more={state.more}
+                onLoadMore={() => void loadMore(nextCursor)}
+              />
+            )}
+          </div>
+          <div ref={setPanelSlot} className="agenda-panel-slot" />
+        </div>
       ) : null}
     </div>
   );
+}
+
+/** La fila elegida, o la primera si la elegida no está en la agenda. */
+function selectedEventOf(
+  events: readonly AgendaEvent[],
+  chosenEventId: string | null,
+): string | null {
+  const isChosenListed = events.some((event) => event.id === chosenEventId);
+  return isChosenListed ? chosenEventId : (events.at(0)?.id ?? null);
+}
+
+/** Con el panel debajo de la lista, elegir una fila lo trae a la vista: si
+ * no, el cambio pasaría lejos de donde se pulsó. Al lado de la lista no hace
+ * falta, y la lista no se mueve. */
+function revealStackedPanel(slot: HTMLElement | null): void {
+  if (slot === null || !window.matchMedia(STACKED_PANEL_QUERY).matches) {
+    return;
+  }
+  slot.scrollIntoView({ block: "start" });
 }
 
 function describeNotice(translate: Translator, notice: AgendaNotice): string {

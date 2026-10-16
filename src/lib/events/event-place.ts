@@ -29,7 +29,9 @@ export type EventPlace = {
 
 const MAPS_SEARCH_URL = "https://www.google.com/maps/search/?api=1&query=";
 
-function searchTextOf(where: {
+/** El nombre y la dirección del lugar elegido, o el texto libre: lo que busca
+ * el mapa y lo que copia "Copiar dirección" (#648). */
+export function placeTextOf(where: {
   readonly location: string;
   readonly place: EventPlace | null;
 }): string {
@@ -52,7 +54,7 @@ export function buildMapsUrl(where: {
   const query =
     place !== null && place.lat !== null
       ? `${place.lat},${place.lng}`
-      : encodeURIComponent(searchTextOf(where));
+      : encodeURIComponent(placeTextOf(where));
   return `${MAPS_SEARCH_URL}${query}`;
 }
 

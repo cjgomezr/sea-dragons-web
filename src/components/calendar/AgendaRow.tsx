@@ -1,7 +1,8 @@
 import { MapPin } from "@phosphor-icons/react/dist/ssr/MapPin";
 import { Repeat } from "@phosphor-icons/react/dist/ssr/Repeat";
 import Link from "next/link";
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   ATTENDANCE_PATH,
   ATTENDANCE_SESSION_QUERY_PARAM,
@@ -21,7 +22,7 @@ import { BUILDABLE_EVENT_TYPES } from "@/lib/teams/team-ids";
 import { clubMoment } from "@/lib/time/club-calendar";
 import { describeRsvpFailure } from "./agenda-client";
 import { EventCover } from "./EventCover";
-import { EventDetailPanel } from "./EventDetailPanel";
+import { EventDetailPanel, type PanelSlots } from "./EventDetailPanel";
 import {
   type EventOrganizer,
   EventOrganizerActions,
@@ -29,8 +30,8 @@ import {
 import { EventRsvp } from "./EventRsvp";
 import { EventTeams } from "./EventTeams";
 import { EventTypeTag } from "./EventTypeTag";
-import { useEventDetail } from "./use-event-detail";
-import { useEventRsvp } from "./use-event-rsvp";
+import { type EventDetailState, useEventDetail } from "./use-event-detail";
+import { type EventRsvpState, useEventRsvp } from "./use-event-rsvp";
 import { useEventTeam } from "./use-event-team";
 
 /**
@@ -41,26 +42,27 @@ import { useEventTeam } from "./use-event-team";
  * acompaña: el tipo lo nombra su etiqueta y el cancelado, su palabra.
  *
  * El lugar es un enlace aparte al mapa, en otra pestaña. No llega a la fila:
- * pulsarlo no la despliega.
+ * pulsarlo no la elige.
+ *
+ * El título es el botón que elige la fila (#648, RF-7 del PRD de E24), así
+ * Enter y Espacio la eligen; con el ratón se pulsa en cualquier punto de la
+ * tarjeta. La elegida pinta su evento en el panel de al lado, que sustituye
+ * al acordeón de #312. El panel sale de la fila, por un portal, porque la
+ * fila es dueña de su respuesta, su detalle y sus equipos: así cambiar de
+ * fila no pierde nada y la píldora cambia cuando se responde en el panel.
  *
  * Responde quien es de la audiencia de un evento que sigue en pie. A un
  * cancelado no se le responde, y quien organiza ve también los eventos que no
  * son para él (B7): esos no llevan botones. A un pasado tampoco (#312).
  *
- * El título es el botón que despliega la fila (#312, RF-8): un botón dentro
- * del encabezado, el patrón del acordeón, así Enter y Espacio lo abren y el
- * lector de pantalla anuncia si está desplegada. Con el ratón se pulsa en
- * cualquier punto de la tarjeta. Desplegada enseña los botones del RSVP con
- * los conteos, las notas y quién va. Es lo que llevará el panel de #648.
+ * A quien organiza, el panel de un evento futuro que sigue en pie le ofrece
+ * editarlo y cancelarlo (#316).
  *
- * A quien organiza, la fila desplegada de un evento futuro que sigue en pie
- * le ofrece editarlo y cancelarlo (#316).
- *
- * A quien pasa lista, la de un entrenamiento que ya empezó y sigue en pie le
+ * A quien pasa lista, el de un entrenamiento que ya empezó y sigue en pie le
  * ofrece "Pasar lista" (#395), que abre Asistencia con esa sesión. Puede estar
  * en Próximos: el de hoy sigue ahí aunque ya haya empezado.
  *
- * La de un entrenamiento o una competición enseña además los equipos del
+ * El de un entrenamiento o una competición enseña además los equipos del
  * reparto publicado (#403). Los demás eventos no se arman: no se piden.
  */
 
@@ -88,7 +90,7 @@ function TakeAttendanceLink({
   return (
     <Link
       href={`${ATTENDANCE_PATH}?${query.toString()}`}
-      className="admin-secondary agenda-take-attendance"
+      className="auth-submit agenda-take-attendance"
     >
       {translate("calendar.takeAttendance")}
     </Link>
@@ -223,18 +225,123 @@ function MyAnswer({
   );
 }
 
-function rowClassName(event: AgendaEvent): string {
-  const classes = ["agenda-row", `agenda-row-${event.eventType}`];
+/** "¿Vas?" en el panel, con lo que se está guardando y el fallo. */
+function RsvpSection({
+  translate,
+  title,
+  rsvp,
+  disabledReasonId,
+}: {
+  readonly translate: Translator;
+  readonly title: string;
+  readonly rsvp: {
+    readonly state: EventRsvpState;
+    readonly respond: (response: RsvpResponse) => void;
+  };
+  readonly disabledReasonId: string | null;
+}): React.JSX.Element {
+  const { state, respond } = rsvp;
   return (
-    event.status === "cancelled" ? [...classes, "is-cancelled"] : classes
-  ).join(" ");
+    <div className="agenda-panel-section">
+      <EventRsvp
+        translate={translate}
+        title={title}
+        savedResponse={state.tally.myResponse}
+        pendingResponse={state.pendingResponse}
+        onRespond={respond}
+        disabledReasonId={disabledReasonId}
+        variant="panel"
+      />
+      <p className="agenda-rsvp-status" role="status">
+        {state.pendingResponse === null
+          ? null
+          : translate("calendar.rsvp.saving")}
+      </p>
+      {state.failure === null ? null : (
+        <p className="auth-error agenda-rsvp-error" role="alert">
+          {describeRsvpFailure(translate, state.failure)}
+        </p>
+      )}
+    </div>
+  );
 }
+
+/** La fila de acciones del panel: Pasar lista, Editar y Cancelar, cada una
+ * para quien puede. Editar y Cancelar esperan a la audiencia del detalle,
+ * que el diálogo necesita. */
+function PanelActions({
+  translate,
+  event,
+  detail,
+  goingCount,
+  organizer,
+  canTakeAttendance,
+}: {
+  readonly translate: Translator;
+  readonly event: AgendaEvent;
+  readonly detail: EventDetailState;
+  readonly goingCount: number;
+  /** Nulo si quien mira no puede editar ni cancelar este evento. */
+  readonly organizer: EventOrganizer | null;
+  readonly canTakeAttendance: boolean;
+}): React.JSX.Element | null {
+  const opened = detail.kind === "loaded" ? detail.opened : null;
+  const audience = opened === null ? null : opened.audience;
+  const canManage = organizer !== null && opened !== null && audience !== null;
+  if (!canTakeAttendance && !canManage) {
+    return null;
+  }
+  return (
+    <div className="agenda-panel-actions">
+      {canTakeAttendance ? (
+        <TakeAttendanceLink translate={translate} eventId={event.id} />
+      ) : null}
+      {canManage ? (
+        <EventOrganizerActions
+          translate={translate}
+          event={event}
+          details={{
+            notes: opened.notes,
+            audience,
+            coverUrl: opened.coverUrl,
+          }}
+          goingCount={goingCount}
+          organizer={organizer}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function rowClassName(event: AgendaEvent, isSelected: boolean): string {
+  const classes = [
+    "agenda-row",
+    `agenda-row-${event.eventType}`,
+    ...(event.status === "cancelled" ? ["is-cancelled"] : []),
+    ...(isSelected ? ["is-selected"] : []),
+  ];
+  return classes.join(" ");
+}
+
+/** Dónde pinta su panel la fila elegida (#648). */
+export type PanelTarget = {
+  /** El hueco junto a la lista; nulo hasta que se monta. */
+  readonly slot: HTMLElement | null;
+  /** El id del panel, al que apunta el botón de cada fila. */
+  readonly id: string;
+  /** Si el panel se llevó el foco al elegirse: lo eligió un gesto, no la
+   * carga de la agenda. */
+  readonly shouldTakeFocus: boolean;
+};
 
 export function AgendaRow({
   translate,
   event,
   period,
   shouldTakeFocus,
+  isSelected,
+  onSelect,
+  panel,
   organizer,
   canTakeAttendance,
   rsvpDisabledReasonId,
@@ -245,6 +352,10 @@ export function AgendaRow({
   /** La primera fila de una página recién cargada: recibe el foco para que
    * quien pulsó "Ver más" siga leyendo desde ahí. */
   readonly shouldTakeFocus: boolean;
+  /** Si es la fila cuyo evento enseña el panel. */
+  readonly isSelected: boolean;
+  readonly onSelect: () => void;
+  readonly panel: PanelTarget;
   /** Nulo para quien no organiza eventos. */
   readonly organizer: EventOrganizer | null;
   /** Si quien mira registra asistencia. Sólo decide si se pinta el enlace:
@@ -254,10 +365,9 @@ export function AgendaRow({
    * o `null` si puede. */
   readonly rsvpDisabledReasonId: string | null;
 }): React.JSX.Element {
-  const { isExpanded, detail, toggle, retry, receive } = useEventDetail(
-    event.id,
-  );
-  const { state, respond } = useEventRsvp(event, receive);
+  const { detail, open, retry, receive } = useEventDetail(event.id);
+  const rsvp = useEventRsvp(event, receive);
+  const { tally } = rsvp.state;
   const teams = useEventTeam(event.id);
   // Los equipos son de socio (#453): sin la membresía al día la frontera los
   // cierra, así que ni se piden.
@@ -265,17 +375,23 @@ export function AgendaRow({
   const canHaveTeams =
     isMembershipCurrent && BUILDABLE_EVENT_TYPES.includes(event.eventType);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const detailId = useId();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const { open: openTeam } = teams;
   const isCancelled = event.status === "cancelled";
   const canRespond = period === "upcoming" && event.inAudience && !isCancelled;
   const canManage = organizer !== null && period === "upcoming" && !isCancelled;
 
-  function toggleRow(): void {
-    if (!isExpanded && canHaveTeams) {
-      teams.open();
+  // Elegida, la fila pide su detalle y sus equipos. Los dos se guardan y sólo
+  // se piden la primera vez: volver a elegirla no pide otra vez.
+  useEffect(() => {
+    if (!isSelected) {
+      return;
     }
-    toggle();
-  }
+    open();
+    if (canHaveTeams) {
+      openTeam();
+    }
+  }, [isSelected, canHaveTeams, open, openTeam]);
 
   useEffect(() => {
     if (shouldTakeFocus) {
@@ -283,8 +399,37 @@ export function AgendaRow({
     }
   }, [shouldTakeFocus]);
 
+  const slots: PanelSlots = {
+    rsvp: canRespond ? (
+      <RsvpSection
+        translate={translate}
+        title={event.title}
+        rsvp={rsvp}
+        disabledReasonId={rsvpDisabledReasonId}
+      />
+    ) : null,
+    teams: canHaveTeams ? (
+      <EventTeams
+        translate={translate}
+        state={teams.team}
+        isCancelled={isCancelled}
+        onRetry={teams.retry}
+      />
+    ) : null,
+    actions: (
+      <PanelActions
+        translate={translate}
+        event={event}
+        detail={detail}
+        goingCount={tally.goingCount}
+        organizer={canManage ? organizer : null}
+        canTakeAttendance={canTakeAttendance && canTakeAttendanceOf(event)}
+      />
+    ),
+  };
+
   return (
-    <li className={rowClassName(event)}>
+    <li className={rowClassName(event, isSelected)}>
       <span className="agenda-bar" aria-hidden="true" />
       <EventTimes translate={translate} event={event} />
       <div className="agenda-thumbnail">
@@ -297,14 +442,14 @@ export function AgendaRow({
       <div className="agenda-body">
         <h3 ref={titleRef} className="agenda-title" tabIndex={-1}>
           <button
+            ref={toggleRef}
             type="button"
             className="agenda-toggle"
-            aria-expanded={isExpanded}
-            aria-controls={detailId}
-            onClick={toggleRow}
+            aria-controls={panel.id}
+            aria-current={isSelected ? "true" : undefined}
+            onClick={onSelect}
           >
             <span className="agenda-title-text">{event.title}</span>
-            <span className="agenda-chevron" aria-hidden="true" />
           </button>
         </h3>
         <div className="agenda-meta">
@@ -328,84 +473,31 @@ export function AgendaRow({
       <div className="agenda-side">
         <MyAnswer
           translate={translate}
-          myResponse={state.tally.myResponse}
+          myResponse={tally.myResponse}
           canRespond={canRespond}
         />
         <p className="agenda-going">
-          {translate("calendar.event.going", {
-            count: state.tally.goingCount,
-          })}
+          {translate("calendar.event.going", { count: tally.goingCount })}
         </p>
       </div>
-      <div id={detailId} className="agenda-detail" hidden={!isExpanded}>
-        <div className="agenda-footer">
-          {canRespond ? (
-            <EventRsvp
+      {isSelected && panel.slot !== null
+        ? createPortal(
+            <EventDetailPanel
+              id={panel.id}
               translate={translate}
-              title={event.title}
-              savedResponse={state.tally.myResponse}
-              pendingResponse={state.pendingResponse}
-              onRespond={respond}
-              disabledReasonId={rsvpDisabledReasonId}
-            />
-          ) : null}
-          <p className="agenda-counts">
-            {translate("calendar.event.counts", {
-              going: translate("calendar.event.going", {
-                count: state.tally.goingCount,
-              }),
-              maybe: translate("calendar.event.maybe", {
-                count: state.tally.maybeCount,
-              }),
-            })}
-          </p>
-        </div>
-        {canRespond ? (
-          <p className="agenda-rsvp-status" role="status">
-            {state.pendingResponse === null
-              ? null
-              : translate("calendar.rsvp.saving")}
-          </p>
-        ) : null}
-        {state.failure === null ? null : (
-          <p className="auth-error agenda-rsvp-error" role="alert">
-            {describeRsvpFailure(translate, state.failure)}
-          </p>
-        )}
-        {isExpanded ? (
-          <EventDetailPanel
-            translate={translate}
-            detail={detail}
-            onRetry={retry}
-          />
-        ) : null}
-        {isExpanded && canHaveTeams ? (
-          <EventTeams
-            translate={translate}
-            state={teams.team}
-            isCancelled={isCancelled}
-            onRetry={teams.retry}
-          />
-        ) : null}
-        {isExpanded && canTakeAttendance && canTakeAttendanceOf(event) ? (
-          <TakeAttendanceLink translate={translate} eventId={event.id} />
-        ) : null}
-        {canManage &&
-        detail.kind === "loaded" &&
-        detail.opened.audience !== null ? (
-          <EventOrganizerActions
-            translate={translate}
-            event={event}
-            details={{
-              notes: detail.opened.notes,
-              audience: detail.opened.audience,
-              coverUrl: detail.opened.coverUrl,
-            }}
-            goingCount={state.tally.goingCount}
-            organizer={organizer}
-          />
-        ) : null}
-      </div>
+              event={event}
+              detail={detail}
+              tally={tally}
+              onRetry={retry}
+              slots={slots}
+              focus={{
+                shouldTakeFocus: panel.shouldTakeFocus,
+                onReturn: () => toggleRef.current?.focus(),
+              }}
+            />,
+            panel.slot,
+          )
+        : null}
     </li>
   );
 }
