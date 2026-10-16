@@ -22,15 +22,25 @@ export function asDollars(cents: number): string {
   return (cents / CENTS_PER_DOLLAR).toFixed(2);
 }
 
+/** La columna de la opción sólo sale si alguna compra la trae (#637): un
+ * extra sin opciones se exporta como antes. */
+function hasAnyOption(buyers: readonly LevyBuyer[]): boolean {
+  return buyers.some(({ option }) => option !== null);
+}
+
 export function levyPayersCsv(
   buyers: readonly LevyBuyer[],
   translate: Translator,
 ): string {
+  const withOption = hasAnyOption(buyers);
+  const optionColumn = (cell: CsvCell): readonly CsvCell[] =>
+    withOption ? [cell] : [];
   const rows: (readonly CsvCell[])[] = [
     [
       translate("payments.levyPayers.csv.column.name"),
       translate("payments.levyPayers.csv.column.email"),
       translate("payments.levyPayers.csv.column.units"),
+      ...optionColumn(translate("payments.levyPayers.csv.column.option")),
       translate("payments.levyPayers.csv.column.date"),
       translate("payments.levyPayers.csv.column.amount"),
     ],
@@ -38,6 +48,8 @@ export function levyPayersCsv(
       buyer.fullName,
       buyer.email,
       buyer.quantity,
+      // Completa: la pantalla la recorta, la hoja de cálculo no.
+      ...optionColumn(buyer.option),
       // El día de Melbourne (NFR-003), el mismo que enseña la pantalla.
       clubCalendarDate(new Date(buyer.paidAt)),
       asDollars(buyer.amountCents),

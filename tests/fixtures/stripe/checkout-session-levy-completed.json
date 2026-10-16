@@ -20,6 +20,7 @@
       "payment_intent": "pi_TestSeadragonsLevy",
       "amount_total": 8000,
       "currency": "aud",
+      "custom_fields": [],
       "metadata": {
         "user_id": "7b0e5a52-3c1d-4e8f-9a6b-2d4c8e1f0a37",
         "kind": "levy",

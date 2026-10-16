@@ -152,19 +152,21 @@ async function readPaymentDescriptions(
 const JERSEY_UNIT_CENTS = 4500;
 
 /** Unidades e importe de cada pago, del más grande al más pequeño. */
-async function readPaymentQuantities(
+async function readPaymentPurchases(
   serviceClient: ServiceRoleClient,
   user: TestUser,
 ): Promise<readonly string[]> {
   const { data, error } = await serviceClient.client
     .from("payments")
-    .select("quantity, amount_cents")
+    .select("quantity, amount_cents, option")
     .eq("user_id", user.id)
     .order("quantity", { ascending: false });
   if (error) {
     throw new Error(`No se pudieron leer los pagos: ${error.message}`);
   }
-  return data.map((row) => `${row.quantity}|${row.amount_cents}`);
+  return data.map(
+    (row) => `${row.quantity}|${row.amount_cents}|${row.option ?? "-"}`,
+  );
 }
 
 async function deleteEvent(
@@ -252,14 +254,17 @@ describeRls("el levy por el webhook contra la base", () => {
   );
 
   it(
-    "apunta las unidades de cada compra de un extra y suma las del socio (#632)",
+    "apunta las unidades y la opción de cada compra de un extra y suma las del socio (#632, #637)",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
       const gateway = createStripeWebhookGateway(serviceClient.client);
       await withPendingMember(serviceClient, async (user) => {
         const clubId = await seededClubId(serviceClient);
         const jerseyProductId = `prod_it_${randomUUID()}`;
-        const purchaseOf = (quantity: number): LevyPaymentToApply => ({
+        const purchaseOf = (
+          quantity: number,
+          option: string | null,
+        ): LevyPaymentToApply => ({
           event: {
             id: `evt_${randomUUID()}`,
             type: "checkout.session.completed",
@@ -273,19 +278,20 @@ describeRls("el levy por el webhook contra la base", () => {
             currency: "aud",
             description: "2026 club jersey",
             paidAt: new Date("2026-10-15T09:00:00Z"),
+            option,
           },
           quantity,
           card: null,
         });
-        const first = purchaseOf(3);
-        const second = purchaseOf(2);
+        const first = purchaseOf(3, "M");
+        const second = purchaseOf(2, null);
         try {
           await gateway.applyLevyPayment(first);
           await gateway.applyLevyPayment(second);
 
           await expect(
-            readPaymentQuantities(serviceClient, user),
-          ).resolves.toEqual(["3|13500", "2|9000"]);
+            readPaymentPurchases(serviceClient, user),
+          ).resolves.toEqual(["3|13500|M", "2|9000|-"]);
           await expect(
             createLevyPurchasesGateway(
               serviceClient.client,

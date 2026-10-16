@@ -89,13 +89,23 @@ export function describePaymentMethod(card: PaymentCard | null): string | null {
     : `${formatCardBrand(card.brand)} •••• ${card.last4}`;
 }
 
+/** "2026 club jersey × 2 · M" (#637): las unidades, si son más de una, y la
+ * opción, si el extra la pedía. */
+const QUANTITY_MARK = " × ";
+const OPTION_SEPARATOR = " · ";
+const SINGLE_UNIT = 1;
+
 export function describePayment(
   translate: Translator,
   payment: PaymentView,
 ): string {
-  return (
-    payment.description ?? translate("payments.history.defaultDescription")
-  );
+  const description =
+    payment.description ?? translate("payments.history.defaultDescription");
+  const units =
+    payment.quantity > SINGLE_UNIT ? `${QUANTITY_MARK}${payment.quantity}` : "";
+  const option =
+    payment.option === null ? "" : `${OPTION_SEPARATOR}${payment.option}`;
+  return `${description}${units}${option}`;
 }
 
 export function describePaymentStatus(

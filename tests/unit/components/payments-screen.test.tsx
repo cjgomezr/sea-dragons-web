@@ -104,6 +104,7 @@ const PAYMENTS: readonly PaymentView[] = [
     card: { brand: "visa", last4: "4242" },
     failureReason: null,
     quantity: 1,
+    option: null,
   },
   {
     id: "pay-may",
@@ -114,6 +115,7 @@ const PAYMENTS: readonly PaymentView[] = [
     card: { brand: "visa", last4: "4242" },
     failureReason: "Your card was declined.",
     quantity: 1,
+    option: null,
   },
   {
     id: "pay-apr",
@@ -124,6 +126,7 @@ const PAYMENTS: readonly PaymentView[] = [
     card: null,
     failureReason: null,
     quantity: 1,
+    option: null,
   },
 ];
 
@@ -664,6 +667,48 @@ describe("PaymentsScreen: historial", () => {
       "1 MayMembership paymentYour card was declined.Visa •••• 4242$45.00Failed",
       "April 2026",
       "12 AprNationals levy—$80.00Pending",
+    ]);
+  });
+
+  it("añade a la descripción de un extra sus unidades y su opción (#637)", async () => {
+    const extra = (
+      id: string,
+      change: Pick<PaymentView, "description" | "quantity" | "option">,
+    ): PaymentView => ({
+      id,
+      date: "2026-10-01T09:00:00.000Z",
+      amountCents: 13500,
+      status: "paid",
+      card: null,
+      failureReason: null,
+      ...change,
+    });
+
+    await renderLoaded(
+      view(panel(), {
+        payments: [
+          extra("jersey", {
+            description: "2026 club jersey",
+            quantity: 2,
+            option: "M",
+          }),
+          extra("hoodie", { description: "Hoodie", quantity: 1, option: "S" }),
+          extra("caps", { description: "Club cap", quantity: 3, option: null }),
+        ],
+      }),
+    );
+
+    const table = screen.getByRole("table", { name: "Payment history" });
+    // Desde #631 la tabla agrupa por mes: las filas de mes no son pagos.
+    const cells = within(table)
+      .getAllByRole("row")
+      .map((row) => within(row).queryAllByRole("cell"))
+      .filter((rowCells) => rowCells.length > 1)
+      .map((rowCells) => rowCells[1]?.textContent);
+    expect(cells).toEqual([
+      "2026 club jersey × 2 · M",
+      "Hoodie · S",
+      "Club cap × 3",
     ]);
   });
 
@@ -1214,6 +1259,11 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
     return screen.getByRole("group", { name });
   }
 
+  /** El selector vive tras el botón Cambiar plan de la tira (#628). */
+  async function openPlanChange(name = "Change plan"): Promise<void> {
+    await userEvent.click(screen.getByRole("button", { name }));
+  }
+
   it("no ofrece el cambio a quien no puede cambiar de plan", async () => {
     await renderLoaded(ACTIVE_FULL);
 
@@ -1229,6 +1279,7 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
         }),
       ),
     );
+    await openPlanChange();
 
     expect(
       within(planChangeGroup()).getByRole("radio", {
@@ -1239,6 +1290,7 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
 
   it("ofrece los otros planes con su precio, y no el que ya tiene", async () => {
     await renderLoaded(CHANGEABLE_FULL);
+    await openPlanChange();
 
     const group = planChangeGroup();
     expect(
@@ -1259,6 +1311,7 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
 
   it("no deja confirmar hasta elegir un plan", async () => {
     await renderLoaded(CHANGEABLE_FULL);
+    await openPlanChange();
 
     expect(
       screen.getByRole("button", { name: "Confirm the change" }),
@@ -1279,6 +1332,7 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
           }),
       },
     });
+    await openPlanChange();
 
     await userEvent.click(screen.getByRole("radio", { name: /^Student/ }));
     await userEvent.click(
@@ -1335,6 +1389,7 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
           jsonResponse({ data: { kind: "checkout", url: CHECKOUT_URL } }),
       },
     });
+    await openPlanChange();
 
     expect(
       screen.getByText("Choosing Full or Student takes you to Stripe."),
@@ -1353,6 +1408,7 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
     const fetchDouble = await renderLoaded(CHANGEABLE_FULL, {
       routes: { plan: () => new Promise<Response>(() => undefined) },
     });
+    await openPlanChange();
 
     await userEvent.click(screen.getByRole("radio", { name: /^Student/ }));
     await userEvent.dblClick(
@@ -1379,6 +1435,7 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
     const fetchDouble = await renderLoaded(CHANGEABLE_FULL, {
       routes: { plan: serviceUnavailable },
     });
+    await openPlanChange();
 
     await userEvent.click(screen.getByRole("radio", { name: /^Student/ }));
     await userEvent.click(
@@ -1413,6 +1470,7 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
 
   it("lo ofrece en español", async () => {
     await renderLoaded(CHANGEABLE_FULL, { locale: "es" });
+    await openPlanChange("Cambiar plan");
 
     const group = planChangeGroup("Cambiar de plan");
     expect(
@@ -1967,5 +2025,304 @@ describe("PaymentsScreen: cobros del club (#473)", () => {
     });
 
     expect(countCalls(fetchDouble, LEVIES_PATH)).toBe(0);
+  });
+});
+
+describe("PaymentsScreen: la tira del plan (#628)", () => {
+  /** La tira de una fila (escritorio) o la tarjeta compacta (móvil): el
+   * mismo marcado, con el nombre accesible de siempre. */
+  function planStrip(): HTMLElement {
+    return screen.getByRole("region", { name: /^(Current plan|Plan actual)$/ });
+  }
+
+  /** El dato de la segunda línea que dice el texto, con su icono. */
+  function detail(text: string): HTMLElement {
+    const item = within(planStrip()).getByText(text).closest("li");
+    if (item === null) {
+      throw new Error(`"${text}" no está en la lista de datos del plan`);
+    }
+    return item;
+  }
+
+  const CASUAL = panel({
+    plan: "Casual",
+    status: "active",
+    monthlyPriceCents: null,
+    nextChargeAt: null,
+    card: null,
+  });
+
+  it("pone en la tira el plan, su estado, el precio, el próximo cobro, la tarjeta y los dos botones", async () => {
+    await renderLoaded(view(panel({ canChangePlan: true })));
+
+    const strip = planStrip();
+    expect(within(strip).getByText("Full membership")).toBeInTheDocument();
+    expect(within(strip).getByText("Active")).toBeInTheDocument();
+    expect(within(strip).getByText("$45.00 a month")).toBeInTheDocument();
+    expect(
+      within(strip).getByText("Next charge 1 July 2026"),
+    ).toBeInTheDocument();
+    expect(
+      within(strip).getByText("Visa ending in 4242, expires 08/2028"),
+    ).toBeInTheDocument();
+    expect(
+      within(strip).getByRole("button", { name: "Change plan" }),
+    ).toBeInTheDocument();
+    expect(
+      within(strip).getByRole("button", { name: "Update card" }),
+    ).toBeInTheDocument();
+  });
+
+  it("acompaña el próximo cobro y la tarjeta con un icono decorativo", async () => {
+    await renderLoaded(ACTIVE_FULL);
+
+    for (const text of [
+      "Next charge 1 July 2026",
+      "Visa ending in 4242, expires 08/2028",
+    ]) {
+      const icons = detail(text).querySelectorAll("svg");
+      expect(icons.length).toBeGreaterThan(0);
+      icons.forEach((icon) =>
+        expect(icon).toHaveAttribute("aria-hidden", "true"),
+      );
+    }
+  });
+
+  it("Cambiar plan abre el selector bajo la tira y lo vuelve a cerrar", async () => {
+    await renderLoaded(view(panel({ canChangePlan: true })));
+    const toggle = screen.getByRole("button", { name: "Change plan" });
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("group", { name: "Change plan" })).toBeNull();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(
+      within(planStrip()).getByRole("group", { name: "Change plan" }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("group", { name: "Change plan" })).toBeNull();
+  });
+
+  it("tras programar un cambio y anularlo, Cambiar plan vuelve cerrado", async () => {
+    const changeable = view(panel({ canChangePlan: true }));
+    const scheduled = view(
+      panel({
+        canChangePlan: true,
+        scheduledChange: { plan: "Student", effectiveAt: PERIOD_END },
+      }),
+    );
+    const served = [changeable, scheduled, changeable];
+    await renderLoaded(changeable, {
+      routes: {
+        membership: () => jsonResponse({ data: served.shift() ?? changeable }),
+        plan: (init) =>
+          init?.method === "DELETE"
+            ? jsonResponse({ data: { scheduledChange: null } })
+            : jsonResponse({
+                data: {
+                  kind: "scheduled",
+                  plan: "Student",
+                  effectiveAt: PERIOD_END,
+                },
+              }),
+      },
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Change plan" }));
+    await userEvent.click(screen.getByRole("radio", { name: /^Student/ }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Confirm the change" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Cancel the change" }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Change plan" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("group", { name: "Change plan" })).toBeNull();
+  });
+
+  it("no pone Cambiar plan a quien no puede cambiar de plan", async () => {
+    await renderLoaded(ACTIVE_FULL);
+
+    expect(screen.queryByRole("button", { name: "Change plan" })).toBeNull();
+  });
+
+  it("dice los botones en español", async () => {
+    await renderLoaded(view(panel({ canChangePlan: true })), {
+      locale: "es",
+    });
+
+    const strip = planStrip();
+    expect(
+      within(strip).getByRole("button", { name: "Cambiar plan" }),
+    ).toBeInTheDocument();
+    expect(
+      within(strip).getByRole("button", { name: "Actualizar tarjeta" }),
+    ).toBeInTheDocument();
+  });
+
+  it("a un socio en prueba le pone su chip y Actualizar tarjeta", async () => {
+    await renderLoaded(TRIALING_FULL);
+
+    const strip = planStrip();
+    expect(
+      within(strip).getByText("On trial until 1 November 2026"),
+    ).toBeInTheDocument();
+    expect(
+      within(strip).getByRole("button", { name: "Update card" }),
+    ).toBeInTheDocument();
+  });
+
+  it("a un cobro fallido le pone su chip y Actualizar tarjeta", async () => {
+    await renderLoaded(PAST_DUE_FULL);
+
+    const strip = planStrip();
+    expect(within(strip).getByText("Payment failed")).toBeInTheDocument();
+    expect(
+      within(strip).getByRole("button", { name: "Update card" }),
+    ).toBeInTheDocument();
+  });
+
+  it("a una suscripción que terminó le pone Volver a suscribirse en vez de Cambiar plan", async () => {
+    await renderLoaded(CANCELLED_FULL);
+
+    const strip = planStrip();
+    expect(
+      within(strip).getByRole("button", { name: "Subscribe again" }),
+    ).toBeInTheDocument();
+    expect(within(strip).queryByRole("button", { name: "Change plan" })).toBe(
+      null,
+    );
+    expect(within(strip).queryByRole("button", { name: "Update card" })).toBe(
+      null,
+    );
+  });
+
+  it("sin tarjeta guardada no pinta la línea de la tarjeta", async () => {
+    await renderLoaded(view(panel({ card: null })));
+
+    expect(within(planStrip()).queryByText(/ending in/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Update card" })).toBeNull();
+  });
+
+  it("a un socio exento le pone el motivo y hasta cuándo en la tira", async () => {
+    await renderLoaded(
+      view(
+        panel({
+          status: "waived",
+          nextChargeAt: null,
+          card: null,
+          waiver: { reason: "Head coach", until: "2027-01-31T13:00:00.000Z" },
+        }),
+      ),
+    );
+
+    const strip = planStrip();
+    expect(within(strip).getByText("Waived")).toBeInTheDocument();
+    expect(within(strip).getByText("Reason: Head coach")).toBeInTheDocument();
+    expect(
+      within(strip).getByText("Until 1 February 2027"),
+    ).toBeInTheDocument();
+  });
+
+  it("a un Casual con saldo le pone sus sesiones y los packs en la propia tira", async () => {
+    await renderLoaded(
+      view(CASUAL, { sessionBalance: { sessions: 3, movements: [] } }),
+    );
+
+    const strip = planStrip();
+    expect(
+      within(strip).getByText("You have 3 sessions left"),
+    ).toBeInTheDocument();
+    expect(
+      await within(strip).findByRole("button", { name: /^Buy 5 sessions/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(strip).getByRole("button", { name: /^Buy 10 sessions/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("a un Casual sin saldo le dice que compre un pack en la tira", async () => {
+    await renderLoaded(view(CASUAL));
+
+    const strip = planStrip();
+    expect(
+      within(strip).getByText("You have 0 sessions left"),
+    ).toBeInTheDocument();
+    expect(
+      within(strip).getByText("Buy a pack to keep training."),
+    ).toBeInTheDocument();
+    expect(
+      await within(strip).findByRole("button", { name: /^Buy 5 sessions/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("a un socio pendiente le ofrece la tarjeta dentro de la tira", async () => {
+    await renderLoaded(PENDING_FULL);
+
+    expect(
+      within(planStrip()).getByRole("button", { name: "Add card" }),
+    ).toBeInTheDocument();
+  });
+
+  it("a quien elige plan le pone las opciones dentro de la tira", async () => {
+    await renderLoaded(
+      view(
+        panel({
+          plan: null,
+          status: "pending",
+          monthlyPriceCents: null,
+          nextChargeAt: null,
+          card: null,
+          canChoosePlan: true,
+          casualSessionPriceCents: 1500,
+        }),
+      ),
+    );
+
+    expect(within(planStrip()).getAllByRole("radio")).toHaveLength(3);
+  });
+
+  it("mientras espera a Stripe lo dice dentro de la tira, sin botones", async () => {
+    const fetchDouble = stubFetch({
+      membership: () => jsonResponse({ data: PENDING_FULL }),
+    });
+    renderScreen({ checkoutReturn: "ok" });
+
+    expect(
+      await within(
+        await screen.findByRole("region", { name: "Current plan" }),
+      ).findByText(/waiting for Stripe to confirm it/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add card" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Change plan" })).toBeNull();
+    expect(countCalls(fetchDouble, MEMBERSHIP_PATH)).toBeGreaterThan(0);
+  });
+
+  it("un cambio programado sigue con su aviso y su anulación, sin Cambiar plan", async () => {
+    await renderLoaded(
+      view(
+        panel({
+          canChangePlan: true,
+          scheduledChange: { plan: "Student", effectiveAt: PERIOD_END },
+        }),
+      ),
+    );
+
+    const strip = planStrip();
+    expect(
+      within(strip).getByText("Moves to Student on 1 July 2026."),
+    ).toBeInTheDocument();
+    expect(
+      within(strip).getByRole("button", { name: "Cancel the change" }),
+    ).toBeInTheDocument();
+    expect(within(strip).queryByRole("button", { name: "Change plan" })).toBe(
+      null,
+    );
   });
 });

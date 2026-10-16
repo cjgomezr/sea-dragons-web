@@ -1252,6 +1252,7 @@ export const spanishMessages: MessageCatalog = {
   "payments.levyPayers.csv.column.name": "Nombre",
   "payments.levyPayers.csv.column.email": "Correo",
   "payments.levyPayers.csv.column.units": "Unidades",
+  "payments.levyPayers.csv.column.option": "Opción",
   "payments.levyPayers.csv.column.date": "Fecha del pago",
   "payments.levyPayers.csv.column.amount": "Importe (AUD)",
   "payments.levyPayers.csv.fileName": "pagos",
@@ -1351,6 +1352,7 @@ export const spanishMessages: MessageCatalog = {
   "payments.choice.failed":
     "No pudimos guardar tu elección. Inténtalo de nuevo.",
   "payments.planChange.title": "Cambiar de plan",
+  "payments.planChange.open": "Cambiar plan",
   "payments.planChange.hint":
     "El cambio empieza con tu siguiente ciclo de cobro, sin prorrateo.",
   "payments.planChange.casualHint": "Al elegir Full o Student vas a Stripe.",

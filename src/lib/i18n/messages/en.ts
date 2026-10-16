@@ -1251,6 +1251,7 @@ export const englishMessages = {
   "payments.levyPayers.csv.column.name": "Name",
   "payments.levyPayers.csv.column.email": "Email",
   "payments.levyPayers.csv.column.units": "Units",
+  "payments.levyPayers.csv.column.option": "Option",
   "payments.levyPayers.csv.column.date": "Payment date",
   "payments.levyPayers.csv.column.amount": "Amount (AUD)",
   "payments.levyPayers.csv.fileName": "payments",
@@ -1347,6 +1348,7 @@ export const englishMessages = {
   "payments.choice.saving": "Saving…",
   "payments.choice.failed": "We couldn't save your choice. Try again.",
   "payments.planChange.title": "Change plan",
+  "payments.planChange.open": "Change plan",
   "payments.planChange.hint":
     "The change starts with your next billing cycle, with no proration.",
   "payments.planChange.casualHint":

@@ -29,6 +29,7 @@ function payment(change: Partial<PaymentView> & { id: string }): PaymentView {
     card: VISA,
     failureReason: null,
     quantity: 1,
+    option: null,
     ...change,
   };
 }

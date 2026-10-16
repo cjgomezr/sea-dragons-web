@@ -15206,6 +15206,7 @@ function paidMembershipFee(id: string, date: string): object {
     card: { brand: "visa", last4: "4242" },
     failureReason: null,
     quantity: 1,
+    option: null,
   };
 }
 
@@ -15227,6 +15228,7 @@ const PAYMENTS_HISTORY = [
     card: { brand: "visa", last4: "4242" },
     failureReason: null,
     quantity: 1,
+    option: null,
   },
   paidMembershipFee(
     "e0e0e0e0-0000-4000-8000-0000000000e4",
@@ -15243,6 +15245,7 @@ const FAILED_PAYMENT = {
   card: { brand: "visa", last4: "4242" },
   failureReason: "Your card was declined.",
   quantity: 1,
+  option: null,
 } as const;
 
 const NO_SESSIONS = { sessions: 0, movements: [] } as const;
@@ -15685,6 +15688,24 @@ function paymentHistoryStates(
   }));
 }
 
+// La tira del plan (#628): un pendiente con su plan ya guardado, que ve el
+// alta en Checkout dentro de la tira sin depender del socio sembrado.
+const PENDING_PLAN_MEMBERSHIP_VIEW = membershipView(
+  { status: "pending", card: null },
+  [],
+);
+
+/** Los estados de la tira del plan (#628), con su axe también en oscuro. */
+function planStripStates(
+  name: string,
+  view: object,
+): readonly PaymentsScreenState[] {
+  return paymentsStates(name, view).map((state) => ({
+    ...state,
+    checksDarkAxe: true,
+  }));
+}
+
 const FAILED_FILTER_NAME = /^(Failed|Fallidos)$/;
 
 const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
@@ -15718,6 +15739,10 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ...paymentsStates("pagos-levy-pagado", ACTIVE_MEMBERSHIP_VIEW, ONE_PAID_LEVY),
   ...levyPayersStates("pagos-levy-pagadores", NATIONALS_PAYERS),
   ...levyPayersStates("pagos-levy-sin-pagos", NATIONALS_WITHOUT_PAYERS),
+  ...planStripStates("pagos-plan-activo", PLAN_CHANGE_MEMBERSHIP_VIEW),
+  ...planStripStates("pagos-plan-casual", CASUAL_BALANCE_MEMBERSHIP_VIEW),
+  ...planStripStates("pagos-plan-exencion", WAIVED_MEMBERSHIP_VIEW),
+  ...planStripStates("pagos-plan-pendiente", PENDING_PLAN_MEMBERSHIP_VIEW),
   ...paymentsTabsStates("pagos-pestanas-socio"),
   ...paymentsTabsStates("pagos-pestanas-admin", "membership"),
   ...paymentsTabsStates("pagos-pestanas-admin-extras", "extras"),
@@ -16092,6 +16117,51 @@ test.describe("Pagos en el navegador", () => {
 
     await expect(receipt).toHaveURL(FAKE_RECEIPT_URL);
     expect(await receipt.evaluate(() => window.opener)).toBeNull();
+  });
+
+  test("a 1440px la tira del plan es una fila con los botones a la derecha", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPayments(page, { view: PLAN_CHANGE_MEMBERSHIP_VIEW });
+
+    const strip = page.getByRole("region", { name: "Current plan" });
+    const name = await strip.getByText("Full membership").boundingBox();
+    const changePlan = await strip
+      .getByRole("button", { name: "Change plan" })
+      .boundingBox();
+    const updateCard = await strip
+      .getByRole("button", { name: "Update card" })
+      .boundingBox();
+    expect(changePlan!.x).toBeGreaterThan(name!.x + name!.width);
+    expect(updateCard!.x).toBeGreaterThan(changePlan!.x);
+    expect(updateCard!.y).toBe(changePlan!.y);
+    expect(changePlan!.y).toBeLessThan(name!.y + name!.height + 24);
+  });
+
+  test("a 375px Cambiar plan y Actualizar tarjeta van lado a lado, de 42px y 44px de zona táctil", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPayments(page, { view: PLAN_CHANGE_MEMBERSHIP_VIEW });
+
+    const strip = page.getByRole("region", { name: "Current plan" });
+    const buttons = [
+      strip.getByRole("button", { name: "Change plan" }),
+      strip.getByRole("button", { name: "Update card" }),
+    ];
+    const [changePlan, updateCard] = await Promise.all(
+      buttons.map((button) => button.boundingBox()),
+    );
+    expect(changePlan!.y).toBe(updateCard!.y);
+    expect(updateCard!.x).toBeGreaterThan(changePlan!.x + changePlan!.width);
+    expect(changePlan!.height).toBe(42);
+    for (const button of buttons) {
+      const touchHeight = await button.evaluate((element) =>
+        getComputedStyle(element, "::after").getPropertyValue("height"),
+      );
+      expect(Number.parseFloat(touchHeight)).toBeGreaterThanOrEqual(44);
+    }
   });
 
   test("a 375px las tres opciones de plan se apilan", async ({ page }) => {
