@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Role } from "@/lib/auth/roles";
 
@@ -131,6 +132,67 @@ describe("llegar a un evento", () => {
   });
 });
 
+describe("?types= de los chips (#647)", () => {
+  function stubEmptyAgenda(requested: string[]): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requested.push(url);
+        return new Response(
+          JSON.stringify({ data: { events: [], nextCursor: null } }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }),
+    );
+  }
+
+  it("abre la agenda con el filtro de la dirección", async () => {
+    const requested: string[] = [];
+    stubEmptyAgenda(requested);
+
+    render(
+      await CalendarioPage({
+        searchParams: Promise.resolve({ types: "social,foo" }),
+      }),
+    );
+
+    await screen.findByText("There are no upcoming events.");
+    expect(requested).toEqual(["/api/v1/events?types=social"]);
+    expect(screen.getByRole("button", { name: "Training" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("con el parámetro vacío abre con todos apagados y no pide la agenda", async () => {
+    const requested: string[] = [];
+    stubEmptyAgenda(requested);
+
+    render(
+      await CalendarioPage({ searchParams: Promise.resolve({ types: "" }) }),
+    );
+
+    expect(
+      await screen.findByText("There are no events of the chosen types."),
+    ).toBeInTheDocument();
+    expect(requested).toEqual([]);
+  });
+
+  it("un parámetro repetido abre con todos los tipos", async () => {
+    const requested: string[] = [];
+    stubEmptyAgenda(requested);
+
+    render(
+      await CalendarioPage({
+        searchParams: Promise.resolve({ types: ["social", "training"] }),
+      }),
+    );
+
+    await screen.findByText("There are no upcoming events.");
+    expect(requested).toEqual(["/api/v1/events"]);
+  });
+});
+
 describe("?nuevo= desde el inicio (#426)", () => {
   it("abre a un Admin el formulario de crear con entrenamiento elegido", async () => {
     await renderAs("Admin", { nuevo: "training" });
@@ -209,8 +271,12 @@ describe("el calendario de quien no tiene la membresía al día", () => {
     );
 
     render(await CalendarioPage({ searchParams: Promise.resolve({}) }));
+    // Los botones del RSVP están en la fila desplegada (#647).
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Pool training" }),
+    );
 
-    expect(await screen.findByRole("button", { name: "Yes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Yes" })).toBeDisabled();
     expect(
       screen.getByRole("link", { name: "Go to Payments" }),
     ).toBeInTheDocument();

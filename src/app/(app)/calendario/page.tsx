@@ -1,4 +1,8 @@
 import { AgendaScreen } from "@/components/calendar/AgendaScreen";
+import {
+  AGENDA_TYPES_QUERY_PARAM,
+  readAgendaTypeFilter,
+} from "@/components/calendar/agenda-type-filter";
 import { readCallerAccess } from "@/lib/auth/caller-role";
 import { hasCapability } from "@/lib/auth/roles";
 import {
@@ -21,7 +25,8 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
  * `?evento=<id>` lleva el foco a la fila de ese evento, y `?periodo=past`
  * la busca entre los pasados: es a donde lleva un evento encontrado en la
  * búsqueda global (#427). `?nuevo=<tipo>` abre ya el formulario de crear con
- * ese tipo (#426), a quien puede crear eventos.
+ * ese tipo (#426), a quien puede crear eventos. `?types=` son los chips de
+ * tipo encendidos (#647).
  */
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -63,6 +68,9 @@ export default async function CalendarioPage({
       // agenda, que es lo que la abre en su periodo y le da el foco.
       key={`${focusEventId ?? ""}-${initialPeriod}`}
       initialPeriod={initialPeriod}
+      initialTypes={readAgendaTypeFilter(
+        readSingle(params[AGENDA_TYPES_QUERY_PARAM]),
+      )}
       focusEventId={focusEventId}
       locale={locale}
       canManageEvents={canManageEvents}

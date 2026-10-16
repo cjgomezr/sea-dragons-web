@@ -149,14 +149,27 @@ function stubApi(respond: Respond): void {
   );
 }
 
-/** La agenda de una sola página y nada más: responder no está servido. */
+/** La agenda de una sola página y el detalle de sus eventos al desplegarlos,
+ * y nada más: responder no está servido. */
 function stubAgenda(events: readonly AgendaEvent[]): void {
   stubApi(({ url }) => {
-    if (url.pathname !== AGENDA_PATH) {
+    const isServed =
+      url.pathname === AGENDA_PATH ||
+      events.some((event) => url.pathname === eventPath(event));
+    if (!isServed) {
       throw new Error(`Petición inesperada: ${url.pathname}`);
     }
-    return pageResponse({ events, nextCursor: null });
+    return agendaOrDetail(url, events);
   });
+}
+
+/** La agenda de una página o, al desplegar una fila, el detalle del evento
+ * tal como lo trae la agenda. */
+function agendaOrDetail(url: URL, events: readonly AgendaEvent[]): Response {
+  const opened = events.find((event) => url.pathname === eventPath(event));
+  return opened === undefined
+    ? pageResponse({ events, nextCursor: null })
+    : detailResponse(opened, {});
 }
 
 function rsvpPath(event: AgendaEvent): string {
@@ -188,7 +201,7 @@ afterEach(() => {
 });
 
 describe("agenda", () => {
-  it("pinta cada evento con su bloque de fecha, título, tipo, hora, lugar y conteos", async () => {
+  it("pinta cada evento bajo su día, con título, tipo, hora, lugar y quienes van", async () => {
     stubAgenda([POOL_TRAINING]);
 
     render(
@@ -201,14 +214,13 @@ describe("agenda", () => {
     );
 
     const row = await findRow(POOL_TRAINING.title);
-    expect(within(row).getByText("Tue")).toBeInTheDocument();
-    expect(within(row).getByText("23")).toBeInTheDocument();
-    expect(within(row).getByText("Jun")).toBeInTheDocument();
+    expect(screen.getByText("TUE · JUN 23")).toBeInTheDocument();
     expect(within(row).getByText("Training")).toBeInTheDocument();
+    expect(within(row).getByText("7:00 pm")).toBeInTheDocument();
     expect(
-      within(row).getByText("7:00 pm · MSAC Dive Pool"),
+      within(row).getByRole("link", { name: /MSAC Dive Pool/ }),
     ).toBeInTheDocument();
-    expect(within(row).getByText("14 going · 2 maybe")).toBeInTheDocument();
+    expect(within(row).getByText("14 going")).toBeInTheDocument();
   });
 
   it("titula la sección Próximos eventos y deja los eventos en el orden del servidor", async () => {
@@ -225,7 +237,7 @@ describe("agenda", () => {
 
     const list = await screen.findByRole("list", { name: "Upcoming events" });
     const titles = within(list)
-      .getAllByRole("heading", { level: 2 })
+      .getAllByRole("heading", { level: 3 })
       .map((heading) => heading.textContent);
     expect(titles).toEqual([POOL_TRAINING.title, SCRIMMAGE.title]);
   });
@@ -258,7 +270,7 @@ describe("agenda", () => {
       />,
     );
 
-    const row = await findRow(CANCELLED_SOCIAL.title);
+    const row = await expandRow(CANCELLED_SOCIAL.title);
     expect(within(row).getByText("Cancelled")).toBeInTheDocument();
     expect(within(row).queryByRole("button", { name: RSVP_CHOICE })).toBeNull();
   });
@@ -275,7 +287,7 @@ describe("agenda", () => {
       />,
     );
 
-    const row = await findRow(COMMITTEE_ONLY.title);
+    const row = await expandRow(COMMITTEE_ONLY.title);
     expect(within(row).queryByRole("button", { name: RSVP_CHOICE })).toBeNull();
     expect(within(row).getByText("18 going · 1 maybe")).toBeInTheDocument();
   });
@@ -411,14 +423,14 @@ describe("agenda", () => {
       />,
     );
 
-    const row = await findRow(POOL_TRAINING.title);
+    const row = await expandRow(POOL_TRAINING.title);
     expect(
       screen.getByRole("heading", { level: 1, name: "Próximos eventos" }),
     ).toBeInTheDocument();
-    expect(within(row).getByText("mar")).toBeInTheDocument();
-    expect(within(row).getByText("jun")).toBeInTheDocument();
+    expect(screen.getByText("MAR · 23 JUN")).toBeInTheDocument();
     expect(within(row).getByText("Entrenamiento")).toBeInTheDocument();
-    expect(within(row).getByText("19:00 · MSAC Dive Pool")).toBeInTheDocument();
+    expect(within(row).getByText("19:00")).toBeInTheDocument();
+    expect(within(row).getByText("14 van")).toBeInTheDocument();
     expect(within(row).getByText("14 van · 2 quizás")).toBeInTheDocument();
     expect(rsvpButton(row, "Sí")).toBeInTheDocument();
     expect(rsvpButton(row, "Quizás")).toBeInTheDocument();
@@ -439,7 +451,7 @@ describe("agenda", () => {
     );
 
     const row = await findRow(SCRIMMAGE.title);
-    expect(within(row).getByText("1 va · 0 quizás")).toBeInTheDocument();
+    expect(within(row).getByText("1 va")).toBeInTheDocument();
   });
 
   it("dice que no hay eventos en español", async () => {
@@ -473,7 +485,7 @@ describe("RSVP en la fila", () => {
       />,
     );
 
-    const row = await findRow(POOL_TRAINING.title);
+    const row = await expandRow(POOL_TRAINING.title);
     const group = within(row).getByRole("group", {
       name: `RSVP: ${POOL_TRAINING.title}`,
     });
@@ -514,7 +526,7 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await findRow(SCRIMMAGE.title);
+    const row = await expandRow(SCRIMMAGE.title);
 
     await userEvent.click(rsvpButton(row, "Maybe"));
 
@@ -530,8 +542,12 @@ describe("RSVP en la fila", () => {
       if (method === "PUT") {
         return savedResponse(POOL_TRAINING.id, "maybe");
       }
+      // Al desplegar, el detalle llega; tras guardar, ya no.
       if (url.pathname === `${AGENDA_PATH}/${POOL_TRAINING.id}`) {
-        throw new TypeError("Failed to fetch");
+        if (rsvpRequests(POOL_TRAINING).length > 0) {
+          throw new TypeError("Failed to fetch");
+        }
+        return detailResponse(POOL_TRAINING, {});
       }
       return pageResponse({ events: [POOL_TRAINING], nextCursor: null });
     });
@@ -543,7 +559,7 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await findRow(POOL_TRAINING.title);
+    const row = await expandRow(POOL_TRAINING.title);
 
     await userEvent.click(rsvpButton(row, "Maybe"));
 
@@ -575,7 +591,7 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await findRow(SCRIMMAGE.title);
+    const row = await expandRow(SCRIMMAGE.title);
 
     await userEvent.click(rsvpButton(row, "Yes"));
     await userEvent.click(rsvpButton(row, "Yes"));
@@ -612,7 +628,7 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await findRow(SCRIMMAGE.title);
+    const row = await expandRow(SCRIMMAGE.title);
 
     await userEvent.click(rsvpButton(row, "Yes"));
 
@@ -632,10 +648,10 @@ describe("RSVP en la fila", () => {
   });
 
   it("con un 422 de evento empezado lo dice en la fila y deja la respuesta que había", async () => {
-    stubApi(({ method }) =>
+    stubApi(({ method, url }) =>
       method === "PUT"
         ? startedResponse()
-        : pageResponse({ events: [POOL_TRAINING], nextCursor: null }),
+        : agendaOrDetail(url, [POOL_TRAINING]),
     );
     render(
       <AgendaScreen
@@ -645,7 +661,7 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await findRow(POOL_TRAINING.title);
+    const row = await expandRow(POOL_TRAINING.title);
 
     await userEvent.click(rsvpButton(row, "No"));
 
@@ -658,10 +674,10 @@ describe("RSVP en la fila", () => {
   });
 
   it("tras un 422 se puede volver a intentar y manda otra petición", async () => {
-    stubApi(({ method }) =>
+    stubApi(({ method, url }) =>
       method === "PUT"
         ? startedResponse()
-        : pageResponse({ events: [POOL_TRAINING], nextCursor: null }),
+        : agendaOrDetail(url, [POOL_TRAINING]),
     );
     render(
       <AgendaScreen
@@ -671,7 +687,7 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await findRow(POOL_TRAINING.title);
+    const row = await expandRow(POOL_TRAINING.title);
     await userEvent.click(rsvpButton(row, "No"));
     await within(row).findByRole("alert");
 
@@ -681,7 +697,7 @@ describe("RSVP en la fila", () => {
   });
 
   it("con un 422 de evento cancelado dice que se canceló", async () => {
-    stubApi(({ method }) =>
+    stubApi(({ method, url }) =>
       method === "PUT"
         ? jsonResponse(422, {
             error: {
@@ -690,7 +706,7 @@ describe("RSVP en la fila", () => {
               reason: "rsvp_event_cancelled",
             },
           })
-        : pageResponse({ events: [SCRIMMAGE], nextCursor: null }),
+        : agendaOrDetail(url, [SCRIMMAGE]),
     );
     render(
       <AgendaScreen
@@ -700,7 +716,7 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await findRow(SCRIMMAGE.title);
+    const row = await expandRow(SCRIMMAGE.title);
 
     await userEvent.click(rsvpButton(row, "Yes"));
 
@@ -711,10 +727,10 @@ describe("RSVP en la fila", () => {
   });
 
   it("dice el error de RSVP en español", async () => {
-    stubApi(({ method }) =>
+    stubApi(({ method, url }) =>
       method === "PUT"
         ? startedResponse()
-        : pageResponse({ events: [POOL_TRAINING], nextCursor: null }),
+        : agendaOrDetail(url, [POOL_TRAINING]),
     );
     render(
       <AgendaScreen
@@ -724,7 +740,7 @@ describe("RSVP en la fila", () => {
         canRespond
       />,
     );
-    const row = await findRow(POOL_TRAINING.title);
+    const row = await expandRow(POOL_TRAINING.title);
 
     await userEvent.click(rsvpButton(row, "No"));
 
@@ -1224,8 +1240,8 @@ const OLDER_PAST_TRAINING: AgendaEvent = {
 function stubBothPeriods(past: readonly AgendaEvent[]): void {
   stubApi(({ url }) =>
     url.searchParams.get("period") === "past"
-      ? pageResponse({ events: past, nextCursor: null })
-      : pageResponse({ events: [POOL_TRAINING], nextCursor: null }),
+      ? agendaOrDetail(url, past)
+      : agendaOrDetail(url, [POOL_TRAINING, ...past]),
   );
 }
 
@@ -1268,7 +1284,7 @@ describe("próximos y pasados", () => {
     const list = await screen.findByRole("list", { name: "Past events" });
     expect(
       within(list)
-        .getAllByRole("heading", { level: 2 })
+        .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent),
     ).toEqual([PAST_MATCH.title, OLDER_PAST_TRAINING.title]);
     expect(requests.at(-1)).toEqual({
@@ -1295,7 +1311,7 @@ describe("próximos y pasados", () => {
 
     await userEvent.click(periodButton("Past"));
 
-    const row = await findRow(PAST_MATCH.title);
+    const row = await expandRow(PAST_MATCH.title);
     expect(within(row).queryByRole("button", { name: RSVP_CHOICE })).toBeNull();
     expect(within(row).getByText("18 going · 1 maybe")).toBeInTheDocument();
   });
@@ -1686,7 +1702,7 @@ describe("quien no tiene la membresía al día (#453)", () => {
       />,
     );
 
-    const row = await findRow(POOL_TRAINING.title);
+    const row = await expandRow(POOL_TRAINING.title);
     for (const name of ["Yes", "Maybe", "No"]) {
       expect(rsvpButton(row, name)).toBeDisabled();
     }
@@ -1747,7 +1763,7 @@ describe("quien no tiene la membresía al día (#453)", () => {
       />,
     );
 
-    const row = await findRow(POOL_TRAINING.title);
+    const row = await expandRow(POOL_TRAINING.title);
     expect(
       within(row).getByRole("group", { name: /^RSVP:/ }),
     ).toHaveAccessibleDescription(/Your membership isn't up to date/);
@@ -1763,7 +1779,7 @@ describe("quien no tiene la membresía al día (#453)", () => {
         canRespond={false}
       />,
     );
-    const row = await findRow(POOL_TRAINING.title);
+    const row = await expandRow(POOL_TRAINING.title);
 
     await userEvent.click(rsvpButton(row, "Yes"));
 
@@ -1813,8 +1829,531 @@ describe("quien no tiene la membresía al día (#453)", () => {
       if (method === "PUT" && url.pathname === rsvpPath(POOL_TRAINING)) {
         return membershipNotCurrentResponse();
       }
-      return pageResponse({ events: [POOL_TRAINING], nextCursor: null });
+      return agendaOrDetail(url, [POOL_TRAINING]);
     });
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+    const row = await expandRow(POOL_TRAINING.title);
+
+    await userEvent.click(rsvpButton(row, "Yes"));
+
+    expect(await within(row).findByRole("alert")).toHaveTextContent(
+      "Your membership isn't up to date. Sort it out in Payments to answer.",
+    );
+  });
+});
+
+// #647, RF-6 del PRD de E24: la agenda de escritorio, con los chips de tipo,
+// los grupos por día y la fila nueva.
+describe("chips de tipo", () => {
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
+  function chip(name: string): HTMLElement {
+    const chips = screen.getByRole("group", { name: "Event types" });
+    return within(chips).getByRole("button", { name });
+  }
+
+  function agendaRequests(): RecordedRequest[] {
+    return requests.filter((request) => request.path.startsWith(AGENDA_PATH));
+  }
+
+  it("enseña los cuatro tipos encendidos como botones con aria-pressed", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    await findRow(POOL_TRAINING.title);
+    for (const name of ["Training", "Competition", "Social", "Meeting"]) {
+      expect(chip(name)).toHaveAttribute("aria-pressed", "true");
+    }
+  });
+
+  it("al apagar uno vuelve a pedir la agenda con los demás y lo guarda en la dirección", async () => {
+    stubAgenda([POOL_TRAINING]);
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+    await findRow(POOL_TRAINING.title);
+
+    await userEvent.click(chip("Meeting"));
+
+    expect(chip("Meeting")).toHaveAttribute("aria-pressed", "false");
+    await waitFor(() =>
+      expect(agendaRequests().at(-1)).toEqual({
+        method: "GET",
+        path: `${AGENDA_PATH}?types=training%2Ccompetition%2Csocial`,
+      }),
+    );
+    expect(window.location.search).toBe(
+      "?types=training%2Ccompetition%2Csocial",
+    );
+  });
+
+  it("al encenderlo otra vez pide todos los tipos y quita el parámetro", async () => {
+    stubAgenda([POOL_TRAINING]);
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+        initialTypes={["training"]}
+      />,
+    );
+    await findRow(POOL_TRAINING.title);
+
+    await userEvent.click(chip("Social"));
+    await userEvent.click(chip("Competition"));
+    await userEvent.click(chip("Meeting"));
+
+    await waitFor(() =>
+      expect(agendaRequests().at(-1)).toEqual({
+        method: "GET",
+        path: AGENDA_PATH,
+      }),
+    );
+    expect(window.location.search).toBe("");
+  });
+
+  it("abre con el filtro que traía la dirección", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+        initialTypes={["training", "social"]}
+      />,
+    );
+
+    await findRow(POOL_TRAINING.title);
+    expect(agendaRequests()).toEqual([
+      { method: "GET", path: `${AGENDA_PATH}?types=training%2Csocial` },
+    ]);
+    expect(chip("Competition")).toHaveAttribute("aria-pressed", "false");
+    expect(chip("Social")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("conserva la dirección que ya tenía al escribir el filtro", async () => {
+    window.history.replaceState(null, "", `/?evento=${POOL_TRAINING.id}`);
+    stubAgenda([POOL_TRAINING]);
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+    await findRow(POOL_TRAINING.title);
+
+    await userEvent.click(chip("Training"));
+
+    expect(window.location.search).toBe(
+      `?evento=${POOL_TRAINING.id}&types=competition%2Csocial%2Cmeeting`,
+    );
+  });
+
+  it("con todos apagados lo dice sin pedir la agenda y deja encenderlos todos", async () => {
+    stubAgenda([POOL_TRAINING]);
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+        initialTypes={["meeting"]}
+      />,
+    );
+    await screen.findByText("TUE · JUN 23");
+    const before = agendaRequests().length;
+
+    await userEvent.click(chip("Meeting"));
+
+    expect(
+      screen.getByText("There are no events of the chosen types."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    expect(agendaRequests()).toHaveLength(before);
+    expect(window.location.search).toBe("?types=");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Show all types" }),
+    );
+
+    expect(await findRow(POOL_TRAINING.title)).toBeInTheDocument();
+    expect(chip("Meeting")).toHaveAttribute("aria-pressed", "true");
+    expect(agendaRequests().at(-1)).toEqual({
+      method: "GET",
+      path: AGENDA_PATH,
+    });
+  });
+
+  it("abre sin pedir la agenda cuando la dirección los traía todos apagados", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+        initialTypes={[]}
+      />,
+    );
+
+    expect(
+      await screen.findByText("There are no events of the chosen types."),
+    ).toBeInTheDocument();
+    expect(agendaRequests()).toEqual([]);
+  });
+
+  it("conserva el filtro al pasar a los pasados", async () => {
+    stubBothPeriods([PAST_MATCH]);
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+    await findRow(POOL_TRAINING.title);
+    await userEvent.click(chip("Social"));
+
+    await userEvent.click(periodButton("Past"));
+
+    await findRow(PAST_MATCH.title);
+    expect(agendaRequests().at(-1)).toEqual({
+      method: "GET",
+      path: `${AGENDA_PATH}?period=past&types=training%2Ccompetition%2Cmeeting`,
+    });
+    expect(chip("Social")).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("escribe los chips y el aviso en español", async () => {
+    stubAgenda([]);
+    render(
+      <AgendaScreen
+        locale="es"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+        initialTypes={[]}
+      />,
+    );
+
+    expect(
+      await screen.findByText("No hay eventos de los tipos elegidos."),
+    ).toBeInTheDocument();
+    const chips = screen.getByRole("group", { name: "Tipos de evento" });
+    expect(
+      within(chips).getByRole("button", { name: "Entrenamiento" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    expect(
+      screen.getByRole("button", { name: "Mostrar todos los tipos" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("grupos por día", () => {
+  // Viernes 16 de octubre de 2026, por la mañana en Melbourne.
+  const FRIDAY_MORNING = new Date("2026-10-15T22:00:00Z");
+
+  const TODAY_TRAINING: AgendaEvent = {
+    ...POOL_TRAINING,
+    startsOn: "2026-10-16",
+  };
+  const SATURDAY_MATCH: AgendaEvent = {
+    ...SCRIMMAGE,
+    startsOn: "2026-10-17",
+  };
+  const TUESDAY_MEETING: AgendaEvent = {
+    ...COMMITTEE_ONLY,
+    startsOn: "2026-10-20",
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FRIDAY_MORNING);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("titula cada día y deja sus eventos debajo", async () => {
+    stubAgenda([TODAY_TRAINING, SATURDAY_MATCH, TUESDAY_MEETING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    await findRow(TODAY_TRAINING.title);
+    const days = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((heading) => heading.textContent);
+    expect(days).toEqual([
+      "TODAY Today Friday 16 October 2026",
+      "SAT · OCT 17 Saturday 17 October 2026 This weekend",
+      "TUE · OCT 20 Tuesday 20 October 2026",
+    ]);
+  });
+
+  it("pinta hoy en el acento y los demás días en secundario", async () => {
+    stubAgenda([TODAY_TRAINING, TUESDAY_MEETING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    await findRow(TODAY_TRAINING.title);
+    expect(screen.getByText("TODAY")).toHaveClass("is-today");
+    expect(screen.getByText("TUE · OCT 20")).not.toHaveClass("is-today");
+  });
+
+  it("anuncia el día entero y no la abreviatura", async () => {
+    stubAgenda([SATURDAY_MATCH]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Saturday 17 October 2026 This weekend",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("escribe los días en español", async () => {
+    stubAgenda([TODAY_TRAINING, SATURDAY_MATCH]);
+
+    render(
+      <AgendaScreen
+        locale="es"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    await findRow(TODAY_TRAINING.title);
+    expect(screen.getByText("HOY")).toBeInTheDocument();
+    expect(screen.getByText("SÁB · 17 OCT")).toBeInTheDocument();
+    expect(screen.getByText("Este fin de semana")).toBeInTheDocument();
+  });
+
+  it("añade el año a un día de otro año", async () => {
+    stubAgenda([{ ...SCRIMMAGE, startsOn: "2025-10-18" }]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    expect(await screen.findByText("SAT · OCT 18 · 2025")).toBeInTheDocument();
+  });
+});
+
+describe("fila de la agenda", () => {
+  const PILL = ".agenda-answer-pill";
+  const MISSING_ANSWER = ".agenda-answer-missing";
+  const WITH_END_AND_COVER: AgendaEvent = {
+    ...POOL_TRAINING,
+    endTime: "20:30",
+    seriesId: "eeeeeeee-0000-4000-8000-00000000000e",
+    coverThumbUrl: "https://storage.example/thumb.webp?token=signed",
+  };
+
+  it("pone la hora de fin debajo de la de inicio", async () => {
+    stubAgenda([WITH_END_AND_COVER]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    const row = await findRow(WITH_END_AND_COVER.title);
+    expect(within(row).getByText("7:00 pm")).toBeInTheDocument();
+    expect(within(row).getByText("8:30 pm")).toBeInTheDocument();
+    expect(within(row).getByText("7:00 pm – 8:30 pm")).toHaveClass(
+      "visually-hidden",
+    );
+  });
+
+  it("sin hora de fin sólo pone la de inicio", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    const row = await findRow(POOL_TRAINING.title);
+    expect(within(row).getAllByText(/\d:\d\d/)).toHaveLength(1);
+  });
+
+  it("pinta la miniatura del evento como decoración", async () => {
+    stubAgenda([WITH_END_AND_COVER]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    const row = await findRow(WITH_END_AND_COVER.title);
+    const thumbnail = row.querySelector("img");
+    expect(thumbnail).toHaveAttribute("src", WITH_END_AND_COVER.coverThumbUrl);
+    expect(thumbnail).toHaveAttribute("alt", "");
+  });
+
+  it("sin imagen pinta el fondo de su tipo", async () => {
+    stubAgenda([SCRIMMAGE]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    const row = await findRow(SCRIMMAGE.title);
+    expect(row.querySelector("img")).toBeNull();
+    expect(
+      row.querySelector(".event-cover-fallback-competition"),
+    ).not.toBeNull();
+  });
+
+  it("dice que el evento se repite cuando es de una serie", async () => {
+    stubAgenda([WITH_END_AND_COVER, SCRIMMAGE]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    const series = await findRow(WITH_END_AND_COVER.title);
+    const single = await findRow(SCRIMMAGE.title);
+    expect(within(series).getByText("Repeats")).toBeInTheDocument();
+    expect(within(single).queryByText("Repeats")).not.toBeInTheDocument();
+  });
+
+  it("enlaza el lugar al mapa en otra pestaña", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    const row = await findRow(POOL_TRAINING.title);
+    const place = within(row).getByRole("link", {
+      name: "MSAC Dive Pool (map, opens in a new tab)",
+    });
+    expect(place).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/search/?api=1&query=MSAC%20Dive%20Pool",
+    );
+    expect(place).toHaveAttribute("target", "_blank");
+    expect(place.getAttribute("rel")).toContain("noopener");
+  });
+
+  it("enlaza al punto del lugar cuando tiene coordenadas", async () => {
+    stubAgenda([
+      {
+        ...POOL_TRAINING,
+        place: {
+          name: "MSAC",
+          address: "Aughtie Dr, Albert Park",
+          lat: -37.84,
+          lng: 144.96,
+        },
+      },
+    ]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    const row = await findRow(POOL_TRAINING.title);
+    expect(within(row).getByRole("link", { name: /MSAC/ })).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/search/?api=1&query=-37.84,144.96",
+    );
+  });
+
+  it("pulsar el lugar no despliega la fila", async () => {
+    stubAgenda([POOL_TRAINING]);
     render(
       <AgendaScreen
         locale="en"
@@ -1825,10 +2364,160 @@ describe("quien no tiene la membresía al día (#453)", () => {
     );
     const row = await findRow(POOL_TRAINING.title);
 
+    await userEvent.click(within(row).getByRole("link", { name: /MSAC/ }));
+
+    expect(rowToggle(row, POOL_TRAINING.title)).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(detailRequests(POOL_TRAINING)).toEqual([]);
+  });
+
+  it("enseña mi respuesta en una píldora", async () => {
+    stubAgenda([
+      POOL_TRAINING,
+      { ...SCRIMMAGE, myResponse: "maybe" },
+      { ...CANCELLED_SOCIAL, status: "scheduled", myResponse: "no" },
+    ]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    const going = await findRow(POOL_TRAINING.title);
+    expect(within(going).getByText("Going", { selector: PILL })).toHaveClass(
+      "agenda-answer-yes",
+    );
+    expect(
+      within(await findRow(SCRIMMAGE.title)).getByText("Maybe", {
+        selector: PILL,
+      }),
+    ).toHaveClass("agenda-answer-maybe");
+    expect(
+      within(await findRow(CANCELLED_SOCIAL.title)).getByText("Can't go", {
+        selector: PILL,
+      }),
+    ).toHaveClass("agenda-answer-no");
+  });
+
+  it("sin respuesta pide el RSVP y dice cuántos van", async () => {
+    stubAgenda([SCRIMMAGE]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    const row = await findRow(SCRIMMAGE.title);
+    expect(
+      within(row).getByText("RSVP", { selector: MISSING_ANSWER }),
+    ).toBeInTheDocument();
+    expect(within(row).getByText("18 going")).toBeInTheDocument();
+  });
+
+  it("no pide el RSVP de un evento al que no se puede responder", async () => {
+    stubAgenda([COMMITTEE_ONLY]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    const row = await findRow(COMMITTEE_ONLY.title);
+    expect(
+      within(row).queryByText("RSVP", { selector: MISSING_ANSWER }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("la píldora cambia al guardar otra respuesta", async () => {
+    stubApi(({ method, url }) =>
+      method === "PUT"
+        ? savedResponse(SCRIMMAGE.id, "yes")
+        : agendaOrDetail(url, [
+            {
+              ...SCRIMMAGE,
+              myResponse: rsvpRequests(SCRIMMAGE).length > 0 ? "yes" : null,
+            },
+          ]),
+    );
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+    const row = await expandRow(SCRIMMAGE.title);
+
     await userEvent.click(rsvpButton(row, "Yes"));
 
-    expect(await within(row).findByRole("alert")).toHaveTextContent(
-      "Your membership isn't up to date. Sort it out in Payments to answer.",
+    expect(
+      await within(row).findByText("Going", { selector: PILL }),
+    ).toHaveClass("agenda-answer-yes");
+    expect(
+      within(row).queryByText("RSVP", { selector: MISSING_ANSWER }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("marca el cancelado con la palabra y lo atenúa", async () => {
+    stubAgenda([CANCELLED_SOCIAL]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
     );
+
+    const row = await findRow(CANCELLED_SOCIAL.title);
+    expect(within(row).getByText("Cancelled")).toBeInTheDocument();
+    expect(row).toHaveClass("is-cancelled");
+  });
+
+  it("escribe la fila en español", async () => {
+    stubAgenda([
+      { ...WITH_END_AND_COVER, myResponse: "no" },
+      { ...SCRIMMAGE, goingCount: 1 },
+    ]);
+
+    render(
+      <AgendaScreen
+        locale="es"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    const row = await findRow(WITH_END_AND_COVER.title);
+    expect(within(row).getByText("19:00")).toBeInTheDocument();
+    expect(within(row).getByText("20:30")).toBeInTheDocument();
+    expect(
+      within(row).getByText("No puedo", { selector: PILL }),
+    ).toBeInTheDocument();
+    expect(within(row).getByText("Se repite")).toBeInTheDocument();
+    expect(
+      within(row).getByRole("link", {
+        name: "MSAC Dive Pool (mapa, se abre en otra pestaña)",
+      }),
+    ).toBeInTheDocument();
+    const single = await findRow(SCRIMMAGE.title);
+    expect(within(single).getByText("1 va")).toBeInTheDocument();
   });
 });

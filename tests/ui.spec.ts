@@ -14833,14 +14833,16 @@ async function stubCalendarReads(
   await page.route(
     (url) => url.pathname === CALENDAR_AGENDA_ENDPOINT,
     (route, request) => {
-      const isPast =
-        new URL(request.url()).searchParams.get("period") === "past";
-      return route.fulfill(
-        jsonBody({
-          events: isPast ? pastEvents : reads.events,
-          nextCursor: null,
-        }),
+      const { searchParams } = new URL(request.url());
+      const isPast = searchParams.get("period") === "past";
+      // Los chips de tipo (#647) piden `types`: la API filtra, el stub también.
+      const types = searchParams.get("types")?.split(",") ?? null;
+      const events = (isPast ? pastEvents : reads.events).filter(
+        (event) =>
+          types === null ||
+          types.includes((event as { readonly eventType: string }).eventType),
       );
+      return route.fulfill(jsonBody({ events, nextCursor: null }));
     },
   );
   const opened = reads.opened ?? PLAYER_OPENED_EVENT;
@@ -14898,7 +14900,7 @@ type CalendarState = CalendarReads & {
 async function waitForAgendaRows(page: Page): Promise<void> {
   await expect(
     page.getByRole("heading", {
-      level: 2,
+      level: 3,
       name: STUBBED_AGENDA_EVENTS[0].title,
     }),
   ).toBeVisible();
@@ -14910,9 +14912,10 @@ async function waitForEmptyAgenda(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
-/** Responde No al primer evento y espera el aviso del 422 en su fila. */
+/** Responde No al primer evento y espera el aviso del 422 en su fila. Los
+ * botones están en la fila desplegada (#647). */
 async function showRsvpError(page: Page): Promise<void> {
-  await waitForAgendaRows(page);
+  await expandFirstRow(page);
   const row = agendaRow(page, STUBBED_AGENDA_EVENTS[0].title);
   await row.getByRole("group").getByRole("button", { name: "No" }).click();
   // Sólo el de la fila: el anunciador de rutas de Next también es un alert.
@@ -14923,15 +14926,20 @@ async function showRsvpError(page: Page): Promise<void> {
 const EVENT_TYPE_NAMES = /^(Training|Competition|Social|Meeting)$/;
 
 async function waitForEachTypeTag(page: Page): Promise<void> {
-  await expect(page.getByText(EVENT_TYPE_NAMES)).toHaveCount(
+  // En la lista: los chips de tipo (#647) también nombran los cuatro.
+  const agenda = page.getByRole("list", { name: CALENDAR_HEADING });
+  await expect(agenda.getByText(EVENT_TYPE_NAMES)).toHaveCount(
     STUBBED_EVENT_OF_EACH_TYPE.length,
   );
 }
 
+/** La fila del evento. El día que la agrupa también es un elemento de la
+ * lista que la contiene (#647): la fila es el último que casa. */
 function agendaRow(page: Page, title: string): Locator {
-  return page.getByRole("listitem").filter({
-    has: page.getByRole("heading", { level: 2, name: title }),
-  });
+  return page
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("heading", { level: 3, name: title }) })
+    .last();
 }
 
 /** Despliega el primer evento y espera a que su detalle esté pintado. */
@@ -14959,7 +14967,7 @@ async function showPastEvents(page: Page): Promise<void> {
   await page.getByRole("button", { name: /^(Past|Pasados)$/ }).click();
   await expect(
     page.getByRole("heading", {
-      level: 2,
+      level: 3,
       name: STUBBED_PAST_EVENTS[0].title,
     }),
   ).toBeVisible();
@@ -15169,6 +15177,154 @@ for (const state of CALENDAR_STATES) {
   });
 }
 
+// La agenda de escritorio de E24 (#647, "#1a Agenda + panel" del handoff;
+// mockup: docs/mockups/calendar-redesign-agenda-dark.png). El reloj se fija
+// en el jueves 25 de junio de 2026 por la mañana en Melbourne: "TODAY" y
+// "This weekend" dependen de hoy, y sin reloj fijo la captura cambiaría cada
+// día. El móvil es #656: aquí sólo 768 y 1440.
+const AGENDA_REDESIGN_NOW = new Date("2026-06-25T00:00:00.000Z");
+const AGENDA_REDESIGN_VIEWPORTS = viewports.filter(
+  (vp) => vp.name !== "mobile",
+);
+
+const AGENDA_REDESIGN_EVENTS = [
+  {
+    ...STUBBED_AGENDA_EVENTS[0],
+    id: "e0e0e0e0-0000-4000-8000-0000000000f1",
+    startsOn: "2026-06-25",
+    title: "Tuesday–Thursday open training",
+    myResponse: "yes",
+  },
+  {
+    ...STUBBED_CANCELLED_EVENT,
+    id: "e0e0e0e0-0000-4000-8000-0000000000f2",
+    startsOn: "2026-06-27",
+    status: "scheduled",
+    title: "Fundraiser trivia night",
+    myResponse: "maybe",
+    goingCount: 34,
+    coverThumbUrl: STUBBED_COVER_THUMBNAIL_URL,
+  },
+  {
+    ...STUBBED_AGENDA_EVENTS[2],
+    id: "e0e0e0e0-0000-4000-8000-0000000000f3",
+    startsOn: "2026-06-27",
+    myResponse: null,
+  },
+  {
+    ...STUBBED_AGENDA_EVENTS[3],
+    id: "e0e0e0e0-0000-4000-8000-0000000000f4",
+    startsOn: "2026-06-30",
+  },
+  {
+    ...STUBBED_CANCELLED_EVENT,
+    id: "e0e0e0e0-0000-4000-8000-0000000000f5",
+    myResponse: "no",
+  },
+] as const;
+
+async function fixAgendaClock(page: Page): Promise<void> {
+  await page.clock.setFixedTime(AGENDA_REDESIGN_NOW);
+  await stubNewsCovers(page);
+}
+
+async function waitForRedesignedAgenda(page: Page): Promise<void> {
+  await expect(
+    page.getByRole("heading", {
+      level: 3,
+      name: AGENDA_REDESIGN_EVENTS[0].title,
+    }),
+  ).toBeVisible();
+  await expect(page.locator(".agenda-thumbnail img")).toHaveJSProperty(
+    "complete",
+    true,
+  );
+}
+
+/** Apaga Competition y Meeting y espera la agenda que pidió con los demás. */
+async function filterRedesignedAgenda(page: Page): Promise<void> {
+  await waitForRedesignedAgenda(page);
+  const chips = page.getByRole("group", {
+    name: /^(Event types|Tipos de evento)$/,
+  });
+  await chips.getByRole("button", { name: "Competition" }).click();
+  await chips.getByRole("button", { name: "Meeting" }).click();
+  await expect(page).toHaveURL(/types=training%2Csocial$/);
+  await expect(
+    page.getByRole("heading", {
+      level: 3,
+      name: AGENDA_REDESIGN_EVENTS[2].title,
+    }),
+  ).toHaveCount(0);
+  await page.mouse.move(0, 0);
+}
+
+const AGENDA_REDESIGN_STATES: readonly CalendarState[] = [
+  {
+    name: "calendario-agenda",
+    events: AGENDA_REDESIGN_EVENTS,
+    beforeVisit: fixAgendaClock,
+    ready: waitForRedesignedAgenda,
+  },
+  {
+    name: "calendario-agenda-filtrada",
+    events: AGENDA_REDESIGN_EVENTS,
+    beforeVisit: fixAgendaClock,
+    ready: filterRedesignedAgenda,
+  },
+  {
+    name: "calendario-agenda-pasados",
+    events: STUBBED_AGENDA_EVENTS,
+    pastEvents: STUBBED_PAST_EVENTS,
+    beforeVisit: fixAgendaClock,
+    ready: showPastEvents,
+  },
+];
+
+for (const state of AGENDA_REDESIGN_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of AGENDA_REDESIGN_VIEWPORTS) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToCalendar(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+      });
+    }
+
+    test("has no horizontal scroll at 375px", async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await goToCalendar(page, state);
+      expect(await hasHorizontalScroll(page)).toBe(false);
+    });
+
+    for (const theme of themes) {
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await goToCalendar(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
+  });
+}
+
 // #641: el texto de cada etiqueta de tipo cumple AA también en oscuro.
 test.describe("calendario-cada-tipo en tema oscuro", () => {
   skipWithoutSession();
@@ -15220,7 +15376,10 @@ test.describe("la puerta de quien no está al día (#453)", () => {
     await page.goto(`${APP_URL}${CALENDAR_SCREEN_PATH}`);
     await waitForAgendaRows(page);
 
-    const row = agendaRow(page, STUBBED_AGENDA_EVENTS[1].title);
+    const { title } = STUBBED_AGENDA_EVENTS[1];
+    const row = agendaRow(page, title);
+    // Los botones están en la fila desplegada (#647).
+    await row.getByRole("button", { name: title }).click();
     await expect(row.getByRole("button", { name: "Yes" })).toBeDisabled();
     await expect(
       page.getByRole("link", { name: "Go to Payments" }),
@@ -16496,6 +16655,7 @@ test.describe("calendario en el navegador", () => {
         ),
     );
     await page.goto(`${APP_URL}${CALENDAR_SCREEN_PATH}`);
+    await page.getByRole("button", { name: event.title }).click();
     const rsvp = page.getByRole("group", { name: `RSVP: ${event.title}` });
 
     await rsvp.getByRole("button", { name: "Maybe" }).click();
@@ -16508,11 +16668,51 @@ test.describe("calendario en el navegador", () => {
     expect(sent).toEqual({ response: "maybe" });
   });
 
+  test("volver atrás tras salir del calendario deja el mismo filtro (#647)", async ({
+    page,
+  }) => {
+    await goToCalendar(page, CALENDAR_WITH_EVENTS);
+    const chips = page.getByRole("group", { name: "Event types" });
+    await chips.getByRole("button", { name: "Meeting" }).click();
+    await expect(page).toHaveURL(/types=training%2Ccompetition%2Csocial$/);
+
+    await page.getByRole("link", { name: "Directory" }).first().click();
+    await expect(page).toHaveURL(/\/directorio/);
+    await page.goBack();
+
+    await expect(page).toHaveURL(/types=training%2Ccompetition%2Csocial$/);
+    await expect(
+      chips.getByRole("button", { name: "Meeting" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await expect(
+      chips.getByRole("button", { name: "Training" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByRole("heading", {
+        level: 3,
+        name: STUBBED_AGENDA_EVENTS[3].title,
+      }),
+    ).toHaveCount(0);
+  });
+
+  test("recargar deja el mismo filtro (#647)", async ({ page }) => {
+    await goToCalendar(page, CALENDAR_WITH_EVENTS);
+    const chips = page.getByRole("group", { name: "Event types" });
+    await chips.getByRole("button", { name: "Meeting" }).click();
+    await expect(page).toHaveURL(/types=/);
+
+    await page.reload();
+
+    await expect(
+      chips.getByRole("button", { name: "Meeting" }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
   test("a 375px los botones de RSVP conservan el objetivo táctil de 44px", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await goToCalendar(page, CALENDAR_WITH_EVENTS);
+    await goToCalendar(page, CALENDAR_EXPANDED_AS_PLAYER);
 
     const heights = await page
       .getByRole("button", { name: /^(Yes|Maybe|No)$/ })

@@ -40,6 +40,12 @@ export function clubMoment(instant: Date): ClubMoment {
 }
 
 const ISO_DATE_LENGTH = "YYYY-MM-DD".length;
+const ISO_YEAR_LENGTH = "YYYY".length;
+
+/** El año (YYYY) de un día de calendario (YYYY-MM-DD). */
+export function calendarYearOf(date: string): string {
+  return date.slice(0, ISO_YEAR_LENGTH);
+}
 
 /** El día del club `days` días antes de `date` (YYYY-MM-DD). Se cuenta en UTC
  * a propósito: es aritmética de calendario, y ahí no hay cambio de horario
