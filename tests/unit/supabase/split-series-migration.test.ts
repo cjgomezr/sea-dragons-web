@@ -322,7 +322,7 @@ describeConPostgres("partir una serie en la base", () => {
     );
   });
 
-  it("conserva las respuestas y la asistencia de las sesiones movidas", async () => {
+  it("conserva las respuestas, la asistencia y los equipos de las sesiones movidas", async () => {
     const database = await migratedDatabase();
     const world = await seedWorld(database);
     await database.query(
@@ -330,6 +330,13 @@ describeConPostgres("partir una serie en la base", () => {
          (event_id, user_id, club_id, status)
        values ('${world.chosenId}', '${world.userId}', '${world.clubId}',
                'present')`,
+    );
+    await database.query(
+      `insert into public.team_splits
+         (club_id, event_id, mode, team_a_name, team_a_color, team_b_name,
+          team_b_color)
+       values ('${world.clubId}', '${world.chosenId}', 'manual', 'Blancos',
+               '#ffffff', 'Negros', '#000000')`,
     );
 
     const split = await splitSeries(database, fromChosen(world), {
@@ -346,6 +353,12 @@ describeConPostgres("partir una serie en la base", () => {
     await expect(
       database.query(
         `select count(*) from public.attendance_records
+          where event_id = '${world.chosenId}'`,
+      ),
+    ).resolves.toBe("1");
+    await expect(
+      database.query(
+        `select count(*) from public.team_splits
           where event_id = '${world.chosenId}'`,
       ),
     ).resolves.toBe("1");

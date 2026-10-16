@@ -56,7 +56,9 @@ export type SeriesEditDraft = Omit<SeriesEdit, "place"> & {
 };
 
 /** Cómo terminó partir una serie desde una sesión. `edited` es la serie
- * entera, cuando la elegida es su primera sesión; `split`, la serie nueva. */
+ * entera, cuando la elegida es su primera sesión; `split`, la serie nueva.
+ * Con `updatedOccurrences` a 0 no se escribió nada: desde la elegida no
+ * quedaba ninguna sesión futura sin cancelar. */
 export type SeriesSplit =
   | {
       readonly kind: "edited" | "split";
