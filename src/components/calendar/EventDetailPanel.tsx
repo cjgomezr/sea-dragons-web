@@ -12,6 +12,7 @@ import {
   type OpenedEvent,
   describeOpeningFailure,
 } from "./agenda-client";
+import { AddToCalendarButton } from "./AddToCalendarButton";
 import { EventCover } from "./EventCover";
 import { EventGoing } from "./EventGoing";
 import { EventPlaceCard } from "./EventPlaceCard";
@@ -70,13 +71,16 @@ function openedOf(detail: EventDetailState): OpenedEvent | null {
   return detail.kind === "loaded" ? detail.opened : null;
 }
 
-/** Un bloque con su icono en un cuadro y dos líneas, como la hora. */
+/** Un bloque con su icono en un cuadro y dos líneas, como la hora, y un
+ * botón al final si lo lleva. */
 function PanelBlock({
   Glyph,
   lines,
+  action = null,
 }: {
   readonly Glyph: PhosphorGlyph;
   readonly lines: { readonly first: string; readonly second: string };
+  readonly action?: React.ReactNode;
 }): React.JSX.Element {
   return (
     <div className="agenda-panel-block">
@@ -87,6 +91,7 @@ function PanelBlock({
         <p className="agenda-panel-block-first">{lines.first}</p>
         <p className="agenda-panel-block-second">{lines.second}</p>
       </div>
+      {action}
     </div>
   );
 }
@@ -136,6 +141,13 @@ function WhenBlocks({
       <PanelBlock
         Glyph={Clock}
         lines={{ first: when.day, second: when.hours }}
+        action={
+          <AddToCalendarButton
+            translate={translate}
+            event={event}
+            notes={opened === null ? null : opened.notes}
+          />
+        }
       />
       {repeat === null ? null : (
         <PanelBlock

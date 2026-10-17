@@ -1595,6 +1595,7 @@ export const spanishMessages: MessageCatalog = {
   "calendar.panel.when": "Cuándo",
   "calendar.panel.repeats": "Se repite",
   "calendar.panel.place": "Dónde",
+  "calendar.panel.addToCalendar": "Agregar a mi calendario",
   "calendar.panel.copyAddress": "Copiar dirección",
   "calendar.panel.addressCopied": "Dirección copiada",
   "calendar.panel.copyFailed": "No se pudo copiar",
