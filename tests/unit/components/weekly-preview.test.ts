@@ -175,6 +175,34 @@ describe("resumen de una serie semanal", () => {
     expect(preview).toEqual({ kind: "noSessions" });
   });
 
+  it("con un rango de más de un año no cuenta nada: el servidor la rechaza", () => {
+    const preview = previewWeeklySeries(
+      english,
+      {
+        ...MONDAYS_AND_THURSDAYS,
+        startsOn: "2026-10-01",
+        endsOn: "2027-10-02",
+      },
+      BEFORE_THE_SERIES,
+    );
+
+    expect(preview).toEqual({ kind: "tooLong" });
+  });
+
+  it("con un rango de un año justo todavía resume", () => {
+    const preview = previewWeeklySeries(
+      english,
+      {
+        ...MONDAYS_AND_THURSDAYS,
+        startsOn: "2026-10-01",
+        endsOn: "2027-10-01",
+      },
+      BEFORE_THE_SERIES,
+    );
+
+    expect(preview).toMatchObject({ kind: "sessions" });
+  });
+
   it("sin la hora de fin dice sólo la de inicio", () => {
     const preview = previewWeeklySeries(
       english,

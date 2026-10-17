@@ -11721,10 +11721,6 @@ a.auth-brand-header:focus-visible {
   border-color: var(--color-danger);
 }
 
-.event-form-weekly-region:empty {
-  display: none;
-}
-
 .event-form-weekly-summary {
   display: flex;
   flex-direction: column;

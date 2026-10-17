@@ -56,10 +56,16 @@ type Status =
   | { readonly kind: "sending" }
   | ApiRequestFailure;
 
-/** Una serie sin días o sin sesiones no se crea: el servidor la rechazaría
- * igual. */
+/** Una serie sin días, sin sesiones o de más de un año no se crea: el
+ * servidor la rechazaría igual. */
+const BLOCKED_PREVIEWS: ReadonlySet<WeeklyPreview["kind"]> = new Set([
+  "noDays",
+  "noSessions",
+  "tooLong",
+]);
+
 function isWeeklyBlocked(preview: WeeklyPreview | null): boolean {
-  return preview?.kind === "noDays" || preview?.kind === "noSessions";
+  return preview !== null && BLOCKED_PREVIEWS.has(preview.kind);
 }
 
 /** El aviso de Termina: el del servidor manda; si no hay, el fin al revés o

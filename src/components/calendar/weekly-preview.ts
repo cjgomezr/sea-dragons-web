@@ -1,6 +1,8 @@
+import { SERIES_MAX_DAYS } from "@/lib/events/event-creation";
 import {
   ISO_WEEKDAYS,
   type IsoWeekday,
+  countRangeDays,
   generateWeeklyOccurrences,
 } from "@/lib/events/event-occurrences";
 import {
@@ -26,6 +28,9 @@ export type WeeklyPreview =
   /** Sin el inicio, el fin o la hora todavía no hay nada que contar. */
   | { readonly kind: "incomplete" }
   | { readonly kind: "noDays" }
+  /** Más de lo que el servidor deja durar a una serie. Ni se cuenta: con un
+   * año mal escrito serían millones de días. */
+  | { readonly kind: "tooLong" }
   | { readonly kind: "noSessions" }
   | {
       readonly kind: "sessions";
@@ -96,8 +101,11 @@ export function previewWeeklySeries(
   if (isIncomplete(series)) {
     return { kind: "incomplete" };
   }
-  const weekdays = [...series.weekdays].sort((first, second) => first - second);
   const { startsOn, endsOn, startTime, endTime } = series;
+  if (countRangeDays(startsOn, endsOn) > SERIES_MAX_DAYS) {
+    return { kind: "tooLong" };
+  }
+  const weekdays = [...series.weekdays].sort((first, second) => first - second);
   const sessions = generateWeeklyOccurrences(
     { weekdays, startsOn, endsOn, startTime },
     now,

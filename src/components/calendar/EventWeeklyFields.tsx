@@ -1,6 +1,8 @@
 import { Repeat } from "@phosphor-icons/react/dist/ssr/Repeat";
 import { useId } from "react";
 import type { Translator } from "@/lib/i18n/translator";
+import { describeEventIssue } from "./event-create-client";
+import type { EventFormField } from "./event-form";
 import { type FieldProps, InputField, WeekdaysField } from "./EventFormFields";
 import type { WeeklyPreview } from "./weekly-preview";
 
@@ -12,11 +14,21 @@ import type { WeeklyPreview } from "./weekly-preview";
 
 const SUMMARY_ICON_SIZE = 16;
 
-/** Por qué no sale ninguna sesión, si se sabe ya en el navegador. */
+/** Por qué no sale ninguna sesión, si se sabe ya en el navegador, junto al
+ * campo que hay que cambiar. */
 function describePreviewIssue(
   translate: Translator,
   preview: WeeklyPreview,
+  field: Extract<EventFormField, "weekdays" | "endsOn">,
 ): string | null {
+  if (field === "endsOn") {
+    return preview.kind === "tooLong"
+      ? describeEventIssue(translate, {
+          field,
+          code: "series_range_too_long",
+        })
+      : null;
+  }
   switch (preview.kind) {
     case "noDays":
       return translate("calendar.form.weekly.noDays");
@@ -39,7 +51,9 @@ function WeeklySummary({
     <div className="event-form-weekly-summary">
       <p className="event-form-weekly-total">
         <Repeat aria-hidden="true" size={SUMMARY_ICON_SIZE} />
-        <span>{preview.summary}</span>
+        {/* Sólo se anuncia la frase: las fechas y la pista no cambian el
+            sentido, y releerlas a cada día que se marca cansa. */}
+        <span aria-live="polite">{preview.summary}</span>
       </p>
       <div className="event-form-weekly-next">
         <span id={nextId}>{translate("calendar.form.weekly.next")}</span>
@@ -68,26 +82,25 @@ function WeeklySummary({
 export function WeeklyFields(
   props: FieldProps & { readonly preview: WeeklyPreview },
 ): React.JSX.Element {
-  const { translate, preview, issueTextFor } = props;
+  const { translate, preview } = props;
+  const issueTextFor = (field: EventFormField): string | null =>
+    field === "weekdays" || field === "endsOn"
+      ? (props.issueTextFor(field) ??
+        describePreviewIssue(translate, preview, field))
+      : props.issueTextFor(field);
   return (
     <div className="event-form-weekly">
-      <WeekdaysField
-        {...props}
-        issueText={
-          issueTextFor("weekdays") ?? describePreviewIssue(translate, preview)
-        }
-      />
+      <WeekdaysField {...props} issueText={issueTextFor("weekdays")} />
       <InputField
         {...props}
+        issueTextFor={issueTextFor}
         field="endsOn"
         type="date"
         label={translate("calendar.form.endsOn")}
       />
-      <div className="event-form-weekly-region" aria-live="polite">
-        {preview.kind === "sessions" ? (
-          <WeeklySummary translate={translate} preview={preview} />
-        ) : null}
-      </div>
+      {preview.kind === "sessions" ? (
+        <WeeklySummary translate={translate} preview={preview} />
+      ) : null}
     </div>
   );
 }

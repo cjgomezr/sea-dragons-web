@@ -660,6 +660,24 @@ describe("diálogo de evento", () => {
     ).toBeDisabled();
   });
 
+  it("con un rango de más de un año lo dice junto al fin y no deja crear", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    await fillWeeklySeries(dialog);
+
+    setValue(dialog, "Until", "2027-10-07");
+
+    expect(within(dialog).getByLabelText("Until")).toHaveAccessibleDescription(
+      "A series can last up to 366 days.",
+    );
+    expect(
+      within(dialog).queryByText(/sessions? until/),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Create event" }),
+    ).toBeDisabled();
+  });
+
   it("en español resume la serie con sus días en plural", async () => {
     stubApi({});
     render(
