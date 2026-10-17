@@ -37,6 +37,9 @@ fábrica: solo sus tickets lo son.
 | **E22** · Rediseño de las noticias          | Las noticias con el diseño de Claude Design (`docs/design/design_handoff_news/`): portada opcional con el fondo de la categoría cuando falta, tarjeta destacada en el feed, una publicación fijada por club con fecha de fin (solo el Admin), lista con miniaturas, cuerpo en Markdown seguro con editor de Escribir y Vista previa, e imágenes dentro del cuerpo, en escritorio y en móvil. Añadido después del plan.                                                                      | L (14)        | E11, E21                      | #589      |
 | **E23** · Rediseño de pagos                 | Pagos con el diseño de Claude Design (`docs/design/design_handoff_payments/`): pestañas Mi membresía y Extras del club, tira del plan, extras opcionales en filas con compra de varias unidades, talla al comprar, historial agrupado por mes con filtro, método, recibo de Stripe y CSV, y la pestaña de gestión con vendidos, compradores y extras cerrados, sin cifras de dinero ni faltantes, en escritorio y en móvil. Añadido después del plan.                                       | L (11)        | E12, E13, E21                 | #626      |
 | **E24** · Rediseño del calendario           | El calendario con el diseño de Claude Design (`docs/design/design_handoff_calendar/`): colores y fondo por tipo, imagen opcional, hora de fin y eventos de varios días, lugar con buscador (Photon, con los del club primero), enlace a Google Maps y mapa embebido si cumple, filtro por tipo, agenda con panel en lugar del acordeón, .ics de la sesión, formulario con resumen de la repetición y partir una serie desde una sesión, en escritorio y en móvil. Añadido después del plan. | L (18)        | E7, E8, E21, E22              | #640      |
+| **E25** · Varios clubes en una instalación  | Una instalación sirve a varios clubes, cada uno en su subdominio: el club de cada petición sale del host, la marca, el registro, la confirmación y la recuperación son las del club de la petición, la sesión vale sólo en su subdominio, los correos llevan la marca de su club, sólo cobra el club dueño de la cuenta de Stripe, y una suite con dos clubes demuestra el aislamiento. Conviven uno o varios clubes por instalación. Añadido después del plan.                             | L (10)        | E2, E18a, E20                 | #663      |
+
+E25 se añadió el 14 de octubre de 2026, a petición del dueño, para comparar su costo con el de seguir con una instalación por club. El esquema ya tiene `club_id` en las 34 tablas de datos y los gateways ya filtran por el club del miembro; lo que falta es lo que da por hecho un solo club: la constante `DEFAULT_CLUB_SLUG` en la entrada, el registro y la recuperación, la caché única de la marca, los correos con esa marca y una sola cuenta de Stripe. Cubre los datos y el club por subdominio; Stripe por club, correo por club y el alta de clubes con pantalla quedan para épicas propias. No reemplaza a un club por instalación: el mismo código sirve para uno o para varios, y E18b se replantea cuando B6 se resuelva. La puesta en producción de los subdominios espera a B8, qué dominio los aloja. PRD en `docs/prd/e25-varios-clubes-por-instalacion.md`.
 
 E15 y E16 se añadieron el 23 de agosto de 2026, después del plan original, al
 resolver los huecos P2, P3 y P4 de `docs/preguntas-abiertas.md`.
@@ -237,6 +240,9 @@ graph LR
   E3 --> E18a
   E5 --> E18a
   E18a --> E18b
+  E2 --> E25
+  E18a --> E25
+  E20 --> E25
   E7 --> E14
   E8 --> E14
   E11 --> E14

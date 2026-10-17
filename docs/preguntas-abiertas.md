@@ -10,7 +10,8 @@ FR o AC que lo cierra.
 
 **Abierto después:** B5, el 16 de septiembre de 2026, resuelto el 30 de
 septiembre de 2026 en `docs/prd/e12-stripe-base.md`; y B6, el 22 de septiembre
-de 2026, que bloquea los de E18b.
+de 2026, que bloquea los de E18b; y B8, el 14 de octubre de 2026, que bloquea
+la puesta en producción de los subdominios de E25.
 
 ---
 
@@ -164,6 +165,25 @@ del código y hace configurables las posiciones de juego, no depende de esta
 respuesta y se trabaja ya. Lo que sigue en pie: sin E18b no se puede operar de
 verdad el modelo de un club por instalación, así que esta decisión es condición
 para el primer cliente.
+
+### B8 · Qué dominio aloja los subdominios de cada club · E25 · SIN RESOLVER
+
+**De dónde sale.** El 14 de octubre de 2026, al escribir el PRD de E25, el dueño
+eligió que cada club tenga su subdominio (`<slug>.<dominio>`) dentro de una
+instalación compartida.
+
+**La pregunta.** ¿Qué dominio aloja esos subdominios? Hace falta uno del dueño
+con DNS comodín (`*.<dominio>`) apuntando a Vercel. Vercel sólo acepta un
+dominio comodín si el dominio usa sus nameservers.
+
+- **`volleytip.com`:** ya es del dueño y ya está verificado en Resend como
+  remitente. Mezcla la plataforma con otro producto suyo.
+- **Uno nuevo para la plataforma:** cuesta el registro anual, pero separa la
+  marca de la plataforma de la de VolleyTip.
+
+**Por qué bloquea.** Sin él, los subdominios no se pueden poner en producción.
+No bloquea construir ni probar E25: en local se usa `<slug>.localhost`, y las
+instalaciones de un solo club siguen funcionando sin subdominio.
 
 ### B7 · Un Coach que también juega · E7, E8, E9, E10 · RESUELTO
 
