@@ -5294,7 +5294,7 @@ a.auth-brand-header:focus-visible {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  max-width: 640px;
+  max-width: 1040px;
 }
 
 .club-settings-form {
@@ -5310,6 +5310,240 @@ a.auth-brand-header:focus-visible {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-3);
+}
+
+/* Las secciones de la configuración (#718, docs/design/
+   design_handoff_club_settings, "#1a", "#3a" y "#3b"). La barra de pestañas
+   va a lo ancho; el contenido de cada sección conserva su columna de 640px
+   hasta que su ticket la rehaga. */
+.club-settings-panel {
+  max-width: 640px;
+}
+
+.app-main h1.club-settings-title {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+/* Una pestaña no parte su nombre: si la fila no cabe (la tableta en
+   español), la barra se desplaza en vez de ensanchar la página. */
+.club-settings-tabs {
+  display: flex;
+  gap: var(--space-6);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.club-settings-tab {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.club-settings-tab svg {
+  font-size: 16px;
+}
+
+.club-settings-tab:hover,
+.club-settings-tab[aria-selected="true"] {
+  color: var(--color-text);
+}
+
+.club-settings-tab[aria-selected="true"] {
+  border-bottom-color: var(--color-accent);
+}
+
+.club-settings-tab:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
+/* El móvil (#3a y #3b): una cabecera con su flecha y su título, y debajo la
+   lista o la sección. */
+.club-settings-mobile-header {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-main .club-settings-mobile-header h1 {
+  margin: 0;
+  font-family: var(--font-family-heading);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.club-settings-mobile-header h1:focus {
+  outline: none;
+}
+
+/* "‹ Configuración" a la izquierda y el título centrado en la pantalla, no
+   en el hueco que deja el botón: las dos columnas de los lados miden igual. */
+.club-settings-section-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+}
+
+.app-main .club-settings-section-header h1 {
+  font-size: 17px;
+  text-align: center;
+}
+
+.club-settings-back-to-list {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  justify-self: start;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-2) 0 0;
+  font: inherit;
+  font-size: 15px;
+  color: var(--color-accent-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.club-settings-back-to-list:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+.club-settings-list-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.club-settings-club-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.club-settings-club-row .auth-brand-mark {
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  font-size: 16px;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.club-settings-club-row .club-logo {
+  height: var(--touch-target-min);
+}
+
+.club-settings-club-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.club-settings-club-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.club-settings-list {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.club-settings-list li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.club-settings-list-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 68px;
+  padding: var(--space-3) 14px;
+  font: inherit;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.club-settings-list-row:hover {
+  background: var(--color-hover);
+}
+
+.club-settings-list-row:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
+.club-settings-list-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  background: var(--color-segment-selected);
+  border-radius: var(--radius);
+}
+
+.club-settings-list-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.club-settings-list-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Una línea: lo que no cabe se recorta. Guarda su alto mientras el resumen
+   llega, para que la fila no salte. */
+.club-settings-list-summary {
+  min-height: 1.35em;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.club-settings-list-caret {
+  display: flex;
+  flex: none;
+  font-size: 16px;
+  color: var(--color-text-secondary);
 }
 
 /* Las posiciones del club (#300): las activas en su orden, el alta y las
