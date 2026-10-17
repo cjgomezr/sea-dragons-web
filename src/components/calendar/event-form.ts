@@ -439,21 +439,33 @@ export function listEventChanges(
   };
 }
 
-/** Los campos que se comparan tal cual para saber si algo cambió. */
-const PLAIN_FIELDS = [
-  "title",
-  "eventType",
-  "repeat",
-  "startsOn",
-  "endsOn",
-  "startTime",
-  "endTime",
-  "endsAnotherDay",
-  "endDate",
-  "location",
-  "placeDetail",
-  "notes",
-] as const satisfies readonly (keyof EventForm)[];
+/** Cómo cuenta cada campo para saber si algo cambió: tal cual, con su
+ * propia regla, o nada (la imagen va en su estado y `belongsToSeries` no
+ * cambia mientras se edita). Un campo nuevo de `EventForm` que no esté aquí
+ * no compila: si no, cambiarlo no contaría y Cancelar cerraría sin preguntar. */
+const FIELD_COMPARISONS = {
+  title: "plain",
+  eventType: "plain",
+  repeat: "plain",
+  startsOn: "plain",
+  endsOn: "plain",
+  weekdays: "ownRule",
+  startTime: "plain",
+  endTime: "plain",
+  endsAnotherDay: "plain",
+  endDate: "plain",
+  location: "plain",
+  place: "ownRule",
+  placeDetail: "plain",
+  notes: "plain",
+  audience: "ownRule",
+  cover: "ignored",
+  belongsToSeries: "ignored",
+} as const satisfies Record<keyof EventForm, "plain" | "ownRule" | "ignored">;
+
+const PLAIN_FIELDS = (
+  Object.keys(FIELD_COMPARISONS) as (keyof EventForm)[]
+).filter((field) => FIELD_COMPARISONS[field] === "plain");
 
 /** Si lo escrito difiere de lo que había al abrir (#657): decide si Cancelar
  * pregunta antes de tirarlo. Escribir y borrar lo escrito no cuenta. La

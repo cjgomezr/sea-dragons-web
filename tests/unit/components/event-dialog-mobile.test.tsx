@@ -167,7 +167,9 @@ async function openEdit(options: {
 }
 
 function phoneBar(dialog: HTMLElement): HTMLElement {
-  return within(dialog).getByRole("group", { name: /event/i });
+  return within(dialog).getByRole("group", {
+    name: /^(New event|Edit event)$/,
+  });
 }
 
 function setValue(dialog: HTMLElement, label: string, value: string): void {
