@@ -360,12 +360,9 @@ async function togglesCornerClip(page: Page): Promise<Clip> {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-/** `revealToggles` los pone a la vista donde no lo están: dentro de la
- * aplicación viven en el menú de la cuenta (#287). */
-function describeTogglesCorner(
-  pg: Screen,
-  revealToggles?: (page: Page) => Promise<void>,
-): void {
+/** Sólo en la cabecera de autenticación: dentro de la aplicación el tema y
+ * el idioma son controles del menú de la cuenta (#716), con sus capturas. */
+function describeTogglesCorner(pg: Screen): void {
   for (const vp of viewports) {
     test.describe(`interruptores-${pg.name} @ ${vp.name}`, () => {
       test.use({ viewport: { width: vp.width, height: vp.height } });
@@ -373,7 +370,6 @@ function describeTogglesCorner(
       for (const theme of themes) {
         test(`matches approved baseline (${theme})`, async ({ page }) => {
           await goToWithTheme(page, pg.path, theme);
-          await revealToggles?.(page);
           const clip = await togglesCornerClip(page);
           const name = `interruptores-${pg.name}-${vp.name}-${theme}.png`;
           await createMissingLocalBaseline(name, () =>
@@ -827,11 +823,6 @@ test.describe("dentro de la aplicación", () => {
   // test agotaba la cuarentena de intentos de Supabase Auth a mitad de la
   // corrida, y ese límite es el que el ticket dice que no se reimplementa.
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
-
-  describeTogglesCorner({ name: "panel", path: "/dashboard" }, async (page) => {
-    await openAccountMenu(page);
-    await page.mouse.move(0, 0);
-  });
 
   const DESKTOP = { width: 1440, height: 900 } as const;
   const MOBILE = { width: 375, height: 812 } as const;
