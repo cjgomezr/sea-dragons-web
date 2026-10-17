@@ -17829,12 +17829,16 @@ test.describe("diálogo de evento en el navegador", () => {
   });
 });
 // Editar y cancelar desde la fila desplegada (#316). La primera fila es una
-// ocurrencia de una serie, así que cada acción pregunta primero el alcance.
-// Todo se sirve desde el test: nada se edita ni se cancela de verdad.
+// ocurrencia de una serie, así que cada acción pregunta primero el alcance:
+// editar, solo esta sesión o esta y las siguientes (#655); cancelar, solo
+// esta o toda la serie. Todo se sirve desde el test: nada se edita ni se
+// cancela de verdad.
 const ORGANIZER_EDIT = /^(Edit|Editar)$/;
 const ORGANIZER_CANCEL = /^(Cancel|Cancelar)$/;
 const ORGANIZER_WHOLE_SERIES =
   /^(The whole series from today on|Toda la serie de hoy en adelante)$/;
+const ORGANIZER_FOLLOWING =
+  /^(This and all following sessions|Esta y las siguientes)$/;
 const ORGANIZER_CONFIRM_SERIES = /^(Cancel series|Cancelar serie)$/;
 const EDIT_SERIES_DIALOG_NAME = /^(Edit series|Editar serie)$/;
 const EDIT_EVENT_DIALOG_NAME = /^(Edit event|Editar evento)$/;
@@ -17850,6 +17854,13 @@ const ORGANIZER_OPENED_EVENT = {
       },
     ],
   },
+} as const;
+
+/** La serie de la primera fila, para elegir qué editar (#655): los martes
+ * hasta septiembre. */
+const ORGANIZER_SERIES_OPENED_EVENT = {
+  ...ORGANIZER_OPENED_EVENT,
+  series: { weekdays: [2], endsOn: "2026-09-15", sessionsLeft: 13 },
 } as const;
 
 function firstAgendaRow(page: Page): Locator {
@@ -17868,13 +17879,13 @@ async function stubEventGroups(page: Page): Promise<void> {
   );
 }
 
-/** Despliega la ocurrencia y pulsa Editar: sale la elección de alcance. */
-async function showScopeChoice(page: Page): Promise<void> {
+/** Elige la sesión y pulsa Editar: sale qué editar de la serie (#655). */
+async function showEditScopeChoice(page: Page): Promise<void> {
   await openFirstPanel(page);
   const row = firstEventPanel(page);
   await row.getByRole("button", { name: ORGANIZER_EDIT }).click();
   await expect(
-    row.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }),
+    row.getByRole("button", { name: ORGANIZER_FOLLOWING }),
   ).toBeVisible();
   await page.mouse.move(0, 0);
 }
@@ -17895,7 +17906,7 @@ async function showEditSeriesDialog(page: Page): Promise<void> {
   await openFirstPanel(page);
   const row = firstEventPanel(page);
   await row.getByRole("button", { name: ORGANIZER_EDIT }).click();
-  await row.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }).click();
+  await row.getByRole("button", { name: ORGANIZER_FOLLOWING }).click();
   const dialog = page.getByRole("dialog", { name: EDIT_SERIES_DIALOG_NAME });
   await expect(
     dialog.getByRole("radio", { name: /^(The whole club|Todo el club)$/ }),
@@ -17906,10 +17917,11 @@ async function showEditSeriesDialog(page: Page): Promise<void> {
 function organizerStates(
   name: string,
   ready: (page: Page) => Promise<void>,
+  opened: CalendarState["opened"] = ORGANIZER_OPENED_EVENT,
 ): readonly [CalendarState, CalendarState] {
   const state = {
     events: STUBBED_AGENDA_EVENTS,
-    opened: ORGANIZER_OPENED_EVENT,
+    opened,
     ready,
   };
   return [
@@ -17929,13 +17941,18 @@ const ORGANIZER_CONFIRM_STATES = organizerStates(
 
 const ORGANIZER_ROW_STATES: readonly CalendarState[] = [
   ...ORGANIZER_ACTIONS_STATES,
-  ...organizerStates("calendario-organizador-alcance", showScopeChoice),
+  ...organizerStates(
+    "calendario-editar-alcance",
+    showEditScopeChoice,
+    ORGANIZER_SERIES_OPENED_EVENT,
+  ),
   ...ORGANIZER_CONFIRM_STATES,
 ];
 
 const ORGANIZER_DIALOG_STATES: readonly CalendarState[] = organizerStates(
   "calendario-organizador-editar-serie",
   showEditSeriesDialog,
+  ORGANIZER_SERIES_OPENED_EVENT,
 );
 
 for (const state of [...ORGANIZER_ROW_STATES, ...ORGANIZER_DIALOG_STATES]) {
@@ -17981,10 +17998,16 @@ for (const state of [...ORGANIZER_ROW_STATES, ...ORGANIZER_DIALOG_STATES]) {
       });
     }
 
-    test("has no accessibility violations (axe-core)", async ({ page }) => {
-      await goToCalendar(page, state);
-      await expectNoAxeViolations(page);
-    });
+    // El contraste de las opciones nuevas (#655) se comprueba en los dos
+    // temas.
+    for (const theme of themes) {
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await goToCalendar(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
   });
 }
 
@@ -18069,7 +18092,7 @@ test.describe("editar y cancelar en el navegador", () => {
     await goToCalendar(page, ACTIONS);
     const row = firstEventPanel(page);
     await row.getByRole("button", { name: ORGANIZER_EDIT }).click();
-    await row.getByRole("button", { name: "Only this one" }).click();
+    await row.getByRole("button", { name: "This session only" }).click();
     const dialog = page.getByRole("dialog", { name: EDIT_EVENT_DIALOG_NAME });
     await expect(dialog.getByLabel("Title")).toHaveValue(OCCURRENCE.title);
 

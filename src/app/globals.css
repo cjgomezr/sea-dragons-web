@@ -11833,6 +11833,78 @@ a.auth-brand-header:focus-visible {
   margin: 0;
 }
 
+/* Qué se edita de una serie (#655, "Editing a series" del handoff de E24):
+   la pregunta y dos opciones de toda la anchura, con su icono, su nombre y,
+   en "Solo esta sesión", la fecha que cambia. */
+.agenda-edit-scope-question {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.agenda-edit-scope-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: var(--space-3);
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.agenda-edit-scope-option:hover {
+  background: var(--color-hover);
+}
+
+.agenda-edit-scope-option:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.agenda-edit-scope-icon {
+  display: flex;
+  flex: none;
+  padding-top: 2px;
+  color: var(--color-accent-text);
+}
+
+.agenda-edit-scope-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.agenda-edit-scope-label {
+  font-weight: 700;
+}
+
+.agenda-edit-scope-hint {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* "Esta serie cambió" (#655): el aviso y Recargar, juntos sobre los
+   botones del formulario. */
+.event-form-stale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.event-form-stale .auth-error {
+  margin: 0;
+}
+
 /* La imagen del evento (#650, punto 1 del "#1c" del handoff de E24): sin
    ella, 120px del fondo del tipo con su icono a la derecha, y el texto y el
    botón abajo; con ella, 160px de foto y "Quitar imagen" debajo. */

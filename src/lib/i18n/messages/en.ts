@@ -1420,10 +1420,16 @@ export const englishMessages = {
   "calendar.edit.titleSeries": "Edit series",
   "calendar.edit.submit": "Save changes",
   "calendar.edit.seriesWarning":
-    "These changes apply to every session from today on, including the ones that were edited on their own.",
+    "These changes apply to this session and every one after it, also to the ones that were edited on their own.",
   "calendar.manage.edit": "Edit",
   "calendar.manage.cancel": "Cancel",
-  "calendar.manage.scopeQuestion.edit": "Which sessions do you want to edit?",
+  "calendar.manage.editScope.question":
+    "This event repeats. What do you want to edit?",
+  "calendar.manage.editScope.session": "This session only",
+  "calendar.manage.editScope.sessionHint":
+    "Changes only {date}. The rest stay the same.",
+  "calendar.manage.editScope.following": "This and all following sessions",
+  "calendar.manage.editScope.close": "Cancel",
   "calendar.manage.scopeQuestion.cancel":
     "Which sessions do you want to cancel?",
   "calendar.manage.scope.event": "Only this one",
@@ -1459,8 +1465,15 @@ export const englishMessages = {
     "This event was already cancelled. We refreshed the calendar.",
   "calendar.manage.closed.series_without_upcoming":
     "This series has no sessions left from today on. We refreshed the calendar.",
+  "calendar.manage.closed.occurrence_started":
+    "This session has already started, so it can't be changed anymore. We refreshed the calendar.",
+  "calendar.manage.closed.session_not_in_series":
+    "This series changed while you were editing it. We refreshed the calendar.",
   "calendar.manage.closed.not_found":
     "This event no longer exists. We refreshed the calendar.",
+  "calendar.manage.error.seriesChanged":
+    "This series changed while you were editing it. Reload to see the current version.",
+  "calendar.manage.reload": "Reload",
   "calendar.manage.error.forbidden": "Your role can't change events.",
   "calendar.manage.error.unexpected": "We couldn't save the change. Try again.",
   "calendar.form.title": "New event",
