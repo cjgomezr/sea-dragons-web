@@ -173,7 +173,11 @@ describe("el Stop gate y Playwright", () => {
   it(
     "dice en una línea que no corrió Playwright y por qué",
     async () => {
-      const { output } = await runGateOnBranchTouching("docs/nota.md");
+      // Una rama de sólo docs ya no llega aquí: la deja ir el guard de sólo
+      // texto. Hace falta algo que no sea texto ni mueva una captura.
+      const { output } = await runGateOnBranchTouching(
+        "supabase/migrations/0099_algo.sql",
+      );
 
       expect(output).toMatch(/Playwright[^\n]*no corre/);
     },
@@ -229,7 +233,9 @@ describe("el Stop gate y Playwright", () => {
   it(
     "corre npm test sin pedir los tests de integración",
     async () => {
-      const { calls } = await runGateOnBranchTouching("docs/nota.md");
+      const { calls } = await runGateOnBranchTouching(
+        "supabase/migrations/0099_algo.sql",
+      );
 
       expect(calls).toContain("npm test [RUN_INTEGRATION_TESTS=]");
     },
