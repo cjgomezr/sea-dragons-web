@@ -41,6 +41,10 @@ export function tabBarOffset({
   if (Math.abs(visualViewport.scale - 1) > UNZOOMED_SCALE_TOLERANCE) {
     return 0;
   }
-  const offset = visualViewport.offsetTop + visualViewport.height - barBottom;
+  // Al tirar de la página para refrescar, offsetTop es negativo mientras dura
+  // el gesto: es la página estirada por encima de su borde, no la ventana
+  // visible moviéndose, y contarlo subiría la barra con el dedo.
+  const visibleTop = Math.max(0, visualViewport.offsetTop);
+  const offset = visibleTop + visualViewport.height - barBottom;
   return Math.abs(offset) < MIN_VISIBLE_OFFSET_PX ? 0 : offset;
 }
