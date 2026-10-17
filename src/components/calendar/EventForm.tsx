@@ -68,6 +68,10 @@ const BLOCKED_PREVIEWS: ReadonlySet<WeeklyPreview["kind"]> = new Set([
   "tooLong",
 ]);
 
+/** Sin resumen ni avisos: los días y el final de una serie que se edita desde
+ * una sesión los valida el servidor (#655). */
+const SERIES_EDIT_PREVIEW: WeeklyPreview = { kind: "incomplete" };
+
 function isWeeklyBlocked(preview: WeeklyPreview | null): boolean {
   return preview !== null && BLOCKED_PREVIEWS.has(preview.kind);
 }
@@ -284,13 +288,16 @@ export function EventForm({
   // Lo anterior a E24 no tiene hora de fin (D5): guardarlo ahora la pide.
   const isEndNowRequired =
     layout !== "create" && initialForm.endTime === "" && form.endTime === "";
-  // Una serie nueva semanal, o una que se edita desde una sesión (#655): las
-  // dos enseñan sus días, su final y el resumen (#651).
-  const isWeekly =
-    layout === "series" || (layout === "create" && form.repeat === "weekly");
-  const weeklyPreview = isWeekly
-    ? previewWeeklySeries(translate, form, openedAt)
-    : null;
+  // Una serie nueva semanal enseña su resumen (#651). La que se edita desde
+  // una sesión (#655) enseña sus días y su final sin resumen: se cuenta desde
+  // la sesión elegida en el servidor, y contarla aquí desde hoy la daría por
+  // vacía y bloquearía Guardar.
+  const weeklyPreview =
+    layout === "series"
+      ? SERIES_EDIT_PREVIEW
+      : layout === "create" && form.repeat === "weekly"
+        ? previewWeeklySeries(translate, form, openedAt)
+        : null;
   const isSubmitBlocked =
     isSending ||
     cover.isUploading ||
