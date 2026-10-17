@@ -98,7 +98,7 @@ async function renderScreen(): Promise<void> {
       club={{ name: "Harbour Hammerheads", initials: "HH", logoUrl: null }}
     />,
   );
-  await screen.findByRole("button", { name: "Save settings" });
+  await screen.findByLabelText("Club name");
 }
 
 function pngFile(size = 64): File {

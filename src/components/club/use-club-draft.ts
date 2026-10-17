@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 
 /**
@@ -99,10 +99,11 @@ export function useClubDraft<Value>({
     setStatus(IDLE);
   }
 
-  function replaceSaved(value: Value): void {
+  // Estable: la sección la llama desde el efecto de su carga.
+  const replaceSaved = useCallback((value: Value): void => {
     setSaved(value);
     setDraft(value);
-  }
+  }, []);
 
   async function save(): Promise<void> {
     if (isSendingRef.current) {

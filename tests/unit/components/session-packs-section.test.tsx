@@ -9,7 +9,8 @@ import { createTranslator } from "@/lib/i18n/translator";
 /**
  * La sección "Packs de sesiones" de `/club` (#469, RF-4 del PRD de E13). El
  * Admin o el Committee ve los packs con su precio, añade, quita y ordena en
- * un borrador, y lo guarda entero con un botón.
+ * un borrador, y lo guarda entero con la barra de cambios sin guardar
+ * (#719).
  */
 
 /** No es el precio del club: el de este test, para que nada pase por
@@ -71,8 +72,17 @@ function stubApi(stub: Stub = {}): void {
   );
 }
 
+function renderPacks(locale: "en" | "es" = "en"): void {
+  render(
+    <ClubSessionPacksSection
+      translate={createTranslator(locale)}
+      onHasDraftChange={() => undefined}
+    />,
+  );
+}
+
 async function renderSection(locale: "en" | "es" = "en"): Promise<void> {
-  render(<ClubSessionPacksSection translate={createTranslator(locale)} />);
+  renderPacks(locale);
   await screen.findByRole("list", { name: /session packs|packs de sesiones/i });
 }
 
@@ -95,8 +105,13 @@ async function addPack(sessions: string): Promise<void> {
   await userEvent.click(screen.getByRole("button", { name: "Add pack" }));
 }
 
+/** Guardar cambios, en la barra que sale con un cambio (#719). */
+function saveButton(): HTMLElement {
+  return screen.getByRole("button", { name: "Save changes" });
+}
+
 async function save(): Promise<void> {
-  await userEvent.click(screen.getByRole("button", { name: "Save packs" }));
+  await userEvent.click(saveButton());
 }
 
 beforeEach(() => {
@@ -137,10 +152,10 @@ describe("la lista de packs", () => {
         jsonResponse(500, { error: { code: "internal_error", message: "x" } }),
     });
 
-    render(<ClubSessionPacksSection translate={createTranslator("en")} />);
+    renderPacks();
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save packs" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
   });
 });
 
@@ -224,9 +239,9 @@ describe("editar la lista", () => {
     );
 
     expect(listedPacks()).toEqual(["10 sessions", "5 sessions"]);
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "10 sessions is now number 1 of 2.",
-    );
+    expect(
+      screen.getByText("10 sessions is now number 1 of 2."),
+    ).toHaveAttribute("role", "status");
 
     await userEvent.click(
       screen.getByRole("button", { name: "Move the 10 sessions pack down" }),
@@ -248,23 +263,22 @@ describe("guardar", () => {
     await save();
 
     expect(savedLists).toEqual([[5, 20, 10]]);
-    expect(await screen.findByText("Packs saved.")).toBeInTheDocument();
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
     expect(listedPacks()).toEqual(["5 sessions", "20 sessions", "10 sessions"]);
   });
 
-  it("no manda una lista vacía y pide dejar al menos uno", async () => {
+  it("no deja guardar una lista vacía y pide dejar al menos uno", async () => {
     stubApi();
     await renderSection();
     await userEvent.click(
       screen.getByRole("button", { name: "Remove the 5 sessions pack" }),
     );
+
     await userEvent.click(
       screen.getByRole("button", { name: "Remove the 10 sessions pack" }),
     );
 
-    await save();
-
-    expect(savedLists).toEqual([]);
+    expect(saveButton()).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Keep at least one pack.",
     );
@@ -282,6 +296,7 @@ describe("guardar", () => {
         }),
     });
     await renderSection();
+    await addPack("7");
 
     await save();
 
@@ -319,10 +334,13 @@ describe("idiomas", () => {
       screen.getByRole("button", { name: "Subir el pack de 10 sesiones" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Guardar los packs" }),
-    ).toBeInTheDocument();
-    expect(
       screen.getByLabelText("Sesiones del pack nuevo"),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Quitar el pack de 5 sesiones" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Guardar cambios" }),
     ).toBeInTheDocument();
   });
 });

@@ -30,7 +30,8 @@ import { CLUB_SETTINGS_SECTION_ICONS } from "./club-settings-section-icons";
 /**
  * La configuración del club en el móvil sin sección abierta (#718, #3a del
  * handoff de E26): la fila del club y una tarjeta con las cuatro secciones,
- * cada una con un resumen de lo que tiene guardado. Tocar una la abre.
+ * cada una con un resumen de lo que tiene guardado. Tocar una la abre. Una
+ * con borrador dice "● Sin guardar" junto a su título (#719).
  */
 
 export type ClubIdentity = Pick<ClubBrand, "name" | "initials" | "logoUrl">;
@@ -138,11 +139,13 @@ function ClubRow({
 export function ClubSettingsList({
   translate,
   club,
+  draftSections,
   shouldFocusTitle,
   onOpen,
 }: {
   readonly translate: Translator;
   readonly club: ClubIdentity;
+  readonly draftSections: ReadonlySet<ClubSettingsSection>;
   /** Si se llega desde una sección: el botón pulsado ya no existe y el foco
    * pasa al título, en vez de perderse en la página. */
   readonly shouldFocusTitle: boolean;
@@ -190,6 +193,13 @@ export function ClubSettingsList({
               <span className="club-settings-list-text">
                 <span className="club-settings-list-title">
                   {translate(`clubSettings.sections.${section}`)}
+                  {draftSections.has(section) ? (
+                    <span className="club-settings-list-draft">
+                      {" "}
+                      <span className="club-draft-dot" aria-hidden="true" />
+                      {translate("clubSettings.draft.marker")}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="club-settings-list-summary">
                   {summarizeSection(translate, section, data)}

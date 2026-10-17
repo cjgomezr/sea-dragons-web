@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import {
   findSignInTextsIssues,
+  isSameSignInTexts,
   NO_SIGN_IN_TEXTS,
   SIGN_IN_TEXT_FIELDS,
   type SignInTextField,
@@ -20,23 +21,28 @@ import {
   readSignInTextIssueField,
   saveSignInTexts,
 } from "./club-sign-in-texts-client";
+import { SavedNotice, UnsavedChangesBar } from "./ClubUnsavedChangesBar";
+import {
+  type ClubDraft,
+  type ClubDraftStatus,
+  type DraftSaveOutcome,
+  useClubDraft,
+} from "./use-club-draft";
 
 /**
  * El lema y el párrafo de la pantalla de entrar, en cada idioma (#301, RF-5
  * del PRD de E18a). Cada campo vacío enseña de muestra el texto de la
  * aplicación que saldrá en su lugar, y vaciarlo es volver a él.
  *
- * Viaja con su propio botón, no con el del formulario de la identidad: es
- * otro recurso de la API, y un fallo aquí no debe perder el nombre escrito
- * arriba.
+ * Se guarda con la barra de cambios sin guardar de la sección (#719), no
+ * con la de General: es otro recurso de la API, y un fallo aquí no debe
+ * perder el nombre escrito allí.
  */
 
-type Status =
+type LoadState =
   | { readonly kind: "loading" }
-  | { readonly kind: "editing" }
-  | { readonly kind: "sending" }
-  | { readonly kind: "saved" }
-  | ({ readonly phase: "load" | "save" } & ApiRequestFailure);
+  | { readonly kind: "loaded" }
+  | ApiRequestFailure;
 
 type Draft = {
   readonly [L in Locale]: { readonly [K in SignInTextKind]: string };
@@ -69,6 +75,17 @@ function toTexts(draft: Draft): SignInTexts {
 
 function isSameField(a: SignInTextField, b: SignInTextField): boolean {
   return a.locale === b.locale && a.kind === b.kind;
+}
+
+function isSameDraft(draft: Draft, saved: Draft): boolean {
+  return isSameSignInTexts(toTexts(draft), toTexts(saved));
+}
+
+async function sendTexts(draft: Draft): Promise<DraftSaveOutcome<Draft>> {
+  const result = await saveSignInTexts(toTexts(draft));
+  return result.kind === "failed"
+    ? result
+    : { kind: "saved", value: toDraft(result.texts) };
 }
 
 function SignInTextInput({
@@ -125,20 +142,13 @@ function SignInTextInput({
   );
 }
 
-function SaveOutcome({
+function SaveFailure({
   translate,
   status,
 }: {
   translate: Translator;
-  status: Status;
+  status: ClubDraftStatus;
 }): React.JSX.Element | null {
-  if (status.kind === "saved") {
-    return (
-      <p className="auth-note" role="status">
-        {translate("clubSettings.signInTexts.saved")}
-      </p>
-    );
-  }
   // Un 400 de un campo ya se enseña junto a ese campo.
   if (status.kind !== "failed" || readSignInTextIssueField(status) !== null) {
     return null;
@@ -150,20 +160,10 @@ function SaveOutcome({
   );
 }
 
-type SignInTextsEditor = {
-  readonly draft: Draft;
-  readonly status: Status;
-  readonly localIssues: readonly SignInTextField[];
-  readonly update: (field: SignInTextField, text: string) => void;
-  readonly submit: () => Promise<void>;
-};
-
-/** Lee lo guardado una vez, al montar. Los setters de React no cambian, así
- * que el efecto no se repite. */
-function useInitialLoad(
-  setDraft: (draft: Draft) => void,
-  setStatus: (status: Status) => void,
-): void {
+/** Lee lo guardado una vez, al montar, y lo da por guardado en el
+ * borrador. `replaceSaved` no cambia, así que el efecto no se repite. */
+function useInitialLoad(replaceSaved: (draft: Draft) => void): LoadState {
+  const [load, setLoad] = useState<LoadState>({ kind: "loading" });
   useEffect(() => {
     let isCurrent = true;
     void loadSignInTexts().then((outcome) => {
@@ -171,85 +171,45 @@ function useInitialLoad(
         return;
       }
       if (outcome.kind === "failed") {
-        setStatus({ ...outcome, phase: "load" });
+        setLoad(outcome);
         return;
       }
-      setDraft(toDraft(outcome.texts));
-      setStatus({ kind: "editing" });
+      replaceSaved(toDraft(outcome.texts));
+      setLoad({ kind: "loaded" });
     });
     return () => {
       isCurrent = false;
     };
-  }, [setDraft, setStatus]);
-}
-
-function useSignInTextsEditor(): SignInTextsEditor {
-  const [draft, setDraft] = useState<Draft>(() => toDraft(NO_SIGN_IN_TEXTS));
-  const [status, setStatus] = useState<Status>({ kind: "loading" });
-  const [localIssues, setLocalIssues] = useState<readonly SignInTextField[]>(
-    [],
-  );
-  // Un doble clic llega antes de que el estado desactive el botón.
-  const isSendingRef = useRef(false);
-  useInitialLoad(setDraft, setStatus);
-
-  function update(field: SignInTextField, text: string): void {
-    setDraft((current) => ({
-      ...current,
-      [field.locale]: { ...current[field.locale], [field.kind]: text },
-    }));
-    setLocalIssues([]);
-    setStatus((current) =>
-      current.kind === "sending" ? current : { kind: "editing" },
-    );
-  }
-
-  async function submit(): Promise<void> {
-    if (isSendingRef.current) {
-      return;
-    }
-    const texts = toTexts(draft);
-    const issues = findSignInTextsIssues(texts);
-    if (issues.length > 0) {
-      setLocalIssues(issues);
-      return;
-    }
-    isSendingRef.current = true;
-    setStatus({ kind: "sending" });
-    const result = await saveSignInTexts(texts);
-    isSendingRef.current = false;
-    if (result.kind === "failed") {
-      setStatus({ ...result, phase: "save" });
-      return;
-    }
-    setDraft(toDraft(result.texts));
-    setStatus({ kind: "saved" });
-  }
-
-  return { draft, status, localIssues, update, submit };
+  }, [replaceSaved]);
+  return load;
 }
 
 function SignInTextsForm({
   translate,
-  editor: { draft, status, localIssues, update, submit },
+  texts,
 }: {
   translate: Translator;
-  editor: SignInTextsEditor;
+  texts: ClubDraft<Draft>;
 }): React.JSX.Element {
+  const { draft, status } = texts;
+  // El borrador se valida mientras se escribe (#719).
+  const localIssues = findSignInTextsIssues(toTexts(draft));
   const serverIssue =
     status.kind === "failed" ? readSignInTextIssueField(status) : null;
   const isInvalid = (field: SignInTextField): boolean =>
     localIssues.some((issue) => isSameField(issue, field)) ||
     (serverIssue !== null && isSameField(serverIssue, field));
   const isSending = status.kind === "sending";
+  const update = (field: SignInTextField, text: string): void =>
+    texts.change((current) => ({
+      ...current,
+      [field.locale]: { ...current[field.locale], [field.kind]: text },
+    }));
 
   return (
     <form
       className="auth-pending club-settings-form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void submit();
-      }}
+      onSubmit={(event) => event.preventDefault()}
       noValidate
     >
       {/* Mientras se guarda no se edita: lo que se escribiera ahora lo
@@ -266,26 +226,39 @@ function SignInTextsForm({
           />
         ))}
       </fieldset>
-      <SaveOutcome translate={translate} status={status} />
-      <button type="submit" className="auth-submit" disabled={isSending}>
-        {translate(
-          isSending
-            ? "clubSettings.signInTexts.saving"
-            : "clubSettings.signInTexts.save",
-        )}
-      </button>
+      <SaveFailure translate={translate} status={status} />
+      {texts.hasDraft ? (
+        <UnsavedChangesBar
+          translate={translate}
+          section="sign-in"
+          canSave={localIssues.length === 0}
+          isSaving={isSending}
+          onDiscard={texts.discard}
+          onSave={() => void texts.save()}
+        />
+      ) : null}
+      <SavedNotice
+        translate={translate}
+        isShowing={texts.isSavedNoticeShowing}
+      />
     </form>
   );
 }
 
 export function ClubSignInTextsSection({
   translate,
+  onHasDraftChange,
 }: {
   translate: Translator;
+  onHasDraftChange: (hasDraft: boolean) => void;
 }): React.JSX.Element {
-  const editor = useSignInTextsEditor();
-  const { status } = editor;
-  const hasLoadFailed = status.kind === "failed" && status.phase === "load";
+  const texts = useClubDraft<Draft>({
+    initial: toDraft(NO_SIGN_IN_TEXTS),
+    isSame: isSameDraft,
+    send: sendTexts,
+    onHasDraftChange,
+  });
+  const load = useInitialLoad(texts.replaceSaved);
 
   return (
     <section className="auth-fields" aria-labelledby="club-textos-entrada">
@@ -293,19 +266,19 @@ export function ClubSignInTextsSection({
         {translate("clubSettings.signInTexts.title")}
       </h2>
       <p className="app-lead">{translate("clubSettings.signInTexts.lead")}</p>
-      {status.kind === "loading" ? (
+      {load.kind === "loading" ? (
         <p className="admin-empty">
           {translate("clubSettings.signInTexts.loading")}
         </p>
       ) : null}
-      {hasLoadFailed ? (
+      {load.kind === "failed" ? (
         <p className="auth-error" role="alert">
-          {describeClubSettingsFailure(translate, status)}
+          {describeClubSettingsFailure(translate, load)}
         </p>
       ) : null}
-      {status.kind === "loading" || hasLoadFailed ? null : (
-        <SignInTextsForm translate={translate} editor={editor} />
-      )}
+      {load.kind === "loaded" ? (
+        <SignInTextsForm translate={translate} texts={texts} />
+      ) : null}
     </section>
   );
 }
