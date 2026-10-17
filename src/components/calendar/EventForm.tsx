@@ -17,6 +17,7 @@ import {
   type EventFormIssue,
   type EventFormLayout,
   endScopeOf,
+  hasEventFormChanged,
   issueFromApi,
   listMissingFields,
 } from "./event-form";
@@ -26,6 +27,7 @@ import {
 } from "./event-manage-client";
 import { type EventEndCheck, evaluateEventEnd } from "./event-end";
 import { EventCoverField, describeCoverIssue } from "./EventCoverField";
+import { EventFormBar } from "./EventFormBar";
 import {
   type FieldProps,
   InputField,
@@ -49,6 +51,9 @@ import { type WeeklyPreview, previewWeeklySeries } from "./weekly-preview";
  * lleva y qué hacer al guardar. Al editar no hay repetición. Una serie se
  * edita desde una de sus sesiones (#655): no enseña la fecha, que es la de
  * esa sesión, pero sí sus días y "Hasta".
+ *
+ * En el móvil (#657) los botones del pie suben a la barra de arriba, y el
+ * aviso de un fallo al guardar va debajo de ella, junto al botón.
  */
 
 /** Lo que devuelve guardar: terminado (el diálogo se cierra) o un fallo que
@@ -165,6 +170,50 @@ const SUBMIT_LABELS = {
   series: "calendar.edit.submit",
 } as const satisfies Record<EventFormLayout, string>;
 
+/** En la barra del móvil no cabe "Crear evento": dice "Crear". */
+const BAR_SUBMIT_LABELS = {
+  create: "calendar.form.barSubmit",
+  event: "calendar.edit.barSubmit",
+  series: "calendar.edit.barSubmit",
+} as const satisfies Record<EventFormLayout, string>;
+
+/** El título de la barra del móvil, que nombra también el diálogo. */
+export type EventFormPhoneHeading = {
+  readonly id: string;
+  readonly text: string;
+};
+
+/** Cancelar y guardar al pie, en el escritorio. */
+function FormActions({
+  translate,
+  submitLabel,
+  isSending,
+  isSubmitBlocked,
+  onCancel,
+}: {
+  readonly translate: Translator;
+  readonly submitLabel: string;
+  readonly isSending: boolean;
+  readonly isSubmitBlocked: boolean;
+  readonly onCancel: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="event-form-actions">
+      <button
+        type="button"
+        className="admin-secondary"
+        onClick={onCancel}
+        disabled={isSending}
+      >
+        {translate("calendar.form.cancel")}
+      </button>
+      <button type="submit" className="auth-submit" disabled={isSubmitBlocked}>
+        {submitLabel}
+      </button>
+    </div>
+  );
+}
+
 /** El motivo de la API junto a su campo, o el fallo entero si no tiene
  * campo. */
 function readFailure(failure: ApiRequestFailure): {
@@ -187,6 +236,8 @@ export function EventForm({
   onCancel,
   onReload,
   onSendingChange,
+  onDirtyChange,
+  phoneHeading,
 }: {
   readonly translate: Translator;
   readonly clubGroups: readonly Group[];
@@ -200,6 +251,10 @@ export function EventForm({
   readonly onReload: () => void;
   /** Mientras se guarda, el diálogo no se deja cerrar. */
   readonly onSendingChange: (isSending: boolean) => void;
+  /** Si hay algo sin guardar: en el móvil, cerrar lo pregunta antes. */
+  readonly onDirtyChange: (isDirty: boolean) => void;
+  /** En el móvil lleva la barra con este título; en el escritorio, `null`. */
+  readonly phoneHeading: EventFormPhoneHeading | null;
 }): React.JSX.Element {
   const [form, setForm] = useState<EventFormValues>(initialForm);
   const [status, setStatus] = useState<Status>({ kind: "editing" });
@@ -216,6 +271,14 @@ export function EventForm({
   useEffect(() => {
     titleRef.current?.focus();
   }, []);
+
+  const isDirty =
+    hasEventFormChanged(initialForm, form) ||
+    cover.isUploading ||
+    cover.change.kind !== "keep";
+  useEffect(() => {
+    onDirtyChange(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   function update(change: Partial<EventFormValues>): void {
     setForm((current) => ({ ...current, ...change }));
@@ -304,6 +367,14 @@ export function EventForm({
     endCheck.kind === "invalid" ||
     isEndNowRequired ||
     isWeeklyBlocked(weeklyPreview);
+  const submitFailure = (
+    <SubmitFailure
+      translate={translate}
+      layout={layout}
+      status={status}
+      onReload={onReload}
+    />
+  );
   const fieldProps: FieldProps = {
     translate,
     form,
@@ -313,6 +384,23 @@ export function EventForm({
 
   return (
     <form className="event-form" onSubmit={handleSubmit} noValidate>
+      {phoneHeading === null ? null : (
+        <>
+          <EventFormBar
+            translate={translate}
+            heading={phoneHeading}
+            submit={{
+              label: translate(
+                isSending ? "calendar.form.sending" : BAR_SUBMIT_LABELS[layout],
+              ),
+              isDisabled: isSubmitBlocked,
+            }}
+            isCancelDisabled={isSending}
+            onCancel={onCancel}
+          />
+          {submitFailure}
+        </>
+      )}
       {layout === "series" ? (
         <p className="event-form-warning">
           {translate("calendar.edit.seriesWarning")}
@@ -364,31 +452,20 @@ export function EventForm({
           onChange={(audience) => update({ audience })}
         />
       </fieldset>
-      <SubmitFailure
-        translate={translate}
-        layout={layout}
-        status={status}
-        onReload={onReload}
-      />
-      <div className="event-form-actions">
-        <button
-          type="button"
-          className="admin-secondary"
-          onClick={onCancel}
-          disabled={isSending}
-        >
-          {translate("calendar.form.cancel")}
-        </button>
-        <button
-          type="submit"
-          className="auth-submit"
-          disabled={isSubmitBlocked}
-        >
-          {translate(
-            isSending ? "calendar.form.sending" : SUBMIT_LABELS[layout],
-          )}
-        </button>
-      </div>
+      {phoneHeading === null ? (
+        <>
+          {submitFailure}
+          <FormActions
+            translate={translate}
+            submitLabel={translate(
+              isSending ? "calendar.form.sending" : SUBMIT_LABELS[layout],
+            )}
+            isSending={isSending}
+            isSubmitBlocked={isSubmitBlocked}
+            onCancel={onCancel}
+          />
+        </>
+      ) : null}
     </form>
   );
 }

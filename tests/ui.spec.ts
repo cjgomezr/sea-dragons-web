@@ -17747,7 +17747,8 @@ const EVENT_PLACES_ENDPOINT = "/api/v1/events/manage/places";
 const EVENT_DIALOG_NAME = /^(New event|Nuevo evento)$/;
 // En el móvil el botón es sólo el + (#656), con su nombre entero.
 const EVENT_DIALOG_OPEN = /^(Event|Evento|New event|Nuevo evento)$/;
-const EVENT_DIALOG_SUBMIT = /^(Create event|Crear evento)$/;
+// En el móvil (#657) el botón de la barra dice sólo Crear.
+const EVENT_DIALOG_SUBMIT = /^(Create event|Crear evento|Create|Crear)$/;
 const EVENT_DIALOG_TAB_PRESSES = 30;
 
 const STUBBED_EVENT_GROUPS = [
@@ -18166,6 +18167,341 @@ for (const state of REDESIGNED_DIALOG_STATES) {
     }
   });
 }
+
+/* #657: crear y editar en el móvil ocupa la pantalla, con la barra de
+   Cancelar, el título y Crear arriba ("#2c" del handoff de E24 y
+   docs/mockups/mobile-calendar-redesign-create-dark.png). Sólo a 375: desde
+   768 manda el diálogo, que se fotografía arriba. */
+/** Rellenar baja el cuerpo; la captura, como el mockup, lo mira desde
+ * arriba y sin foco en ningún campo. */
+async function backToEventFormTop(page: Page): Promise<void> {
+  const body = eventDialog(page).locator(".event-dialog-body");
+  await body.evaluate((element) => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    element.scrollTo(0, 0);
+  });
+  await expect
+    .poll(() => body.evaluate((element) => element.scrollTop))
+    .toBe(0);
+}
+
+const MOBILE_EVENT_FORM_STATES: readonly CalendarState[] = [
+  {
+    name: "calendario-movil-crear",
+    events: [],
+    ready: async (page) => {
+      await showCreateDialog(page);
+      await backToEventFormTop(page);
+    },
+  },
+  {
+    name: "calendario-movil-crear-semanal",
+    events: [],
+    // Lo de arriba ya sale en calendario-movil-crear: ésta mira los días,
+    // Hasta y el resumen con las próximas fechas.
+    ready: async (page) => {
+      await showCreateWeeklyDialog(page);
+      await backToEventFormTop(page);
+      await eventDialog(page)
+        .locator(".event-form-weekly")
+        .evaluate((panel) => panel.scrollIntoView({ block: "center" }));
+    },
+  },
+];
+
+for (const state of MOBILE_EVENT_FORM_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE, viewport: MOBILE_VIEWPORT });
+
+    for (const theme of themes) {
+      test(`matches approved baseline (${theme})`, async ({ page }) => {
+        await goToCalendar(page, state, theme);
+        const snapshot = `${state.name}-mobile-${theme}.png`;
+        await createMissingLocalBaseline(snapshot, () =>
+          page.screenshot(SCREENSHOT_OPTIONS),
+        );
+        await expect(page).toHaveScreenshot(snapshot, {
+          ...SCREENSHOT_OPTIONS,
+          maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        });
+      });
+
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await goToCalendar(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
+
+    for (const width of MOBILE_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ ...MOBILE_VIEWPORT, width });
+        await goToCalendar(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+        expect(
+          await eventDialog(page)
+            .locator(".event-dialog-body")
+            .evaluate((body) => body.scrollWidth <= body.clientWidth),
+        ).toBe(true);
+      });
+    }
+  });
+}
+
+const EVENT_FORM_BAR_SUBMIT_PX = 36;
+const EVENT_FORM_COVER_PX = 120;
+const EVENT_FORM_COVER_WITH_IMAGE_PX = 160;
+const EVENT_FORM_TYPE_PX = 46;
+const EVENT_FORM_TIME_PX = 48;
+const EVENT_FORM_CHIP_PX = 40;
+const EVENT_FORM_REPEAT_PX = 40;
+const EVENT_FORM_DAY_PX = 44;
+const EVENT_FORM_SWITCH = { width: 44, height: 26 } as const;
+const EVENT_FORM_PLACE_OPTION_MIN_PX = 56;
+const EVENT_FORM_IOS_NO_ZOOM_FONT = "16px";
+
+function eventFormBar(page: Page): Locator {
+  return eventDialog(page).getByRole("group", { name: EVENT_DIALOG_NAME });
+}
+
+async function heightOf(control: Locator): Promise<number | undefined> {
+  return (await control.boundingBox())?.height;
+}
+
+test.describe("el formulario de evento en el móvil: barra y medidas (#657)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE, viewport: MOBILE_VIEWPORT });
+
+  const [CREATE, CREATE_WEEKLY] = MOBILE_EVENT_FORM_STATES as [
+    CalendarState,
+    CalendarState,
+  ];
+
+  test("ocupa la pantalla y la barra se queda arriba al desplazar", async ({
+    page,
+  }) => {
+    await goToCalendar(page, CREATE);
+    const dialog = eventDialog(page);
+
+    expect(await dialog.boundingBox()).toEqual({
+      x: 0,
+      y: 0,
+      width: MOBILE_VIEWPORT.width,
+      height: MOBILE_VIEWPORT.height,
+    });
+    await dialog
+      .locator(".event-dialog-body")
+      .evaluate(
+        (body, distance) => body.scrollTo(0, distance),
+        SCROLL_BEFORE_BAR_CHECK_PX,
+      );
+    const bar = eventFormBar(page);
+    expect((await bar.boundingBox())?.y).toBe(0);
+    await expect(bar.getByRole("button", { name: "Cancel" })).toBeInViewport();
+    await expect(bar.getByRole("button", { name: "Create" })).toBeInViewport();
+    await expect(
+      dialog.getByRole("button", { name: EVENT_DIALOG_SUBMIT }),
+    ).toHaveCount(1);
+  });
+
+  test("Crear se dibuja de 36 px con 44 de zona táctil", async ({ page }) => {
+    await goToCalendar(page, CREATE);
+    const submit = eventFormBar(page).getByRole("button", { name: "Create" });
+
+    expect(await heightOf(submit)).toBe(EVENT_FORM_BAR_SUBMIT_PX);
+    expect(await touchAreaHeight(submit)).toBe(MIN_TOUCH_TARGET_PX);
+  });
+
+  test("la imagen mide 120 y los tipos van en rejilla 2×2 de 46", async ({
+    page,
+  }) => {
+    await goToCalendar(page, CREATE);
+    const dialog = eventDialog(page);
+    const types = await dialog
+      .locator(".event-form-type")
+      .evaluateAll((labels) =>
+        labels.map((label) => label.getBoundingClientRect()),
+      );
+
+    expect(await heightOf(dialog.locator(".event-cover-banner"))).toBe(
+      EVENT_FORM_COVER_PX,
+    );
+    expect(types.map((box) => box.height)).toEqual(
+      Array(4).fill(EVENT_FORM_TYPE_PX),
+    );
+    expect(new Set(types.map((box) => box.top)).size).toBe(2);
+  });
+
+  test("con imagen elegida la imagen mide 160", async ({ page }) => {
+    await goToCalendar(page, { ...CREATE, ready: showCreateDialogWithImage });
+
+    expect(
+      await heightOf(
+        eventDialog(page).getByRole("img", { name: EVENT_COVER_PREVIEW_NAME }),
+      ),
+    ).toBe(EVENT_FORM_COVER_WITH_IMAGE_PX);
+  });
+
+  test("Empieza y Termina van lado a lado, de 48, y la fecha a lo ancho", async ({
+    page,
+  }) => {
+    await goToCalendar(page, CREATE);
+    const dialog = eventDialog(page);
+    const date = await dialog.getByLabel("Date", { exact: true }).boundingBox();
+    const starts = await dialog
+      .getByLabel("Starts", { exact: true })
+      .boundingBox();
+    const ends = await dialog.getByLabel("Ends", { exact: true }).boundingBox();
+
+    expect(starts?.height).toBe(EVENT_FORM_TIME_PX);
+    expect(ends?.height).toBe(EVENT_FORM_TIME_PX);
+    expect(starts?.y).toBe(ends?.y);
+    expect(date?.width).toBeGreaterThan((starts?.width ?? 0) * 2);
+  });
+
+  test("las duraciones rápidas miden 40 en una sola fila", async ({ page }) => {
+    await goToCalendar(page, CREATE);
+    const chips = await eventDialog(page)
+      .locator(".event-form-chip")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getBoundingClientRect()),
+      );
+
+    expect(chips.map((box) => box.height)).toEqual(
+      Array(chips.length).fill(EVENT_FORM_CHIP_PX),
+    );
+    expect(new Set(chips.map((box) => box.top)).size).toBe(1);
+  });
+
+  test("Termina otro día es un interruptor de 44×26", async ({ page }) => {
+    await goToCalendar(page, CREATE);
+    const toggle = eventDialog(page).getByRole("switch", {
+      name: "Ends on another day",
+    });
+
+    const box = await toggle.boundingBox();
+    expect({ width: box?.width, height: box?.height }).toEqual(
+      EVENT_FORM_SWITCH,
+    );
+  });
+
+  test("Repetir mide 40 y los días, de 44, llenan la fila", async ({
+    page,
+  }) => {
+    await goToCalendar(page, CREATE_WEEKLY);
+    const dialog = eventDialog(page);
+    const row = await dialog.locator(".event-form-days").boundingBox();
+    const days = await dialog
+      .locator(".event-form-day")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getBoundingClientRect()),
+      );
+    const first = days[0];
+    const last = days[days.length - 1];
+
+    expect(
+      await heightOf(dialog.locator(".event-form-segment label").first()),
+    ).toBe(EVENT_FORM_REPEAT_PX);
+    expect(days.map((box) => [box.width, box.height])).toEqual(
+      Array(7).fill([EVENT_FORM_DAY_PX, EVENT_FORM_DAY_PX]),
+    );
+    expect(first?.left).toBe(row?.x);
+    expect(last?.right).toBe((row?.x ?? 0) + (row?.width ?? 0));
+  });
+
+  test("los resultados del buscador miden al menos 56 y la × de la tarjeta 44", async ({
+    page,
+  }) => {
+    await goToCalendar(page, {
+      ...CREATE,
+      ready: async (place) => {
+        await searchPlaces(place);
+      },
+    });
+    const dialog = eventDialog(page);
+    const heights = await dialog
+      .getByRole("option")
+      .evaluateAll((options) =>
+        options.map((option) => option.getBoundingClientRect().height),
+      );
+
+    for (const height of heights) {
+      expect(height).toBeGreaterThanOrEqual(EVENT_FORM_PLACE_OPTION_MIN_PX);
+    }
+    await dialog.getByRole("option", { name: /Princes Park, Oval 2/ }).click();
+    const remove = dialog.getByRole("button", { name: "Change the place" });
+    expect(await remove.boundingBox()).toMatchObject({
+      width: MIN_TOUCH_TARGET_PX,
+      height: MIN_TOUCH_TARGET_PX,
+    });
+  });
+
+  test("todo campo de texto lleva letra de 16 para que iOS no haga zoom", async ({
+    page,
+  }) => {
+    await goToCalendar(page, CREATE);
+    const sizes = await eventDialog(page)
+      .locator(
+        'input:not([type="checkbox"], [type="radio"], [type="file"]), textarea, select',
+      )
+      .evaluateAll((fields) =>
+        fields.map((field) => getComputedStyle(field).fontSize),
+      );
+
+    expect(sizes.length).toBeGreaterThan(0);
+    expect(new Set(sizes)).toEqual(new Set([EVENT_FORM_IOS_NO_ZOOM_FONT]));
+  });
+
+  test("con el fin antes del inicio Crear de la barra se apaga y Termina lo dice", async ({
+    page,
+  }) => {
+    await goToCalendar(page, {
+      ...CREATE,
+      ready: showCreateDialogWithInvalidEnd,
+    });
+    const dialog = eventDialog(page);
+
+    await expect(
+      eventFormBar(page).getByRole("button", { name: "Create" }),
+    ).toBeDisabled();
+    await expect(
+      dialog.getByText("The end must be after the start."),
+    ).toBeVisible();
+  });
+
+  test("Cancelar con cambios pregunta y se queda si se dice que no", async ({
+    page,
+  }) => {
+    await goToCalendar(page, CREATE);
+    const question = page.waitForEvent("dialog");
+    void question.then((prompt) => prompt.dismiss());
+
+    await eventFormBar(page).getByRole("button", { name: "Cancel" }).click();
+
+    expect((await question).message()).toBe(
+      "You have unsaved changes. Leave and discard them?",
+    );
+    await expect(eventDialog(page)).toBeVisible();
+  });
+
+  test("a 768 vuelve el diálogo con su pie", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await goToCalendar(page, CREATE);
+    const dialog = eventDialog(page);
+
+    await expect(
+      dialog.getByRole("button", { name: /^Create event$/ }),
+    ).toBeVisible();
+    await expect(eventFormBar(page)).toHaveCount(0);
+    expect((await dialog.boundingBox())?.width).toBeLessThan(768);
+  });
+});
 
 test.describe("diálogo de evento en el navegador", () => {
   skipWithoutSession();

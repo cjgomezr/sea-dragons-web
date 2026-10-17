@@ -1419,6 +1419,7 @@ export const englishMessages = {
   "calendar.edit.titleEvent": "Edit event",
   "calendar.edit.titleSeries": "Edit series",
   "calendar.edit.submit": "Save changes",
+  "calendar.edit.barSubmit": "Save",
   "calendar.edit.seriesWarning":
     "These changes apply to this session and every one after it, also to the ones that were edited on their own.",
   "calendar.manage.edit": "Edit",
@@ -1541,6 +1542,9 @@ export const englishMessages = {
   "calendar.form.audience": "Who's invited",
   "calendar.form.cancel": "Cancel",
   "calendar.form.submit": "Create event",
+  "calendar.form.barSubmit": "Create",
+  "calendar.form.discardQuestion":
+    "You have unsaved changes. Leave and discard them?",
   "calendar.form.sending": "Saving…",
   "calendar.form.issue.required": "Fill in this field.",
   "calendar.form.issue.event_title_invalid":

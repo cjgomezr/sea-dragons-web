@@ -12984,6 +12984,209 @@ a.auth-brand-header:focus-visible {
   border-radius: var(--radius);
 }
 
+/* El formulario de evento en el móvil (#657, "#2c" del handoff de E24 y
+   docs/mockups/mobile-calendar-redesign-create-dark.png). El diálogo ocupa
+   la pantalla y la barra de Cancelar y Crear se pega arriba del cuerpo que se
+   desplaza. Las piezas son las del escritorio, con las medidas del móvil. */
+.event-dialog-phone,
+.event-dialog-phone .event-dialog-panel {
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
+/* `clip` y no `hidden`: llevar un campo a la vista (el foco, un
+   `scrollIntoView`) no puede desplazar el diálogo y esconder la barra; lo que
+   se desplaza es el cuerpo. */
+.event-dialog-phone {
+  margin: 0;
+  overflow: clip;
+  background: var(--color-background);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.event-dialog-phone .event-dialog-body {
+  padding: 0 var(--space-4)
+    calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+}
+
+.event-form-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  /* Como en la de noticias (#602): Cancelar y el botón nunca se encogen, y
+     lo que se corta con puntos es el título. */
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(
+      max-content,
+      1fr
+    );
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0 calc(-1 * var(--space-4));
+  padding: max(var(--space-1), env(safe-area-inset-top, 0px)) var(--space-4)
+    var(--space-1);
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.event-form-bar-cancel {
+  justify-self: start;
+  min-height: var(--touch-target-min);
+  padding: 0;
+  font: inherit;
+  font-size: 15px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.event-form-bar-cancel:hover:not(:disabled) {
+  color: var(--color-text);
+}
+
+.event-form-bar-cancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.event-form-bar-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 36 px dibujado; la zona táctil llega a los 44. */
+.event-form-bar-submit {
+  position: relative;
+  justify-self: end;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.event-form-bar-submit::after {
+  position: absolute;
+  inset: calc((36px - var(--touch-target-min)) / 2) 0;
+  content: "";
+}
+
+.event-form-bar-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* La imagen: sin texto a la vista, sólo el botón abajo a la izquierda. El
+   texto sigue para el lector de pantalla (las declaraciones de
+   `.visually-hidden`, que no se aplica sólo en un ancho). Igual la etiqueta
+   de las duraciones rápidas, que nombra su grupo. */
+.event-dialog-phone .event-cover-banner-text,
+.event-dialog-phone .event-form-quick > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.event-dialog-phone .event-cover-banner-content {
+  padding: var(--space-3);
+}
+
+.event-dialog-phone .event-form-types {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.event-dialog-phone .event-form-type {
+  min-height: 46px;
+}
+
+.event-dialog-phone
+  .auth-field
+  input:not([type="checkbox"], [type="radio"], [type="file"]) {
+  min-height: 48px;
+}
+
+/* La fecha a lo ancho, y Empieza y Termina lado a lado debajo. */
+.event-dialog-phone .event-form-when-row,
+.event-dialog-phone .event-form-when-row:has(> :nth-child(3)) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.event-dialog-phone .event-form-when-row:has(> :nth-child(3)) > :first-child {
+  grid-column: 1 / -1;
+}
+
+/* Las duraciones rápidas en una fila que se desplaza de lado hasta el borde
+   de la pantalla. */
+.event-dialog-phone .event-form-quick {
+  flex-wrap: nowrap;
+  margin: 0 calc(-1 * var(--space-4));
+  padding: 0 var(--space-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.event-dialog-phone .event-form-chip {
+  flex: none;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+}
+
+.event-dialog-phone .event-form-switch input {
+  width: 44px;
+  height: 26px;
+}
+
+.event-dialog-phone .event-form-switch input::before {
+  width: 20px;
+  height: 20px;
+}
+
+.event-dialog-phone .event-form-switch input:checked::before {
+  transform: translateX(18px);
+}
+
+.event-dialog-phone .event-form-segment label {
+  min-height: 40px;
+}
+
+/* Los siete días de 44 repartidos en la fila: a 375 px sólo caben con el
+   panel más estrecho de lado y sin hueco fijo entre ellos. Por debajo
+   encogen sin dejar de ser círculos. */
+.event-dialog-phone .event-form-weekly {
+  padding: var(--space-3) var(--space-2);
+}
+
+.event-dialog-phone .event-form-days {
+  flex-wrap: nowrap;
+  gap: 0;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.event-dialog-phone .event-form-day {
+  flex: 0 1 44px;
+  width: auto;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.event-dialog-phone .event-place-option {
+  min-height: 56px;
+}
+
 /* La pantalla de Asistencia (#395). Sigue docs/mockups/attendance-light.png:
    la cabecera con el título y el botón de guardar, las fichas de las sesiones,
    tres contadores y la lista en un solo panel. Sin mockup móvil: los tres

@@ -110,6 +110,8 @@ function renderForm(
       onCancel={() => undefined}
       onReload={() => undefined}
       onSendingChange={() => undefined}
+      onDirtyChange={() => undefined}
+      phoneHeading={null}
     />,
   );
 }
