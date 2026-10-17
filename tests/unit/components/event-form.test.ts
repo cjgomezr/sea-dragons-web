@@ -4,6 +4,7 @@ import {
   endScopeOf,
   type EventForm,
   formFromEvent,
+  hasEventFormChanged,
   isFieldIssueCode,
   issueFromApi,
   listEventChanges,
@@ -385,5 +386,64 @@ describe("el lugar elegido (#652)", () => {
     if (isFieldIssueCode(code)) {
       expect(issueFromApi(code).field).toBe(field);
     }
+  });
+});
+
+describe("hasEventFormChanged (#657)", () => {
+  it("no ve cambios en un formulario igual al de partida", () => {
+    const copy: EventForm = {
+      ...SAVED,
+      weekdays: new Set(SAVED.weekdays),
+      audience: { kind: "groups", groupIds: new Set([MASTERS_ID, SENIOR_ID]) },
+    };
+
+    expect(hasEventFormChanged(SAVED, copy)).toBe(false);
+  });
+
+  it("ve el cambio de un texto", () => {
+    expect(hasEventFormChanged(SAVED, { ...SAVED, title: "Gym" })).toBe(true);
+  });
+
+  it("ve el cambio de tipo y de repetición", () => {
+    expect(hasEventFormChanged(SAVED, { ...SAVED, eventType: "social" })).toBe(
+      true,
+    );
+    expect(hasEventFormChanged(SAVED, { ...SAVED, repeat: "weekly" })).toBe(
+      true,
+    );
+  });
+
+  it("ve un día de la semana marcado", () => {
+    expect(
+      hasEventFormChanged(SAVED, { ...SAVED, weekdays: new Set([2] as const) }),
+    ).toBe(true);
+  });
+
+  it("ve otro grupo en la audiencia", () => {
+    const initial: EventForm = {
+      ...SAVED,
+      audience: { kind: "groups", groupIds: new Set([SENIOR_ID]) },
+    };
+
+    expect(
+      hasEventFormChanged(initial, {
+        ...initial,
+        audience: { kind: "groups", groupIds: new Set([MASTERS_ID]) },
+      }),
+    ).toBe(true);
+  });
+
+  it("ve un lugar elegido del buscador", () => {
+    expect(
+      hasEventFormChanged(SAVED, {
+        ...SAVED,
+        place: {
+          name: "MSAC",
+          address: "Aughtie Dr, Albert Park VIC 3206",
+          lat: -37.84,
+          lng: 144.96,
+        },
+      }),
+    ).toBe(true);
   });
 });

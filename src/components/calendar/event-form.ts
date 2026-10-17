@@ -438,3 +438,34 @@ export function listEventChanges(
       : { endsOn: eventEndsOn(form) }),
   };
 }
+
+/** Los campos que se comparan tal cual para saber si algo cambió. */
+const PLAIN_FIELDS = [
+  "title",
+  "eventType",
+  "repeat",
+  "startsOn",
+  "endsOn",
+  "startTime",
+  "endTime",
+  "endsAnotherDay",
+  "endDate",
+  "location",
+  "placeDetail",
+  "notes",
+] as const satisfies readonly (keyof EventForm)[];
+
+/** Si lo escrito difiere de lo que había al abrir (#657): decide si Cancelar
+ * pregunta antes de tirarlo. Escribir y borrar lo escrito no cuenta. La
+ * imagen va aparte, en su propio estado. */
+export function hasEventFormChanged(
+  initial: EventForm,
+  form: EventForm,
+): boolean {
+  return (
+    PLAIN_FIELDS.some((field) => form[field] !== initial[field]) ||
+    !isSameWeekdays(form.weekdays, initial.weekdays) ||
+    !isSamePlace(form.place, initial.place) ||
+    !isSameAudience(form.audience, initial.audience)
+  );
+}

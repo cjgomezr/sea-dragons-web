@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { loadGroups } from "@/components/groups/groups-client";
+import { useIsPhone } from "@/components/use-is-phone";
 import type { Group } from "@/lib/groups/groups";
 import type { Translator } from "@/lib/i18n/translator";
 import type {
@@ -23,6 +24,11 @@ import { EventForm, type FormSubmission } from "./EventForm";
  *
  * Los grupos de la audiencia se leen del endpoint de E4, que alcanzan Admin y
  * Committee (`manageGroups`), así que son los vigentes del club.
+ *
+ * En el móvil (#657, "#2c" del handoff de E24) ocupa la pantalla: la cabecera
+ * y el pie se cambian por la barra del formulario, y cerrar con algo sin
+ * guardar (Cancelar o el botón atrás del teléfono) pregunta antes. Mientras
+ * cargan los grupos no hay formulario, y queda la cabecera con su ×.
  */
 
 type GroupsState =
@@ -108,7 +114,9 @@ export function EventDialog({
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const isSendingRef = useRef(false);
+  const isDirtyRef = useRef(false);
   const { groups, retry } = useClubGroups();
+  const isPhone = useIsPhone();
 
   useEffect(() => {
     dialogRef.current?.showModal();
@@ -116,9 +124,20 @@ export function EventDialog({
 
   // Todo cierre pasa por aquí, y el evento `close` del diálogo avisa.
   const close = useCallback(() => {
-    if (!isSendingRef.current) {
+    if (isSendingRef.current) {
+      return;
+    }
+    const isDiscardRefused =
+      isPhone &&
+      isDirtyRef.current &&
+      !window.confirm(translate("calendar.form.discardQuestion"));
+    if (!isDiscardRefused) {
       dialogRef.current?.close();
     }
+  }, [isPhone, translate]);
+
+  const trackDirty = useCallback((isDirty: boolean) => {
+    isDirtyRef.current = isDirty;
   }, []);
 
   function closeAndReload(): void {
@@ -136,10 +155,16 @@ export function EventDialog({
     return submission;
   }
 
+  const hasPhoneBar = isPhone && groups.kind === "ready";
+  const title = translate(DIALOG_TITLES[layout]);
   return (
     <dialog
       ref={dialogRef}
-      className="event-dialog event-dialog-form"
+      className={
+        isPhone
+          ? "event-dialog event-dialog-form event-dialog-phone"
+          : "event-dialog event-dialog-form"
+      }
       aria-labelledby={titleId}
       onClose={onClosed}
       // El `preventDefault` del keydown es la defensa real contra Escape
@@ -159,19 +184,21 @@ export function EventDialog({
       }}
     >
       <div className="event-dialog-panel">
-        <div className="event-dialog-header">
-          <h2 id={titleId} className="event-dialog-title">
-            {translate(DIALOG_TITLES[layout])}
-          </h2>
-          <button
-            type="button"
-            className="photo-viewer-close"
-            aria-label={translate("calendar.form.close")}
-            onClick={close}
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-        </div>
+        {hasPhoneBar ? null : (
+          <div className="event-dialog-header">
+            <h2 id={titleId} className="event-dialog-title">
+              {title}
+            </h2>
+            <button
+              type="button"
+              className="photo-viewer-close"
+              aria-label={translate("calendar.form.close")}
+              onClick={close}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+        )}
         {/* Se enfoca para poder desplazarlo con el teclado aunque, mientras
             guarda, todos sus controles estén desactivados. */}
         <div
@@ -199,6 +226,8 @@ export function EventDialog({
               onSendingChange={(isSending) => {
                 isSendingRef.current = isSending;
               }}
+              onDirtyChange={trackDirty}
+              phoneHeading={hasPhoneBar ? { id: titleId, text: title } : null}
             />
           ) : null}
         </div>
