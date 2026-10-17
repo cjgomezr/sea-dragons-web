@@ -12072,6 +12072,9 @@ async function waitForManagedPost(page: Page): Promise<void> {
 const WITHDRAW_BUTTON = /^(Withdraw|Retirar)$/;
 const WITHDRAW_QUESTION = /^(Withdraw this post\?|¿Retirar esta publicación\?)/;
 
+/** Cuántas veces se alarga la ventana antes de rendirse. */
+const MAX_VIEWPORT_FITS = 5;
+
 /**
  * Alarga la ventana hasta que quepa la página entera, sin tocar su ancho.
  *
@@ -12080,18 +12083,29 @@ const WITHDRAW_QUESTION = /^(Withdraw this post\?|¿Retirar esta publicación\?)
  * Ahí `(width < 768px)` se cumple, `useIsPhone` pasa a móvil y las acciones
  * de la línea del autor se desmontan: vuelven en reposo, sin lo que se había
  * abierto. Si la página ya cabe, Playwright captura sin ese truco.
+ *
+ * Alargar la ventana puede alargar la página: el panel del calendario mide
+ * según la ventana (#656). Por eso se repite hasta que cabe.
  */
 async function fitViewportToPage(page: Page): Promise<void> {
   const viewport = page.viewportSize();
   if (viewport === null) {
     throw new Error("La página no tiene un tamaño de ventana fijo.");
   }
-  const pageHeight = await page.evaluate(
-    () => document.documentElement.scrollHeight,
-  );
-  if (pageHeight > viewport.height) {
-    await page.setViewportSize({ width: viewport.width, height: pageHeight });
+  let height = viewport.height;
+  for (let attempt = 0; attempt < MAX_VIEWPORT_FITS; attempt += 1) {
+    const pageHeight = await page.evaluate(
+      () => document.documentElement.scrollHeight,
+    );
+    if (pageHeight <= height) {
+      return;
+    }
+    height = pageHeight;
+    await page.setViewportSize({ width: viewport.width, height });
   }
+  throw new Error(
+    `La página sigue creciendo tras alargar la ventana ${MAX_VIEWPORT_FITS} veces.`,
+  );
 }
 
 async function openWithdrawConfirmation(page: Page): Promise<void> {
@@ -18298,6 +18312,13 @@ async function showEditScopeChoice(page: Page): Promise<void> {
   await expect(
     row.getByRole("button", { name: ORGANIZER_FOLLOWING }),
   ).toBeVisible();
+  // La captura es de página entera: sin esto, su ventana de 1×1
+  // pasa la agenda a la pantalla del móvil (#656) y el panel vuelve sin
+  // lo que se abrió.
+  await fitViewportToPage(page);
+  await expect(
+    row.getByRole("button", { name: ORGANIZER_FOLLOWING }),
+  ).toBeVisible();
   await page.mouse.move(0, 0);
 }
 
@@ -18306,6 +18327,11 @@ async function showSeriesCancelConfirmation(page: Page): Promise<void> {
   const row = firstEventPanel(page);
   await row.getByRole("button", { name: ORGANIZER_CANCEL }).click();
   await row.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }).click();
+  await expect(
+    row.getByRole("button", { name: ORGANIZER_CONFIRM_SERIES }),
+  ).toBeVisible();
+  // Lo mismo que al elegir qué editar: ver showEditScopeChoice.
+  await fitViewportToPage(page);
   await expect(
     row.getByRole("button", { name: ORGANIZER_CONFIRM_SERIES }),
   ).toBeVisible();
