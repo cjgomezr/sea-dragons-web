@@ -1424,7 +1424,7 @@ export const spanishMessages: MessageCatalog = {
   "calendar.edit.titleSeries": "Editar serie",
   "calendar.edit.submit": "Guardar cambios",
   "calendar.edit.seriesWarning":
-    "Estos cambios se aplican a esta sesión y a todas las siguientes, y pisan lo que se cambió en las sesiones editadas solas.",
+    "Estos cambios se aplican a esta sesión y a todas las siguientes, también a las que se editaron solas.",
   "calendar.manage.edit": "Editar",
   "calendar.manage.cancel": "Cancelar",
   "calendar.manage.editScope.question":

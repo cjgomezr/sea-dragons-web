@@ -708,7 +708,7 @@ describe("editar desde el calendario", () => {
 
     expect(
       within(dialog).getByText(
-        "These changes apply to this session and every one after it, and replace what was changed in sessions edited on their own.",
+        "These changes apply to this session and every one after it, also to the ones that were edited on their own.",
       ),
     ).toBeInTheDocument();
   });

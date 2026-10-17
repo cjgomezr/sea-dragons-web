@@ -1420,7 +1420,7 @@ export const englishMessages = {
   "calendar.edit.titleSeries": "Edit series",
   "calendar.edit.submit": "Save changes",
   "calendar.edit.seriesWarning":
-    "These changes apply to this session and every one after it, and replace what was changed in sessions edited on their own.",
+    "These changes apply to this session and every one after it, also to the ones that were edited on their own.",
   "calendar.manage.edit": "Edit",
   "calendar.manage.cancel": "Cancel",
   "calendar.manage.editScope.question":
