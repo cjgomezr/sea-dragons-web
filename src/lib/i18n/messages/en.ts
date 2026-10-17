@@ -1717,6 +1717,7 @@ export const englishMessages = {
   "clubSettings.summary.general.initials": "initials",
   "clubSettings.summary.general.colour": "colour {colour}",
   "clubSettings.summary.general.logo": "logo",
+  "clubSettings.summary.signIn.entry": "{language}: {source}",
   "clubSettings.summary.signIn.english": "English",
   "clubSettings.summary.signIn.spanish": "Español",
   "clubSettings.summary.signIn.appText": "app text",

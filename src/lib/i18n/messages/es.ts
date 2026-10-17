@@ -1719,6 +1719,7 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.summary.general.initials": "iniciales",
   "clubSettings.summary.general.colour": "color {colour}",
   "clubSettings.summary.general.logo": "logo",
+  "clubSettings.summary.signIn.entry": "{language}: {source}",
   "clubSettings.summary.signIn.english": "Inglés",
   "clubSettings.summary.signIn.spanish": "Español",
   "clubSettings.summary.signIn.appText": "texto de la app",

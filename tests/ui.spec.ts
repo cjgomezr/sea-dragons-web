@@ -10249,6 +10249,7 @@ test.describe("la lista de la configuración en el móvil", () => {
     await waitForClubSettingsList(page);
   });
 });
+
 const CLUB_POSITIONS_STATES = inClubSection("positions", [
   { name: "club-posiciones" },
   { name: "club-posiciones-es", beforeVisit: chooseSpanish },

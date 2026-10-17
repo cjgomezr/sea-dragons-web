@@ -182,10 +182,21 @@ describe("las pestañas de un Admin en escritorio", () => {
     expect(
       await screen.findByRole("region", { name: "Positions" }),
     ).toBeVisible();
-    // General se queda montada pero escondida: no pierde lo escrito.
     expect(
       screen.queryByRole("textbox", { name: "Club name" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("lo escrito en una sección sigue ahí al volver a su pestaña", async () => {
+    renderScreen();
+    const name = await screen.findByLabelText("Club name");
+    await userEvent.clear(name);
+    await userEvent.type(name, "Borrador");
+
+    await userEvent.click(tab("Session packs"));
+    await userEvent.click(tab("General"));
+
+    expect(screen.getByLabelText("Club name")).toHaveValue("Borrador");
   });
 
   it("abre la sección que dice la dirección", async () => {

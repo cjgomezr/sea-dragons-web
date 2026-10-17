@@ -54,8 +54,14 @@ export function summarizeSignInTexts(
   texts: SignInTexts,
 ): string {
   return [
-    `${translate("clubSettings.summary.signIn.english")}: ${describeSignInSource(translate, texts.en)}`,
-    `${translate("clubSettings.summary.signIn.spanish")}: ${describeSignInSource(translate, texts.es)}`,
+    translate("clubSettings.summary.signIn.entry", {
+      language: translate("clubSettings.summary.signIn.english"),
+      source: describeSignInSource(translate, texts.en),
+    }),
+    translate("clubSettings.summary.signIn.entry", {
+      language: translate("clubSettings.summary.signIn.spanish"),
+      source: describeSignInSource(translate, texts.es),
+    }),
   ].join(PART_SEPARATOR);
 }
 
