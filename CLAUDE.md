@@ -29,7 +29,10 @@ endpoints).
 ## Definition of Done
 
 A task is ONLY finished when ALL of the following are true. The Stop hook
-enforces this; you cannot end the session with failing checks.
+enforces this; you cannot end the session with failing checks. A session
+whose only changes are text (the paths in `.github/text-only-paths.txt`:
+docs, Markdown, skills) has nothing for it to check, and it says so in one
+line and lets you stop.
 
 1. All tests pass (`npm test`), including new tests for the new behavior.
    Locally `npm test` skips the tests that talk to Supabase

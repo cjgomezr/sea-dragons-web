@@ -3,9 +3,11 @@
 # sí y 1 si no. Lo usa `checks` en un pull request para no correr los tests de
 # red cuando el PR solo cambia documentos, tickets o skills (#439).
 #
-# Solo cuenta lo commiteado: en CI no hay otra cosa. Si no se puede averiguar
-# la diferencia (sin origin/main, clon superficial) o la rama no cambia nada,
-# responde que no: ante la duda, todo corre.
+# Solo cuenta lo commiteado: en CI no hay otra cosa. Con `--with-worktree`
+# cuenta además lo que no está commiteado, sin seguimiento incluido; así lo
+# usa el Stop gate (.claude/hooks/stop-gate.sh). Si no se puede averiguar la
+# diferencia (sin origin/main, clon superficial) o no cambia nada, responde
+# que no: ante la duda, todo corre.
 
 set -o pipefail
 
@@ -58,6 +60,16 @@ is_text_file() {
 # src/a.ts a docs/ también borra código.
 if ! CHANGED=$(git diff --no-renames --name-only origin/main...HEAD 2>/dev/null); then
   exit 1
+fi
+
+# `core.quotepath=off` para que un nombre con tildes salga tal cual y no entre
+# comillas, que ningún patrón reconocería.
+if [ "${1:-}" = "--with-worktree" ]; then
+  if ! UNCOMMITTED=$(git -c core.quotepath=off diff --no-renames --name-only HEAD 2>/dev/null) ||
+    ! UNTRACKED=$(git -c core.quotepath=off ls-files --others --exclude-standard 2>/dev/null); then
+    exit 1
+  fi
+  CHANGED=$(printf '%s\n%s\n%s\n' "$CHANGED" "$UNCOMMITTED" "$UNTRACKED" | sed '/^$/d')
 fi
 [ -z "$CHANGED" ] && exit 1
 
