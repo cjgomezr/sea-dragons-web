@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { TextField } from "@/components/directory/record-fields";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import {
-  POSITION_NAME_MAX_LENGTH,
   type PositionIssueCode,
   type PositionNamesInput,
   findPositionNameIssues,
@@ -18,10 +16,15 @@ import {
 } from "./club-positions-admin-client";
 
 /**
- * Los nombres de una posición, uno por idioma (#300): el mismo formulario para
- * crear una y para renombrarla. Valida lo que puede sin el servidor, y lo que
+ * Los nombres de una posición, uno por idioma (#300), en una fila de la
+ * tabla de posiciones (#723): el mismo formulario para la fila de añadir y
+ * para renombrar en la fila. Valida lo que puede sin el servidor, y lo que
  * sólo sabe el servidor (el nombre repetido) lo pone junto al campo de su
  * idioma.
+ *
+ * El formulario no tiene caja propia (`display: contents`): sus celdas son
+ * celdas de la fila. Lo que va detrás de los nombres (el rol, la pista, los
+ * botones) lo pone quien lo usa.
  *
  * Un fallo que no es de un campo, como uno de red, se queda aquí con todo lo
  * escrito: reintentar es volver a pulsar el botón.
@@ -56,32 +59,74 @@ function toNames(draft: Draft): PositionNamesInput {
   return { en: blankAsNull(draft.en), es: blankAsNull(draft.es) };
 }
 
+function hasAnyName(draft: Draft): boolean {
+  return LOCALES.some((locale) => draft[locale].trim() !== "");
+}
+
+/** Un nombre de 32 px: la etiqueta no cabe en la fila y se lee, no se ve. */
+function NameField({
+  id,
+  label,
+  placeholder,
+  value,
+  issueText,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  placeholder: string;
+  value: string;
+  issueText: string | null;
+  onChange: (value: string) => void;
+}): React.JSX.Element {
+  const issueId = `${id}-aviso`;
+  return (
+    <div className="club-positions-name-field">
+      <label className="visually-hidden" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        id={id}
+        className="club-positions-input"
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        autoComplete="off"
+        aria-invalid={issueText !== null}
+        aria-describedby={issueText === null ? undefined : issueId}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {issueText === null ? null : (
+        <p className="auth-field-error" id={issueId}>
+          {issueText}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function PositionNamesForm({
   translate,
   formLabel,
-  submitText,
-  savingText,
+  placeholders,
   initialNames,
   isDisabled,
-  isSaving,
   shouldFocusOnOpen = false,
   onSubmit,
-  onCancel,
+  children,
 }: {
   translate: Translator;
   /** El nombre accesible del formulario. */
   formLabel: string;
-  submitText: string;
-  savingText: string;
+  placeholders: Readonly<Record<Locale, string>>;
   initialNames: PositionNamesInput;
   /** Hay una acción en vuelo, sea esta o cualquier otra de la sección. */
   isDisabled: boolean;
-  /** La que está en vuelo es justo la de este formulario. */
-  isSaving: boolean;
   /** Al abrir el de renombrar, el foco va al primer campo. */
   shouldFocusOnOpen?: boolean;
   onSubmit: (names: PositionNamesInput) => Promise<PositionFormOutcome>;
-  onCancel?: () => void;
+  /** Las celdas que siguen a los nombres; saben si hay alguno escrito. */
+  children: (hasName: boolean) => React.ReactNode;
 }): React.JSX.Element {
   const idPrefix = useId();
   const formRef = useRef<HTMLFormElement>(null);
@@ -124,7 +169,6 @@ export function PositionNamesForm({
     setFailure(code === null ? outcome : null);
   }
 
-  const hintId = `${idPrefix}-ayuda`;
   const issueTextFor = (locale: Locale): string | null =>
     issueCode !== null && FIELD_OF_ISSUE[issueCode] === locale
       ? describePositionIssue(translate, issueCode)
@@ -138,45 +182,27 @@ export function PositionNamesForm({
       onSubmit={(event) => void submit(event)}
       noValidate
     >
-      <fieldset className="club-positions-fields" disabled={isDisabled}>
-        {LOCALES.map((locale) => (
-          <TextField
-            key={locale}
-            id={`${idPrefix}-${locale}`}
-            label={translate(`clubSettings.positions.name.${locale}`)}
-            type="text"
-            value={draft[locale]}
-            issueText={issueTextFor(locale)}
-            hintIds={[hintId]}
-            onChange={(name) => update(locale, name)}
-          />
-        ))}
-      </fieldset>
-      <p className="auth-hint" id={hintId}>
-        {translate("clubSettings.positions.name.hint", {
-          max: POSITION_NAME_MAX_LENGTH,
-        })}
-      </p>
-      {failure === null ? null : (
-        <p className="auth-error" role="alert">
-          {describePositionsFailure(translate, failure)}
-        </p>
-      )}
-      <div className="groups-actions">
-        <button type="submit" className="auth-submit" disabled={isDisabled}>
-          {isSaving ? savingText : submitText}
-        </button>
-        {onCancel === undefined ? null : (
-          <button
-            type="button"
-            className="admin-secondary"
-            disabled={isDisabled}
-            onClick={onCancel}
-          >
-            {translate("clubSettings.positions.cancel")}
-          </button>
+      <div className="club-positions-cell club-positions-names-cell">
+        <fieldset className="club-positions-fields" disabled={isDisabled}>
+          {LOCALES.map((locale) => (
+            <NameField
+              key={locale}
+              id={`${idPrefix}-${locale}`}
+              label={translate(`clubSettings.positions.name.${locale}`)}
+              placeholder={placeholders[locale]}
+              value={draft[locale]}
+              issueText={issueTextFor(locale)}
+              onChange={(name) => update(locale, name)}
+            />
+          ))}
+        </fieldset>
+        {failure === null ? null : (
+          <p className="auth-error" role="alert">
+            {describePositionsFailure(translate, failure)}
+          </p>
         )}
       </div>
+      {children(hasAnyName(draft))}
     </form>
   );
 }

@@ -270,7 +270,7 @@ function PackItem({
       disabled={isBusy || isAtEdge(direction)}
       onClick={() => onMove(direction)}
     >
-      {translate(`clubSettings.positions.move.${direction}`)}
+      {translate(`clubSettings.sessionPacks.move.${direction}.text`)}
     </button>
   );
   return (
