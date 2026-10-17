@@ -40,14 +40,16 @@ describe("desfase de la barra de pestañas", () => {
     expect(offset).toBe(30);
   });
 
-  it("sube la barra cuando la ventana visible es más baja que su borde", () => {
+  it("no sube la barra cuando la ventana visible es más baja que su borde", () => {
+    // Chrome en el iPhone encoge la ventana visible mientras se tira de la
+    // página para refrescar; subir la barra la dejaba a media pantalla.
     const offset = tabBarOffset({
       barBottom: BAR_BOTTOM,
       visualViewport: { height: BAR_BOTTOM - 20, offsetTop: 0, scale: 1 },
       isKeyboardOpen: false,
     });
 
-    expect(offset).toBe(-20);
+    expect(offset).toBe(0);
   });
 
   it("es 0 con el teclado abierto, para que la barra no suba encima de él", () => {
