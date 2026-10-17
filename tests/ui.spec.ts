@@ -78,6 +78,7 @@ import {
 } from "@/lib/club/accent-color";
 import { memberInitials } from "@/lib/auth/member-initials";
 import { buildAccentStylesheet } from "@/lib/club/accent-stylesheet";
+import type { ClubSettingsSection } from "@/lib/club/club-settings-sections";
 import { shrinkProfilePhoto } from "@/lib/members/shrink-profile-photo";
 import {
   shrinkNewsCover,
@@ -9861,7 +9862,23 @@ type ClubSettingsState = {
   readonly createPosition?: PositionCreate;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
+  /** La sección que abre (#718). Sin ella, General: en el móvil hace falta
+   * nombrarla, porque sin `tab` sale la lista. */
+  readonly tab?: ClubSettingsSection;
 };
+
+/** Los estados de una sección, abiertos en su pestaña (#718). */
+function inClubSection(
+  tab: ClubSettingsSection,
+  states: readonly ClubSettingsState[],
+): readonly ClubSettingsState[] {
+  return states.map((state) => ({ ...state, tab }));
+}
+
+/** La dirección de la configuración con su sección. */
+function clubSettingsPath(tab: ClubSettingsSection): string {
+  return `${CLUB_SETTINGS_SCREEN_PATH}?tab=${tab}`;
+}
 
 const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
   { name: "club-cargada" },
@@ -9930,26 +9947,38 @@ const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
   },
 ];
 
-/** La configuración carga cada sección por su lado (#469): sin esperarlas
- * todas, la captura de la pantalla entera salía con unas cargadas y otras en
- * "Loading…", según la corrida (#561). */
-async function waitForClubSettingsSections(page: Page): Promise<void> {
+/** El título de cada sección que carga por su lado (#469). General no
+ * tiene: se espera a su campo del nombre. */
+const CLUB_SECTION_HEADINGS = {
+  "sign-in": "clubSettings.signInTexts.title",
+  positions: "clubSettings.positions.title",
+  packs: "clubSettings.sessionPacks.title",
+} as const;
+
+/** Sin esperar a que la sección cargue, la captura salía con ella en
+ * "Loading…", según la corrida (#561). Desde #718 sólo se pinta la sección
+ * abierta. */
+async function waitForClubSettingsSection(
+  page: Page,
+  tab: ClubSettingsSection,
+): Promise<void> {
+  if (tab === "general") {
+    await expect(clubNameField(page)).toHaveValue(STUBBED_CLUB_SETTINGS.name);
+    await waitForSectionsLoaded(page, []);
+    return;
+  }
   const lang = await page.locator("html").getAttribute("lang");
   if (!isLocale(lang)) {
     throw new Error(`La configuración del club no declara su idioma: ${lang}`);
   }
   const translate = createTranslator(lang);
-  await waitForSectionsLoaded(page, [
-    translate("clubSettings.signInTexts.title"),
-    translate("clubSettings.positions.title"),
-    translate("clubSettings.sessionPacks.title"),
-  ]);
+  await waitForSectionsLoaded(page, [translate(CLUB_SECTION_HEADINGS[tab])]);
 }
 
-async function goToClubSettings(
+/** Las secciones de la configuración servidas con datos fijos. */
+async function stubClubSettingsSections(
   page: Page,
   state: ClubSettingsState,
-  theme?: (typeof themes)[number],
 ): Promise<void> {
   await stubClubSettings(page, state.save);
   await stubClubPositions(page, {
@@ -9958,14 +9987,22 @@ async function goToClubSettings(
   });
   await stubSignInTexts(page, state.signInTexts ?? NO_STUBBED_SIGN_IN_TEXTS);
   await stubSessionPacks(page);
+}
+
+async function goToClubSettings(
+  page: Page,
+  state: ClubSettingsState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  const tab = state.tab ?? "general";
+  await stubClubSettingsSections(page, state);
   await state.beforeVisit?.(page);
   if (theme === undefined) {
-    await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
+    await page.goto(`${APP_URL}${clubSettingsPath(tab)}`);
   } else {
-    await goToWithTheme(page, CLUB_SETTINGS_SCREEN_PATH, theme);
+    await goToWithTheme(page, clubSettingsPath(tab), theme);
   }
-  await expect(clubNameField(page)).toHaveValue(STUBBED_CLUB_SETTINGS.name);
-  await waitForClubSettingsSections(page);
+  await waitForClubSettingsSection(page, tab);
   await state.prepare?.(page);
   // El puntero se queda sobre el botón pulsado: la captura saldría con su
   // hover.
@@ -10018,7 +10055,201 @@ for (const state of CLUB_SETTINGS_STATES) {
   });
 }
 
-const CLUB_POSITIONS_STATES: readonly ClubSettingsState[] = [
+/* ---------------------------------------------------------------------------
+   Las secciones de la configuración (#718, RF-1 del PRD de E26): la barra de
+   pestañas en escritorio (docs/design/design_handoff_club_settings,
+   01-desktop-positions.png), la lista y la pantalla de una sección en el
+   móvil (07-mobile-settings-list.png) y el Committee, que sólo ve Packs.
+   --------------------------------------------------------------------------- */
+
+const CLUB_COMMITTEE_STORAGE_STATE = roleRequestStorageStatePath(
+  "committee-de-configuracion",
+);
+const CLUB_SECTIONS_MOBILE = viewports.filter((vp) => vp.name === "mobile");
+const CLUB_SECTIONS_WIDE = viewports.filter((vp) => vp.name !== "mobile");
+const CLUB_SECTIONS_COMMITTEE = viewports.filter((vp) => vp.name !== "tablet");
+/** El alto mínimo de una fila de la lista del móvil (#3a del handoff). */
+const CLUB_LIST_ROW_MIN_HEIGHT_PX = 68;
+
+/** Las cuatro filas de la lista del móvil, con su resumen ya llegado. */
+async function waitForClubSettingsList(page: Page): Promise<void> {
+  const summaries = page.locator(".club-settings-list-summary");
+  await expect(summaries).toHaveCount(4);
+  for (const summary of await summaries.all()) {
+    await expect(summary).not.toBeEmpty();
+  }
+}
+
+type ClubSectionsScreen = {
+  readonly name: string;
+  readonly path: string;
+  readonly storageState: string;
+  readonly viewports: readonly (typeof viewports)[number][];
+  readonly waitUntilReady: (page: Page) => Promise<void>;
+};
+
+const CLUB_SECTIONS_SCREENS: readonly ClubSectionsScreen[] = [
+  {
+    name: "club-pestanas-general",
+    path: CLUB_SETTINGS_SCREEN_PATH,
+    storageState: ADMIN_STORAGE_STATE,
+    viewports: CLUB_SECTIONS_WIDE,
+    waitUntilReady: (page) => waitForClubSettingsSection(page, "general"),
+  },
+  {
+    name: "club-lista-movil",
+    path: CLUB_SETTINGS_SCREEN_PATH,
+    storageState: ADMIN_STORAGE_STATE,
+    viewports: CLUB_SECTIONS_MOBILE,
+    waitUntilReady: waitForClubSettingsList,
+  },
+  {
+    name: "club-seccion-movil",
+    path: clubSettingsPath("positions"),
+    storageState: ADMIN_STORAGE_STATE,
+    viewports: CLUB_SECTIONS_MOBILE,
+    waitUntilReady: (page) => waitForClubSettingsSection(page, "positions"),
+  },
+  {
+    // Con `?tab=general` a propósito: el Committee ve Packs igual (D9).
+    name: "club-committee",
+    path: clubSettingsPath("general"),
+    storageState: CLUB_COMMITTEE_STORAGE_STATE,
+    viewports: CLUB_SECTIONS_COMMITTEE,
+    waitUntilReady: (page) => waitForClubSettingsSection(page, "packs"),
+  },
+];
+
+async function goToClubSectionsScreen(
+  page: Page,
+  screen: ClubSectionsScreen,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubClubSettingsSections(page, { name: screen.name });
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${screen.path}`);
+  } else {
+    await goToWithTheme(page, screen.path, theme);
+  }
+  await screen.waitUntilReady(page);
+  await page.mouse.move(0, 0);
+}
+
+for (const screen of CLUB_SECTIONS_SCREENS) {
+  test.describe(screen.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: screen.storageState });
+
+    for (const vp of screen.viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToClubSectionsScreen(page, screen, theme);
+            const snapshot = `${screen.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToClubSectionsScreen(page, screen);
+          await expectNoHorizontalScroll(page);
+        });
+
+        test("has no accessibility violations (axe-core)", async ({ page }) => {
+          await goToClubSectionsScreen(page, screen);
+          await expectNoAxeViolations(page);
+        });
+      });
+    }
+  });
+}
+
+test.describe("las pestañas de la configuración en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 1440, height: 900 },
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await stubClubSettingsSections(page, { name: "club-pestanas" });
+    await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
+    await waitForClubSettingsSection(page, "general");
+  });
+
+  test("recargar deja la pestaña y volver atrás abre la de antes", async ({
+    page,
+  }) => {
+    await page.getByRole("tab", { name: "Positions" }).click();
+    await expect(page).toHaveURL(/\/club\?tab=positions$/);
+
+    await page.reload();
+
+    await expect(page.getByRole("tab", { name: "Positions" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await page.goBack();
+    await expect(page.getByRole("tab", { name: "General" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  test("el título mide 28px y la pestaña abierta lleva un subrayado de 2px", async ({
+    page,
+  }) => {
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCSS(
+      "font-size",
+      "28px",
+    );
+    await expect(page.getByRole("tab", { name: "General" })).toHaveCSS(
+      "border-bottom-width",
+      "2px",
+    );
+  });
+});
+
+test.describe("la lista de la configuración en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 375, height: 812 },
+  });
+
+  test("cada fila mide al menos 68px y abre su sección", async ({ page }) => {
+    await stubClubSettingsSections(page, { name: "club-lista-filas" });
+    await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
+    await waitForClubSettingsList(page);
+
+    for (const row of await page.locator(".club-settings-list-row").all()) {
+      const box = await row.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(CLUB_LIST_ROW_MIN_HEIGHT_PX);
+    }
+    await page.getByRole("button", { name: /^Positions/ }).click();
+
+    await expect(page).toHaveURL(/\/club\?tab=positions$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Positions" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Settings" }).click();
+    await expect(page).toHaveURL(/\/club$/);
+    await waitForClubSettingsList(page);
+  });
+});
+const CLUB_POSITIONS_STATES = inClubSection("positions", [
   { name: "club-posiciones" },
   { name: "club-posiciones-es", beforeVisit: chooseSpanish },
   {
@@ -10051,7 +10282,7 @@ const CLUB_POSITIONS_STATES: readonly ClubSettingsState[] = [
       issue: /Otra posición ya se llama así/,
     }),
   },
-];
+]);
 
 /* La sección se fotografía sola: el resto de la pantalla ya tiene sus
    capturas arriba, y así un cambio de las posiciones no las mueve. La barra
@@ -10114,7 +10345,7 @@ for (const state of CLUB_POSITIONS_STATES) {
   });
 }
 
-const CLUB_SIGN_IN_TEXTS_STATES: readonly ClubSettingsState[] = [
+const CLUB_SIGN_IN_TEXTS_STATES = inClubSection("sign-in", [
   { name: "club-textos-entrada", signInTexts: SHORT_SIGN_IN_TEXTS },
   {
     name: "club-textos-entrada-es",
@@ -10138,7 +10369,7 @@ const CLUB_SIGN_IN_TEXTS_STATES: readonly ClubSettingsState[] = [
       issue: /El lema puede tener como mucho 140 caracteres/,
     }),
   },
-];
+]);
 
 async function goToSignInTextsSection(
   page: Page,
@@ -10199,10 +10430,10 @@ for (const state of CLUB_SIGN_IN_TEXTS_STATES) {
   });
 }
 
-const CLUB_SESSION_PACKS_STATES: readonly ClubSettingsState[] = [
+const CLUB_SESSION_PACKS_STATES = inClubSection("packs", [
   { name: "club-packs" },
   { name: "club-packs-es", beforeVisit: chooseSpanish },
-];
+]);
 
 /* #469: como las posiciones, la sección se fotografía sola, sin la barra de
    pestañas del móvil encima. `goToClubSettings` ya esperó a su lista. */
@@ -11002,16 +11233,9 @@ async function goToClubSettingsWithLogo(
   theme?: (typeof themes)[number],
 ): Promise<void> {
   await serveClubLogos(page);
-  await stubClubSettings(page);
-  // Las posiciones y los textos de entrada, de mentira como en los demás
-  // estados de la pantalla: los de verdad cambian con lo que dejen otras
-  // pruebas de la corrida.
-  await stubClubPositions(page, {
-    positions: STUBBED_ACTIVE_POSITIONS,
-    create: "hangs",
-  });
-  await stubSignInTexts(page, NO_STUBBED_SIGN_IN_TEXTS);
-  await stubSessionPacks(page);
+  // Las demás secciones, de mentira como en los demás estados de la
+  // pantalla: las de verdad cambian con lo que dejen otras pruebas.
+  await stubClubSettingsSections(page, { name: "club-con-logo" });
   // Registrada después, gana a la de `stubClubSettings`.
   await page.route(
     (url) => url.pathname === CLUB_SETTINGS_ENDPOINT,
@@ -11024,12 +11248,11 @@ async function goToClubSettingsWithLogo(
     },
   );
   if (theme === undefined) {
-    await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
+    await page.goto(`${APP_URL}${clubSettingsPath("general")}`);
   } else {
-    await goToWithTheme(page, CLUB_SETTINGS_SCREEN_PATH, theme);
+    await goToWithTheme(page, clubSettingsPath("general"), theme);
   }
-  await expect(clubNameField(page)).toHaveValue(STUBBED_CLUB_SETTINGS.name);
-  await waitForClubSettingsSections(page);
+  await waitForClubSettingsSection(page, "general");
 }
 
 test.describe("club-con-logo", () => {
