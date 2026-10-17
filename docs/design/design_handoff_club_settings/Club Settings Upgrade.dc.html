@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+body{margin:0;background:#070f16;color:#e8f0f7;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+a{color:#33a1e0}a:hover{color:#5ab4e8}
+input::placeholder,textarea::placeholder{color:#5a7086}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #33a1e0;outline-offset:2px}
+</style>
+</helmet>
+
+<section id="t3" style="padding:48px 56px 24px;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:8px;max-width:940px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t3" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">3</a><span style="font-size:20px;font-weight:700">Celular, opción 3 — lista en vez de pestañas</span></div>
+<p style="margin:0;font-size:14.5px;line-height:1.55;color:#cfdeea;text-wrap:pretty">Compará con los chips de <a href="#2b">2b</a>. En <a href="#3a">3a</a> tocá cualquier fila para entrar y "‹ Settings" para volver. <a href="#3b">3b</a> muestra una sección ya abierta. Los cambios sin guardar se marcan en la fila de la lista.</p>
+</div>
+<div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+<div id="3a" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:10px;align-items:center"><a href="#3a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">3a</a><span style="font-size:13.5px;color:#8aa1b5">Club settings: la lista</span></div><div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;position:relative;display:flex;flex-direction:column"><sc-if value="{{ mD.isList }}"><div style="display:flex;align-items:center;gap:4px;padding:8px;border-bottom:1px solid #274055"><button aria-label="Back to account" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#33a1e0"><i class="ph ph-arrow-left" style="font-size:21px"></i></button><span style="font-size:17px;font-weight:700">Club settings</span></div></sc-if>
+<sc-if value="{{ mD.notList }}"><div style="display:flex;align-items:center;gap:4px;padding:8px;border-bottom:1px solid #274055"><button onClick="{{ mD.back }}" aria-label="Back to club settings" style="all:unset;cursor:pointer;display:flex;gap:2px;align-items:center;height:44px;padding:0 10px 0 6px;color:#33a1e0;font-size:15px"><i class="ph ph-caret-left" style="font-size:20px"></i>Settings</button><span style="flex:1;text-align:center;margin-right:84px;font-size:17px;font-weight:700">{{ mD.title }}</span></div></sc-if>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none">
+<sc-if value="{{ mD.isList }}">
+<div style="padding:16px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;gap:12px;align-items:center;padding:4px 2px 6px"><span style="width:44px;height:44px;border-radius:10px;background:{{ accentSafe }};display:grid;place-items:center;font-size:15px;font-weight:800;color:#0c1a26">{{ initialsShown }}</span><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:16px;font-weight:700">{{ clubName }}</span><span style="font-size:13px;color:#8aa1b5">Only Admins see this.</span></span></div>
+<div style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ mD.rows }}" as="r">
+<button onClick="{{ r.open }}" style="all:unset;cursor:pointer;display:flex;gap:14px;align-items:center;min-height:68px;padding:0 12px 0 14px;border-bottom:1px solid color-mix(in srgb,#274055 70%,transparent)">
+<span style="flex:none;width:36px;height:36px;border-radius:9px;background:#1d4869;display:grid;place-items:center"><i class="ph {{ r.icon }}" style="font-size:19px;color:#cfe8f7"></i></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="display:flex;gap:8px;align-items:center;font-size:15.5px;font-weight:600">{{ r.label }}<sc-if value="{{ r.dirty }}"><span style="display:flex;gap:5px;align-items:center;font-size:12px;font-weight:600;color:#f2ce78"><span style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span>Unsaved</span></sc-if></span><span style="font-size:13px;color:#8aa1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.sum }}</span></span>
+<i class="ph ph-caret-right" style="color:#5a7086"></i>
+</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ mD.isGeneral }}">
+<div style="padding:16px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;gap:14px;align-items:center;padding:12px;border:1px solid #274055;border-radius:12px;background:#13283a"><span style="flex:none;width:56px;height:56px;border-radius:12px;border:1px dashed #5a7086;display:grid;place-items:center;font-size:18px;font-weight:800;color:{{ accentSafe }}">{{ initialsShown }}</span><span style="flex:1;font-size:14px;color:#cfdeea">Logo</span><button style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:44px;padding:0 14px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;font-weight:600"><i class="ph ph-upload-simple"></i>Upload</button></div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Club name</span><input value="{{ clubName }}" onChange="{{ onName }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Initials <span style="font-weight:400;color:#8aa1b5">· optional</span></span><input value="{{ initials }}" onChange="{{ onInitials }}" placeholder="{{ autoInitials }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:600">Accent colour</span>
+<div style="display:flex;gap:10px;align-items:center"><sc-for list="{{ swatches }}" as="s"><button onClick="{{ s.pick }}" aria-label="{{ s.hex }}" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:50%;background:{{ s.hex }};box-shadow:{{ s.ring }}"></button></sc-for></div>
+<input value="{{ accent }}" onChange="{{ onAccent }}" aria-label="Accent colour code" style="all:unset;box-sizing:border-box;width:140px;height:44px;padding:0 12px;border-radius:8px;border:1px solid {{ accentBorder }};background:#13283a;font:16px ui-monospace,Menlo,monospace;color:#e8f0f7"></div>
+</div>
+</sc-if>
+<sc-if value="{{ mD.isSignin }}">
+<div style="padding:16px;display:flex;flex-direction:column;gap:16px">
+<div style="display:grid;grid-template-columns:repeat(2,1fr);padding:3px;gap:2px;border:1px solid #274055;border-radius:10px;background:#0c1a26"><sc-for list="{{ langs2 }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" aria-pressed="true" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;font-weight:700;background:#1d4869;color:#e8f0f7"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" aria-pressed="false" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;color:#8aa1b5"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if></sc-for></div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Headline</span><input value="{{ tagline }}" onChange="{{ onTagline }}" placeholder="{{ tagFallback }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Welcome paragraph</span><textarea value="{{ welcome }}" onChange="{{ onWelcome }}" placeholder="{{ welFallback }}" rows="4" style="all:unset;box-sizing:border-box;padding:12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;line-height:1.5;color:#e8f0f7;white-space:pre-wrap"></textarea></label>
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">PREVIEW</span>
+<div style="border:1px solid #274055;border-radius:12px;padding:18px;background:linear-gradient(160deg,#163a55,#0f2131 70%);display:flex;flex-direction:column;gap:10px"><span style="font-size:19px;line-height:1.25;font-weight:700">{{ tagShown }}</span><span style="font-size:14px;line-height:1.5;color:#cfdeea">{{ welShown }}</span></div>
+</div>
+</sc-if>
+<sc-if value="{{ mD.isPositions }}">
+<div style="padding:12px 16px 24px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center;min-height:24px"><span style="flex:1;min-width:0;white-space:nowrap;font-size:13px;color:#8aa1b5">Hold ⋮⋮ and drag to reorder</span><sc-if value="{{ posNotice }}"><span style="display:flex;gap:5px;align-items:center;font-size:12.5px;color:#6fd6b4"><i class="ph ph-check-circle"></i>Saved</span></sc-if></div>
+<div ref="{{ mD.listRef }}" style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ mD.pos }}" as="p">
+<div style="display:flex;gap:6px;align-items:center;height:60px;box-sizing:border-box;padding:0 6px 0 2px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ p.bg }};box-shadow:{{ p.line }};transform:{{ p.lift }};position:relative;z-index:{{ p.z }}">
+<span onPointerDown="{{ p.pd }}" onPointerMove="{{ p.pm }}" onPointerUp="{{ p.pu }}" onPointerCancel="{{ p.pu }}" aria-label="{{ p.handleLabel }}" role="button" tabindex="0" style="touch-action:none;cursor:grab;width:44px;height:44px;display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-dots-six-vertical" style="font-size:20px"></i></span>
+<button onClick="{{ p.open }}" style="all:unset;cursor:pointer;flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;min-height:44px;justify-content:center">
+<span style="font-size:15.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span>
+<span style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:#8aa1b5"><span style="color:{{ p.covColor }}">{{ p.covText }}</span><sc-if value="{{ p.missing }}"><span style="color:#f2ce78">· {{ p.other }}</span></sc-if></span>
+</button>
+<button onClick="{{ p.open }}" aria-label="{{ p.renameLabel }}" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#5a7086"><i class="ph ph-caret-right" style="font-size:16px"></i></button>
+</div>
+</sc-for>
+</div>
+<form onSubmit="{{ addPos }}" style="display:flex;gap:8px"><input value="{{ newEn }}" onChange="{{ onNewEn }}" placeholder="New position" aria-label="New position" style="all:unset;box-sizing:border-box;flex:1;min-width:0;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"><button type="submit" style="all:unset;cursor:pointer;height:48px;padding:0 18px;border-radius:8px;font-size:15px;font-weight:700;background:{{ addBg }};color:{{ addColor }}">Add</button></form>
+<button onClick="{{ toggleArch }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;min-height:44px;font-size:14px;font-weight:600;color:#cfdeea"><i class="ph {{ archCaret }}" style="font-size:12px"></i>Archived · {{ archCount }}</button>
+<sc-if value="{{ archOpen }}"><div style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;overflow:hidden"><sc-for list="{{ archRows }}" as="p"><div style="display:flex;gap:10px;align-items:center;min-height:56px;padding:0 8px 0 14px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)"><span style="flex:1;font-size:15px;color:#cfdeea">{{ p.name }}</span><button onClick="{{ p.restore }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:40px;padding:0 12px;border-radius:8px;border:1px solid #274055;font-size:13.5px;font-weight:600"><i class="ph ph-arrow-counter-clockwise"></i>Reactivate</button></div></sc-for></div></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ mD.isPacks }}">
+<div style="padding:12px 16px 100px;display:flex;flex-direction:column;gap:10px">
+<span style="font-size:13px;color:#8aa1b5;line-height:1.45">{{ sessionPrice }} per session · hold ⋮⋮ to reorder</span>
+<div ref="{{ mD.packRef }}" style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ mD.packs }}" as="k">
+<div style="display:flex;gap:8px;align-items:center;height:60px;box-sizing:border-box;padding:0 4px 0 2px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ k.bg }};box-shadow:{{ k.line }};transform:{{ k.lift }};position:relative;z-index:{{ k.z }}">
+<span onPointerDown="{{ k.pd }}" onPointerMove="{{ k.pm }}" onPointerUp="{{ k.pu }}" onPointerCancel="{{ k.pu }}" aria-label="{{ k.handleLabel }}" role="button" tabindex="0" style="touch-action:none;cursor:grab;width:44px;height:44px;display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-dots-six-vertical" style="font-size:20px"></i></span>
+<span style="min-width:34px;height:30px;padding:0 8px;box-sizing:border-box;border-radius:8px;background:#1d4869;display:grid;place-items:center;font:700 14px ui-monospace,Menlo,monospace">{{ k.n }}</span>
+<span style="flex:1;font-size:15px;font-weight:600">sessions</span>
+<span style="font:15px ui-monospace,Menlo,monospace">{{ k.price }}</span>
+<button onClick="{{ k.remove }}" aria-label="{{ k.removeLabel }}" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-trash" style="font-size:18px"></i></button>
+</div>
+</sc-for>
+</div>
+<form onSubmit="{{ addPack }}" style="display:flex;gap:8px;align-items:center"><input type="number" inputmode="numeric" value="{{ newPack }}" onChange="{{ onNewPack }}" placeholder="Sessions" aria-label="Sessions in the new pack" style="all:unset;box-sizing:border-box;width:120px;height:48px;padding:0 12px;border-radius:8px;border:1px solid {{ packBorder }};background:#13283a;font:16px ui-monospace,Menlo,monospace;color:#e8f0f7"><span style="flex:1;font:15px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ newPackPrice }}</span><button type="submit" style="all:unset;cursor:pointer;height:48px;padding:0 18px;border-radius:8px;font-size:15px;font-weight:700;background:{{ addPackBg }};color:{{ addPackColor }}">Add</button></form>
+<sc-if value="{{ packErr }}"><span style="font-size:13px;color:#f2887a">{{ packErr }}</span></sc-if>
+</div>
+</sc-if>
+</div>
+<sc-if value="{{ mD.showBar }}">
+<div style="display:flex;gap:8px;padding:10px 12px 16px;border-top:1px solid color-mix(in srgb,#f2ce78 40%,transparent);background:#13283a"><button onClick="{{ mD.discard }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:46px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:15px;font-weight:600">Discard</button><button onClick="{{ mD.save }}" style="all:unset;cursor:pointer;flex:1.4;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Save changes</button></div>
+</sc-if>
+<sc-if value="{{ mD.sheetOpen }}">
+<div onClick="{{ mD.closeSheet }}" style="position:absolute;inset:0;background:color-mix(in srgb,#0c1a26 60%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 16px 22px;display:flex;flex-direction:column;gap:14px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055"></span>
+<span style="font-size:18px;font-weight:700">{{ mD.sh.name }}</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">English</span><input value="{{ mD.sh.en }}" onChange="{{ mD.sh.onEn }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7;background:#0c1a26"></label>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">Español</span><input value="{{ mD.sh.es }}" onChange="{{ mD.sh.onEs }}" placeholder="Add a name" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7;background:#0c1a26"></label>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">ROLE IN AUTO-BALANCE</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><sc-for list="{{ mD.sh.covs }}" as="c"><button onClick="{{ c.pick }}" aria-pressed="{{ c.on }}" style="all:unset;cursor:pointer;text-align:center;height:44px;line-height:42px;box-sizing:border-box;border-radius:8px;font-size:14px;font-weight:{{ c.w }};border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.color }}">{{ c.label }}</button></sc-for></div></div>
+<div style="display:flex;gap:8px;padding-top:4px">
+<button onClick="{{ mD.sh.archive }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:48px;padding:0 16px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:14.5px;font-weight:600;color:#cfdeea"><i class="ph ph-archive"></i>Archive</button>
+<button onClick="{{ mD.sh.save }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Save</button>
+</div>
+</div>
+</sc-if></div></div>
+<div id="3b" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:10px;align-items:center"><a href="#3b" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">3b</a><span style="font-size:13.5px;color:#8aa1b5">Una sección abierta (Positions)</span></div><div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;position:relative;display:flex;flex-direction:column"><sc-if value="{{ mE.isList }}"><div style="display:flex;align-items:center;gap:4px;padding:8px;border-bottom:1px solid #274055"><button aria-label="Back to account" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#33a1e0"><i class="ph ph-arrow-left" style="font-size:21px"></i></button><span style="font-size:17px;font-weight:700">Club settings</span></div></sc-if>
+<sc-if value="{{ mE.notList }}"><div style="display:flex;align-items:center;gap:4px;padding:8px;border-bottom:1px solid #274055"><button onClick="{{ mE.back }}" aria-label="Back to club settings" style="all:unset;cursor:pointer;display:flex;gap:2px;align-items:center;height:44px;padding:0 10px 0 6px;color:#33a1e0;font-size:15px"><i class="ph ph-caret-left" style="font-size:20px"></i>Settings</button><span style="flex:1;text-align:center;margin-right:84px;font-size:17px;font-weight:700">{{ mE.title }}</span></div></sc-if>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none">
+<sc-if value="{{ mE.isList }}">
+<div style="padding:16px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;gap:12px;align-items:center;padding:4px 2px 6px"><span style="width:44px;height:44px;border-radius:10px;background:{{ accentSafe }};display:grid;place-items:center;font-size:15px;font-weight:800;color:#0c1a26">{{ initialsShown }}</span><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:16px;font-weight:700">{{ clubName }}</span><span style="font-size:13px;color:#8aa1b5">Only Admins see this.</span></span></div>
+<div style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ mE.rows }}" as="r">
+<button onClick="{{ r.open }}" style="all:unset;cursor:pointer;display:flex;gap:14px;align-items:center;min-height:68px;padding:0 12px 0 14px;border-bottom:1px solid color-mix(in srgb,#274055 70%,transparent)">
+<span style="flex:none;width:36px;height:36px;border-radius:9px;background:#1d4869;display:grid;place-items:center"><i class="ph {{ r.icon }}" style="font-size:19px;color:#cfe8f7"></i></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="display:flex;gap:8px;align-items:center;font-size:15.5px;font-weight:600">{{ r.label }}<sc-if value="{{ r.dirty }}"><span style="display:flex;gap:5px;align-items:center;font-size:12px;font-weight:600;color:#f2ce78"><span style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span>Unsaved</span></sc-if></span><span style="font-size:13px;color:#8aa1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.sum }}</span></span>
+<i class="ph ph-caret-right" style="color:#5a7086"></i>
+</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ mE.isGeneral }}">
+<div style="padding:16px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;gap:14px;align-items:center;padding:12px;border:1px solid #274055;border-radius:12px;background:#13283a"><span style="flex:none;width:56px;height:56px;border-radius:12px;border:1px dashed #5a7086;display:grid;place-items:center;font-size:18px;font-weight:800;color:{{ accentSafe }}">{{ initialsShown }}</span><span style="flex:1;font-size:14px;color:#cfdeea">Logo</span><button style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:44px;padding:0 14px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;font-weight:600"><i class="ph ph-upload-simple"></i>Upload</button></div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Club name</span><input value="{{ clubName }}" onChange="{{ onName }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Initials <span style="font-weight:400;color:#8aa1b5">· optional</span></span><input value="{{ initials }}" onChange="{{ onInitials }}" placeholder="{{ autoInitials }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:600">Accent colour</span>
+<div style="display:flex;gap:10px;align-items:center"><sc-for list="{{ swatches }}" as="s"><button onClick="{{ s.pick }}" aria-label="{{ s.hex }}" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:50%;background:{{ s.hex }};box-shadow:{{ s.ring }}"></button></sc-for></div>
+<input value="{{ accent }}" onChange="{{ onAccent }}" aria-label="Accent colour code" style="all:unset;box-sizing:border-box;width:140px;height:44px;padding:0 12px;border-radius:8px;border:1px solid {{ accentBorder }};background:#13283a;font:16px ui-monospace,Menlo,monospace;color:#e8f0f7"></div>
+</div>
+</sc-if>
+<sc-if value="{{ mE.isSignin }}">
+<div style="padding:16px;display:flex;flex-direction:column;gap:16px">
+<div style="display:grid;grid-template-columns:repeat(2,1fr);padding:3px;gap:2px;border:1px solid #274055;border-radius:10px;background:#0c1a26"><sc-for list="{{ langs2 }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" aria-pressed="true" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;font-weight:700;background:#1d4869;color:#e8f0f7"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" aria-pressed="false" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;color:#8aa1b5"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if></sc-for></div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Headline</span><input value="{{ tagline }}" onChange="{{ onTagline }}" placeholder="{{ tagFallback }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Welcome paragraph</span><textarea value="{{ welcome }}" onChange="{{ onWelcome }}" placeholder="{{ welFallback }}" rows="4" style="all:unset;box-sizing:border-box;padding:12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;line-height:1.5;color:#e8f0f7;white-space:pre-wrap"></textarea></label>
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">PREVIEW</span>
+<div style="border:1px solid #274055;border-radius:12px;padding:18px;background:linear-gradient(160deg,#163a55,#0f2131 70%);display:flex;flex-direction:column;gap:10px"><span style="font-size:19px;line-height:1.25;font-weight:700">{{ tagShown }}</span><span style="font-size:14px;line-height:1.5;color:#cfdeea">{{ welShown }}</span></div>
+</div>
+</sc-if>
+<sc-if value="{{ mE.isPositions }}">
+<div style="padding:12px 16px 24px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center;min-height:24px"><span style="flex:1;min-width:0;white-space:nowrap;font-size:13px;color:#8aa1b5">Hold ⋮⋮ and drag to reorder</span><sc-if value="{{ posNotice }}"><span style="display:flex;gap:5px;align-items:center;font-size:12.5px;color:#6fd6b4"><i class="ph ph-check-circle"></i>Saved</span></sc-if></div>
+<div ref="{{ mE.listRef }}" style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ mE.pos }}" as="p">
+<div style="display:flex;gap:6px;align-items:center;height:60px;box-sizing:border-box;padding:0 6px 0 2px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ p.bg }};box-shadow:{{ p.line }};transform:{{ p.lift }};position:relative;z-index:{{ p.z }}">
+<span onPointerDown="{{ p.pd }}" onPointerMove="{{ p.pm }}" onPointerUp="{{ p.pu }}" onPointerCancel="{{ p.pu }}" aria-label="{{ p.handleLabel }}" role="button" tabindex="0" style="touch-action:none;cursor:grab;width:44px;height:44px;display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-dots-six-vertical" style="font-size:20px"></i></span>
+<button onClick="{{ p.open }}" style="all:unset;cursor:pointer;flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;min-height:44px;justify-content:center">
+<span style="font-size:15.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span>
+<span style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:#8aa1b5"><span style="color:{{ p.covColor }}">{{ p.covText }}</span><sc-if value="{{ p.missing }}"><span style="color:#f2ce78">· {{ p.other }}</span></sc-if></span>
+</button>
+<button onClick="{{ p.open }}" aria-label="{{ p.renameLabel }}" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#5a7086"><i class="ph ph-caret-right" style="font-size:16px"></i></button>
+</div>
+</sc-for>
+</div>
+<form onSubmit="{{ addPos }}" style="display:flex;gap:8px"><input value="{{ newEn }}" onChange="{{ onNewEn }}" placeholder="New position" aria-label="New position" style="all:unset;box-sizing:border-box;flex:1;min-width:0;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"><button type="submit" style="all:unset;cursor:pointer;height:48px;padding:0 18px;border-radius:8px;font-size:15px;font-weight:700;background:{{ addBg }};color:{{ addColor }}">Add</button></form>
+<button onClick="{{ toggleArch }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;min-height:44px;font-size:14px;font-weight:600;color:#cfdeea"><i class="ph {{ archCaret }}" style="font-size:12px"></i>Archived · {{ archCount }}</button>
+<sc-if value="{{ archOpen }}"><div style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;overflow:hidden"><sc-for list="{{ archRows }}" as="p"><div style="display:flex;gap:10px;align-items:center;min-height:56px;padding:0 8px 0 14px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)"><span style="flex:1;font-size:15px;color:#cfdeea">{{ p.name }}</span><button onClick="{{ p.restore }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:40px;padding:0 12px;border-radius:8px;border:1px solid #274055;font-size:13.5px;font-weight:600"><i class="ph ph-arrow-counter-clockwise"></i>Reactivate</button></div></sc-for></div></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ mE.isPacks }}">
+<div style="padding:12px 16px 100px;display:flex;flex-direction:column;gap:10px">
+<span style="font-size:13px;color:#8aa1b5;line-height:1.45">{{ sessionPrice }} per session · hold ⋮⋮ to reorder</span>
+<div ref="{{ mE.packRef }}" style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ mE.packs }}" as="k">
+<div style="display:flex;gap:8px;align-items:center;height:60px;box-sizing:border-box;padding:0 4px 0 2px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ k.bg }};box-shadow:{{ k.line }};transform:{{ k.lift }};position:relative;z-index:{{ k.z }}">
+<span onPointerDown="{{ k.pd }}" onPointerMove="{{ k.pm }}" onPointerUp="{{ k.pu }}" onPointerCancel="{{ k.pu }}" aria-label="{{ k.handleLabel }}" role="button" tabindex="0" style="touch-action:none;cursor:grab;width:44px;height:44px;display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-dots-six-vertical" style="font-size:20px"></i></span>
+<span style="min-width:34px;height:30px;padding:0 8px;box-sizing:border-box;border-radius:8px;background:#1d4869;display:grid;place-items:center;font:700 14px ui-monospace,Menlo,monospace">{{ k.n }}</span>
+<span style="flex:1;font-size:15px;font-weight:600">sessions</span>
+<span style="font:15px ui-monospace,Menlo,monospace">{{ k.price }}</span>
+<button onClick="{{ k.remove }}" aria-label="{{ k.removeLabel }}" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-trash" style="font-size:18px"></i></button>
+</div>
+</sc-for>
+</div>
+<form onSubmit="{{ addPack }}" style="display:flex;gap:8px;align-items:center"><input type="number" inputmode="numeric" value="{{ newPack }}" onChange="{{ onNewPack }}" placeholder="Sessions" aria-label="Sessions in the new pack" style="all:unset;box-sizing:border-box;width:120px;height:48px;padding:0 12px;border-radius:8px;border:1px solid {{ packBorder }};background:#13283a;font:16px ui-monospace,Menlo,monospace;color:#e8f0f7"><span style="flex:1;font:15px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ newPackPrice }}</span><button type="submit" style="all:unset;cursor:pointer;height:48px;padding:0 18px;border-radius:8px;font-size:15px;font-weight:700;background:{{ addPackBg }};color:{{ addPackColor }}">Add</button></form>
+<sc-if value="{{ packErr }}"><span style="font-size:13px;color:#f2887a">{{ packErr }}</span></sc-if>
+</div>
+</sc-if>
+</div>
+<sc-if value="{{ mE.showBar }}">
+<div style="display:flex;gap:8px;padding:10px 12px 16px;border-top:1px solid color-mix(in srgb,#f2ce78 40%,transparent);background:#13283a"><button onClick="{{ mE.discard }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:46px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:15px;font-weight:600">Discard</button><button onClick="{{ mE.save }}" style="all:unset;cursor:pointer;flex:1.4;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Save changes</button></div>
+</sc-if>
+<sc-if value="{{ mE.sheetOpen }}">
+<div onClick="{{ mE.closeSheet }}" style="position:absolute;inset:0;background:color-mix(in srgb,#0c1a26 60%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 16px 22px;display:flex;flex-direction:column;gap:14px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055"></span>
+<span style="font-size:18px;font-weight:700">{{ mE.sh.name }}</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">English</span><input value="{{ mE.sh.en }}" onChange="{{ mE.sh.onEn }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7;background:#0c1a26"></label>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">Español</span><input value="{{ mE.sh.es }}" onChange="{{ mE.sh.onEs }}" placeholder="Add a name" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7;background:#0c1a26"></label>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">ROLE IN AUTO-BALANCE</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><sc-for list="{{ mE.sh.covs }}" as="c"><button onClick="{{ c.pick }}" aria-pressed="{{ c.on }}" style="all:unset;cursor:pointer;text-align:center;height:44px;line-height:42px;box-sizing:border-box;border-radius:8px;font-size:14px;font-weight:{{ c.w }};border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.color }}">{{ c.label }}</button></sc-for></div></div>
+<div style="display:flex;gap:8px;padding-top:4px">
+<button onClick="{{ mE.sh.archive }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:48px;padding:0 16px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:14.5px;font-weight:600;color:#cfdeea"><i class="ph ph-archive"></i>Archive</button>
+<button onClick="{{ mE.sh.save }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Save</button>
+</div>
+</div>
+</sc-if></div></div>
+</div>
+<ul style="margin:0;padding-left:18px;max-width:940px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+<li>Nunca se corta: agregar una sección nueva es otra fila, no otro chip que no entra.</li>
+<li>Cada fila resume lo que hay adentro (cuántas posiciones, cuántos packs), así no hace falta entrar para saber.</li>
+<li>Si salís de una sección con algo sin guardar, la fila queda marcada "Unsaved". Al tocar "‹ Settings" con cambios también se podría preguntar "¿Descartar cambios?".</li>
+</ul>
+</section>
+
+<section id="t2" style="padding:48px 56px 24px;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:8px;max-width:940px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t2" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">2</a><span style="font-size:20px;font-weight:700">Celular — cuenta y configuración del club</span></div>
+<p style="margin:0;font-size:14.5px;line-height:1.55;color:#cfdeea;text-wrap:pretty">Mismos datos que <a href="#1a">1a</a>. En el celular se arrastra manteniendo ⋮⋮ (en <a href="#2b">2b</a> probá con el mouse: apretá y arrastrá). Tocá una posición para renombrarla, cambiar su función o archivarla.</p>
+</div>
+<div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+<div id="2a" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:10px;align-items:center"><a href="#2a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2a</a><span style="font-size:13.5px;color:#8aa1b5">Menú de la cuenta</span></div><div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;position:relative;display:flex;flex-direction:column"><div style="display:flex;align-items:center;gap:4px;padding:8px;border-bottom:1px solid #274055"><button aria-label="Back" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#33a1e0"><i class="ph ph-arrow-left" style="font-size:21px"></i></button><span style="font-size:17px;font-weight:700">Account</span></div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:16px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;gap:14px;align-items:center"><span style="width:52px;height:52px;border-radius:50%;background:#1d4869;display:grid;place-items:center;font-size:16px;font-weight:700">CG</span><span style="display:flex;flex-direction:column;gap:3px"><span style="font-size:17px;font-weight:700">Camilo Gomez</span><span style="font-size:13.5px;color:#8aa1b5">Admin · camilo@seadragons.club</span></span></div>
+<div style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<a href="#2a" style="display:flex;gap:14px;align-items:center;min-height:54px;padding:0 14px;font-size:15.5px;color:#e8f0f7;text-decoration:none;border-bottom:1px solid #274055"><i class="ph ph-user-circle" style="font-size:21px;color:#8aa1b5"></i><span style="flex:1">My profile</span><i class="ph ph-caret-right" style="color:#5a7086"></i></a>
+<a href="#2b" style="display:flex;gap:14px;align-items:center;min-height:54px;padding:0 14px;font-size:15.5px;color:#e8f0f7;text-decoration:none"><i class="ph ph-gear-six" style="font-size:21px;color:#8aa1b5"></i><span style="flex:1">Club settings</span><i class="ph ph-caret-right" style="color:#5a7086"></i></a>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">APPEARANCE</span><div style="display:grid;grid-template-columns:repeat(3,1fr);padding:3px;gap:2px;border:1px solid #274055;border-radius:10px;background:#0c1a26"><sc-for list="{{ themeOpts }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" aria-pressed="true" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;font-weight:700;background:#1d4869;color:#e8f0f7"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" aria-pressed="false" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;color:#8aa1b5"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if></sc-for></div></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">LANGUAGE</span><div style="display:grid;grid-template-columns:repeat(2,1fr);padding:3px;gap:2px;border:1px solid #274055;border-radius:10px;background:#0c1a26"><sc-for list="{{ langOpts }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" aria-pressed="true" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;font-weight:700;background:#1d4869;color:#e8f0f7"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" aria-pressed="false" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;color:#8aa1b5"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if></sc-for></div></div>
+<button style="all:unset;cursor:pointer;display:flex;gap:12px;align-items:center;justify-content:center;min-height:50px;margin-top:6px;border-radius:12px;border:1px solid color-mix(in srgb,#f2887a 45%,transparent);font-size:15.5px;font-weight:600;color:#f2887a"><i class="ph ph-sign-out" style="font-size:20px"></i>Sign out</button>
+</div></div></div>
+<div id="2b" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:10px;align-items:center"><a href="#2b" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2b</a><span style="font-size:13.5px;color:#8aa1b5">Configuración · Posiciones</span></div><div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;position:relative;display:flex;flex-direction:column"><div style="display:flex;align-items:center;gap:4px;padding:8px 8px 0">
+<button aria-label="Back" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#33a1e0"><i class="ph ph-arrow-left" style="font-size:21px"></i></button><span style="font-size:17px;font-weight:700">Club settings</span></div>
+<div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:8px 16px 12px;border-bottom:1px solid #274055">
+<sc-for list="{{ mB.tabs }}" as="t"><button onClick="{{ t.pick }}" role="tab" aria-selected="{{ t.on }}" style="all:unset;cursor:pointer;flex:none;display:flex;gap:7px;align-items:center;height:38px;box-sizing:border-box;padding:0 14px;border-radius:999px;font-size:14px;font-weight:600;border:1px solid {{ t.border }};background:{{ t.bg }};color:{{ t.color }}"><i class="ph {{ t.icon }}"></i>{{ t.label }}<sc-if value="{{ t.dirty }}"><span style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span></sc-if></button></sc-for>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none">
+<sc-if value="{{ mB.isGeneral }}">
+<div style="padding:16px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;gap:14px;align-items:center;padding:12px;border:1px solid #274055;border-radius:12px;background:#13283a"><span style="flex:none;width:56px;height:56px;border-radius:12px;border:1px dashed #5a7086;display:grid;place-items:center;font-size:18px;font-weight:800;color:{{ accentSafe }}">{{ initialsShown }}</span><span style="flex:1;font-size:14px;color:#cfdeea">Logo</span><button style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:44px;padding:0 14px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;font-weight:600"><i class="ph ph-upload-simple"></i>Upload</button></div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Club name</span><input value="{{ clubName }}" onChange="{{ onName }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Initials <span style="font-weight:400;color:#8aa1b5">· optional</span></span><input value="{{ initials }}" onChange="{{ onInitials }}" placeholder="{{ autoInitials }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:600">Accent colour</span>
+<div style="display:flex;gap:10px;align-items:center"><sc-for list="{{ swatches }}" as="s"><button onClick="{{ s.pick }}" aria-label="{{ s.hex }}" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:50%;background:{{ s.hex }};box-shadow:{{ s.ring }}"></button></sc-for></div>
+<input value="{{ accent }}" onChange="{{ onAccent }}" aria-label="Accent colour code" style="all:unset;box-sizing:border-box;width:140px;height:44px;padding:0 12px;border-radius:8px;border:1px solid {{ accentBorder }};background:#13283a;font:16px ui-monospace,Menlo,monospace;color:#e8f0f7"></div>
+</div>
+</sc-if>
+<sc-if value="{{ mB.isSignin }}">
+<div style="padding:16px;display:flex;flex-direction:column;gap:16px">
+<div style="display:grid;grid-template-columns:repeat(2,1fr);padding:3px;gap:2px;border:1px solid #274055;border-radius:10px;background:#0c1a26"><sc-for list="{{ langs2 }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" aria-pressed="true" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;font-weight:700;background:#1d4869;color:#e8f0f7"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" aria-pressed="false" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;color:#8aa1b5"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if></sc-for></div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Headline</span><input value="{{ tagline }}" onChange="{{ onTagline }}" placeholder="{{ tagFallback }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Welcome paragraph</span><textarea value="{{ welcome }}" onChange="{{ onWelcome }}" placeholder="{{ welFallback }}" rows="4" style="all:unset;box-sizing:border-box;padding:12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;line-height:1.5;color:#e8f0f7;white-space:pre-wrap"></textarea></label>
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">PREVIEW</span>
+<div style="border:1px solid #274055;border-radius:12px;padding:18px;background:linear-gradient(160deg,#163a55,#0f2131 70%);display:flex;flex-direction:column;gap:10px"><span style="font-size:19px;line-height:1.25;font-weight:700">{{ tagShown }}</span><span style="font-size:14px;line-height:1.5;color:#cfdeea">{{ welShown }}</span></div>
+</div>
+</sc-if>
+<sc-if value="{{ mB.isPositions }}">
+<div style="padding:12px 16px 24px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center;min-height:24px"><span style="flex:1;min-width:0;white-space:nowrap;font-size:13px;color:#8aa1b5">Hold ⋮⋮ and drag to reorder</span><sc-if value="{{ posNotice }}"><span style="display:flex;gap:5px;align-items:center;font-size:12.5px;color:#6fd6b4"><i class="ph ph-check-circle"></i>Saved</span></sc-if></div>
+<div ref="{{ mB.listRef }}" style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ mB.pos }}" as="p">
+<div style="display:flex;gap:6px;align-items:center;height:60px;box-sizing:border-box;padding:0 6px 0 2px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ p.bg }};box-shadow:{{ p.line }};transform:{{ p.lift }};position:relative;z-index:{{ p.z }}">
+<span onPointerDown="{{ p.pd }}" onPointerMove="{{ p.pm }}" onPointerUp="{{ p.pu }}" onPointerCancel="{{ p.pu }}" aria-label="{{ p.handleLabel }}" role="button" tabindex="0" style="touch-action:none;cursor:grab;width:44px;height:44px;display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-dots-six-vertical" style="font-size:20px"></i></span>
+<button onClick="{{ p.open }}" style="all:unset;cursor:pointer;flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;min-height:44px;justify-content:center">
+<span style="font-size:15.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span>
+<span style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:#8aa1b5"><span style="color:{{ p.covColor }}">{{ p.covText }}</span><sc-if value="{{ p.missing }}"><span style="color:#f2ce78">· {{ p.other }}</span></sc-if></span>
+</button>
+<button onClick="{{ p.open }}" aria-label="{{ p.renameLabel }}" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#5a7086"><i class="ph ph-caret-right" style="font-size:16px"></i></button>
+</div>
+</sc-for>
+</div>
+<form onSubmit="{{ addPos }}" style="display:flex;gap:8px"><input value="{{ newEn }}" onChange="{{ onNewEn }}" placeholder="New position" aria-label="New position" style="all:unset;box-sizing:border-box;flex:1;min-width:0;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"><button type="submit" style="all:unset;cursor:pointer;height:48px;padding:0 18px;border-radius:8px;font-size:15px;font-weight:700;background:{{ addBg }};color:{{ addColor }}">Add</button></form>
+<button onClick="{{ toggleArch }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;min-height:44px;font-size:14px;font-weight:600;color:#cfdeea"><i class="ph {{ archCaret }}" style="font-size:12px"></i>Archived · {{ archCount }}</button>
+<sc-if value="{{ archOpen }}"><div style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;overflow:hidden"><sc-for list="{{ archRows }}" as="p"><div style="display:flex;gap:10px;align-items:center;min-height:56px;padding:0 8px 0 14px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)"><span style="flex:1;font-size:15px;color:#cfdeea">{{ p.name }}</span><button onClick="{{ p.restore }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:40px;padding:0 12px;border-radius:8px;border:1px solid #274055;font-size:13.5px;font-weight:600"><i class="ph ph-arrow-counter-clockwise"></i>Reactivate</button></div></sc-for></div></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ mB.isPacks }}">
+<div style="padding:12px 16px 100px;display:flex;flex-direction:column;gap:10px">
+<span style="font-size:13px;color:#8aa1b5;line-height:1.45">{{ sessionPrice }} per session · hold ⋮⋮ to reorder</span>
+<div ref="{{ mB.packRef }}" style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ mB.packs }}" as="k">
+<div style="display:flex;gap:8px;align-items:center;height:60px;box-sizing:border-box;padding:0 4px 0 2px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ k.bg }};box-shadow:{{ k.line }};transform:{{ k.lift }};position:relative;z-index:{{ k.z }}">
+<span onPointerDown="{{ k.pd }}" onPointerMove="{{ k.pm }}" onPointerUp="{{ k.pu }}" onPointerCancel="{{ k.pu }}" aria-label="{{ k.handleLabel }}" role="button" tabindex="0" style="touch-action:none;cursor:grab;width:44px;height:44px;display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-dots-six-vertical" style="font-size:20px"></i></span>
+<span style="min-width:34px;height:30px;padding:0 8px;box-sizing:border-box;border-radius:8px;background:#1d4869;display:grid;place-items:center;font:700 14px ui-monospace,Menlo,monospace">{{ k.n }}</span>
+<span style="flex:1;font-size:15px;font-weight:600">sessions</span>
+<span style="font:15px ui-monospace,Menlo,monospace">{{ k.price }}</span>
+<button onClick="{{ k.remove }}" aria-label="{{ k.removeLabel }}" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-trash" style="font-size:18px"></i></button>
+</div>
+</sc-for>
+</div>
+<form onSubmit="{{ addPack }}" style="display:flex;gap:8px;align-items:center"><input type="number" inputmode="numeric" value="{{ newPack }}" onChange="{{ onNewPack }}" placeholder="Sessions" aria-label="Sessions in the new pack" style="all:unset;box-sizing:border-box;width:120px;height:48px;padding:0 12px;border-radius:8px;border:1px solid {{ packBorder }};background:#13283a;font:16px ui-monospace,Menlo,monospace;color:#e8f0f7"><span style="flex:1;font:15px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ newPackPrice }}</span><button type="submit" style="all:unset;cursor:pointer;height:48px;padding:0 18px;border-radius:8px;font-size:15px;font-weight:700;background:{{ addPackBg }};color:{{ addPackColor }}">Add</button></form>
+<sc-if value="{{ packErr }}"><span style="font-size:13px;color:#f2887a">{{ packErr }}</span></sc-if>
+</div>
+</sc-if>
+</div>
+<sc-if value="{{ mB.showBar }}">
+<div style="display:flex;gap:8px;padding:10px 12px 16px;border-top:1px solid color-mix(in srgb,#f2ce78 40%,transparent);background:#13283a"><button onClick="{{ mB.discard }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:46px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:15px;font-weight:600">Discard</button><button onClick="{{ mB.save }}" style="all:unset;cursor:pointer;flex:1.4;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Save changes</button></div>
+</sc-if>
+<sc-if value="{{ mB.sheetOpen }}">
+<div onClick="{{ mB.closeSheet }}" style="position:absolute;inset:0;background:color-mix(in srgb,#0c1a26 60%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 16px 22px;display:flex;flex-direction:column;gap:14px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055"></span>
+<span style="font-size:18px;font-weight:700">{{ mB.sh.name }}</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">English</span><input value="{{ mB.sh.en }}" onChange="{{ mB.sh.onEn }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7;background:#0c1a26"></label>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">Español</span><input value="{{ mB.sh.es }}" onChange="{{ mB.sh.onEs }}" placeholder="Add a name" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7;background:#0c1a26"></label>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">ROLE IN AUTO-BALANCE</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><sc-for list="{{ mB.sh.covs }}" as="c"><button onClick="{{ c.pick }}" aria-pressed="{{ c.on }}" style="all:unset;cursor:pointer;text-align:center;height:44px;line-height:42px;box-sizing:border-box;border-radius:8px;font-size:14px;font-weight:{{ c.w }};border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.color }}">{{ c.label }}</button></sc-for></div></div>
+<div style="display:flex;gap:8px;padding-top:4px">
+<button onClick="{{ mB.sh.archive }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:48px;padding:0 16px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:14.5px;font-weight:600;color:#cfdeea"><i class="ph ph-archive"></i>Archive</button>
+<button onClick="{{ mB.sh.save }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Save</button>
+</div>
+</div>
+</sc-if></div></div>
+<div id="2c" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:10px;align-items:center"><a href="#2c" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2c</a><span style="font-size:13.5px;color:#8aa1b5">Configuración · Packs con cambios sin guardar</span></div><div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;position:relative;display:flex;flex-direction:column"><div style="display:flex;align-items:center;gap:4px;padding:8px 8px 0">
+<button aria-label="Back" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#33a1e0"><i class="ph ph-arrow-left" style="font-size:21px"></i></button><span style="font-size:17px;font-weight:700">Club settings</span></div>
+<div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:8px 16px 12px;border-bottom:1px solid #274055">
+<sc-for list="{{ mC.tabs }}" as="t"><button onClick="{{ t.pick }}" role="tab" aria-selected="{{ t.on }}" style="all:unset;cursor:pointer;flex:none;display:flex;gap:7px;align-items:center;height:38px;box-sizing:border-box;padding:0 14px;border-radius:999px;font-size:14px;font-weight:600;border:1px solid {{ t.border }};background:{{ t.bg }};color:{{ t.color }}"><i class="ph {{ t.icon }}"></i>{{ t.label }}<sc-if value="{{ t.dirty }}"><span style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span></sc-if></button></sc-for>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none">
+<sc-if value="{{ mC.isGeneral }}">
+<div style="padding:16px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;gap:14px;align-items:center;padding:12px;border:1px solid #274055;border-radius:12px;background:#13283a"><span style="flex:none;width:56px;height:56px;border-radius:12px;border:1px dashed #5a7086;display:grid;place-items:center;font-size:18px;font-weight:800;color:{{ accentSafe }}">{{ initialsShown }}</span><span style="flex:1;font-size:14px;color:#cfdeea">Logo</span><button style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:44px;padding:0 14px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;font-weight:600"><i class="ph ph-upload-simple"></i>Upload</button></div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Club name</span><input value="{{ clubName }}" onChange="{{ onName }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Initials <span style="font-weight:400;color:#8aa1b5">· optional</span></span><input value="{{ initials }}" onChange="{{ onInitials }}" placeholder="{{ autoInitials }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:600">Accent colour</span>
+<div style="display:flex;gap:10px;align-items:center"><sc-for list="{{ swatches }}" as="s"><button onClick="{{ s.pick }}" aria-label="{{ s.hex }}" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:50%;background:{{ s.hex }};box-shadow:{{ s.ring }}"></button></sc-for></div>
+<input value="{{ accent }}" onChange="{{ onAccent }}" aria-label="Accent colour code" style="all:unset;box-sizing:border-box;width:140px;height:44px;padding:0 12px;border-radius:8px;border:1px solid {{ accentBorder }};background:#13283a;font:16px ui-monospace,Menlo,monospace;color:#e8f0f7"></div>
+</div>
+</sc-if>
+<sc-if value="{{ mC.isSignin }}">
+<div style="padding:16px;display:flex;flex-direction:column;gap:16px">
+<div style="display:grid;grid-template-columns:repeat(2,1fr);padding:3px;gap:2px;border:1px solid #274055;border-radius:10px;background:#0c1a26"><sc-for list="{{ langs2 }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" aria-pressed="true" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;font-weight:700;background:#1d4869;color:#e8f0f7"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" aria-pressed="false" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:42px;border-radius:8px;font-size:14px;color:#8aa1b5"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if></sc-for></div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Headline</span><input value="{{ tagline }}" onChange="{{ onTagline }}" placeholder="{{ tagFallback }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Welcome paragraph</span><textarea value="{{ welcome }}" onChange="{{ onWelcome }}" placeholder="{{ welFallback }}" rows="4" style="all:unset;box-sizing:border-box;padding:12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;line-height:1.5;color:#e8f0f7;white-space:pre-wrap"></textarea></label>
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">PREVIEW</span>
+<div style="border:1px solid #274055;border-radius:12px;padding:18px;background:linear-gradient(160deg,#163a55,#0f2131 70%);display:flex;flex-direction:column;gap:10px"><span style="font-size:19px;line-height:1.25;font-weight:700">{{ tagShown }}</span><span style="font-size:14px;line-height:1.5;color:#cfdeea">{{ welShown }}</span></div>
+</div>
+</sc-if>
+<sc-if value="{{ mC.isPositions }}">
+<div style="padding:12px 16px 24px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center;min-height:24px"><span style="flex:1;min-width:0;white-space:nowrap;font-size:13px;color:#8aa1b5">Hold ⋮⋮ and drag to reorder</span><sc-if value="{{ posNotice }}"><span style="display:flex;gap:5px;align-items:center;font-size:12.5px;color:#6fd6b4"><i class="ph ph-check-circle"></i>Saved</span></sc-if></div>
+<div ref="{{ mC.listRef }}" style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ mC.pos }}" as="p">
+<div style="display:flex;gap:6px;align-items:center;height:60px;box-sizing:border-box;padding:0 6px 0 2px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ p.bg }};box-shadow:{{ p.line }};transform:{{ p.lift }};position:relative;z-index:{{ p.z }}">
+<span onPointerDown="{{ p.pd }}" onPointerMove="{{ p.pm }}" onPointerUp="{{ p.pu }}" onPointerCancel="{{ p.pu }}" aria-label="{{ p.handleLabel }}" role="button" tabindex="0" style="touch-action:none;cursor:grab;width:44px;height:44px;display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-dots-six-vertical" style="font-size:20px"></i></span>
+<button onClick="{{ p.open }}" style="all:unset;cursor:pointer;flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;min-height:44px;justify-content:center">
+<span style="font-size:15.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span>
+<span style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:#8aa1b5"><span style="color:{{ p.covColor }}">{{ p.covText }}</span><sc-if value="{{ p.missing }}"><span style="color:#f2ce78">· {{ p.other }}</span></sc-if></span>
+</button>
+<button onClick="{{ p.open }}" aria-label="{{ p.renameLabel }}" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#5a7086"><i class="ph ph-caret-right" style="font-size:16px"></i></button>
+</div>
+</sc-for>
+</div>
+<form onSubmit="{{ addPos }}" style="display:flex;gap:8px"><input value="{{ newEn }}" onChange="{{ onNewEn }}" placeholder="New position" aria-label="New position" style="all:unset;box-sizing:border-box;flex:1;min-width:0;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"><button type="submit" style="all:unset;cursor:pointer;height:48px;padding:0 18px;border-radius:8px;font-size:15px;font-weight:700;background:{{ addBg }};color:{{ addColor }}">Add</button></form>
+<button onClick="{{ toggleArch }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;min-height:44px;font-size:14px;font-weight:600;color:#cfdeea"><i class="ph {{ archCaret }}" style="font-size:12px"></i>Archived · {{ archCount }}</button>
+<sc-if value="{{ archOpen }}"><div style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;overflow:hidden"><sc-for list="{{ archRows }}" as="p"><div style="display:flex;gap:10px;align-items:center;min-height:56px;padding:0 8px 0 14px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)"><span style="flex:1;font-size:15px;color:#cfdeea">{{ p.name }}</span><button onClick="{{ p.restore }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:40px;padding:0 12px;border-radius:8px;border:1px solid #274055;font-size:13.5px;font-weight:600"><i class="ph ph-arrow-counter-clockwise"></i>Reactivate</button></div></sc-for></div></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ mC.isPacks }}">
+<div style="padding:12px 16px 100px;display:flex;flex-direction:column;gap:10px">
+<span style="font-size:13px;color:#8aa1b5;line-height:1.45">{{ sessionPrice }} per session · hold ⋮⋮ to reorder</span>
+<div ref="{{ mC.packRef }}" style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ mC.packs }}" as="k">
+<div style="display:flex;gap:8px;align-items:center;height:60px;box-sizing:border-box;padding:0 4px 0 2px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ k.bg }};box-shadow:{{ k.line }};transform:{{ k.lift }};position:relative;z-index:{{ k.z }}">
+<span onPointerDown="{{ k.pd }}" onPointerMove="{{ k.pm }}" onPointerUp="{{ k.pu }}" onPointerCancel="{{ k.pu }}" aria-label="{{ k.handleLabel }}" role="button" tabindex="0" style="touch-action:none;cursor:grab;width:44px;height:44px;display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-dots-six-vertical" style="font-size:20px"></i></span>
+<span style="min-width:34px;height:30px;padding:0 8px;box-sizing:border-box;border-radius:8px;background:#1d4869;display:grid;place-items:center;font:700 14px ui-monospace,Menlo,monospace">{{ k.n }}</span>
+<span style="flex:1;font-size:15px;font-weight:600">sessions</span>
+<span style="font:15px ui-monospace,Menlo,monospace">{{ k.price }}</span>
+<button onClick="{{ k.remove }}" aria-label="{{ k.removeLabel }}" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-trash" style="font-size:18px"></i></button>
+</div>
+</sc-for>
+</div>
+<form onSubmit="{{ addPack }}" style="display:flex;gap:8px;align-items:center"><input type="number" inputmode="numeric" value="{{ newPack }}" onChange="{{ onNewPack }}" placeholder="Sessions" aria-label="Sessions in the new pack" style="all:unset;box-sizing:border-box;width:120px;height:48px;padding:0 12px;border-radius:8px;border:1px solid {{ packBorder }};background:#13283a;font:16px ui-monospace,Menlo,monospace;color:#e8f0f7"><span style="flex:1;font:15px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ newPackPrice }}</span><button type="submit" style="all:unset;cursor:pointer;height:48px;padding:0 18px;border-radius:8px;font-size:15px;font-weight:700;background:{{ addPackBg }};color:{{ addPackColor }}">Add</button></form>
+<sc-if value="{{ packErr }}"><span style="font-size:13px;color:#f2887a">{{ packErr }}</span></sc-if>
+</div>
+</sc-if>
+</div>
+<sc-if value="{{ mC.showBar }}">
+<div style="display:flex;gap:8px;padding:10px 12px 16px;border-top:1px solid color-mix(in srgb,#f2ce78 40%,transparent);background:#13283a"><button onClick="{{ mC.discard }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:46px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:15px;font-weight:600">Discard</button><button onClick="{{ mC.save }}" style="all:unset;cursor:pointer;flex:1.4;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Save changes</button></div>
+</sc-if>
+<sc-if value="{{ mC.sheetOpen }}">
+<div onClick="{{ mC.closeSheet }}" style="position:absolute;inset:0;background:color-mix(in srgb,#0c1a26 60%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 16px 22px;display:flex;flex-direction:column;gap:14px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055"></span>
+<span style="font-size:18px;font-weight:700">{{ mC.sh.name }}</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">English</span><input value="{{ mC.sh.en }}" onChange="{{ mC.sh.onEn }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7;background:#0c1a26"></label>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">Español</span><input value="{{ mC.sh.es }}" onChange="{{ mC.sh.onEs }}" placeholder="Add a name" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7;background:#0c1a26"></label>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">ROLE IN AUTO-BALANCE</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><sc-for list="{{ mC.sh.covs }}" as="c"><button onClick="{{ c.pick }}" aria-pressed="{{ c.on }}" style="all:unset;cursor:pointer;text-align:center;height:44px;line-height:42px;box-sizing:border-box;border-radius:8px;font-size:14px;font-weight:{{ c.w }};border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.color }}">{{ c.label }}</button></sc-for></div></div>
+<div style="display:flex;gap:8px;padding-top:4px">
+<button onClick="{{ mC.sh.archive }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:48px;padding:0 16px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:14.5px;font-weight:600;color:#cfdeea"><i class="ph ph-archive"></i>Archive</button>
+<button onClick="{{ mC.sh.save }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Save</button>
+</div>
+</div>
+</sc-if></div></div>
+</div>
+<ul style="margin:0;padding-left:18px;max-width:940px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+<li>Pestañas como chips que se deslizan de lado; el punto amarillo marca cambios sin guardar.</li>
+<li>Posiciones: cada fila muestra nombre y función. Al tocarla se abre una hoja con los dos nombres, la función en 4 botones y Archivar.</li>
+<li>La barra Discard / Save queda fija abajo, solo cuando hay cambios. Todos los controles miden 44px o más y los campos usan letra de 16px.</li>
+</ul>
+</section>
+
+<section id="t1" style="padding:48px 56px 80px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:10px;max-width:940px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t1" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">1</a><span style="font-size:20px;font-weight:700">Configuración del club — por pestañas, filas compactas y arrastrar</span></div>
+<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14.5px;line-height:1.5;color:#cfdeea">
+<li><strong>4 pestañas</strong>: General (nombre, iniciales, color, logo) · Pantalla de entrada · Posiciones · Packs de sesiones. El Committee solo ve Packs, sin pestañas.</li>
+<li><strong>Posiciones</strong> en filas de una línea: se ordenan arrastrando desde ⋮⋮, la función se cambia en el mismo renglón, y renombrar / archivar son íconos.</li>
+<li><strong>Packs</strong> en filas chicas con precio, arrastrables, y "Agregar" en la misma lista.</li>
+<li>Cada pestaña guarda lo suyo; la barra "Unsaved changes" aparece solo cuando hay algo sin guardar.</li>
+</ul>
+<p style="margin:0;font-size:14px;color:#8aa1b5">Probá las pestañas, arrastrá una posición o un pack, usá ⋮⋮ + flechas del teclado, cambiá una función, renombrá, archivá y reactivá.</p>
+</div>
+
+<div id="1a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1a</a><span style="font-size:13.5px;color:#8aa1b5">Escritorio — vista del Admin</span></div>
+<div style="width:1180px;min-height:820px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;display:grid;grid-template-columns:200px minmax(0,1fr);overflow:hidden">
+<aside style="background:#163a55;border-right:1px solid #244b69;padding:18px 10px;display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;gap:10px;align-items:center;padding:0 8px 14px"><span style="width:30px;height:30px;border-radius:6px;background:{{ accentSafe }};flex:none;display:grid;place-items:center;font-size:12px;font-weight:800;color:#0c1a26">{{ initialsShown }}</span><span style="font-weight:700;font-size:15px;line-height:1.2">{{ clubName }}</span></div>
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="9"><span style="padding:9px 12px;border-radius:8px;font-size:14px;color:#cfdeea">{{ n }}</span></sc-for>
+</aside>
+<div style="display:flex;flex-direction:column;min-width:0;position:relative">
+<div style="display:flex;justify-content:flex-end;gap:6px;padding:10px 16px;border-bottom:1px solid #274055;position:relative;z-index:20">
+<button aria-label="Notifications" title="Notifications" style="all:unset;cursor:pointer;width:38px;height:38px;border-radius:8px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349"><i class="ph ph-bell" style="font-size:19px"></i></button>
+<button onClick="{{ toggleAcct }}" aria-label="Account" title="Account" aria-expanded="{{ acctOpen }}" style="all:unset;cursor:pointer;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:{{ acctBg }};box-shadow:{{ acctRing }};font-size:12.5px;font-weight:700;color:#e8f0f7">CG</button>
+<sc-if value="{{ acctOpen }}">
+<div style="position:absolute;right:16px;top:calc(100% + 6px);width:300px;background:#13283a;border:1px solid #274055;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.4);padding:6px;display:flex;flex-direction:column">
+<div style="display:flex;gap:12px;align-items:center;padding:10px 10px 12px;border-bottom:1px solid #274055;margin-bottom:6px"><span style="width:40px;height:40px;border-radius:50%;background:#1d4869;display:grid;place-items:center;font-size:13.5px;font-weight:700">CG</span><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:14.5px;font-weight:600">Camilo Gomez</span><span style="font-size:12.5px;color:#8aa1b5">Admin · camilo@seadragons.club</span></span></div>
+<a href="#1a" style="display:flex;gap:12px;align-items:center;padding:9px 10px;border-radius:8px;font-size:14px;color:#e8f0f7;text-decoration:none" style-hover="background:#1a3349"><i class="ph ph-user-circle" style="font-size:19px;color:#8aa1b5"></i>My profile</a>
+<a href="#1a" style="display:flex;gap:12px;align-items:center;padding:9px 10px;border-radius:8px;font-size:14px;color:#e8f0f7;text-decoration:none;background:#1a3349"><i class="ph ph-gear-six" style="font-size:19px;color:#33a1e0"></i>Club settings<span style="margin-left:auto;font-size:11.5px;color:#8aa1b5">You're here</span></a>
+<div style="display:flex;flex-direction:column;gap:6px;padding:10px 10px 4px;margin-top:4px;border-top:1px solid #274055"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">APPEARANCE</span><div style="--n:3"><div style="display:grid;grid-template-columns:repeat(var(--n),1fr);padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#0c1a26"><sc-for list="{{ themeOpts }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" aria-pressed="true" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:32px;border-radius:6px;font-size:13px;font-weight:700;background:#1d4869;color:#e8f0f7"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" aria-pressed="false" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:32px;border-radius:6px;font-size:13px;color:#8aa1b5" style-hover="color:#e8f0f7;background:#1a3349"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if></sc-for></div></div></div>
+<div style="display:flex;flex-direction:column;gap:6px;padding:10px 10px 8px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">LANGUAGE</span><div style="--n:2"><div style="display:grid;grid-template-columns:repeat(var(--n),1fr);padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#0c1a26"><sc-for list="{{ langOpts }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" aria-pressed="true" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:32px;border-radius:6px;font-size:13px;font-weight:700;background:#1d4869;color:#e8f0f7"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" aria-pressed="false" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:32px;border-radius:6px;font-size:13px;color:#8aa1b5" style-hover="color:#e8f0f7;background:#1a3349"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if></sc-for></div></div></div>
+<button style="all:unset;cursor:pointer;display:flex;gap:12px;align-items:center;padding:10px;margin-top:2px;border-top:1px solid #274055;border-radius:0 0 8px 8px;font-size:14px;color:#f2887a" style-hover="background:color-mix(in srgb,#f2887a 10%,transparent)"><i class="ph ph-sign-out" style="font-size:19px"></i>Sign out</button>
+</div>
+</sc-if>
+</div>
+<div style="padding:22px 28px 0;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #274055">
+<h1 style="margin:0;font-size:28px;line-height:1.1;font-weight:700">Club settings</h1>
+<p style="margin:0 0 8px;font-size:14px;color:#8aa1b5">What members see and how the club is set up.</p>
+<div style="display:flex;gap:4px">
+<sc-for list="{{ tabs }}" as="t"><button onClick="{{ t.pick }}" role="tab" aria-selected="{{ t.on }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center;padding:10px 4px;margin-right:20px;font-size:14px;font-weight:600;color:{{ t.color }};box-shadow:inset 0 -2px 0 {{ t.line }}"><i class="ph {{ t.icon }}" style="font-size:16px"></i>{{ t.label }}<sc-if value="{{ t.dirty }}"><span title="Unsaved changes" style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span></sc-if></button></sc-for>
+</div>
+</div>
+
+<sc-if value="{{ tabGeneral }}">
+<div style="padding:24px 28px 96px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:32px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;flex-direction:column;gap:14px">
+<span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">IDENTITY</span>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="display:flex;justify-content:space-between;font-size:14px;font-weight:600">Club name<span style="font:400 12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ nameCount }}</span></span><input value="{{ clubName }}" onChange="{{ onName }}" style="all:unset;box-sizing:border-box;height:42px;padding:0 12px;border-radius:8px;border:1px solid {{ nameBorder }};background:#13283a;font-size:14.5px;color:#e8f0f7"><sc-if value="{{ nameEmpty }}"><span style="font-size:12.5px;color:#f2887a">The club needs a name.</span></sc-if></label>
+<label style="display:flex;flex-direction:column;gap:6px;width:220px"><span style="font-size:14px;font-weight:600">Initials <span style="font-weight:400;color:#8aa1b5">· optional</span></span><input value="{{ initials }}" onChange="{{ onInitials }}" placeholder="{{ autoInitials }}" style="all:unset;box-sizing:border-box;height:42px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:14.5px;color:#e8f0f7;letter-spacing:.06em"><span style="font-size:12.5px;color:#8aa1b5">Shown when there's no logo. Up to 3 letters.</span></label>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px">
+<span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">BRAND</span>
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:14px;font-weight:600">Accent colour</span>
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+<sc-for list="{{ swatches }}" as="s"><button onClick="{{ s.pick }}" aria-label="{{ s.hex }}" title="{{ s.hex }}" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:50%;background:{{ s.hex }};box-shadow:{{ s.ring }}"></button></sc-for>
+<span style="width:1px;height:24px;background:#274055;margin:0 4px"></span>
+<input value="{{ accent }}" onChange="{{ onAccent }}" aria-label="Accent colour code" style="all:unset;box-sizing:border-box;width:110px;height:36px;padding:0 10px;border-radius:8px;border:1px solid {{ accentBorder }};background:#13283a;font:14px ui-monospace,Menlo,monospace;color:#e8f0f7">
+</div>
+<sc-if value="{{ accentBad }}"><span style="font-size:12.5px;color:#f2887a">Use a code like #33A1E0.</span></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:14px;font-weight:600">Logo</span>
+<div style="display:flex;gap:14px;align-items:center;padding:12px;border:1px solid #274055;border-radius:10px;background:#13283a">
+<span style="flex:none;width:56px;height:56px;border-radius:10px;border:1px dashed #5a7086;display:grid;place-items:center;background:#0c1a26;font-size:18px;font-weight:800;color:{{ accentSafe }}">{{ initialsShown }}</span>
+<span style="display:flex;flex-direction:column;gap:3px;flex:1"><span style="font-size:14px;font-weight:600">No logo yet</span><span style="font-size:12.5px;color:#8aa1b5">PNG or SVG, square, at least 256 px. Saves right away.</span></span>
+<button style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center;padding:8px 14px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0"><i class="ph ph-upload-simple"></i>Upload</button>
+</div>
+</div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;position:sticky;top:16px">
+<span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">PREVIEW</span>
+<div style="border:1px solid #274055;border-radius:10px;overflow:hidden;background:#13283a">
+<div style="display:flex;gap:10px;align-items:center;padding:12px 14px;background:#163a55"><span style="width:28px;height:28px;border-radius:6px;background:{{ accentSafe }};display:grid;place-items:center;font-size:11px;font-weight:800;color:#0c1a26">{{ initialsShown }}</span><span style="font-size:14px;font-weight:700">{{ clubName }}</span></div>
+<div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+<span style="align-self:flex-start;padding:7px 14px;border-radius:8px;background:{{ accentSafe }};color:#0c1a26;font-size:13px;font-weight:700">Primary button</span>
+<span style="font-size:13px;color:#cfdeea">Text with <span style="color:{{ accentSafe }};font-weight:600">a link</span>.</span>
+</div>
+</div>
+<span style="font-size:12.5px;color:#8aa1b5;line-height:1.45">The app checks the colour reads well on light and dark, as it does today.</span>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ tabSignin }}">
+<div style="padding:24px 28px 96px;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:32px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="font-size:14px;color:#8aa1b5;max-width:440px;line-height:1.45">The headline and paragraph on the sign-in page. Leave a field empty to use the app's text.</span>
+<div style="display:flex;padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#13283a"><sc-for list="{{ langs }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:700;background:#33a1e0;color:#0c1a26">{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:6px 14px;border-radius:6px;font-size:13px;color:#8aa1b5" style-hover="color:#e8f0f7;background:#1a3349">{{ o.label }}</button></sc-if></sc-for></div>
+</div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="display:flex;justify-content:space-between;font-size:14px;font-weight:600">Headline<span style="font:400 12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ tagCount }}</span></span><input value="{{ tagline }}" onChange="{{ onTagline }}" placeholder="{{ tagFallback }}" style="all:unset;box-sizing:border-box;height:42px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:14.5px;color:#e8f0f7"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="display:flex;justify-content:space-between;font-size:14px;font-weight:600">Welcome paragraph<span style="font:400 12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ welCount }}</span></span><textarea value="{{ welcome }}" onChange="{{ onWelcome }}" placeholder="{{ welFallback }}" rows="5" style="all:unset;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:14.5px;line-height:1.55;color:#e8f0f7;white-space:pre-wrap"></textarea></label>
+<span style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:#8aa1b5"><i class="ph ph-translate"></i>{{ otherLangNote }}</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">SIGN-IN PAGE · {{ langUp }}</span>
+<div style="border:1px solid #274055;border-radius:10px;padding:22px 20px;background:linear-gradient(160deg,#163a55,#0f2131 70%);display:flex;flex-direction:column;gap:12px;min-height:220px">
+<span style="width:36px;height:36px;border-radius:8px;background:{{ accentSafe }};display:grid;place-items:center;font-size:13px;font-weight:800;color:#0c1a26">{{ initialsShown }}</span>
+<span style="font-size:20px;line-height:1.25;font-weight:700;text-wrap:pretty">{{ tagShown }}</span>
+<span style="font-size:13.5px;line-height:1.5;color:#cfdeea;text-wrap:pretty">{{ welShown }}</span>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ tabPositions }}">
+<div style="padding:22px 28px 40px;display:flex;flex-direction:column;gap:16px;max-width:820px">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
+<span style="font-size:14px;color:#8aa1b5;line-height:1.45;max-width:520px">The order here is the order everywhere: directory filters, teams and evaluations. The role tells auto-balance where each position plays.</span>
+<sc-if value="{{ posNotice }}"><span style="display:flex;gap:6px;align-items:center;font-size:13px;color:#6fd6b4;white-space:nowrap"><i class="ph ph-check-circle"></i>{{ posNotice }}</span></sc-if>
+</div>
+<div style="border:1px solid #274055;border-radius:10px;overflow:hidden">
+<div style="display:grid;grid-template-columns:36px 28px minmax(0,1fr) 170px 84px;gap:10px;align-items:center;padding:8px 12px;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5;background:#0f2131;border-bottom:1px solid #274055"><span></span><span>#</span><span>POSITION</span><span>ROLE IN AUTO-BALANCE</span><span></span></div>
+<sc-for list="{{ posRows }}" as="p" hint-placeholder-count="5">
+<div draggable="true" onDragStart="{{ p.dragStart }}" onDragOver="{{ p.dragOver }}" onDrop="{{ p.drop }}" onDragEnd="{{ p.dragEnd }}" style="display:grid;grid-template-columns:36px 28px minmax(0,1fr) 170px 84px;gap:10px;align-items:center;padding:7px 12px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ p.bg }};box-shadow:{{ p.dropLine }};opacity:{{ p.op }}">
+<button onKeyDown="{{ p.key }}" aria-label="{{ p.handleLabel }}" title="Drag to reorder, or use the arrow keys" style="all:unset;cursor:grab;width:30px;height:30px;border-radius:6px;display:grid;place-items:center;color:#8aa1b5" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph ph-dots-six-vertical" style="font-size:18px"></i></button>
+<span style="font:13px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ p.rank }}</span>
+<sc-if value="{{ p.notEditing }}">
+<span style="display:flex;gap:8px;align-items:baseline;min-width:0"><span style="font-size:14.5px;font-weight:600;white-space:nowrap">{{ p.name }}</span><span style="font-size:12.5px;color:{{ p.otherColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.other }}</span></span>
+</sc-if>
+<sc-if value="{{ p.editing }}">
+<span style="display:flex;gap:6px;align-items:center;min-width:0">
+<input value="{{ p.edEn }}" onChange="{{ p.onEdEn }}" aria-label="Name in English" placeholder="English" style="all:unset;box-sizing:border-box;flex:1;min-width:0;height:32px;padding:0 8px;border-radius:6px;border:1px solid #33a1e0;background:#0c1a26;font-size:13.5px;color:#e8f0f7">
+<input value="{{ p.edEs }}" onChange="{{ p.onEdEs }}" aria-label="Name in Spanish" placeholder="Español" style="all:unset;box-sizing:border-box;flex:1;min-width:0;height:32px;padding:0 8px;border-radius:6px;border:1px solid #274055;background:#0c1a26;font-size:13.5px;color:#e8f0f7">
+</span>
+</sc-if>
+<select onChange="{{ p.onCov }}" value="{{ p.cov }}" aria-label="{{ p.covLabel }}" style="height:32px;padding:0 8px;border-radius:6px;border:1px solid #274055;background:#13283a;color:{{ p.covColor }};font-size:13px"><option value="">No role</option><option value="goalkeeper">Goalkeeper</option><option value="defence">Defence</option><option value="attack">Attack</option></select>
+<span style="display:flex;justify-content:flex-end;gap:2px">
+<sc-if value="{{ p.notEditing }}">
+<button onClick="{{ p.startEdit }}" title="Rename" aria-label="{{ p.renameLabel }}" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:6px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349"><i class="ph ph-pencil-simple" style="font-size:16px"></i></button>
+<button onClick="{{ p.archive }}" title="Archive" aria-label="{{ p.archiveLabel }}" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:6px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349"><i class="ph ph-archive" style="font-size:16px"></i></button>
+</sc-if>
+<sc-if value="{{ p.editing }}">
+<button onClick="{{ p.saveEdit }}" title="Save name" aria-label="Save name" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:6px;display:grid;place-items:center;background:#33a1e0;color:#0c1a26"><i class="ph ph-check" style="font-size:16px"></i></button>
+<button onClick="{{ p.cancelEdit }}" title="Cancel" aria-label="Cancel rename" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:6px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349"><i class="ph ph-x" style="font-size:16px"></i></button>
+</sc-if>
+</span>
+</div>
+</sc-for>
+<form onSubmit="{{ addPos }}" style="display:grid;grid-template-columns:36px 28px minmax(0,1fr) 170px 84px;gap:10px;align-items:center;padding:8px 12px;background:#0f2131">
+<span style="display:grid;place-items:center;color:#5a7086"><i class="ph ph-plus" style="font-size:16px"></i></span>
+<span></span>
+<span style="display:flex;gap:6px;min-width:0">
+<input value="{{ newEn }}" onChange="{{ onNewEn }}" aria-label="New position in English" placeholder="New position (English)" style="all:unset;box-sizing:border-box;flex:1;min-width:0;height:32px;padding:0 8px;border-radius:6px;border:1px solid #274055;background:#0c1a26;font-size:13.5px;color:#e8f0f7">
+<input value="{{ newEs }}" onChange="{{ onNewEs }}" aria-label="New position in Spanish" placeholder="Español" style="all:unset;box-sizing:border-box;flex:1;min-width:0;height:32px;padding:0 8px;border-radius:6px;border:1px solid #274055;background:#0c1a26;font-size:13.5px;color:#e8f0f7">
+</span>
+<span style="font-size:12px;color:#8aa1b5">One name is enough.</span>
+<span style="display:flex;justify-content:flex-end"><button type="submit" style="all:unset;cursor:pointer;white-space:nowrap;padding:0 14px;height:32px;line-height:32px;border-radius:6px;font-size:13px;font-weight:700;background:{{ addBg }};color:{{ addColor }}">Add</button></span>
+</form>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<button onClick="{{ toggleArch }}" aria-expanded="{{ archOpen }}" style="all:unset;cursor:pointer;align-self:flex-start;display:flex;gap:8px;align-items:center;font-size:13.5px;font-weight:600;color:#cfdeea"><i class="ph {{ archCaret }}" style="font-size:12px"></i>Archived · {{ archCount }}<span style="font-weight:400;color:#8aa1b5">— hidden from new records, kept on old ones</span></button>
+<sc-if value="{{ archOpen }}">
+<div style="border:1px solid #274055;border-radius:10px;overflow:hidden">
+<sc-for list="{{ archRows }}" as="p"><div style="display:flex;gap:10px;align-items:center;padding:8px 12px 8px 16px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)"><span style="flex:1;font-size:14px;color:#cfdeea">{{ p.name }} <span style="font-size:12.5px;color:#8aa1b5">{{ p.other }}</span></span><button onClick="{{ p.restore }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center;padding:6px 12px;border-radius:6px;border:1px solid #274055;font-size:13px;font-weight:600" style-hover="border-color:#33a1e0"><i class="ph ph-arrow-counter-clockwise"></i>Reactivate</button></div></sc-for>
+<sc-if value="{{ archEmpty }}"><div style="padding:12px 16px;font-size:13.5px;color:#8aa1b5">Nothing archived.</div></sc-if>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ tabPacks }}">
+<div style="padding:22px 28px 96px;display:flex;flex-direction:column;gap:16px;max-width:620px">
+<span style="font-size:14px;color:#8aa1b5;line-height:1.45">Bundles Casual members can buy. Each pack costs the Casual session price × sessions (now {{ sessionPrice }} per session in Stripe).</span>
+<div style="border:1px solid #274055;border-radius:10px;overflow:hidden">
+<sc-for list="{{ packRows }}" as="k" hint-placeholder-count="3">
+<div draggable="true" onDragStart="{{ k.dragStart }}" onDragOver="{{ k.dragOver }}" onDrop="{{ k.drop }}" onDragEnd="{{ k.dragEnd }}" style="display:grid;grid-template-columns:36px minmax(0,1fr) 110px 40px;gap:10px;align-items:center;padding:7px 12px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ k.bg }};box-shadow:{{ k.dropLine }};opacity:{{ k.op }}">
+<button onKeyDown="{{ k.key }}" aria-label="{{ k.handleLabel }}" title="Drag to reorder, or use the arrow keys" style="all:unset;cursor:grab;width:30px;height:30px;border-radius:6px;display:grid;place-items:center;color:#8aa1b5" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph ph-dots-six-vertical" style="font-size:18px"></i></button>
+<span style="display:flex;gap:10px;align-items:center"><span style="min-width:30px;height:26px;padding:0 8px;box-sizing:border-box;border-radius:6px;background:#1d4869;display:grid;place-items:center;font:700 13px ui-monospace,Menlo,monospace">{{ k.n }}</span><span style="font-size:14.5px;font-weight:600">{{ k.label }}</span></span>
+<span style="font:14px ui-monospace,Menlo,monospace;text-align:right">{{ k.price }}</span>
+<button onClick="{{ k.remove }}" title="Remove" aria-label="{{ k.removeLabel }}" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:6px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349;color:#f2887a"><i class="ph ph-trash" style="font-size:16px"></i></button>
+</div>
+</sc-for>
+<sc-if value="{{ packsEmpty }}"><div style="padding:14px 16px;font-size:13.5px;color:#8aa1b5">No packs. Casual members can only pay per session.</div></sc-if>
+<form onSubmit="{{ addPack }}" style="display:grid;grid-template-columns:36px minmax(0,1fr) 110px 40px;gap:10px;align-items:center;padding:8px 12px;background:#0f2131">
+<span style="display:grid;place-items:center;color:#5a7086"><i class="ph ph-plus" style="font-size:16px"></i></span>
+<span style="display:flex;gap:8px;align-items:center"><input type="number" min="2" max="50" value="{{ newPack }}" onChange="{{ onNewPack }}" aria-label="Sessions in the new pack" placeholder="10" style="all:unset;box-sizing:border-box;width:80px;height:32px;padding:0 8px;border-radius:6px;border:1px solid {{ packBorder }};background:#0c1a26;font:13.5px ui-monospace,Menlo,monospace;color:#e8f0f7"><span style="font-size:13px;color:#8aa1b5">sessions</span><sc-if value="{{ packErr }}"><span style="font-size:12.5px;color:#f2887a">{{ packErr }}</span></sc-if></span>
+<span style="font:14px ui-monospace,Menlo,monospace;text-align:right;color:#8aa1b5">{{ newPackPrice }}</span>
+<button type="submit" title="Add pack" aria-label="Add pack" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:6px;display:grid;place-items:center;background:{{ addPackBg }};color:{{ addPackColor }}"><i class="ph ph-plus" style="font-size:16px"></i></button>
+</form>
+</div>
+<span style="font-size:12.5px;color:#8aa1b5">From 2 to 50 sessions, no repeats. Members see them in this order.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ showBar }}">
+<div style="position:absolute;left:28px;right:28px;bottom:20px;display:flex;gap:12px;align-items:center;padding:10px 12px 10px 16px;border-radius:10px;background:#13283a;border:1px solid color-mix(in srgb,#f2ce78 40%,transparent);box-shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35)">
+<span style="width:8px;height:8px;border-radius:50%;background:#f2ce78"></span>
+<span style="flex:1;font-size:13.5px;color:#cfdeea">{{ barText }}</span>
+<button onClick="{{ discard }}" style="all:unset;cursor:pointer;padding:8px 14px;border-radius:8px;font-size:13.5px;font-weight:600;color:#cfdeea" style-hover="background:#1a3349">Discard</button>
+<button onClick="{{ save }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:8px 18px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13.5px;font-weight:700;opacity:{{ saveOp }}" style-hover="background:#5ab4e8">Save changes</button>
+</div>
+</sc-if>
+<sc-if value="{{ savedToast }}">
+<div style="position:absolute;right:28px;bottom:20px;display:flex;gap:8px;align-items:center;padding:10px 14px;border-radius:10px;background:#13283a;border:1px solid color-mix(in srgb,#6fd6b4 40%,transparent);font-size:13.5px;color:#6fd6b4"><i class="ph ph-check-circle"></i>{{ savedToast }}</div>
+</sc-if>
+</div>
+</div>
+</div>
+
+<ul style="margin:0;padding-left:18px;max-width:940px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+<li>Cerrar sesión, tema e idioma no van acá: son personales de cada usuario y siguen en el menú de la cuenta (el círculo con tus iniciales, arriba a la derecha). Club settings es solo lo del club y solo lo ve el Admin. Lo rediseñé para que el tema tenga Light / Dark / System y el idioma English / Español a un toque, en vez de botones que alternan.</li>
+<li>Arrastrar también funciona con teclado: foco en ⋮⋮ y flechas ↑ ↓ (la app hoy usa los botones justamente por esto, así no se pierde).</li>
+<li>Posiciones se guardan en el acto (como hoy): mover, función, renombrar y archivar. General, Pantalla de entrada y Packs juntan cambios y se guardan con la barra.</li>
+<li>Si cambiás de pestaña con algo sin guardar, queda el punto amarillo en esa pestaña.</li>
+</ul>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const POS = [
+  {id:'p1',en:'Goalkeeper',es:'Portero',cov:'goalkeeper'},
+  {id:'p2',en:'Full back',es:'Defensa',cov:'defence'},
+  {id:'p3',en:'Half back',es:'Medio defensivo',cov:'defence'},
+  {id:'p4',en:'Centre',es:'Centro',cov:'attack'},
+  {id:'p5',en:'Forward',es:null,cov:'attack'},
+  {id:'p6',en:'Utility',es:'Comodín',cov:''},
+  {id:'p7',en:'Sweeper',es:'Líbero',cov:'defence',arch:true}
+];
+const SESSION_CENTS = 1500;
+const money = c => 'A$' + (c/100).toFixed(2);
+const FALL = {en:{tag:'Your club, all in one place.', wel:'Sign in to see your schedule, RSVP to events and keep your details up to date.'}, es:{tag:'Tu club, todo en un lugar.', wel:'Entrá para ver tu agenda, confirmar asistencia y mantener tus datos al día.'}};
+const SWATCHES = ['#33A1E0','#2E9E86','#E0A33A','#D9667A','#8C7AE6'];
+const autoIni = n => n.trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+const isHex = s => /^#[0-9a-f]{6}$/i.test(s.trim());
+const GEN0 = {name:'Victoria Seadragons', initials:'', accent:'#33A1E0'};
+const SIGN0 = {en:{tag:'',wel:''}, es:{tag:'Bienvenidos a los Seadragons',wel:''}};
+const PACKS0 = [5,10,20];
+
+class Component extends DCLogic {
+  mtab = {mB:'positions', mC:'packs'}; listRefs = {}; 
+  state = { mtabD:'list', mtabE:'positions', mtabB:'positions', mtabC:'packs', mSheet:null, mDrag:null, mDraft:null, acct:true, theme:'dark', appLang:'en', tab:'positions', gen:{...GEN0}, genSaved:{...GEN0}, sign:JSON.parse(JSON.stringify(SIGN0)), signSaved:JSON.parse(JSON.stringify(SIGN0)), lang:'en',
+    pos:POS.map(p=>({...p})), edit:null, ed:{en:'',es:''}, newEn:'', newEs:'', archOpen:false, posNotice:null,
+    packs:[5,10,20,8], packsSaved:[...PACKS0], newPack:'', packErr:null, drag:null, over:null, toast:null };
+  note(t){ clearTimeout(this._n); this.setState({posNotice:t}); this._n = setTimeout(()=>this.setState({posNotice:null}), 2600); }
+  toast(t){ clearTimeout(this._t); this.setState({toast:t}); this._t = setTimeout(()=>this.setState({toast:null}), 2400); }
+  name(p){ return p.en || p.es; }
+  reorder(kind, from, to){
+    if(from===to || from<0 || to<0) return;
+    if(kind==='pos'){
+      const act = this.state.pos.filter(p=>!p.arch), arch = this.state.pos.filter(p=>p.arch);
+      if(to>=act.length) return; const [m] = act.splice(from,1); act.splice(to,0,m);
+      this.setState({pos:[...act, ...arch]}); this.note(`${this.name(m)} moved to ${to+1} of ${act.length} · saved`);
+    } else {
+      const a = [...this.state.packs]; if(to>=a.length) return; const [m] = a.splice(from,1); a.splice(to,0,m); this.setState({packs:a});
+    }
+  }
+  dnd(kind, i, len){
+    const s = this.state, key = kind+':'+i;
+    return {
+      dragStart: e=>{ e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain', key); }catch(x){} this.setState({drag:key}); },
+      dragOver: e=>{ if(!s.drag || !s.drag.startsWith(kind)) return; e.preventDefault(); if(s.over!==i) this.setState({over:i}); },
+      drop: e=>{ e.preventDefault(); const from = s.drag ? Number(s.drag.split(':')[1]) : -1; this.setState({drag:null, over:null}); this.reorder(kind, from, i); },
+      dragEnd: ()=>this.setState({drag:null, over:null}),
+      key: e=>{ if(e.key==='ArrowUp' && i>0){ e.preventDefault(); this.reorder(kind,i,i-1); this._focus = kind+(i-1); } else if(e.key==='ArrowDown' && i<len-1){ e.preventDefault(); this.reorder(kind,i,i+1); this._focus = kind+(i+1); } },
+      op: s.drag===key ? .45 : 1,
+      dropLine: s.drag && s.drag.startsWith(kind) && s.over===i && s.drag!==key ? 'inset 0 2px 0 #33a1e0' : 'none'
+    };
+  }
+  mdrag(P, kind, i, len){
+    const s = this.state, d = s.mDrag, ROW = 60;
+    const isMe = d && d.P===P && d.kind===kind && d.from===i;
+    const active = d && d.P===P && d.kind===kind;
+    return {
+      pd: e=>{ e.currentTarget.setPointerCapture && e.currentTarget.setPointerCapture(e.pointerId); this.setState({mDrag:{P, kind, from:i, y0:e.clientY, dy:0, to:i}}); },
+      pm: e=>{ const dd = this.state.mDrag; if(!dd || dd.P!==P || dd.kind!==kind || dd.from!==i) return; const dy = e.clientY-dd.y0; const to = Math.max(0, Math.min(len-1, i+Math.round(dy/ROW))); this.setState({mDrag:{...dd, dy, to}}); },
+      pu: ()=>{ const dd = this.state.mDrag; if(!dd || dd.from!==i || dd.P!==P) return; this.setState({mDrag:null}); this.reorder(kind, dd.from, dd.to); },
+      lift: isMe ? `translateY(${d.dy}px) scale(1.02)` : 'none',
+      z: isMe ? 5 : 1,
+      bg: isMe ? '#1d4869' : 'transparent',
+      line: isMe ? '0 8px 24px rgba(0,0,0,.45)' : (active && d.to===i && d.from!==i ? (d.to<d.from ? 'inset 0 2px 0 #33a1e0' : 'inset 0 -2px 0 #33a1e0') : 'none')
+    };
+  }
+  mob(P, base){
+    const s = this.state, tab = s['mtab'+P.slice(1)];
+    const act = s.pos.filter(p=>!p.arch);
+    const COVL = {'':'No role', goalkeeper:'Goalkeeper', defence:'Defence', attack:'Attack'};
+    const sheetP = s.mSheet && s.mSheet.P===P ? act.find(p=>p.id===s.mSheet.id) : null;
+    const dr = s.mDraft || {};
+    const dirtyOf = base._dirtyOf;
+    return {
+      tabs: [['general','General','ph-identification-card'],['signin','Sign-in','ph-sign-in'],['positions','Positions','ph-soccer-ball'],['packs','Packs','ph-ticket']].map(([k,l,ic])=>({label:l, icon:ic, on:tab===k, dirty:dirtyOf[k],
+        bg: tab===k?'#1d4869':'transparent', border: tab===k?'#33a1e0':'#274055', color: tab===k?'#e8f0f7':'#cfdeea', pick:()=>this.setState({['mtab'+P.slice(1)]:k, mSheet:null})})),
+      isList: tab==='list', notList: tab!=='list', back: ()=>this.setState({['mtab'+P.slice(1)]:'list', mSheet:null}),
+      title: {general:'General', signin:'Sign-in page', positions:'Positions', packs:'Session packs'}[tab] || '',
+      rows: [['general','General','ph-identification-card', base._sum.general],['signin','Sign-in page','ph-sign-in', base._sum.signin],['positions','Positions','ph-soccer-ball', base._sum.positions],['packs','Session packs','ph-ticket', base._sum.packs]].map(([k,l,ic,sum])=>({label:l, icon:ic, sum, dirty:dirtyOf[k], open:()=>this.setState({['mtab'+P.slice(1)]:k})})),
+      isGeneral: tab==='general', isSignin: tab==='signin', isPositions: tab==='positions', isPacks: tab==='packs',
+      pos: act.map((p,i)=>{ const nm = this.name(p); const other = base._L==='en' ? p.es : p.en;
+        return {...this.mdrag(P,'pos',i,act.length), name:nm, covText:COVL[p.cov||''], covColor:p.cov?'#cfdeea':'#8aa1b5', missing:!other, other: base._L==='en'?'No Spanish name':'No English name',
+          handleLabel:`Reorder ${nm}`, renameLabel:`Edit ${nm}`, open:()=>this.setState({mSheet:{P, id:p.id}, mDraft:{en:p.en||'', es:p.es||'', cov:p.cov||''}})}; }),
+      packs: s.packs.map((k,i)=>({...this.mdrag(P,'pack',i,s.packs.length), n:k, price:money(SESSION_CENTS*k), handleLabel:`Reorder pack of ${k}`, removeLabel:`Remove the ${k}-session pack`, remove:()=>this.setState(st=>({packs:st.packs.filter(x=>x!==k)}))})),
+      showBar: (tab==='general'||tab==='signin'||tab==='packs') && dirtyOf[tab],
+      discard: ()=>{ if(tab==='general') this.setState(st=>({gen:{...st.genSaved}})); if(tab==='signin') this.setState(st=>({sign:JSON.parse(JSON.stringify(st.signSaved))})); if(tab==='packs') this.setState(st=>({packs:[...st.packsSaved]})); },
+      save: ()=>{ if(tab==='general') this.setState(st=>({genSaved:{...st.gen}})); if(tab==='signin') this.setState(st=>({signSaved:JSON.parse(JSON.stringify(st.sign))})); if(tab==='packs') this.setState(st=>({packsSaved:[...st.packs]})); },
+      sheetOpen: !!sheetP, closeSheet: ()=>this.setState({mSheet:null}),
+      sh: sheetP ? {name:this.name(sheetP), en:dr.en, es:dr.es,
+        onEn:e=>this.setState(st=>({mDraft:{...st.mDraft, en:e.target.value}})), onEs:e=>this.setState(st=>({mDraft:{...st.mDraft, es:e.target.value}})),
+        covs: Object.keys(COVL).map(k=>({label:COVL[k], on:dr.cov===k, w:dr.cov===k?700:500, bg:dr.cov===k?'#1d4869':'#0c1a26', border:dr.cov===k?'#33a1e0':'#274055', color:dr.cov===k?'#e8f0f7':'#cfdeea', pick:()=>this.setState(st=>({mDraft:{...st.mDraft, cov:k}}))})),
+        archive: ()=>{ this.setState(st=>({pos:st.pos.map(x=>x.id===sheetP.id?{...x, arch:true}:x), mSheet:null})); this.note(this.name(sheetP)+' archived'); },
+        save: ()=>{ const en = (dr.en||'').trim()||null, es = (dr.es||'').trim()||null; if(!en && !es) return; this.setState(st=>({pos:st.pos.map(x=>x.id===sheetP.id?{...x, en, es, cov:dr.cov}:x), mSheet:null})); this.note('Saved'); }} : {}
+    };
+  }
+  componentDidUpdate(){ if(this._focus){ const k = this._focus; this._focus = null; requestAnimationFrame(()=>{ const kind = k.replace(/\d+$/,''), i = Number(k.match(/\d+$/)[0]); const btns = document.querySelectorAll(kind==='pos' ? '[aria-label^="Reorder "]' : '[aria-label^="Reorder pack"]'); const list = [...btns].filter(b => kind==='pos' ? !b.getAttribute('aria-label').startsWith('Reorder pack') : true); list[i] && list[i].focus(); }); } }
+  renderVals(){
+    const s = this.state, g = s.gen;
+    const genDirty = JSON.stringify(g)!==JSON.stringify(s.genSaved);
+    const signDirty = JSON.stringify(s.sign)!==JSON.stringify(s.signSaved);
+    const packsDirty = JSON.stringify(s.packs)!==JSON.stringify(s.packsSaved);
+    const dirtyOf = {general:genDirty, signin:signDirty, positions:false, packs:packsDirty};
+    const accentOk = isHex(g.accent);
+    const ini = (g.initials.trim() || autoIni(g.name)).toUpperCase();
+    const L = s.lang, other = L==='en'?'es':'en', sg = s.sign[L];
+    const act = s.pos.filter(p=>!p.arch), arch = s.pos.filter(p=>p.arch);
+    const setPos = (id, patch) => this.setState(st=>({pos:st.pos.map(p=>p.id===id?{...p,...patch}:p)}));
+    const n = Number(s.newPack);
+    const newPackPrice = s.newPack && n>=2 && n<=50 ? money(SESSION_CENTS*n) : '—';
+    const canAddPos = !!(s.newEn.trim()||s.newEs.trim());
+    const canAddPack = !!s.newPack;
+    const tabDirty = dirtyOf[s.tab];
+    const saveBlocked = s.tab==='general' && (!g.name.trim() || !accentOk);
+    const _base = {_dirtyOf:dirtyOf, _L:L, _sum:{
+      general: `Name, initials, colour ${g.accent}, logo`,
+      signin: ['en','es'].map(k=>(k==='en'?'English':'Español')+': '+((s.sign[k].tag||s.sign[k].wel)?'custom':'app text')).join(' · '),
+      positions: `${act.length} positions · ${arch.length} archived`,
+      packs: s.packs.length ? s.packs.length+' packs · '+s.packs.join(', ')+' sessions' : 'No packs'}};
+    return {
+      mB: this.mob('mB', _base), mC: this.mob('mC', _base), mD: this.mob('mD', _base), mE: this.mob('mE', _base),
+      langs2: [['en','English','ph-translate'],['es','Español','ph-translate']].map(([k,l,ic])=>({label:l, icon:ic, active:L===k, inactive:L!==k, pick:()=>this.setState({lang:k})})),
+      acctOpen:s.acct, toggleAcct:()=>this.setState(st=>({acct:!st.acct})), acctBg:s.acct?'#1d4869':'#163a55', acctRing:s.acct?'0 0 0 2px #33a1e0':'none',
+      themeOpts:[['light','Light','ph-sun'],['dark','Dark','ph-moon'],['system','System','ph-desktop']].map(([k,l,ic])=>({label:l, icon:ic, active:s.theme===k, inactive:s.theme!==k, pick:()=>this.setState({theme:k})})),
+      langOpts:[['en','English','ph-translate'],['es','Español','ph-translate']].map(([k,l,ic])=>({label:l, icon:ic, active:s.appLang===k, inactive:s.appLang!==k, pick:()=>this.setState({appLang:k})})),
+      nav:['Dashboard','Directory','Calendar','Attendance','Teams','Evaluations','News','Payments','Groups'],
+      tabs:[['general','General','ph-identification-card'],['signin','Sign-in page','ph-sign-in'],['positions','Positions','ph-soccer-ball'],['packs','Session packs','ph-ticket']].map(([k,l,ic])=>({label:l, icon:ic, on:s.tab===k, dirty:dirtyOf[k], color:s.tab===k?'#e8f0f7':'#8aa1b5', line:s.tab===k?'#33a1e0':'transparent', pick:()=>this.setState({tab:k, edit:null})})),
+      tabGeneral:s.tab==='general', tabSignin:s.tab==='signin', tabPositions:s.tab==='positions', tabPacks:s.tab==='packs',
+      clubName:g.name, nameCount:g.name.length+' / 60', nameEmpty:!g.name.trim(), nameBorder:!g.name.trim()?'#f2887a':'#274055',
+      onName:e=>this.setState(st=>({gen:{...st.gen, name:e.target.value.slice(0,60)}})),
+      initials:g.initials, autoInitials:autoIni(g.name), initialsShown:ini,
+      onInitials:e=>this.setState(st=>({gen:{...st.gen, initials:e.target.value.slice(0,3).toUpperCase()}})),
+      accent:g.accent, accentSafe: accentOk ? g.accent : s.genSaved.accent, accentBad:!accentOk, accentBorder:accentOk?'#274055':'#f2887a',
+      onAccent:e=>this.setState(st=>({gen:{...st.gen, accent:e.target.value.toUpperCase()}})),
+      swatches:SWATCHES.map(h=>({hex:h, ring: g.accent===h ? '0 0 0 2px #0c1a26, 0 0 0 4px #e8f0f7' : 'inset 0 0 0 1px rgba(255,255,255,.12)', pick:()=>this.setState(st=>({gen:{...st.gen, accent:h}}))})),
+      langs:[['en','English'],['es','Español']].map(([k,l])=>({label:l, active:L===k, inactive:L!==k, pick:()=>this.setState({lang:k})})),
+      langUp: L.toUpperCase(),
+      tagline:sg.tag, welcome:sg.wel, tagFallback:FALL[L].tag, welFallback:FALL[L].wel,
+      tagCount:sg.tag.length+' / 80', welCount:sg.wel.length+' / 400',
+      onTagline:e=>{ const v=e.target.value.slice(0,80); this.setState(st=>({sign:{...st.sign,[L]:{...st.sign[L], tag:v}}})); },
+      onWelcome:e=>{ const v=e.target.value.slice(0,400); this.setState(st=>({sign:{...st.sign,[L]:{...st.sign[L], wel:v}}})); },
+      tagShown: sg.tag.trim() || FALL[L].tag, welShown: sg.wel.trim() || FALL[L].wel,
+      otherLangNote: (s.sign[other].tag||s.sign[other].wel) ? `${other==='es'?'Español':'English'} has its own text.` : `${other==='es'?'Español':'English'} uses the app's text.`,
+      posNotice:s.posNotice,
+      posRows: act.map((p,i)=>{ const editing = s.edit===p.id; const nm = this.name(p);
+        const otherName = L==='en' ? p.es : p.en;
+        return {...this.dnd('pos', i, act.length), rank:i+1, name:nm,
+          other: otherName ? (L==='en'?'ES · ':'EN · ')+otherName : (L==='en'?'No Spanish name':'No English name'),
+          otherColor: otherName ? '#8aa1b5' : '#f2ce78',
+          bg: editing ? '#13283a' : 'transparent',
+          handleLabel:`Reorder ${nm}, position ${i+1} of ${act.length}`,
+          editing, notEditing:!editing, edEn:s.ed.en, edEs:s.ed.es,
+          onEdEn:e=>this.setState(st=>({ed:{...st.ed, en:e.target.value}})), onEdEs:e=>this.setState(st=>({ed:{...st.ed, es:e.target.value}})),
+          startEdit:()=>this.setState({edit:p.id, ed:{en:p.en||'', es:p.es||''}}),
+          cancelEdit:()=>this.setState({edit:null}),
+          saveEdit:()=>{ const en=s.ed.en.trim()||null, es=s.ed.es.trim()||null; if(!en&&!es) return; setPos(p.id,{en,es}); this.setState({edit:null}); this.note('Name saved'); },
+          cov:p.cov, covColor:p.cov?'#e8f0f7':'#8aa1b5', covLabel:`Role in auto-balance for ${nm}`,
+          onCov:e=>{ setPos(p.id,{cov:e.target.value}); this.note(`${nm}: ${e.target.value ? e.target.value[0].toUpperCase()+e.target.value.slice(1) : 'no role'} · saved`); },
+          renameLabel:`Rename ${nm}`, archiveLabel:`Archive ${nm}`,
+          archive:()=>{ setPos(p.id,{arch:true}); this.note(`${nm} archived`); }}; }),
+      newEn:s.newEn, newEs:s.newEs, onNewEn:e=>this.setState({newEn:e.target.value}), onNewEs:e=>this.setState({newEs:e.target.value}),
+      addBg: canAddPos?'#33a1e0':'#274055', addColor: canAddPos?'#0c1a26':'#8aa1b5',
+      addPos:e=>{ e.preventDefault(); if(!canAddPos) return; const p = {id:'n'+Date.now(), en:s.newEn.trim()||null, es:s.newEs.trim()||null, cov:''};
+        this.setState(st=>({pos:[...st.pos.filter(x=>!x.arch), p, ...st.pos.filter(x=>x.arch)], newEn:'', newEs:''})); this.note(`${this.name(p)} added`); },
+      archOpen:s.archOpen, archCaret:s.archOpen?'ph-caret-down':'ph-caret-right', archCount:arch.length, archEmpty:arch.length===0,
+      toggleArch:()=>this.setState(st=>({archOpen:!st.archOpen})),
+      archRows: arch.map(p=>({name:this.name(p), other: (L==='en'?p.es:p.en)||'', restore:()=>{ this.setState(st=>({pos:[...st.pos.filter(x=>!x.arch), {...p, arch:false}, ...st.pos.filter(x=>x.arch && x.id!==p.id)]})); this.note(`${this.name(p)} reactivated`); }})),
+      sessionPrice: money(SESSION_CENTS),
+      packRows: s.packs.map((k,i)=>({...this.dnd('pack', i, s.packs.length), n:k, label:`${k} sessions`, price:money(SESSION_CENTS*k), bg:'transparent',
+        handleLabel:`Reorder pack of ${k}, position ${i+1} of ${s.packs.length}`, removeLabel:`Remove the ${k}-session pack`,
+        remove:()=>this.setState(st=>({packs:st.packs.filter(x=>x!==k)}))})),
+      packsEmpty: s.packs.length===0,
+      newPack:s.newPack, onNewPack:e=>this.setState({newPack:e.target.value, packErr:null}), newPackPrice,
+      packErr:s.packErr, packBorder:s.packErr?'#f2887a':'#274055',
+      addPackBg: canAddPack?'#33a1e0':'#274055', addPackColor: canAddPack?'#0c1a26':'#8aa1b5',
+      addPack:e=>{ e.preventDefault(); if(!s.newPack) return; if(!(Number.isInteger(n) && n>=2 && n<=50)) return this.setState({packErr:'Between 2 and 50.'}); if(s.packs.includes(n)) return this.setState({packErr:'Already in the list.'}); this.setState(st=>({packs:[...st.packs, n], newPack:'', packErr:null})); },
+      showBar: tabDirty, saveOp: saveBlocked ? .45 : 1,
+      barText: s.tab==='packs' ? 'Unsaved changes to session packs' : s.tab==='signin' ? 'Unsaved changes to the sign-in page' : 'Unsaved changes to the club details',
+      discard:()=>{ if(s.tab==='general') this.setState(st=>({gen:{...st.genSaved}})); if(s.tab==='signin') this.setState(st=>({sign:JSON.parse(JSON.stringify(st.signSaved))})); if(s.tab==='packs') this.setState(st=>({packs:[...st.packsSaved]})); },
+      save:()=>{ if(saveBlocked) return; if(s.tab==='general') this.setState(st=>({genSaved:{...st.gen}})); if(s.tab==='signin') this.setState(st=>({signSaved:JSON.parse(JSON.stringify(st.sign))})); if(s.tab==='packs') this.setState(st=>({packsSaved:[...st.packs]})); this.toast('Saved'); },
+      savedToast: !tabDirty && s.toast ? s.toast : null
+    };
+  }
+}
+</script>
+</body>
+</html>
