@@ -10062,9 +10062,16 @@ for (const state of CLUB_SETTINGS_STATES) {
    (escritorio) y 06-mobile-account.png (la pantalla Cuenta del móvil).
    --------------------------------------------------------------------------- */
 
+const CLUB_COMMITTEE_STORAGE_STATE = roleRequestStorageStatePath(
+  "committee-de-configuracion",
+);
+
+/** El Committee y no el Admin: el Admin sembrado lleva en el nombre el id de
+ * la corrida, y el nombre sale arriba del menú. El Committee también ve la
+ * configuración del club (#469), abierta en Packs, que es lo único suyo. */
 const ACCOUNT_MENU_ON_CLUB: ClubSettingsState = {
   name: "cuenta-menu",
-  tab: "general",
+  tab: "packs",
 };
 
 /** El nombre de la captura: el móvil es la pantalla Cuenta, y el resto el
@@ -10088,7 +10095,7 @@ async function openAccountMenuOnClub(
 test.describe("menú de la cuenta sobre la configuración del club (#716)", () => {
   skipWithoutSession();
   quietNotificationBell();
-  test.use({ storageState: ADMIN_STORAGE_STATE });
+  test.use({ storageState: CLUB_COMMITTEE_STORAGE_STATE });
 
   for (const vp of viewports) {
     test.describe(`@ ${vp.name}`, () => {
@@ -10186,9 +10193,6 @@ test.describe("menú de la cuenta sobre la configuración del club (#716)", () =
    móvil (07-mobile-settings-list.png) y el Committee, que sólo ve Packs.
    --------------------------------------------------------------------------- */
 
-const CLUB_COMMITTEE_STORAGE_STATE = roleRequestStorageStatePath(
-  "committee-de-configuracion",
-);
 const CLUB_SECTIONS_MOBILE = viewports.filter((vp) => vp.name === "mobile");
 const CLUB_SECTIONS_WIDE = viewports.filter((vp) => vp.name !== "mobile");
 const CLUB_SECTIONS_COMMITTEE = viewports.filter((vp) => vp.name !== "tablet");
