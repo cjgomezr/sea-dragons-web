@@ -3,33 +3,24 @@
 import { useSyncExternalStore } from "react";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
+import { type Theme, nextTheme } from "@/lib/theme";
 import {
-  THEME_STORAGE_KEY,
-  type Theme,
-  nextTheme,
-  resolveInitialTheme,
-} from "@/lib/theme";
+  THEME_CHANGE_EVENT,
+  chooseThemePreference,
+  readAppliedTheme,
+  subscribeToSystemScheme,
+} from "@/lib/theme-preference";
 
-// Same-tab writes do not fire `storage`, so the toggle announces its own change.
-const THEME_CHANGE_EVENT = "seadragons:themechange";
-
+// Under `system` the painted theme also moves when the operating system does.
 function subscribe(onStoreChange: () => void): () => void {
   window.addEventListener(THEME_CHANGE_EVENT, onStoreChange);
   window.addEventListener("storage", onStoreChange);
+  const unsubscribeFromSystem = subscribeToSystemScheme(onStoreChange);
   return () => {
     window.removeEventListener(THEME_CHANGE_EVENT, onStoreChange);
     window.removeEventListener("storage", onStoreChange);
+    unsubscribeFromSystem();
   };
-}
-
-// Reads storage, never `data-theme`. Deriving the snapshot from the attribute
-// this component also writes creates a feedback loop that latches the theme to
-// whatever the hydration render happened to guess.
-function readStoredTheme(): Theme {
-  return resolveInitialTheme(
-    window.localStorage.getItem(THEME_STORAGE_KEY),
-    window.matchMedia("(prefers-color-scheme: dark)").matches,
-  );
 }
 
 // The server cannot know a visitor's stored choice. ThemeScript has already
@@ -43,16 +34,13 @@ export function ThemeToggle({ locale }: { locale: Locale }): React.JSX.Element {
   const translate = createTranslator(locale);
   const theme = useSyncExternalStore(
     subscribe,
-    readStoredTheme,
+    readAppliedTheme,
     readServerTheme,
   );
   const isDark = theme === "dark";
 
   function handleToggle(): void {
-    const updated = nextTheme(theme);
-    window.localStorage.setItem(THEME_STORAGE_KEY, updated);
-    document.documentElement.dataset.theme = updated;
-    window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
+    chooseThemePreference(nextTheme(theme));
   }
 
   return (
