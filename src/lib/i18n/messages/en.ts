@@ -1493,7 +1493,17 @@ export const englishMessages = {
   "calendar.form.image.uploadFailed":
     "We couldn't upload the image. Try again.",
   "calendar.form.location": "Location",
-  "calendar.form.locationPlaceholder": "e.g. MSAC Dive Pool",
+  "calendar.form.locationPlaceholder": "Search for a place or type it",
+  "calendar.form.place.suggestions": "Suggested places",
+  "calendar.form.place.freeText":
+    "Or keep what you typed as free text (it won't open a map).",
+  "calendar.form.place.searchUnavailable":
+    "Place search isn't available right now. Pick one of the club's places or keep what you typed.",
+  "calendar.form.place.checkOnMap": "Check on map",
+  "calendar.form.place.change": "Change the place",
+  "calendar.form.place.detail": "Where exactly",
+  "calendar.form.place.optional": "optional",
+  "calendar.form.place.detailPlaceholder": "e.g. Field 2, near the pavilion",
   "calendar.form.notes": "Notes",
   "calendar.form.repeat": "Repeat",
   "calendar.form.repeat.none": "One-time",
@@ -1510,6 +1520,12 @@ export const englishMessages = {
     "Write a title of up to {max} characters.",
   "calendar.form.issue.event_location_invalid":
     "Write a location of up to {max} characters.",
+  "calendar.form.issue.event_place_invalid":
+    "That place can't be saved. Choose another one or keep the text.",
+  "calendar.form.issue.event_place_coordinates_invalid":
+    "That place's position isn't valid. Choose another one or keep the text.",
+  "calendar.form.issue.event_place_detail_invalid":
+    "Where exactly can be up to {max} characters.",
   "calendar.form.issue.event_notes_too_long":
     "The notes can be up to {max} characters long.",
   "calendar.form.issue.event_audience_empty":

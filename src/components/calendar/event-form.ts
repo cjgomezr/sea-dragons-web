@@ -11,6 +11,7 @@ import type {
 } from "@/lib/events/event-creation";
 import type { EventEdit } from "@/lib/events/event-management";
 import type { IsoWeekday } from "@/lib/events/event-occurrences";
+import { type EventPlace, isSamePlace } from "@/lib/events/event-place";
 import type { SeriesEdit } from "@/lib/events/series-management";
 import type { EndScope } from "./event-end";
 
@@ -56,7 +57,13 @@ export type EventForm = {
   /** La fecha de fin de un evento de varios días. `endsOn` es la de la
    * serie. */
   readonly endDate: string;
+  /** Lo escrito en el buscador de lugares: el texto libre si no se elige
+   * ninguno, y lo que vuelve al quitar el elegido (#652). */
   readonly location: string;
+  /** El lugar elegido del buscador; nulo con texto libre. */
+  readonly place: EventPlace | null;
+  /** "Dónde exactamente": sólo va con un lugar elegido. */
+  readonly placeDetail: string;
   readonly notes: string;
   readonly audience: AudienceChoice;
   readonly cover: EventCoverChange;
@@ -77,6 +84,8 @@ export const EMPTY_EVENT_FORM: EventForm = {
   endsAnotherDay: false,
   endDate: "",
   location: "",
+  place: null,
+  placeDetail: "",
   notes: "",
   audience: { kind: "club", groupIds: new Set() },
   cover: { kind: "keep" },
@@ -92,6 +101,7 @@ export type EventFormField =
   | "endTime"
   | "endDate"
   | "location"
+  | "placeDetail"
   | "notes"
   | "audience"
   | "cover";
@@ -106,11 +116,6 @@ export type FieldIssueCode = Exclude<
   | "event_cancelled"
   | "series_without_upcoming"
   | "occurrence_started"
-  // El formulario todavía no elige un lugar: lo pone #646, que también
-  // traduce estos tres junto a su campo.
-  | "event_place_invalid"
-  | "event_place_coordinates_invalid"
-  | "event_place_detail_invalid"
 >;
 
 export type EventFormIssue = {
@@ -121,6 +126,10 @@ export type EventFormIssue = {
 const ISSUE_FIELDS: Readonly<Record<FieldIssueCode, EventFormField>> = {
   event_title_invalid: "title",
   event_location_invalid: "location",
+  // El lugar elegido sustituye al campo de texto: su motivo va donde estaba.
+  event_place_invalid: "location",
+  event_place_coordinates_invalid: "location",
+  event_place_detail_invalid: "placeDetail",
   event_notes_too_long: "notes",
   event_audience_empty: "audience",
   event_audience_foreign_group: "audience",
@@ -185,16 +194,43 @@ export function endScopeOf(layout: EventFormLayout, form: EventForm): EndScope {
     : "event";
 }
 
+/** Un lugar elegido es el lugar, aunque el buscador se quedara en blanco. */
+function isBlank(form: EventForm, field: RequiredField): boolean {
+  if (field === "location" && form.place !== null) {
+    return false;
+  }
+  return form[field].trim() === "";
+}
+
 /** Los campos obligatorios que siguen en blanco, en el orden del diálogo. */
 export function listMissingFields(form: EventForm): readonly EventFormIssue[] {
   return requiredFields(form)
-    .filter((field) => form[field].trim() === "")
+    .filter((field) => isBlank(form, field))
     .map((field) => ({ field, code: "required" }));
 }
 
 /** Las notas en blanco son ninguna. */
 function toNotes(notes: string): string | null {
   return notes.trim() === "" ? null : notes;
+}
+
+/** "Dónde exactamente" en blanco es ninguno. */
+function toPlaceDetail(placeDetail: string): string | null {
+  return placeDetail.trim() === "" ? null : placeDetail;
+}
+
+/** Dónde al crear: el lugar elegido con su detalle, o sólo el texto libre
+ * (#645). Con lugar, `location` es su nombre, como lo guarda el servidor. */
+function whereFields(
+  form: EventForm,
+): Pick<EventDraft, "location" | "place" | "placeDetail"> {
+  return form.place === null
+    ? { location: form.location }
+    : {
+        location: form.place.name,
+        place: form.place,
+        placeDetail: toPlaceDetail(form.placeDetail),
+      };
 }
 
 function toAudience(choice: AudienceChoice): EventAudience {
@@ -223,7 +259,7 @@ export function toEventDraft(form: EventForm): EventDraft {
     eventType: form.eventType,
     startTime: form.startTime,
     endTime: form.endTime,
-    location: form.location,
+    ...whereFields(form),
     notes: toNotes(form.notes),
     audience: toAudience(form.audience),
     ...coverField(form.cover),
@@ -265,6 +301,8 @@ export function formFromEvent(
     endDate: event.endsOn ?? "",
     belongsToSeries: event.seriesId !== null,
     location: event.location,
+    place: event.place,
+    placeDetail: event.placeDetail ?? "",
     notes: details.notes ?? "",
     audience:
       details.audience.kind === "club"
@@ -290,6 +328,27 @@ function isSameAudience(
   );
 }
 
+/** Lo que cambió de dónde (#645): el lugar nuevo, sólo su detalle, o el
+ * texto libre. Volver al texto libre manda el texto aunque sea el mismo: es
+ * lo que le dice al servidor que quite el lugar elegido. */
+function listWhereChanges(
+  initial: EventForm,
+  form: EventForm,
+): Pick<SeriesEdit, "location" | "place" | "placeDetail"> {
+  if (form.place === null) {
+    return initial.place === null && form.location === initial.location
+      ? {}
+      : { location: form.location };
+  }
+  const placeDetail = toPlaceDetail(form.placeDetail);
+  return {
+    ...(isSamePlace(form.place, initial.place) ? {} : { place: form.place }),
+    ...(placeDetail === toPlaceDetail(initial.placeDetail)
+      ? {}
+      : { placeDetail }),
+  };
+}
+
 /** Lo que cambió de lo que comparten un evento y una serie. */
 export function listSeriesChanges(
   initial: EventForm,
@@ -305,7 +364,7 @@ export function listSeriesChanges(
       ? {}
       : { startTime: form.startTime }),
     ...(form.endTime === initial.endTime ? {} : { endTime: form.endTime }),
-    ...(form.location === initial.location ? {} : { location: form.location }),
+    ...listWhereChanges(initial, form),
     ...(notes === toNotes(initial.notes) ? {} : { notes }),
     ...(isSameAudience(form.audience, initial.audience)
       ? {}

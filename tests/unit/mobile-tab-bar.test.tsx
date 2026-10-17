@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileTabBar } from "@/components/MobileTabBar";
@@ -538,5 +538,162 @@ describe("cierre del menú Más (#577)", () => {
     await user.click(moreButton());
 
     expectMenuClosed();
+  });
+});
+
+// #703: Chrome en el iPhone esconde su barra de abajo y la ventana visible
+// crece, pero la barra de pestañas se queda donde estaba. La barra sigue el
+// fondo de `visualViewport`; cómo se ve lo prueba Playwright.
+describe("barra pegada al fondo de la ventana visible", () => {
+  const PHONE_QUERY = "(width < 768px)";
+  const BAR_BOTTOM = 664;
+
+  class FakeVisualViewport extends EventTarget {
+    height = BAR_BOTTOM;
+    offsetTop = 0;
+    scale = 1;
+  }
+
+  function stubPhoneScreen(isPhone: boolean): void {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: isPhone && query === PHONE_QUERY,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }));
+  }
+
+  function stubVisualViewport(): FakeVisualViewport {
+    const visualViewport = new FakeVisualViewport();
+    vi.stubGlobal("visualViewport", visualViewport);
+    return visualViewport;
+  }
+
+  /** jsdom no maqueta: la barra dice dónde está su borde, sin el transform. */
+  function stubBarBottom(): void {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement): DOMRect {
+        const offset = Number(
+          /translateY\((-?[\d.]+)px\)/.exec(this.style.transform)?.[1] ?? 0,
+        );
+        return DOMRect.fromRect({ y: 0, height: BAR_BOTTOM + offset });
+      },
+    );
+  }
+
+  function renderPhoneBar(): ReturnType<typeof render> {
+    usePathname.mockReturnValue("/dashboard");
+    return render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Player", membershipCurrent: true }}
+      />,
+    );
+  }
+
+  function tabBar(): HTMLElement {
+    return screen.getByRole("navigation");
+  }
+
+  function emit(visualViewport: FakeVisualViewport, type: string): void {
+    act(() => {
+      visualViewport.dispatchEvent(new Event(type));
+    });
+  }
+
+  beforeEach(() => stubBarBottom());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("baja la barra cuando la ventana visible crece al cambiar de tamaño", () => {
+    stubPhoneScreen(true);
+    const visualViewport = stubVisualViewport();
+    renderPhoneBar();
+
+    visualViewport.height = BAR_BOTTOM + 49;
+    emit(visualViewport, "resize");
+
+    expect(tabBar().style.transform).toBe("translateY(49px)");
+  });
+
+  it("recoloca la barra al hacer scroll", () => {
+    stubPhoneScreen(true);
+    const visualViewport = stubVisualViewport();
+    renderPhoneBar();
+    visualViewport.height = BAR_BOTTOM + 49;
+    emit(visualViewport, "resize");
+
+    visualViewport.height = BAR_BOTTOM;
+    emit(visualViewport, "scroll");
+
+    expect(tabBar().style.transform).toBe("");
+  });
+
+  it("no desplaza la barra cuando ya coincide con el fondo visible", () => {
+    stubPhoneScreen(true);
+    stubVisualViewport();
+
+    renderPhoneBar();
+
+    expect(tabBar().style.transform).toBe("");
+  });
+
+  it("deja la barra abajo cuando el teclado encoge la ventana visible", () => {
+    stubPhoneScreen(true);
+    const visualViewport = stubVisualViewport();
+    renderPhoneBar();
+    const field = document.createElement("input");
+    document.body.append(field);
+    field.focus();
+
+    visualViewport.height = BAR_BOTTOM - 300;
+    emit(visualViewport, "resize");
+
+    expect(tabBar().style.transform).toBe("");
+    field.remove();
+  });
+
+  it("deja de escuchar la ventana visible al desmontarse", () => {
+    stubPhoneScreen(true);
+    const visualViewport = stubVisualViewport();
+    const addListener = vi.spyOn(visualViewport, "addEventListener");
+    const removeListener = vi.spyOn(visualViewport, "removeEventListener");
+    const { unmount } = renderPhoneBar();
+
+    unmount();
+
+    const added = addListener.mock.calls.map(([type, listener]) => [
+      type,
+      listener,
+    ]);
+    const removed = removeListener.mock.calls.map(([type, listener]) => [
+      type,
+      listener,
+    ]);
+    expect(added.map(([type]) => type).sort()).toEqual(["resize", "scroll"]);
+    expect(removed).toEqual(added);
+  });
+
+  it("no escucha la ventana visible a 768 px o más", () => {
+    stubPhoneScreen(false);
+    const visualViewport = stubVisualViewport();
+    const addListener = vi.spyOn(visualViewport, "addEventListener");
+
+    renderPhoneBar();
+
+    expect(addListener).not.toHaveBeenCalled();
+  });
+
+  it("se queda como hoy en un navegador sin visualViewport", () => {
+    stubPhoneScreen(true);
+    vi.stubGlobal("visualViewport", undefined);
+
+    renderPhoneBar();
+
+    expect(tabBar().style.transform).toBe("");
   });
 });

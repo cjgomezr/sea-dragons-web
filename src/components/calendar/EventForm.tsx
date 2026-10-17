@@ -30,6 +30,7 @@ import {
   TypeField,
   WeekdaysField,
 } from "./EventFormFields";
+import { EventPlaceField } from "./EventPlaceField";
 import { EventWhenField } from "./EventWhenField";
 import { useEventCover } from "./use-event-cover";
 
@@ -176,12 +177,15 @@ export function EventForm({
     setForm((current) => ({ ...current, ...change }));
     // Sólo se va el aviso del campo que cambió: los demás siguen guiando. El
     // de Termina habla del cuándo entero, así que se va con cualquier parte.
+    // Elegir o quitar un lugar cambia lo que se pinta en Lugar.
     const isWhenChange = WHEN_FIELDS.some((field) => field in change);
+    const isPlaceChange = "place" in change;
     setIssues((current) =>
       current.filter(
         (issue) =>
           !(issue.field in change) &&
-          !(isWhenChange && issue.field === "endTime"),
+          !(isWhenChange && issue.field === "endTime") &&
+          !(isPlaceChange && issue.field === "location"),
       ),
     );
   }
@@ -294,13 +298,7 @@ export function EventForm({
         {layout === "create" && form.repeat === "weekly" ? (
           <WeeklyFields {...fieldProps} />
         ) : null}
-        <InputField
-          {...fieldProps}
-          field="location"
-          type="text"
-          label={translate("calendar.form.location")}
-          placeholder={translate("calendar.form.locationPlaceholder")}
-        />
+        <EventPlaceField {...fieldProps} />
         <NotesField {...fieldProps} />
         <AudienceField
           translate={translate}

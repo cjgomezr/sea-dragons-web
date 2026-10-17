@@ -16,6 +16,7 @@ import {
   type EventDraft,
   SERIES_MAX_DAYS,
 } from "@/lib/events/event-creation";
+import { PLACE_DETAIL_MAX_LENGTH } from "@/lib/events/event-place";
 import type { Translator } from "@/lib/i18n/translator";
 import { NEWS_ATTACHMENT_MAX_BYTES } from "@/lib/news/news-attachments";
 import {
@@ -140,6 +141,12 @@ export function describeEventIssue(
       return translate("calendar.form.issue.event_cover_too_large", {
         max: COVER_MAX_MEGABYTES,
       });
+    case "event_place_detail_invalid":
+      return translate("calendar.form.issue.event_place_detail_invalid", {
+        max: PLACE_DETAIL_MAX_LENGTH,
+      });
+    case "event_place_invalid":
+    case "event_place_coordinates_invalid":
     case "event_audience_empty":
     case "event_audience_foreign_group":
     case "event_in_past":
