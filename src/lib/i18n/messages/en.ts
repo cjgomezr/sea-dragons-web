@@ -1603,6 +1603,7 @@ export const englishMessages = {
   "calendar.panel.when": "When",
   "calendar.panel.repeats": "Repeats",
   "calendar.panel.place": "Where",
+  "calendar.panel.addToCalendar": "Add to my calendar",
   "calendar.panel.copyAddress": "Copy address",
   "calendar.panel.addressCopied": "Address copied",
   "calendar.panel.copyFailed": "Couldn't copy",

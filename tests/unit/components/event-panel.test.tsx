@@ -10,6 +10,11 @@ import type {
 } from "@/lib/events/event-agenda";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
 
+const saveFile = vi.fn<(file: Blob, filename: string) => void>();
+vi.mock("@/components/save-file", () => ({
+  saveFile: (file: Blob, filename: string) => saveFile(file, filename),
+}));
+
 /**
  * El panel del evento en escritorio (#648, RF-4 y RF-7 del PRD de E24): elegir
  * una fila llena el panel de la derecha con todo lo del evento, en lugar del
@@ -217,6 +222,7 @@ afterEach(() => {
   calls.length = 0;
   savedResponses.clear();
   vi.unstubAllGlobals();
+  saveFile.mockReset();
   Reflect.deleteProperty(navigator, "clipboard");
 });
 
@@ -514,6 +520,67 @@ describe("bloque de hora", () => {
 
     expect(
       within(panel).getByText("miércoles, 14 de octubre"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("agregar a mi calendario", () => {
+  /** El archivo que se guardó, con su nombre y su texto. */
+  async function savedCalendar(): Promise<{ name: string; text: string }> {
+    expect(saveFile).toHaveBeenCalledOnce();
+    const call = saveFile.mock.lastCall;
+    if (call === undefined) {
+      throw new Error("No se guardó ningún archivo");
+    }
+    const [file, name] = call;
+    return { name, text: await file.text() };
+  }
+
+  it("descarga el .ics de la sesión con el título por nombre", async () => {
+    stubApi([TRIVIA_NIGHT], {
+      [TRIVIA_NIGHT.id]: { notes: "Bring a gold coin" },
+    });
+    renderAgenda();
+    const panel = await findLoadedPanel(TRIVIA_NIGHT.title);
+
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Add to my calendar" }),
+    );
+
+    const { name, text } = await savedCalendar();
+    expect(name).toBe("Fundraiser trivia night.ics");
+    expect(text).toContain(`UID:${TRIVIA_NIGHT.id}@`);
+    expect(text).toContain("SUMMARY:Fundraiser trivia night");
+    expect(text).toContain(
+      "LOCATION:Seadragons Clubhouse\\, 12 Beach Rd\\, St Kilda VIC 3182",
+    );
+    expect(text).toContain("DESCRIPTION:Bring a gold coin");
+    expect(text).toContain("DTSTART;TZID=Australia/Melbourne:20261014T180000");
+  });
+
+  it("de una sesión de una serie baja sólo esa sesión", async () => {
+    stubApi([OPEN_TRAINING], { [OPEN_TRAINING.id]: { series: WEDNESDAYS } });
+    renderAgenda();
+    const panel = await findLoadedPanel(OPEN_TRAINING.title);
+
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Add to my calendar" }),
+    );
+
+    const { text } = await savedCalendar();
+    const vevent = text.slice(text.indexOf("BEGIN:VEVENT"));
+    expect(vevent).toContain(`UID:${OPEN_TRAINING.id}@`);
+    expect(vevent).not.toContain("RRULE");
+  });
+
+  it("se anuncia en español", async () => {
+    stubApi([TRIVIA_NIGHT]);
+    renderAgenda({ locale: "es" });
+
+    const panel = await findPanel(TRIVIA_NIGHT.title);
+
+    expect(
+      within(panel).getByRole("button", { name: "Agregar a mi calendario" }),
     ).toBeInTheDocument();
   });
 });
