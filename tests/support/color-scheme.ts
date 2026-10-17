@@ -1,12 +1,11 @@
 import { vi } from "vitest";
+import { DARK_SCHEME_QUERY } from "@/lib/theme";
 
 /**
  * Un doble de `matchMedia` para el esquema de color del sistema, que se puede
  * cambiar con la página abierta: `setPrefersDark` avisa a quien escuche
  * `change`, como hace el navegador. Se deshace con `vi.unstubAllGlobals()`.
  */
-
-const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
 export type ColorSchemeControl = {
   readonly setPrefersDark: (prefersDark: boolean) => void;
