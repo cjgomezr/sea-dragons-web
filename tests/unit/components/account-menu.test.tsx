@@ -1,7 +1,7 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AccountMenu } from "@/components/AccountMenu";
+import { AccountMenu, requestAccountMenu } from "@/components/AccountMenu";
 import {
   ACCOUNT_PAGE_PATH,
   CLUB_SETTINGS_PATH,
@@ -223,6 +223,17 @@ describe("menú de la cuenta", () => {
 
     expect(queryMenu()).toBeNull();
     expect(accountButton()).toHaveFocus();
+  });
+
+  // #718: la lista de la configuración en el móvil vuelve a la cuenta.
+  it("se abre cuando otra pantalla lo pide, con el foco dentro", () => {
+    renderMenu();
+
+    act(() => requestAccountMenu());
+
+    const menu = screen.getByRole("region", { name: "My account" });
+    expect(accountButton()).toHaveAttribute("aria-expanded", "true");
+    expect(within(menu).getByRole("heading")).toHaveFocus();
   });
 
   it("al abrirse lleva el foco dentro del menú", async () => {

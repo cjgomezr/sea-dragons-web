@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import { ClubSettingsScreen } from "@/components/club/ClubSettingsScreen";
 import { readCallerRole } from "@/lib/auth/caller-role";
 import { hasCapability } from "@/lib/auth/roles";
+import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { readMetadataContext } from "@/lib/club/metadata-context";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 
 /**
  * La configuración del club (#296, RF-6 del PRD de E18a): nombre, iniciales,
- * acento y logo, y los packs de sesiones (#469).
+ * acento y logo, y los packs de sesiones (#469). La sección abierta va en
+ * `?tab=` (#718), y la lee la pantalla.
  *
  * `RESTRICTED_ROUTES` la reserva al Admin y al Committee: a los demás la
  * frontera los manda al panel antes de llegar aquí. El rol sólo decide qué
@@ -24,9 +26,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ClubSettingsPage(): Promise<React.JSX.Element> {
-  const [locale, role] = await Promise.all([
+  const [locale, role, brand] = await Promise.all([
     readRequestLocale(),
     readCallerRole(),
+    readClubBrand(),
   ]);
   return (
     <ClubSettingsScreen
@@ -34,6 +37,7 @@ export default async function ClubSettingsPage(): Promise<React.JSX.Element> {
       // La matriz del SRD no tiene una fila para configurar el club, y la
       // única que es sólo del Admin es esta.
       canManageClub={hasCapability(role, "manageUsersAndRoles")}
+      club={brand}
     />
   );
 }

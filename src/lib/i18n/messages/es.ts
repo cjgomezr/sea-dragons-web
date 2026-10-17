@@ -1705,7 +1705,7 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.metaDescription":
     "El nombre, las iniciales, el color de acento y el logo del club, tal como los ven los miembros en cada pantalla.",
   "clubSettings.title": "Configuración del club",
-  "clubSettings.lead": "Lo que ven los socios y cómo está montado el club.",
+  "clubSettings.lead": "Lo que ven los miembros y cómo está montado el club.",
   "clubSettings.loading": "Cargando la configuración del club…",
   "clubSettings.sections.label": "Secciones de la configuración",
   "clubSettings.sections.general": "General",

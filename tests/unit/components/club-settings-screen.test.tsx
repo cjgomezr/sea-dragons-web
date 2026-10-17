@@ -5,6 +5,8 @@ import { ClubSettingsScreen } from "@/components/club/ClubSettingsScreen";
 import { evaluateAccentColor } from "@/lib/club/accent-color";
 import type { ClubSettings } from "@/lib/club/club-settings";
 import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
+import { visit } from "../../support/location-search-params";
+import { stubScreenWidth } from "../../support/screen-width";
 
 /**
  * La pantalla de configuración del club (#296, RF-6 del PRD de E18a): carga
@@ -33,7 +35,13 @@ const STORED: ClubSettings = {
 };
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+vi.mock("next/navigation", async () => ({
+  ...(await import("../../support/location-search-params")),
+  useRouter: () => ({ refresh }),
+}));
+
+/** La fila del club de la lista del móvil (#718); aquí no se ve. */
+const CLUB = { name: STORED.name, initials: "HH", logoUrl: null } as const;
 
 type Stub = {
   readonly settings?: ClubSettings;
@@ -104,7 +112,7 @@ function stubApi(stub: Stub = {}): void {
 }
 
 async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
-  render(<ClubSettingsScreen locale={locale} canManageClub />);
+  render(<ClubSettingsScreen locale={locale} canManageClub club={CLUB} />);
   await screen.findByRole("button", {
     name: /save settings|guardar la configuración/i,
   });
@@ -144,6 +152,9 @@ beforeEach(() => {
   patches.length = 0;
   loads = 0;
   refresh.mockClear();
+  visit("/club");
+  // El escritorio, que abre en General (#718).
+  stubScreenWidth(false);
 });
 
 afterEach(() => {
@@ -200,7 +211,7 @@ describe("pantalla de configuración: carga", () => {
           : jsonResponse(200, { data: STORED });
       },
     });
-    render(<ClubSettingsScreen locale="en" canManageClub />);
+    render(<ClubSettingsScreen locale="en" canManageClub club={CLUB} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't reach the server.",
@@ -215,7 +226,7 @@ describe("pantalla de configuración: carga", () => {
   it("no habla de guardar cuando lo que falló fue la carga", async () => {
     stubApi({ load: () => errorResponse(500, "internal_error") });
 
-    render(<ClubSettingsScreen locale="en" canManageClub />);
+    render(<ClubSettingsScreen locale="en" canManageClub club={CLUB} />);
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(
@@ -707,27 +718,32 @@ describe("guardado del color", () => {
 });
 
 describe("los packs de sesiones en la pantalla (#469)", () => {
-  it("un Admin ve la sección de los packs junto a lo demás", async () => {
+  it("un Admin ve la sección de los packs en su pestaña (#718)", async () => {
     stubApi();
-
     await renderScreen();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Session packs" }));
 
     expect(
       await screen.findByRole("heading", { name: "Session packs" }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("Club name")).toBeInTheDocument();
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("textbox", { name: "Club name" }),
+    ).not.toBeInTheDocument();
   });
 
   it("quien sólo configura los packs ve esa sección y nada más", async () => {
     stubApi();
 
-    render(<ClubSettingsScreen locale="en" canManageClub={false} />);
+    render(
+      <ClubSettingsScreen locale="en" canManageClub={false} club={CLUB} />,
+    );
 
     expect(
       await screen.findByRole("heading", { name: "Session packs" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText(/How the club appears to its members/),
+      screen.queryByText(/What members see and how the club is set up/),
     ).toBeNull();
     expect(screen.queryByLabelText("Club name")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Positions" })).toBeNull();

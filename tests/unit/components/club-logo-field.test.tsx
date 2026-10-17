@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClubSettingsScreen } from "@/components/club/ClubSettingsScreen";
 import type { ClubSettings } from "@/lib/club/club-settings";
 import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
+import { visit } from "../../support/location-search-params";
+import { stubScreenWidth } from "../../support/screen-width";
 
 /**
  * El logo en la pantalla de configuración del club (#295, RF-4 del PRD de
@@ -35,7 +37,10 @@ const STORED: ClubSettings = {
 };
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+vi.mock("next/navigation", async () => ({
+  ...(await import("../../support/location-search-params")),
+  useRouter: () => ({ refresh }),
+}));
 
 type LogoCall = { readonly method: string; readonly body: unknown };
 
@@ -86,7 +91,13 @@ function stubApi(options: {
 }
 
 async function renderScreen(): Promise<void> {
-  render(<ClubSettingsScreen locale="en" canManageClub />);
+  render(
+    <ClubSettingsScreen
+      locale="en"
+      canManageClub
+      club={{ name: "Harbour Hammerheads", initials: "HH", logoUrl: null }}
+    />,
+  );
   await screen.findByRole("button", { name: "Save settings" });
 }
 
@@ -97,6 +108,9 @@ function pngFile(size = 64): File {
 beforeEach(() => {
   logoCalls.length = 0;
   refresh.mockClear();
+  // El escritorio, que abre en General (#718).
+  visit("/club");
+  stubScreenWidth(false);
 });
 
 afterEach(() => {
