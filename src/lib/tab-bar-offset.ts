@@ -27,7 +27,7 @@ const MIN_VISIBLE_OFFSET_PX = 1;
 /** Con la página ampliada la barra se queda como hoy, quieta en la página. */
 const UNZOOMED_SCALE_TOLERANCE = 0.01;
 
-/** Píxeles que bajar la barra; negativo es subirla. */
+/** Píxeles que bajar la barra; nunca la sube. */
 export function tabBarOffset({
   barBottom,
   visualViewport,
@@ -41,10 +41,10 @@ export function tabBarOffset({
   if (Math.abs(visualViewport.scale - 1) > UNZOOMED_SCALE_TOLERANCE) {
     return 0;
   }
-  // Al tirar de la página para refrescar, offsetTop es negativo mientras dura
-  // el gesto: es la página estirada por encima de su borde, no la ventana
-  // visible moviéndose, y contarlo subiría la barra con el dedo.
-  const visibleTop = Math.max(0, visualViewport.offsetTop);
-  const offset = visibleTop + visualViewport.height - barBottom;
-  return Math.abs(offset) < MIN_VISIBLE_OFFSET_PX ? 0 : offset;
+  const offset = visualViewport.offsetTop + visualViewport.height - barBottom;
+  // Sólo se baja. El fallo de Chrome es que la ventana visible crece por
+  // debajo de la barra; cuando encoge (al tirar de la página para refrescar,
+  // con offsetTop negativo o con la ventana más baja) la barra ya está bien
+  // donde la deja `position: fixed`, y subirla la dejaba a media pantalla.
+  return offset < MIN_VISIBLE_OFFSET_PX ? 0 : offset;
 }
