@@ -320,6 +320,48 @@ export function formatClockRange(
     : `${start}${RANGE_SEPARATOR}${formatClockTime(locale, endTime)}`;
 }
 
+/** En la tarjeta del móvil la raya va pegada, como en el diseño. */
+const COMPACT_RANGE_SEPARATOR = "–";
+
+/** Una hora sin su am o pm, que la de fin ya dice: "6:00". */
+function formatClockTimeWithoutDayPeriod(
+  locale: Locale,
+  clockTime: string,
+): string {
+  return CLOCK_TIME_FORMATTERS[locale]
+    .formatToParts(new Date(`1970-01-01T${clockTime}:00Z`))
+    .filter((part) => part.type !== "dayPeriod")
+    .map((part) => part.value)
+    .join("")
+    .trim();
+}
+
+function dayPeriodOf(locale: Locale, clockTime: string): string | null {
+  const dayPeriod = CLOCK_TIME_FORMATTERS[locale]
+    .formatToParts(new Date(`1970-01-01T${clockTime}:00Z`))
+    .find((part) => part.type === "dayPeriod");
+  return dayPeriod === undefined ? null : dayPeriod.value;
+}
+
+/** La hora de la tarjeta del móvil (#656, "#2a" del handoff de E24):
+ * "6:00–7:30 pm", con am o pm una sola vez si las dos lo comparten. En
+ * español, "18:00–19:30". Sin hora de fin, sólo el inicio. */
+export function formatCompactClockRange(
+  locale: Locale,
+  startTime: string,
+  endTime: string | null,
+): string {
+  if (endTime === null) {
+    return formatClockTime(locale, startTime);
+  }
+  const startPeriod = dayPeriodOf(locale, startTime);
+  const start =
+    startPeriod !== null && startPeriod === dayPeriodOf(locale, endTime)
+      ? formatClockTimeWithoutDayPeriod(locale, startTime)
+      : formatClockTime(locale, startTime);
+  return `${start}${COMPACT_RANGE_SEPARATOR}${formatClockTime(locale, endTime)}`;
+}
+
 /** Cuándo empieza y termina un evento, con su día y su hora de Melbourne.
  * El de varios días repite el día al final; el de uno, sólo la hora. */
 export function formatEventSpan(
