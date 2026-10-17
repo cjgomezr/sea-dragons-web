@@ -1,6 +1,7 @@
 import type { AudienceChoice } from "@/components/AudienceField";
 import type {
   AgendaEvent,
+  EventSeriesSummary,
   NamedEventAudience,
 } from "@/lib/events/event-agenda";
 import type {
@@ -12,7 +13,10 @@ import type {
 import type { EventEdit } from "@/lib/events/event-management";
 import type { IsoWeekday } from "@/lib/events/event-occurrences";
 import { type EventPlace, isSamePlace } from "@/lib/events/event-place";
-import type { SeriesEdit } from "@/lib/events/series-management";
+import type {
+  SeriesEdit,
+  SeriesScheduleEdit,
+} from "@/lib/events/series-management";
 import type { EndScope } from "./event-end";
 
 /**
@@ -31,7 +35,8 @@ import type { EndScope } from "./event-end";
  */
 
 /** Qué se escribe en el diálogo: un evento nuevo, uno que ya existe (o una
- * sola ocurrencia) o una serie de hoy en adelante, que no cambia de fechas. */
+ * sola ocurrencia) o una serie desde una de sus sesiones (#655), que cambia
+ * de días y de fecha final pero no de inicio. */
 export type EventFormLayout = "create" | "event" | "series";
 
 export type EventRepeat = EventDraft["repeat"];
@@ -314,6 +319,26 @@ export function formFromEvent(
   };
 }
 
+/** "Esta y las siguientes" (#655) arranca con lo que tiene la sesión elegida
+ * y con los días y la fecha final de su serie. Sin el resumen de la serie
+ * los días quedan vacíos y "Hasta" en blanco: el formulario lo pide. */
+export function formFromSeriesSession(
+  event: AgendaEvent,
+  details: {
+    readonly notes: string | null;
+    readonly audience: NamedEventAudience;
+    readonly series: EventSeriesSummary | null;
+  },
+): EventForm {
+  const { series } = details;
+  return {
+    ...formFromEvent(event, details),
+    repeat: "weekly",
+    weekdays: new Set(series === null ? [] : series.weekdays),
+    endsOn: series === null ? "" : series.endsOn,
+  };
+}
+
 function isSameAudience(
   first: AudienceChoice,
   second: AudienceChoice,
@@ -370,6 +395,32 @@ export function listSeriesChanges(
       ? {}
       : { audience: toAudience(form.audience) }),
     ...coverField(form.cover),
+  };
+}
+
+function isSameWeekdays(
+  first: ReadonlySet<IsoWeekday>,
+  second: ReadonlySet<IsoWeekday>,
+): boolean {
+  return (
+    first.size === second.size && [...first].every((day) => second.has(day))
+  );
+}
+
+/** Lo que cambió de una serie desde una sesión (#655): lo de la serie, y los
+ * días y la fecha final sólo si cambiaron. */
+export function listFollowingChanges(
+  initial: EventForm,
+  form: EventForm,
+): SeriesEdit & SeriesScheduleEdit {
+  return {
+    ...listSeriesChanges(initial, form),
+    ...(isSameWeekdays(form.weekdays, initial.weekdays)
+      ? {}
+      : {
+          weekdays: [...form.weekdays].sort((first, second) => first - second),
+        }),
+    ...(form.endsOn === initial.endsOn ? {} : { endsOn: form.endsOn }),
   };
 }
 

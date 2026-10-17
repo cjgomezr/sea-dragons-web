@@ -89,6 +89,7 @@ export function EventDialog({
   initialForm,
   currentCoverUrl = null,
   submit,
+  onReload = null,
   onClosed,
 }: {
   readonly translate: Translator;
@@ -98,6 +99,9 @@ export function EventDialog({
   readonly currentCoverUrl?: string | null;
   /** Guarda lo escrito. Si termina, el diálogo se cierra. */
   readonly submit: (form: EventFormValues) => Promise<FormSubmission>;
+  /** Lo que cambió por otro lado mientras se editaba se vuelve a pedir:
+   * el diálogo se cierra y avisa a quien lo abrió. Al crear no pasa. */
+  readonly onReload?: (() => void) | null;
   /** Ya cerrado: quien lo abrió recupera el foco y lo desmonta. */
   readonly onClosed: () => void;
 }): React.JSX.Element {
@@ -116,6 +120,11 @@ export function EventDialog({
       dialogRef.current?.close();
     }
   }, []);
+
+  function closeAndReload(): void {
+    dialogRef.current?.close();
+    onReload?.();
+  }
 
   async function submitAndClose(
     form: EventFormValues,
@@ -186,6 +195,7 @@ export function EventDialog({
               currentCoverUrl={currentCoverUrl}
               submit={submitAndClose}
               onCancel={close}
+              onReload={closeAndReload}
               onSendingChange={(isSending) => {
                 isSendingRef.current = isSending;
               }}

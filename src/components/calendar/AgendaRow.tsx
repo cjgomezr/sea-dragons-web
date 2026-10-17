@@ -304,6 +304,7 @@ function PanelActions({
             notes: opened.notes,
             audience,
             coverUrl: opened.coverUrl,
+            series: opened.series,
           }}
           goingCount={goingCount}
           organizer={organizer}
