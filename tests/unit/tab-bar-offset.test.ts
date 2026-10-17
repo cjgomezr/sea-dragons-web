@@ -80,6 +80,18 @@ describe("desfase de la barra de pestañas", () => {
     expect(offset).toBe(0);
   });
 
+  it("no sube la barra al tirar de la página para refrescar", () => {
+    // Al tirar hacia abajo, Chrome en el iPhone estira la página por encima
+    // de su borde y offsetTop pasa a ser negativo mientras dura el gesto.
+    const offset = tabBarOffset({
+      barBottom: BAR_BOTTOM,
+      visualViewport: { height: BAR_BOTTOM, offsetTop: -110, scale: 1 },
+      isKeyboardOpen: false,
+    });
+
+    expect(offset).toBe(0);
+  });
+
   it("es 0 cuando el desfase es menor que un píxel", () => {
     const offset = tabBarOffset({
       barBottom: BAR_BOTTOM,
