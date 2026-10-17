@@ -133,7 +133,8 @@ async function openCreate(locale: Locale = "en"): Promise<HTMLElement> {
       canRespond
     />,
   );
-  const openName = locale === "en" ? "Event" : "Evento";
+  // En el móvil el botón de crear es sólo el + (#656), con su nombre entero.
+  const openName = locale === "en" ? "New event" : "Nuevo evento";
   await userEvent.click(await screen.findByRole("button", { name: openName }));
   const dialog = await screen.findByRole("dialog", {
     name: locale === "en" ? "New event" : "Nuevo evento",

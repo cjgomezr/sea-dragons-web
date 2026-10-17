@@ -50,19 +50,31 @@ export type EventOrganizer = {
 
 type OrganizerAction = "edit" | "cancel";
 
-type CancelStatus =
+export type CancelStatus =
   | { readonly kind: "confirming" }
   | { readonly kind: "sending" }
   | ApiRequestFailure;
 
+/** Lo que trae el detalle del evento y el diálogo de editar necesita. */
+export type OrganizerDetails = {
+  readonly notes: string | null;
+  readonly audience: NamedEventAudience;
+  /** La imagen grande firmada, o null sin imagen (#644). */
+  readonly coverUrl: string | null;
+  /** Los días y la fecha final de su serie; nulo en un evento suelto. */
+  readonly series: EventSeriesSummary | null;
+};
+
+/** Qué se está editando y con qué valores abrió el diálogo. */
+export type EditingStep = {
+  readonly target: ManageTarget;
+  readonly initialForm: EventFormValues;
+};
+
 type ActionStep =
   | { readonly kind: "idle" }
   | { readonly kind: "choosingScope"; readonly action: OrganizerAction }
-  | {
-      readonly kind: "editing";
-      readonly target: ManageTarget;
-      readonly initialForm: EventFormValues;
-    }
+  | ({ readonly kind: "editing" } & EditingStep)
   | {
       readonly kind: "cancelling";
       readonly target: ManageTarget;
@@ -182,7 +194,7 @@ function EditScopeChoice({
   );
 }
 
-function CancelScopeChoice({
+export function CancelScopeChoice({
   translate,
   onChoose,
   onBack,
@@ -227,7 +239,7 @@ function CancelScopeChoice({
   );
 }
 
-function CancelConfirmation({
+export function CancelConfirmation({
   translate,
   scope,
   goingCount,
@@ -292,72 +304,33 @@ function CancelConfirmation({
   );
 }
 
-export function EventOrganizerActions({
-  translate,
-  event,
-  details,
-  goingCount,
-  organizer,
-}: {
-  readonly translate: Translator;
-  readonly event: AgendaEvent;
-  /** Lo que trae la fila desplegada y el diálogo necesita. */
-  readonly details: {
-    readonly notes: string | null;
-    readonly audience: NamedEventAudience;
-    /** La imagen grande firmada, o null sin imagen (#644). */
-    readonly coverUrl: string | null;
-    /** Los días y la fecha final de su serie; nulo en un evento suelto. */
-    readonly series: EventSeriesSummary | null;
-  };
-  /** Los que van según la fila, que ya cuenta la respuesta propia. */
-  readonly goingCount: number;
-  readonly organizer: EventOrganizer;
-}): React.JSX.Element {
-  const [step, setStep] = useState<ActionStep>({ kind: "idle" });
-  const editRef = useRef<HTMLButtonElement>(null);
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  // Como en el formulario: el estado desactiva el botón en el siguiente
-  // pintado, pero un doble clic llega antes.
-  const isSendingRef = useRef(false);
+/** Lo que quien organiza hace con un evento (#316, #655), igual desde los
+ * botones del panel que desde la hoja ⋯ del móvil (#656). Lo que termina
+ * (bien, o porque el evento ya no admitía cambios) se lo pasa a la agenda;
+ * lo que se puede reintentar, no. */
+export type EventManagement = {
+  readonly startEditing: (scope: ManageScope) => EditingStep;
+  readonly targetFor: (scope: ManageScope) => ManageTarget;
+  readonly submitEdit: (
+    editing: EditingStep,
+    form: EventFormValues,
+  ) => Promise<FormSubmission>;
+  /** La serie cambió por otro lado: la agenda la vuelve a pedir. */
+  readonly reloadSeries: () => void;
+  readonly cancel: (target: ManageTarget) => Promise<FormSubmission>;
+};
 
+export function manageEvent(
+  event: AgendaEvent,
+  details: OrganizerDetails,
+  organizer: EventOrganizer,
+): EventManagement {
   function targetFor(scope: ManageScope): ManageTarget {
     return scope === "series" && event.seriesId !== null
       ? { scope: "series", seriesId: event.seriesId }
       : { scope: "event", eventId: event.id };
   }
 
-  function proceed(action: OrganizerAction, scope: ManageScope): void {
-    const target = targetFor(scope);
-    setStep(
-      action === "edit"
-        ? {
-            kind: "editing",
-            target,
-            initialForm:
-              target.scope === "series"
-                ? formFromSeriesSession(event, details)
-                : formFromEvent(event, details),
-          }
-        : { kind: "cancelling", target, status: { kind: "confirming" } },
-    );
-  }
-
-  function start(action: OrganizerAction): void {
-    if (event.seriesId === null) {
-      proceed(action, "event");
-      return;
-    }
-    setStep({ kind: "choosingScope", action });
-  }
-
-  function returnTo(action: OrganizerAction): void {
-    setStep({ kind: "idle" });
-    (action === "edit" ? editRef : cancelRef).current?.focus();
-  }
-
-  /** Lo que terminó se lo pasa a la agenda; lo que se puede reintentar,
-   * no. */
   function settle(result: ManageSave): FormSubmission {
     if (result.kind === "saved") {
       organizer.onSettled(event.id, result.notice);
@@ -373,8 +346,7 @@ export function EventOrganizerActions({
 
   /** Una serie se edita desde esta sesión: se parte desde aquí (#653). */
   async function submitEdit(
-    target: ManageTarget,
-    initialForm: EventFormValues,
+    { target, initialForm }: EditingStep,
     form: EventFormValues,
   ): Promise<FormSubmission> {
     const changes =
@@ -394,12 +366,73 @@ export function EventOrganizerActions({
     );
   }
 
-  /** La serie cambió por otro lado: la agenda la vuelve a pedir. */
-  function reloadSeries(): void {
-    organizer.onSettled(event.id, {
-      kind: "closed",
-      reason: "session_not_in_series",
-    });
+  return {
+    targetFor,
+    startEditing: (scope) => {
+      const target = targetFor(scope);
+      return {
+        target,
+        initialForm:
+          target.scope === "series"
+            ? formFromSeriesSession(event, details)
+            : formFromEvent(event, details),
+      };
+    },
+    submitEdit,
+    reloadSeries: () =>
+      organizer.onSettled(event.id, {
+        kind: "closed",
+        reason: "session_not_in_series",
+      }),
+    cancel: async (target) => settle(await cancelTarget(target)),
+  };
+}
+
+export function EventOrganizerActions({
+  translate,
+  event,
+  details,
+  goingCount,
+  organizer,
+}: {
+  readonly translate: Translator;
+  readonly event: AgendaEvent;
+  readonly details: OrganizerDetails;
+  /** Los que van según la fila, que ya cuenta la respuesta propia. */
+  readonly goingCount: number;
+  readonly organizer: EventOrganizer;
+}): React.JSX.Element {
+  const [step, setStep] = useState<ActionStep>({ kind: "idle" });
+  const editRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  // Como en el formulario: el estado desactiva el botón en el siguiente
+  // pintado, pero un doble clic llega antes.
+  const isSendingRef = useRef(false);
+  const management = manageEvent(event, details, organizer);
+
+  function proceed(action: OrganizerAction, scope: ManageScope): void {
+    setStep(
+      action === "edit"
+        ? { kind: "editing", ...management.startEditing(scope) }
+        : {
+            kind: "cancelling",
+            target: management.targetFor(scope),
+            status: { kind: "confirming" },
+          },
+    );
+  }
+
+  function start(action: OrganizerAction): void {
+    if (event.seriesId === null) {
+      proceed(action, "event");
+      return;
+    }
+    setStep({ kind: "choosingScope", action });
+  }
+
+  function returnTo(action: OrganizerAction): void {
+    setStep({ kind: "idle" });
+    (action === "edit" ? editRef : cancelRef).current?.focus();
   }
 
   async function confirmCancel(target: ManageTarget): Promise<void> {
@@ -408,7 +441,7 @@ export function EventOrganizerActions({
     }
     isSendingRef.current = true;
     setStep({ kind: "cancelling", target, status: { kind: "sending" } });
-    const outcome = settle(await cancelTarget(target));
+    const outcome = await management.cancel(target);
     isSendingRef.current = false;
     if (outcome.kind === "failed") {
       setStep({ kind: "cancelling", target, status: outcome });
@@ -471,8 +504,8 @@ export function EventOrganizerActions({
           layout={step.target.scope}
           initialForm={step.initialForm}
           currentCoverUrl={details.coverUrl}
-          submit={(form) => submitEdit(step.target, step.initialForm, form)}
-          onReload={reloadSeries}
+          submit={(form) => management.submitEdit(step, form)}
+          onReload={management.reloadSeries}
           onClosed={() => returnTo("edit")}
         />
       ) : null}

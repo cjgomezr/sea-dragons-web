@@ -12,6 +12,7 @@ import {
   formatCalendarDayWithWeekday,
   formatCalendarMonth,
   formatClubCompactDay,
+  formatCompactClockRange,
   formatClubDay,
   formatClubMoment,
   formatWeekdayName,
@@ -404,5 +405,33 @@ describe("días del panel del evento (#648)", () => {
 
   it("escribe el día y el mes en español", () => {
     expect(formatShortMonthDay("es", "2026-12-16")).toBe("16 dic");
+  });
+});
+
+describe("hora corta de la tarjeta del móvil (#656)", () => {
+  it("escribe am o pm una sola vez cuando inicio y fin lo comparten", () => {
+    expect(formatCompactClockRange("en", "18:00", "19:30")).toBe(
+      "6:00–7:30 pm",
+    );
+  });
+
+  it("escribe los dos cuando cruzan el mediodía", () => {
+    expect(formatCompactClockRange("en", "11:00", "13:00")).toBe(
+      "11:00 am–1:00 pm",
+    );
+  });
+
+  it("escribe las dos horas de 24 en español", () => {
+    expect(formatCompactClockRange("es", "18:00", "19:30")).toBe("18:00–19:30");
+  });
+
+  it("sin hora de fin escribe sólo el inicio", () => {
+    expect(formatCompactClockRange("en", "18:00", null)).toBe("6:00 pm");
+  });
+
+  it("rechaza una hora que no es HH:MM", () => {
+    expect(() => formatCompactClockRange("en", "6pm", "19:30")).toThrow(
+      RangeError,
+    );
   });
 });

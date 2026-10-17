@@ -12072,6 +12072,9 @@ async function waitForManagedPost(page: Page): Promise<void> {
 const WITHDRAW_BUTTON = /^(Withdraw|Retirar)$/;
 const WITHDRAW_QUESTION = /^(Withdraw this post\?|¿Retirar esta publicación\?)/;
 
+/** Cuántas veces se alarga la ventana antes de rendirse. */
+const MAX_VIEWPORT_FITS = 5;
+
 /**
  * Alarga la ventana hasta que quepa la página entera, sin tocar su ancho.
  *
@@ -12080,18 +12083,29 @@ const WITHDRAW_QUESTION = /^(Withdraw this post\?|¿Retirar esta publicación\?)
  * Ahí `(width < 768px)` se cumple, `useIsPhone` pasa a móvil y las acciones
  * de la línea del autor se desmontan: vuelven en reposo, sin lo que se había
  * abierto. Si la página ya cabe, Playwright captura sin ese truco.
+ *
+ * Alargar la ventana puede alargar la página: el panel del calendario mide
+ * según la ventana (#656). Por eso se repite hasta que cabe.
  */
 async function fitViewportToPage(page: Page): Promise<void> {
   const viewport = page.viewportSize();
   if (viewport === null) {
     throw new Error("La página no tiene un tamaño de ventana fijo.");
   }
-  const pageHeight = await page.evaluate(
-    () => document.documentElement.scrollHeight,
-  );
-  if (pageHeight > viewport.height) {
-    await page.setViewportSize({ width: viewport.width, height: pageHeight });
+  let height = viewport.height;
+  for (let attempt = 0; attempt < MAX_VIEWPORT_FITS; attempt += 1) {
+    const pageHeight = await page.evaluate(
+      () => document.documentElement.scrollHeight,
+    );
+    if (pageHeight <= height) {
+      return;
+    }
+    height = pageHeight;
+    await page.setViewportSize({ width: viewport.width, height });
   }
+  throw new Error(
+    `La página sigue creciendo tras alargar la ventana ${MAX_VIEWPORT_FITS} veces.`,
+  );
 }
 
 async function openWithdrawConfirmation(page: Page): Promise<void> {
@@ -14837,7 +14851,9 @@ test.describe("editar y retirar en el navegador", () => {
 const CALENDAR_SCREEN_PATH = "/calendario";
 const CALENDAR_AGENDA_ENDPOINT = "/api/v1/events";
 const CALENDAR_NARROW_WIDTHS = [320, 375, 768] as const;
-const CALENDAR_HEADING = /^(Upcoming events|Próximos eventos)$/;
+// En el móvil la agenda se titula Calendario (#656).
+const CALENDAR_HEADING =
+  /^(Upcoming events|Próximos eventos|Calendar|Calendario)$/;
 const RSVP_MIN_TOUCH_TARGET_PX = 44;
 
 const STUBBED_AGENDA_EVENTS = [
@@ -15227,9 +15243,11 @@ function agendaRow(page: Page, title: string): Locator {
     .last();
 }
 
-/** El panel del evento elegido (#648). */
+/** El panel del evento elegido (#648) o, en el móvil, su pantalla (#656). */
 function eventPanel(page: Page, title: string): Locator {
-  return page.getByRole("complementary", { name: title });
+  return page
+    .getByRole("complementary", { name: title })
+    .or(page.getByRole("article", { name: title }));
 }
 
 /** "Going · n", que sólo sale cuando el detalle ya llegó. */
@@ -15850,6 +15868,188 @@ test.describe("mapa de la tarjeta del lugar", () => {
   });
 });
 
+// El calendario en el móvil (#656, RF-12 y RF-13 del PRD de E24; mockups
+// mobile-calendar-redesign-agenda-dark.png, -event-dark.png y
+// -event-actions-dark.png): las tarjetas, la pantalla del evento y la hoja
+// ⋯ de una serie, a 375. Desde 768 se ve el escritorio, que fotografían los
+// estados de arriba. Quien mira es un Admin con la audiencia del detalle: es
+// a quien le sale el ⋯.
+const MOBILE_CALENDAR_VIEWPORTS = viewports.filter(
+  (vp) => vp.name === "mobile",
+);
+
+const MOBILE_SERIES_OPENED = {
+  ...COMMITTEE_OPENED_EVENT,
+  series: PANEL_SERIES_OPENED.series,
+} as const;
+
+const MOBILE_CANCELLED_EVENT = AGENDA_REDESIGN_EVENTS[4];
+
+const MORE_ACTIONS_NAME = /^(Event actions|Acciones del evento)$/;
+
+/** Abre el evento de la serie y despliega su hoja ⋯. */
+async function showSeriesSheet(page: Page): Promise<void> {
+  await choosePanelEvent(PANEL_SERIES_EVENT.title)(page);
+  await eventPanel(page, PANEL_SERIES_EVENT.title)
+    .getByRole("button", { name: MORE_ACTIONS_NAME })
+    .click();
+  const sheet = page.getByRole("dialog", { name: MORE_ACTIONS_NAME });
+  await expect(
+    sheet.getByRole("button", { name: /^(Cancel event|Cancelar evento)$/ }),
+  ).toBeVisible();
+  // La hoja sube con una transición: se fotografía quieta.
+  await expect(sheet).toHaveJSProperty("open", true);
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every((animation) => animation.playState !== "running"),
+  );
+  await page.mouse.move(0, 0);
+}
+
+const MOBILE_AGENDA_STATE: CalendarState = {
+  name: "calendario-movil-agenda",
+  events: AGENDA_REDESIGN_EVENTS,
+  beforeVisit: fixAgendaClock,
+  ready: waitForRedesignedAgenda,
+};
+
+const MOBILE_CALENDAR_STATES: readonly CalendarState[] = [
+  MOBILE_AGENDA_STATE,
+  {
+    name: "calendario-movil-evento",
+    events: [PANEL_SERIES_EVENT, PANEL_SOCIAL_EVENT],
+    opened: MOBILE_SERIES_OPENED,
+    beforeVisit: fixAgendaClock,
+    ready: choosePanelEvent(PANEL_SERIES_EVENT.title),
+  },
+  {
+    name: "calendario-movil-evento-cancelado",
+    events: [PANEL_SERIES_EVENT, MOBILE_CANCELLED_EVENT],
+    opened: COMMITTEE_OPENED_EVENT,
+    beforeVisit: fixAgendaClock,
+    ready: choosePanelEvent(MOBILE_CANCELLED_EVENT.title),
+  },
+  {
+    name: "calendario-movil-acciones-serie",
+    events: [PANEL_SERIES_EVENT, PANEL_SOCIAL_EVENT],
+    opened: MOBILE_SERIES_OPENED,
+    beforeVisit: fixAgendaClock,
+    ready: showSeriesSheet,
+  },
+];
+
+/** La hoja vive en la capa superior: se fotografía lo que se ve. */
+const MOBILE_VIEWPORT_ONLY_STATES = new Set([
+  "calendario-movil-acciones-serie",
+]);
+
+for (const state of MOBILE_CALENDAR_STATES) {
+  const isFullPage = !MOBILE_VIEWPORT_ONLY_STATES.has(state.name);
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of MOBILE_CALENDAR_VIEWPORTS) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToCalendar(page, state, theme);
+            const snapshot = `${state.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: isFullPage }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: isFullPage,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+
+          test(`has no accessibility violations (axe-core, ${theme})`, async ({
+            page,
+          }) => {
+            await goToCalendar(page, state, theme);
+            await expectNoAxeViolations(page);
+          });
+        }
+      });
+    }
+
+    test("has no horizontal scroll at 320px", async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 812 });
+      await goToCalendar(page, state);
+      expect(await hasHorizontalScroll(page)).toBe(false);
+    });
+  });
+}
+
+test.describe("volver de la pantalla del evento en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 375, height: 640 },
+  });
+
+  const LAST_EVENT = AGENDA_REDESIGN_EVENTS.at(-1) ?? PANEL_SERIES_EVENT;
+
+  /** Baja hasta la última tarjeta y la abre; devuelve el scroll de antes. */
+  async function openLastEvent(page: Page): Promise<number> {
+    const toggle = agendaRow(page, LAST_EVENT.title).getByRole("button", {
+      name: LAST_EVENT.title,
+    });
+    await toggle.scrollIntoViewIfNeeded();
+    const scrollBefore = await page.evaluate(() => window.scrollY);
+    await toggle.click();
+    await expect(
+      page.getByRole("article", { name: LAST_EVENT.title }),
+    ).toBeVisible();
+    return scrollBefore;
+  }
+
+  test("el botón de volver deja la agenda donde estaba, con el foco en la tarjeta", async ({
+    page,
+  }) => {
+    await goToCalendar(page, MOBILE_AGENDA_STATE);
+    const scrollBefore = await openLastEvent(page);
+    expect(scrollBefore).toBeGreaterThan(0);
+
+    await page
+      .getByRole("button", {
+        name: /^(Back to calendar|Volver al calendario)$/,
+      })
+      .click();
+
+    await expect(
+      agendaRow(page, LAST_EVENT.title).getByRole("button", {
+        name: LAST_EVENT.title,
+      }),
+    ).toBeFocused();
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+  });
+
+  test("volver del navegador cierra la pantalla sin salir del calendario", async ({
+    page,
+  }) => {
+    await goToCalendar(page, MOBILE_AGENDA_STATE);
+    const calendarUrl = page.url();
+    await openLastEvent(page);
+
+    await page.goBack();
+
+    await expect(page.getByRole("article")).toHaveCount(0);
+    await expect(
+      agendaRow(page, LAST_EVENT.title).getByRole("button", {
+        name: LAST_EVENT.title,
+      }),
+    ).toBeFocused();
+    expect(page.url()).toBe(calendarUrl);
+  });
+});
 // #641: el texto de cada etiqueta de tipo cumple AA también en oscuro.
 test.describe("calendario-cada-tipo en tema oscuro", () => {
   skipWithoutSession();
@@ -17545,7 +17745,8 @@ const EVENT_DIALOG_GROUPS_ENDPOINT = "/api/v1/groups";
 // lo que sugiere se sirve desde el test, vacío salvo en sus propios estados.
 const EVENT_PLACES_ENDPOINT = "/api/v1/events/manage/places";
 const EVENT_DIALOG_NAME = /^(New event|Nuevo evento)$/;
-const EVENT_DIALOG_OPEN = /^(Event|Evento)$/;
+// En el móvil el botón es sólo el + (#656), con su nombre entero.
+const EVENT_DIALOG_OPEN = /^(Event|Evento|New event|Nuevo evento)$/;
 // En el móvil (#657) el botón de la barra dice sólo Crear.
 const EVENT_DIALOG_SUBMIT = /^(Create event|Crear evento|Create|Crear)$/;
 const EVENT_DIALOG_TAB_PRESSES = 30;
@@ -18447,6 +18648,13 @@ async function showEditScopeChoice(page: Page): Promise<void> {
   await expect(
     row.getByRole("button", { name: ORGANIZER_FOLLOWING }),
   ).toBeVisible();
+  // La captura es de página entera: sin esto, su ventana de 1×1
+  // pasa la agenda a la pantalla del móvil (#656) y el panel vuelve sin
+  // lo que se abrió.
+  await fitViewportToPage(page);
+  await expect(
+    row.getByRole("button", { name: ORGANIZER_FOLLOWING }),
+  ).toBeVisible();
   await page.mouse.move(0, 0);
 }
 
@@ -18455,6 +18663,11 @@ async function showSeriesCancelConfirmation(page: Page): Promise<void> {
   const row = firstEventPanel(page);
   await row.getByRole("button", { name: ORGANIZER_CANCEL }).click();
   await row.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }).click();
+  await expect(
+    row.getByRole("button", { name: ORGANIZER_CONFIRM_SERIES }),
+  ).toBeVisible();
+  // Lo mismo que al elegir qué editar: ver showEditScopeChoice.
+  await fitViewportToPage(page);
   await expect(
     row.getByRole("button", { name: ORGANIZER_CONFIRM_SERIES }),
   ).toBeVisible();
@@ -18515,6 +18728,12 @@ const ORGANIZER_DIALOG_STATES: readonly CalendarState[] = organizerStates(
   ORGANIZER_SERIES_OPENED_EVENT,
 );
 
+// Editar y Cancelar en el panel son de 768 en adelante: en el móvil van en
+// la hoja ⋯ de la pantalla del evento (#656), con sus propios estados.
+const ORGANIZER_PANEL_WIDTHS = CALENDAR_NARROW_WIDTHS.filter(
+  (width) => width >= 768,
+);
+
 for (const state of [...ORGANIZER_ROW_STATES, ...ORGANIZER_DIALOG_STATES]) {
   // El diálogo vive en la capa superior: se fotografía lo que se ve, no la
   // página entera, como en el de crear.
@@ -18524,7 +18743,7 @@ for (const state of [...ORGANIZER_ROW_STATES, ...ORGANIZER_DIALOG_STATES]) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of PANEL_VIEWPORTS) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -18550,7 +18769,7 @@ for (const state of [...ORGANIZER_ROW_STATES, ...ORGANIZER_DIALOG_STATES]) {
       });
     }
 
-    for (const width of CALENDAR_NARROW_WIDTHS) {
+    for (const width of ORGANIZER_PANEL_WIDTHS) {
       test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 812 });
         await goToCalendar(page, state);
@@ -18664,13 +18883,25 @@ test.describe("editar y cancelar en el navegador", () => {
     ).toBeFocused();
   });
 
+  // En el móvil la confirmación sale en la hoja ⋯ de la pantalla del evento
+  // (#656).
   test("a 375px los botones de confirmar conservan el objetivo táctil de 44px", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await goToCalendar(page, CONFIRM);
+    await goToCalendar(page, { ...CONFIRM, ready: openFirstPanel });
+    await firstEventPanel(page)
+      .getByRole("button", { name: /^(Event actions|Acciones del evento)$/ })
+      .click();
+    const sheet = page.getByRole("dialog", {
+      name: /^(Event actions|Acciones del evento)$/,
+    });
+    await sheet
+      .getByRole("button", { name: /^(Cancel event|Cancelar evento)$/ })
+      .click();
+    await sheet.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }).click();
 
-    const heights = await firstEventPanel(page)
+    const heights = await sheet
       .getByRole("group", { name: /said they're going|dijo que va|dijeron/ })
       .getByRole("button")
       .evaluateAll((buttons) =>

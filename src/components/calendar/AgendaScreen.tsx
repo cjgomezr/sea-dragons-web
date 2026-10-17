@@ -1,8 +1,11 @@
 "use client";
 
+import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { Icon } from "@/components/Icon";
+import { useIsPhone } from "@/components/use-is-phone";
 import { PAYMENTS_PATH } from "@/lib/auth/routes";
 import type { AgendaEvent, AgendaPeriod } from "@/lib/events/event-agenda";
 import type { EventType } from "@/lib/events/event-creation";
@@ -20,7 +23,7 @@ import {
   loadAgenda,
 } from "./agenda-client";
 import { classifyAgendaDay, groupAgendaByDay } from "./agenda-days";
-import { AgendaRow, type PanelTarget } from "./AgendaRow";
+import { AgendaRow, type EventTarget } from "./AgendaRow";
 import {
   AGENDA_TYPES_QUERY_PARAM,
   AGENDA_TYPE_CHIPS,
@@ -72,6 +75,14 @@ import type { EventOrganizer } from "./EventOrganizerActions";
  * servidor dice que el evento ya no admitía cambios: la agenda que había ya
  * no es la verdad. Tras volver a pedirla, el foco vuelve al título de ese
  * evento.
+ *
+ * En el móvil (#656, RF-13 del PRD de E24) la cabecera se queda en
+ * "Calendario" con el botón +, las filas son tarjetas y un evento se abre en
+ * su propia pantalla, en lugar de la agenda y no en una ruta aparte: la agenda
+ * sólo se esconde, así que al volver sigue con su periodo, su filtro, lo
+ * cargado y las respuestas, sin pedir nada. Abrirla deja una entrada en el
+ * historial para que volver del navegador (o el gesto de Android) la cierre
+ * en vez de salir del calendario; el scroll de la agenda se guarda y vuelve.
  */
 
 /** Lo que la agenda anuncia tras crear, editar o cancelar. */
@@ -116,12 +127,25 @@ type EventChoice = {
   readonly isByGesture: boolean;
 };
 
-/** Qué fila enseña el panel y dónde lo pinta (#648). */
+/** Qué fila enseña su evento y dónde lo pinta: el panel (#648) o la
+ * pantalla del móvil (#656). */
 type AgendaSelection = {
   readonly selectedEventId: string | null;
   readonly onSelect: (eventId: string) => void;
-  readonly panel: PanelTarget;
+  readonly target: EventTarget;
 };
+
+/** El evento abierto en su pantalla del móvil (#656), dónde se pinta y cómo
+ * se abre y se cierra. */
+type PhoneScreen = {
+  readonly openedEventId: string | null;
+  readonly slot: HTMLElement | null;
+  readonly onOpen: (eventId: string) => void;
+  readonly onBack: () => void;
+};
+
+/** La marca de la entrada del historial que deja la pantalla del evento. */
+const SCREEN_HISTORY_KEY = "calendarEventScreen";
 
 // En el orden del control. No se importa `AGENDA_PERIODS`: vive junto a la
 // lógica de servidor de la agenda, que no tiene por qué llegar al navegador.
@@ -310,7 +334,7 @@ function AgendaList({
                 shouldTakeFocus={event.id === focusEventId}
                 isSelected={event.id === selection.selectedEventId}
                 onSelect={() => selection.onSelect(event.id)}
-                panel={selection.panel}
+                target={selection.target}
                 organizer={organizer}
                 canTakeAttendance={canTakeAttendance}
                 rsvpDisabledReasonId={rsvpDisabledReasonId}
@@ -328,11 +352,14 @@ function AgendaList({
 function CreateEventButton({
   translate,
   openWith,
+  isCompact,
   onOpen,
   onCreated,
 }: {
   readonly translate: Translator;
   readonly openWith: EventType | null;
+  /** En el móvil es sólo el +, de 44 px (#656). */
+  readonly isCompact: boolean;
   readonly onOpen: () => void;
   readonly onCreated: (summary: CreatedSummary) => void;
 }): React.JSX.Element {
@@ -358,14 +385,25 @@ function CreateEventButton({
       <button
         ref={openButtonRef}
         type="button"
-        className="auth-submit agenda-create"
+        className={
+          isCompact
+            ? "auth-submit agenda-create agenda-create-compact"
+            : "auth-submit agenda-create"
+        }
+        aria-label={isCompact ? translate("calendar.mobile.create") : undefined}
         onClick={() => {
           onOpen();
           setIsDialogOpen(true);
         }}
       >
-        <span aria-hidden="true">+ </span>
-        {translate("calendar.create.open")}
+        {isCompact ? (
+          <Icon glyph={Plus} />
+        ) : (
+          <>
+            <span aria-hidden="true">+ </span>
+            {translate("calendar.create.open")}
+          </>
+        )}
       </button>
       {isDialogOpen ? (
         <EventDialog
@@ -495,6 +533,7 @@ function AgendaView({
   organizer,
   canTakeAttendance,
   rsvpDisabledReasonId,
+  phoneScreen,
 }: {
   readonly translate: Translator;
   readonly period: AgendaPeriod;
@@ -506,6 +545,8 @@ function AgendaView({
   readonly organizer: EventOrganizer | null;
   readonly canTakeAttendance: boolean;
   readonly rsvpDisabledReasonId: string | null;
+  /** Nula desde 768 px, donde el evento se abre en el panel. */
+  readonly phoneScreen: PhoneScreen | null;
 }): React.JSX.Element {
   const [state, setState] = useState<AgendaState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
@@ -579,6 +620,33 @@ function AgendaView({
 
   const nextCursor = state.kind === "ready" ? state.nextCursor : null;
 
+  function selectionOf(events: readonly AgendaEvent[]): AgendaSelection {
+    if (phoneScreen === null) {
+      return {
+        selectedEventId: selectedEventOf(events, choice.eventId),
+        onSelect: selectEvent,
+        target: {
+          kind: "panel",
+          slot: panelSlot,
+          id: panelId,
+          shouldTakeFocus: choice.isByGesture,
+        },
+      };
+    }
+    const openedEventId = isActive ? phoneScreen.openedEventId : null;
+    return {
+      selectedEventId: events.some((event) => event.id === openedEventId)
+        ? openedEventId
+        : null,
+      onSelect: phoneScreen.onOpen,
+      target: {
+        kind: "screen",
+        slot: phoneScreen.slot,
+        onBack: phoneScreen.onBack,
+      },
+    };
+  }
+
   return (
     <div className="agenda-view" hidden={!isActive}>
       {state.kind === "loading" ? (
@@ -602,15 +670,7 @@ function AgendaView({
               period={period}
               events={state.events}
               focusEventId={state.focusEventId}
-              selection={{
-                selectedEventId: selectedEventOf(state.events, choice.eventId),
-                onSelect: selectEvent,
-                panel: {
-                  slot: panelSlot,
-                  id: panelId,
-                  shouldTakeFocus: choice.isByGesture,
-                },
-              }}
+              selection={selectionOf(state.events)}
               organizer={organizer}
               canTakeAttendance={canTakeAttendance}
               rsvpDisabledReasonId={rsvpDisabledReasonId}
@@ -623,7 +683,9 @@ function AgendaView({
               />
             )}
           </div>
-          <div ref={setPanelSlot} className="agenda-panel-slot" />
+          {phoneScreen === null ? (
+            <div ref={setPanelSlot} className="agenda-panel-slot" />
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -674,6 +736,68 @@ function MembershipRsvpNotice({
   );
 }
 
+function isScreenHistoryEntry(state: unknown): boolean {
+  return (
+    typeof state === "object" && state !== null && SCREEN_HISTORY_KEY in state
+  );
+}
+
+/** El evento abierto en su pantalla del móvil (#656). Abrirla guarda el
+ * scroll de la agenda y deja una entrada en el historial; cerrarla, con su
+ * botón o con el del navegador, quita esa entrada y devuelve el scroll. */
+function usePhoneEventScreen(): {
+  readonly openedEventId: string | null;
+  readonly open: (eventId: string) => void;
+  readonly close: () => void;
+} {
+  const [openedEventId, setOpenedEventId] = useState<string | null>(null);
+  const agendaScrollRef = useRef(0);
+  const hasOpenedRef = useRef(false);
+  const isOpen = openedEventId !== null;
+
+  // Quien sale desde la pantalla (Pasar lista) y vuelve llega a la agenda
+  // sobre la entrada que dejó la pantalla: se le quita la marca para que la
+  // agenda no crea tener una pantalla que cerrar.
+  useEffect(() => {
+    if (isScreenHistoryEntry(window.history.state)) {
+      window.history.replaceState(null, "");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    const closeOnBack = (): void => setOpenedEventId(null);
+    window.addEventListener("popstate", closeOnBack);
+    return () => window.removeEventListener("popstate", closeOnBack);
+  }, [isOpen]);
+
+  // La pantalla abre arriba, y la agenda vuelve a donde estaba. Antes de
+  // pintar: si no, se vería un instante en otra altura.
+  useLayoutEffect(() => {
+    if (hasOpenedRef.current) {
+      window.scrollTo(0, isOpen ? 0 : agendaScrollRef.current);
+    }
+  }, [isOpen]);
+
+  function open(eventId: string): void {
+    agendaScrollRef.current = window.scrollY;
+    hasOpenedRef.current = true;
+    setOpenedEventId(eventId);
+    window.history.pushState({ [SCREEN_HISTORY_KEY]: eventId }, "");
+  }
+
+  function close(): void {
+    setOpenedEventId(null);
+    if (isScreenHistoryEntry(window.history.state)) {
+      window.history.back();
+    }
+  }
+
+  return { openedEventId, open, close };
+}
+
 export function AgendaScreen({
   locale,
   canManageEvents,
@@ -709,6 +833,10 @@ export function AgendaScreen({
   readonly openCreateWith?: EventType | null;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
+  const isPhone = useIsPhone();
+  const eventScreen = usePhoneEventScreen();
+  const [screenSlot, setScreenSlot] = useState<HTMLElement | null>(null);
+  const isScreenOpen = isPhone && eventScreen.openedEventId !== null;
   const membershipNoticeId = useId();
   const rsvpDisabledReasonId = canRespond ? null : membershipNoticeId;
   const [period, setPeriod] = useState<AgendaPeriod>(initialPeriod);
@@ -742,6 +870,9 @@ export function AgendaScreen({
     ? {
         onSettled: (eventId, managed) => {
           setNotice(managed);
+          // Lo que termina se anuncia en la agenda: la pantalla del evento
+          // se cierra para enseñarlo.
+          eventScreen.close();
           reloadAgenda(eventId);
         },
       }
@@ -762,79 +893,102 @@ export function AgendaScreen({
     );
   }
 
+  const phoneScreen: PhoneScreen | null = isPhone
+    ? {
+        openedEventId: eventScreen.openedEventId,
+        slot: screenSlot,
+        onOpen: eventScreen.open,
+        onBack: eventScreen.close,
+      }
+    : null;
+
   return (
     <div className="agenda">
-      <header className="agenda-header">
-        <div>
-          <p className="agenda-eyebrow">{translate("calendar.eyebrow")}</p>
-          <h1 id={TITLE_ID}>{translate(PERIOD_TEXTS[period].title)}</h1>
-        </div>
-        <div className="agenda-actions">
-          <PeriodChoice
-            translate={translate}
-            period={period}
-            onChoose={choosePeriod}
-          />
-          {canManageEvents ? (
-            <CreateEventButton
-              translate={translate}
-              openWith={openCreateWith}
-              onOpen={() => setNotice(null)}
-              onCreated={(summary) => {
-                setNotice({ kind: "created", summary });
-                reloadAgenda(null);
-              }}
-            />
-          ) : null}
-        </div>
-        <TypeChips
-          translate={translate}
-          chosenTypes={chosenTypes}
-          onToggle={(eventType) =>
-            chooseTypes(toggleAgendaType(chosenTypes, eventType))
-          }
-        />
-      </header>
-      {rsvpDisabledReasonId === null ? null : (
-        <MembershipRsvpNotice translate={translate} id={rsvpDisabledReasonId} />
-      )}
-      {/* Siempre en el DOM: un lector de pantalla sólo anuncia los cambios
-          de una región que ya estaba. */}
-      {canManageEvents ? (
-        <p className="agenda-notice" role="status">
-          {notice === null || notice.kind === "closed"
-            ? null
-            : describeNotice(translate, notice)}
-        </p>
-      ) : null}
-      {notice?.kind === "closed" ? (
-        <p className="auth-error agenda-closed" role="alert">
-          {describeManageNotice(translate, notice)}
-        </p>
-      ) : null}
-      {chosenTypes.length === 0 ? (
-        <NoTypesChosen
-          translate={translate}
-          onShowAll={() => chooseTypes(AGENDA_TYPE_CHIPS)}
-        />
-      ) : null}
-      {chosenTypes.length === 0
-        ? null
-        : PERIODS.filter((choice) => openedPeriods.has(choice)).map(
-            (choice) => (
-              <AgendaView
-                key={`${choice}-${agendaVersion.number}`}
-                translate={translate}
-                period={choice}
-                eventTypes={agendaRequestTypes(chosenTypes)}
-                isActive={choice === period}
-                focusOnLoad={agendaVersion.focusEventId}
-                organizer={organizer}
-                canTakeAttendance={canTakeAttendance}
-                rsvpDisabledReasonId={rsvpDisabledReasonId}
-              />
-            ),
+      <div className="agenda-main" hidden={isScreenOpen}>
+        <header className="agenda-header">
+          {isPhone ? (
+            <h1 id={TITLE_ID}>{translate("calendar.mobile.title")}</h1>
+          ) : (
+            <div>
+              <p className="agenda-eyebrow">{translate("calendar.eyebrow")}</p>
+              <h1 id={TITLE_ID}>{translate(PERIOD_TEXTS[period].title)}</h1>
+            </div>
           )}
+          <div className="agenda-actions">
+            <PeriodChoice
+              translate={translate}
+              period={period}
+              onChoose={choosePeriod}
+            />
+            {canManageEvents ? (
+              <CreateEventButton
+                translate={translate}
+                openWith={openCreateWith}
+                isCompact={isPhone}
+                onOpen={() => setNotice(null)}
+                onCreated={(summary) => {
+                  setNotice({ kind: "created", summary });
+                  reloadAgenda(null);
+                }}
+              />
+            ) : null}
+          </div>
+          <TypeChips
+            translate={translate}
+            chosenTypes={chosenTypes}
+            onToggle={(eventType) =>
+              chooseTypes(toggleAgendaType(chosenTypes, eventType))
+            }
+          />
+        </header>
+        {rsvpDisabledReasonId === null ? null : (
+          <MembershipRsvpNotice
+            translate={translate}
+            id={rsvpDisabledReasonId}
+          />
+        )}
+        {/* Siempre en el DOM: un lector de pantalla sólo anuncia los cambios
+          de una región que ya estaba. */}
+        {canManageEvents ? (
+          <p className="agenda-notice" role="status">
+            {notice === null || notice.kind === "closed"
+              ? null
+              : describeNotice(translate, notice)}
+          </p>
+        ) : null}
+        {notice?.kind === "closed" ? (
+          <p className="auth-error agenda-closed" role="alert">
+            {describeManageNotice(translate, notice)}
+          </p>
+        ) : null}
+        {chosenTypes.length === 0 ? (
+          <NoTypesChosen
+            translate={translate}
+            onShowAll={() => chooseTypes(AGENDA_TYPE_CHIPS)}
+          />
+        ) : null}
+        {chosenTypes.length === 0
+          ? null
+          : PERIODS.filter((choice) => openedPeriods.has(choice)).map(
+              (choice) => (
+                <AgendaView
+                  key={`${choice}-${agendaVersion.number}`}
+                  translate={translate}
+                  period={choice}
+                  eventTypes={agendaRequestTypes(chosenTypes)}
+                  isActive={choice === period}
+                  focusOnLoad={agendaVersion.focusEventId}
+                  organizer={organizer}
+                  canTakeAttendance={canTakeAttendance}
+                  rsvpDisabledReasonId={rsvpDisabledReasonId}
+                  phoneScreen={phoneScreen}
+                />
+              ),
+            )}
+      </div>
+      {isPhone ? (
+        <div ref={setScreenSlot} className="agenda-screen-slot" />
+      ) : null}
     </div>
   );
 }
