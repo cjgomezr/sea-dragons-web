@@ -201,9 +201,9 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
     await page.goto(`${APP_URL}/dashboard`);
     await openAccountMenu(page);
 
-    const box = await englishToggle(page).boundingBox();
+    const box = await languageOption(page, "Español").boundingBox();
 
-    expect(box, "el interruptor no tiene caja").not.toBeNull();
+    expect(box, "el radio no tiene caja").not.toBeNull();
     expect(box!.width).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
     expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
   });

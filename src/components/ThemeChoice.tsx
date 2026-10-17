@@ -17,8 +17,8 @@ import {
   subscribeToThemeChanges,
 } from "@/lib/theme-preference";
 
-// The server cannot read the visitor's storage. The menu only renders once it
-// is opened, after hydration, so this value is never actually painted.
+// El servidor no ve el almacenamiento del navegador. El menú sólo se pinta al
+// abrirlo, después de hidratar, así que este valor nunca llega a verse.
 function readServerPreference(): ThemePreference {
   return "system";
 }

@@ -9293,8 +9293,10 @@ test.describe("menú de la cuenta", () => {
 
     const menu = await openAccountMenu(page);
 
+    // El grupo de radios no lleva su nombre dentro: va en la etiqueta de
+    // encima, que es lo que se compara.
     await expect(
-      menu.locator("a, [role=radiogroup], .account-menu-signout button"),
+      menu.locator("a, .segmented-choice-label, .account-menu-signout button"),
     ).toHaveText([/My profile/, /Appearance/, /Language/, /Sign out/]);
   });
 

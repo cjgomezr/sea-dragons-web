@@ -37,8 +37,8 @@ import { isSectionActive } from "@/lib/navigation";
  * con el rol que ya decide la navegación. */
 export type AccountIdentity = MemberIdentity & { readonly role: Role };
 
-/** El avatar mide 40 px en escritorio y 52 en el móvil; el CSS manda, y la
- * medida mayor es la que se pide por si un día lleva foto. */
+/** `MemberAvatar` pide una medida; la que manda es la del CSS, 40 px en
+ * escritorio y 52 en el móvil. */
 const AVATAR_SIZE = 52;
 
 /** Lo que avisa al menú de que otra pantalla quiere volver a él: la lista
