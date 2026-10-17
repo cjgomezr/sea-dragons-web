@@ -1423,6 +1423,7 @@ export const spanishMessages: MessageCatalog = {
   "calendar.edit.titleEvent": "Editar evento",
   "calendar.edit.titleSeries": "Editar serie",
   "calendar.edit.submit": "Guardar cambios",
+  "calendar.edit.barSubmit": "Guardar",
   "calendar.edit.seriesWarning":
     "Estos cambios se aplican a esta sesión y a todas las siguientes, también a las que se editaron solas.",
   "calendar.manage.edit": "Editar",
@@ -1546,6 +1547,9 @@ export const spanishMessages: MessageCatalog = {
   "calendar.form.audience": "A quién va",
   "calendar.form.cancel": "Cancelar",
   "calendar.form.submit": "Crear evento",
+  "calendar.form.barSubmit": "Crear",
+  "calendar.form.discardQuestion":
+    "Tienes cambios sin guardar. ¿Salir y descartarlos?",
   "calendar.form.sending": "Guardando…",
   "calendar.form.issue.required": "Rellena este campo.",
   "calendar.form.issue.event_title_invalid":
