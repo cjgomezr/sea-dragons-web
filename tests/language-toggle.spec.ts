@@ -42,10 +42,15 @@ function spanishToggle(page: Page): Locator {
   return page.getByRole("button", { name: /cambiar a english/i });
 }
 
-/** Dentro de la aplicación el interruptor vive en el menú de la cuenta
- * (#287), así que primero se abre. */
+/** Dentro de la aplicación el idioma vive en el menú de la cuenta (#287),
+ * así que primero se abre. Desde #716 es un control segmentado: un radio
+ * por idioma, nombrado en sí mismo. */
 async function openAccountMenu(page: Page): Promise<void> {
   await page.getByRole("button", { name: /^(My account|Mi cuenta)$/ }).click();
+}
+
+function languageOption(page: Page, name: "English" | "Español"): Locator {
+  return page.getByRole("radio", { name });
 }
 
 async function expectDocumentLanguage(page: Page, lang: string): Promise<void> {
@@ -170,7 +175,7 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
     await expectDocumentLanguage(page, "en");
 
     await openAccountMenu(page);
-    await englishToggle(page).click();
+    await languageOption(page, "Español").click();
     await expectDocumentLanguage(page, "es");
     // El desplegable abierto tapa la navegación de la barra lateral.
     await page.keyboard.press("Escape");
@@ -181,7 +186,7 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
 
     await expect(page).toHaveURL(new RegExp(`${CALENDAR_PATH}$`));
     await openAccountMenu(page);
-    await expect(spanishToggle(page)).toBeVisible();
+    await expect(languageOption(page, "Español")).toBeChecked();
     // Desde #311 el Calendario es la agenda, y su título es el de la pantalla.
     await expect(
       page.getByRole("heading", { level: 1, name: "Próximos eventos" }),
