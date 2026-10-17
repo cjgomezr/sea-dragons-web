@@ -428,4 +428,10 @@ describe("hora corta de la tarjeta del móvil (#656)", () => {
   it("sin hora de fin escribe sólo el inicio", () => {
     expect(formatCompactClockRange("en", "18:00", null)).toBe("6:00 pm");
   });
+
+  it("rechaza una hora que no es HH:MM", () => {
+    expect(() => formatCompactClockRange("en", "6pm", "19:30")).toThrow(
+      RangeError,
+    );
+  });
 });

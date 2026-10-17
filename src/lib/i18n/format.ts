@@ -323,23 +323,32 @@ export function formatClockRange(
 /** En la tarjeta del móvil la raya va pegada, como en el diseño. */
 const COMPACT_RANGE_SEPARATOR = "–";
 
-/** Una hora sin su am o pm, que la de fin ya dice: "6:00". */
-function formatClockTimeWithoutDayPeriod(
+/** Las piezas de una hora de reloj, comprobada como en `formatClockTime`. */
+function clockTimePartsOf(
   locale: Locale,
   clockTime: string,
+): readonly Intl.DateTimeFormatPart[] {
+  if (!CLOCK_TIME.test(clockTime)) {
+    throw new RangeError(`"${clockTime}" no es una hora en formato HH:MM.`);
+  }
+  return CLOCK_TIME_FORMATTERS[locale].formatToParts(
+    new Date(`1970-01-01T${clockTime}:00Z`),
+  );
+}
+
+/** Una hora sin su am o pm, que la de fin ya dice: "6:00". */
+function joinWithoutDayPeriod(
+  parts: readonly Intl.DateTimeFormatPart[],
 ): string {
-  return CLOCK_TIME_FORMATTERS[locale]
-    .formatToParts(new Date(`1970-01-01T${clockTime}:00Z`))
+  return parts
     .filter((part) => part.type !== "dayPeriod")
     .map((part) => part.value)
     .join("")
     .trim();
 }
 
-function dayPeriodOf(locale: Locale, clockTime: string): string | null {
-  const dayPeriod = CLOCK_TIME_FORMATTERS[locale]
-    .formatToParts(new Date(`1970-01-01T${clockTime}:00Z`))
-    .find((part) => part.type === "dayPeriod");
+function dayPeriodOf(parts: readonly Intl.DateTimeFormatPart[]): string | null {
+  const dayPeriod = parts.find((part) => part.type === "dayPeriod");
   return dayPeriod === undefined ? null : dayPeriod.value;
 }
 
@@ -354,11 +363,14 @@ export function formatCompactClockRange(
   if (endTime === null) {
     return formatClockTime(locale, startTime);
   }
-  const startPeriod = dayPeriodOf(locale, startTime);
-  const start =
-    startPeriod !== null && startPeriod === dayPeriodOf(locale, endTime)
-      ? formatClockTimeWithoutDayPeriod(locale, startTime)
-      : formatClockTime(locale, startTime);
+  const startParts = clockTimePartsOf(locale, startTime);
+  const startPeriod = dayPeriodOf(startParts);
+  const isSameDayPeriod =
+    startPeriod !== null &&
+    startPeriod === dayPeriodOf(clockTimePartsOf(locale, endTime));
+  const start = isSameDayPeriod
+    ? joinWithoutDayPeriod(startParts)
+    : formatClockTime(locale, startTime);
   return `${start}${COMPACT_RANGE_SEPARATOR}${formatClockTime(locale, endTime)}`;
 }
 

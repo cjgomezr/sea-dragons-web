@@ -109,7 +109,10 @@ function cancelledEvent(event: AgendaEvent): Response {
 
 /** La agenda, el detalle de cada evento, los equipos (nunca publicados), el
  * RSVP (que guarda siempre Quizás) y las acciones de quien organiza. */
-function stubApi(events: readonly AgendaEvent[]): void {
+function stubApi(
+  events: readonly AgendaEvent[],
+  options: { readonly isCancelDown?: boolean } = {},
+): void {
   const answeredMaybe = new Set<string>();
   vi.stubGlobal(
     "fetch",
@@ -128,7 +131,11 @@ function stubApi(events: readonly AgendaEvent[]): void {
         if (target === undefined) {
           throw new Error(`Petición inesperada: ${method} ${url.pathname}`);
         }
-        return cancelledEvent(target);
+        return options.isCancelDown === true
+          ? jsonResponse(500, {
+              error: { code: "internal", message: "Algo falló." },
+            })
+          : cancelledEvent(target);
       }
       if (url.pathname.endsWith("/rsvp") && method === "PUT") {
         const eventId = url.pathname.split("/").at(-2);
@@ -661,6 +668,25 @@ describe("la hoja ⋯", () => {
     expect(
       calls.filter((call) => call.pathname.startsWith(MANAGE_PATH)),
     ).toHaveLength(1);
+  });
+
+  it("si cancelar falla lo dice en la hoja y deja volver a intentarlo", async () => {
+    stubApi([TRIVIA_NIGHT], { isCancelDown: true });
+    renderAgenda({ canManage: true });
+    const sheet = await openSheet(TRIVIA_NIGHT.title);
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Cancel event" }),
+    );
+
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Cancel event" }),
+    );
+
+    expect(await within(sheet).findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("article")).toBeInTheDocument();
+    expect(
+      within(sheet).getByRole("button", { name: "Cancel event" }),
+    ).toBeEnabled();
   });
 
   it("al cancelar una sesión de una serie pregunta antes si es sólo esta", async () => {

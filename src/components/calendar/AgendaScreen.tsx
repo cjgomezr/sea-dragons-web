@@ -755,6 +755,15 @@ function usePhoneEventScreen(): {
   const hasOpenedRef = useRef(false);
   const isOpen = openedEventId !== null;
 
+  // Quien sale desde la pantalla (Pasar lista) y vuelve llega a la agenda
+  // sobre la entrada que dejó la pantalla: se le quita la marca para que la
+  // agenda no crea tener una pantalla que cerrar.
+  useEffect(() => {
+    if (isScreenHistoryEntry(window.history.state)) {
+      window.history.replaceState(null, "");
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) {
       return;
