@@ -60,7 +60,7 @@ export function issueAttributes(
 
 type InputFieldField = Extract<
   EventFormField,
-  "title" | "startsOn" | "endsOn" | "startTime" | "endDate" | "location"
+  "title" | "startsOn" | "endsOn" | "startTime" | "endDate"
 >;
 
 export function InputField({

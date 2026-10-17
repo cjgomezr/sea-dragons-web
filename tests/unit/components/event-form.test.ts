@@ -272,3 +272,118 @@ describe("si puede terminar otro día (#650)", () => {
     expect(endScopeOf(layout, form)).toBe("series");
   });
 });
+
+describe("el lugar elegido (#652)", () => {
+  const PRINCES_PARK = {
+    name: "Princes Park, Oval 2",
+    address: "Princes Park Dr, Carlton North VIC 3054",
+    lat: -37.7836,
+    lng: 144.9616,
+  } as const;
+  const FILLED: EventForm = {
+    ...SAVED,
+    audience: { kind: "club", groupIds: new Set() },
+    endTime: "20:30",
+  };
+  const CHOSEN: EventForm = {
+    ...FILLED,
+    location: "princes",
+    place: PRINCES_PARK,
+    placeDetail: "Field 2, near the pavilion",
+  };
+
+  it("manda el lugar y dónde exactamente al crear con un lugar elegido", () => {
+    expect(toEventDraft(CHOSEN)).toMatchObject({
+      location: PRINCES_PARK.name,
+      place: PRINCES_PARK,
+      placeDetail: "Field 2, near the pavilion",
+    });
+  });
+
+  it("manda dónde exactamente en blanco como ninguno", () => {
+    expect(toEventDraft({ ...CHOSEN, placeDetail: "  " })).toMatchObject({
+      placeDetail: null,
+    });
+  });
+
+  it("manda sólo el texto con texto libre", () => {
+    const draft = toEventDraft({ ...FILLED, placeDetail: "Field 2" });
+
+    expect(draft.location).toBe("MSAC Dive Pool");
+    expect(draft).not.toHaveProperty("place");
+    expect(draft).not.toHaveProperty("placeDetail");
+  });
+
+  it("no pide el texto del lugar cuando hay uno elegido", () => {
+    expect(listMissingFields({ ...CHOSEN, location: "" })).toEqual([]);
+  });
+
+  it("arranca con el lugar y dónde exactamente del evento", () => {
+    const event: AgendaEvent = {
+      id: "aaaaaaaa-0000-4000-8000-00000000000a",
+      startsOn: "2026-10-06",
+      startTime: "19:00",
+      endTime: "20:30",
+      endsOn: null,
+      title: "Pool Training",
+      eventType: "training",
+      location: PRINCES_PARK.name,
+      place: PRINCES_PARK,
+      placeDetail: "Field 2",
+      status: "scheduled",
+      seriesId: null,
+      goingCount: 0,
+      maybeCount: 0,
+      myResponse: null,
+      inAudience: true,
+      coverThumbUrl: null,
+    };
+
+    expect(
+      formFromEvent(event, { notes: null, audience: { kind: "club" } }),
+    ).toMatchObject({
+      location: PRINCES_PARK.name,
+      place: PRINCES_PARK,
+      placeDetail: "Field 2",
+    });
+  });
+
+  it("manda el lugar nuevo al elegir otro al editar", () => {
+    expect(listEventChanges(FILLED, CHOSEN)).toEqual({
+      place: PRINCES_PARK,
+      placeDetail: "Field 2, near the pavilion",
+    });
+  });
+
+  it("no manda el lugar si sigue siendo el mismo", () => {
+    expect(listSeriesChanges(CHOSEN, { ...CHOSEN })).toEqual({});
+  });
+
+  it("manda sólo dónde exactamente si es lo único que cambió", () => {
+    const edited = { ...CHOSEN, placeDetail: "Field 3" };
+
+    expect(listSeriesChanges(CHOSEN, edited)).toEqual({
+      placeDetail: "Field 3",
+    });
+  });
+
+  it("manda el texto al volver al texto libre aunque no cambie", () => {
+    const saved = { ...CHOSEN, location: PRINCES_PARK.name };
+    const freeText = { ...saved, place: null };
+
+    expect(listEventChanges(saved, freeText)).toEqual({
+      location: PRINCES_PARK.name,
+    });
+  });
+
+  it.each([
+    ["event_place_invalid", "location"],
+    ["event_place_coordinates_invalid", "location"],
+    ["event_place_detail_invalid", "placeDetail"],
+  ])("pinta %s junto a %s", (code, field) => {
+    expect(isFieldIssueCode(code)).toBe(true);
+    if (isFieldIssueCode(code)) {
+      expect(issueFromApi(code).field).toBe(field);
+    }
+  });
+});

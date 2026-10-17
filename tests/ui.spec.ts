@@ -17317,6 +17317,9 @@ test.describe("calendario en el navegador", () => {
 // en la base de desarrollo, y nada se guarda de verdad.
 const EVENTS_MANAGE_ENDPOINT = "/api/v1/events/manage";
 const EVENT_DIALOG_GROUPS_ENDPOINT = "/api/v1/groups";
+// El buscador de lugares (#652) nunca llama a Photon ni a la base de verdad:
+// lo que sugiere se sirve desde el test, vacío salvo en sus propios estados.
+const EVENT_PLACES_ENDPOINT = "/api/v1/events/manage/places";
 const EVENT_DIALOG_NAME = /^(New event|Nuevo evento)$/;
 const EVENT_DIALOG_OPEN = /^(Event|Evento)$/;
 const EVENT_DIALOG_SUBMIT = /^(Create event|Crear evento)$/;
@@ -17339,12 +17342,31 @@ function eventDialog(page: Page): Locator {
   return page.getByRole("dialog", { name: EVENT_DIALOG_NAME });
 }
 
+async function servePlaces(
+  page: Page,
+  places: readonly Record<string, unknown>[],
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === EVENT_PLACES_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ places, searchAvailable: true })),
+  );
+}
+
+/** Lo escrito en Lugar como texto libre, con la lista de sugerencias
+ * cerrada: la captura mira el formulario, no el buscador. */
+async function fillFreeTextLocation(dialog: Locator): Promise<void> {
+  const location = dialog.getByLabel(/^(Location|Lugar)$/);
+  await location.fill("MSAC Dive Pool");
+  await location.blur();
+}
+
 /** Abre "+ Evento" con los grupos servidos y espera al formulario. */
 async function openEventDialog(page: Page): Promise<Locator> {
   await page.route(
     (url) => url.pathname === EVENT_DIALOG_GROUPS_ENDPOINT,
     (route) => route.fulfill(jsonBody({ groups: STUBBED_EVENT_GROUPS })),
   );
+  await servePlaces(page, []);
   await waitForEmptyAgenda(page);
   await page.getByRole("button", { name: EVENT_DIALOG_OPEN }).click();
   const dialog = eventDialog(page);
@@ -17358,7 +17380,7 @@ async function fillEventBasics(dialog: Locator): Promise<void> {
   await dialog.getByLabel(/^(Title|Título)$/).fill("Pool Training");
   await dialog.getByLabel(/^(Starts|Empieza)$/).fill("19:00");
   await dialog.getByLabel(/^(Ends|Termina)$/).fill("20:30");
-  await dialog.getByLabel(/^(Location|Lugar)$/).fill("MSAC Dive Pool");
+  await fillFreeTextLocation(dialog);
 }
 
 async function showOneTimeDialog(page: Page): Promise<void> {
@@ -17509,7 +17531,7 @@ async function fillCreateDialog(
   await dialog.getByLabel(/^(Date|Fecha)$/).fill("2026-10-14");
   await dialog.getByLabel(/^(Starts|Empieza)$/).fill(times.starts);
   await dialog.getByLabel(/^(Ends|Termina)$/).fill(times.ends);
-  await dialog.getByLabel(/^(Location|Lugar)$/).fill("MSAC Dive Pool");
+  await fillFreeTextLocation(dialog);
   return dialog;
 }
 
@@ -17572,6 +17594,66 @@ async function showCreateDialogWithImage(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
 }
 
+// Lo que sugiere el buscador para "princes": el lugar del club primero y
+// después los de Photon, como en el mockup.
+const SUGGESTED_PLACES = [
+  {
+    source: "club",
+    name: "Princes Park, Oval 2",
+    address: "Princes Park Dr, Carlton North VIC 3054",
+    lat: -37.7836,
+    lng: 144.9616,
+  },
+  {
+    source: "search",
+    name: "Princes Bridge",
+    address: "Swanston St, Melbourne VIC 3000",
+    lat: -37.8191,
+    lng: 144.9683,
+  },
+  {
+    source: "search",
+    name: "Princess Theatre",
+    address: "163 Spring St, Melbourne VIC 3000",
+    lat: -37.8107,
+    lng: 144.9725,
+  },
+] as const;
+
+async function searchPlaces(page: Page): Promise<Locator> {
+  const dialog = await fillCreateDialog(page, {
+    starts: "18:00",
+    ends: "19:30",
+  });
+  await servePlaces(page, SUGGESTED_PLACES);
+  const location = dialog.getByRole("combobox", { name: /^(Location|Lugar)$/ });
+  await location.fill("princes");
+  await expect(
+    dialog.getByRole("option", { name: /Princess Theatre/ }),
+  ).toBeVisible();
+  return dialog;
+}
+
+async function showPlaceSearch(page: Page): Promise<void> {
+  const dialog = await searchPlaces(page);
+  await dialog
+    .getByRole("option", { name: /keep what you typed|texto libre/ })
+    .scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+}
+
+async function showChosenPlace(page: Page): Promise<void> {
+  const dialog = await searchPlaces(page);
+  await dialog.getByRole("option", { name: /Princes Park, Oval 2/ }).click();
+  const detail = dialog.getByLabel(
+    /^(Where exactly · optional|Dónde exactamente · opcional)$/,
+  );
+  await detail.fill("Field 2, near the pavilion");
+  await detail.blur();
+  await detail.scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+}
+
 const REDESIGNED_DIALOG_STATES: readonly CalendarState[] = [
   ...inBothLanguages("calendario-crear", showCreateDialog),
   ...inBothLanguages(
@@ -17579,6 +17661,8 @@ const REDESIGNED_DIALOG_STATES: readonly CalendarState[] = [
     showCreateDialogWithInvalidEnd,
   ),
   ...inBothLanguages("calendario-crear-con-imagen", showCreateDialogWithImage),
+  ...inBothLanguages("calendario-crear-lugar-buscando", showPlaceSearch),
+  ...inBothLanguages("calendario-crear-lugar-elegido", showChosenPlace),
 ];
 
 for (const state of REDESIGNED_DIALOG_STATES) {
