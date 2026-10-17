@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { AccentStyle } from "@/components/AccentStyle";
 import { ThemeScript } from "@/components/ThemeScript";
+import { ThemeSystemSync } from "@/components/ThemeSystemSync";
 import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 import { createTranslator } from "@/lib/i18n/translator";
@@ -46,7 +47,10 @@ export default async function RootLayout({
         <ThemeScript />
         <AccentStyle accentColor={brand.accentColor} />
       </head>
-      <body>{children}</body>
+      <body>
+        <ThemeSystemSync />
+        {children}
+      </body>
     </html>
   );
 }

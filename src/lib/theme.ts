@@ -1,9 +1,15 @@
 export const THEME_STORAGE_KEY = "seadragons-theme";
 
+/** The theme painted on the page. */
 export type Theme = "light" | "dark";
 
-function isTheme(value: unknown): value is Theme {
-  return value === "light" || value === "dark";
+/** What the visitor chose: a fixed theme, or whatever the system prefers. */
+export type ThemePreference = Theme | "system";
+
+export const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
+
+function isThemePreference(value: unknown): value is ThemePreference {
+  return value === "light" || value === "dark" || value === "system";
 }
 
 export function nextTheme(current: Theme): Theme {
@@ -11,15 +17,21 @@ export function nextTheme(current: Theme): Theme {
 }
 
 /**
- * FR-079: the persisted choice always wins. The operating system preference is
- * only the starting point for a visitor who has never picked one.
+ * RF-9 (E26): a visitor who never chose, or whose stored value is unreadable,
+ * follows the system. The light and dark values stored before `system` existed
+ * keep meaning what they meant.
  */
-export function resolveInitialTheme(
-  stored: string | null,
+export function readThemePreference(stored: string | null): ThemePreference {
+  return isThemePreference(stored) ? stored : "system";
+}
+
+/** FR-079: an explicit choice always wins over the operating system. */
+export function resolveTheme(
+  preference: ThemePreference,
   prefersDark: boolean,
 ): Theme {
-  if (isTheme(stored)) {
-    return stored;
+  if (preference !== "system") {
+    return preference;
   }
   return prefersDark ? "dark" : "light";
 }

@@ -156,6 +156,38 @@ test.describe("la elección guardada manda sobre la del sistema", () => {
   });
 });
 
+// RF-9 (E26): con `system` el tema sigue al sistema al cargar y también con la
+// página abierta. Sólo un navegador real cambia `prefers-color-scheme` en vivo.
+test.describe("la preferencia sistema", () => {
+  test("sigue al sistema cuando cambia con la página abierta", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await storeThemeChoice(page, "system");
+    await page.goto(`${APP_URL}${SIGN_IN_PATH}`);
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute("data-theme", "light");
+
+    await page.emulateMedia({ colorScheme: "dark" });
+
+    await expect(html).toHaveAttribute("data-theme", "dark");
+  });
+
+  test("no mueve un tema claro guardado cuando cambia el sistema", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await storeThemeChoice(page, "light");
+    await page.goto(`${APP_URL}${SIGN_IN_PATH}`);
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute("data-theme", "light");
+
+    await page.emulateMedia({ colorScheme: "dark" });
+
+    await expect(html).toHaveAttribute("data-theme", "light");
+  });
+});
+
 test("serves the versioned health endpoint", async ({ request }) => {
   const response = await request.get(`${APP_URL}/api/v1/health`);
   const body = await response.json();
