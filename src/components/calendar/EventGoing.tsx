@@ -1,3 +1,4 @@
+import { CaretRight } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import { useId, useState } from "react";
 import type { Translator } from "@/lib/i18n/translator";
 import type { EventTally, OpenedEvent } from "./agenda-client";
@@ -10,7 +11,14 @@ import type { EventTally, OpenedEvent } from "./agenda-client";
  * Los conteos son los de la fila, que ya cuentan la respuesta propia; los
  * nombres, los del detalle. Cada avatar lleva el nombre entero para el lector
  * de pantalla: las iniciales sólo se ven.
+ *
+ * En la pantalla del evento del móvil (#656, "#2b" del handoff) la fila entera
+ * de avatares es el botón que abre la lista, con su flecha. Un botón no puede
+ * llevar una lista dentro: ahí las caras sólo se ven, y los nombres los da la
+ * lista que abre.
  */
+
+export type EventGoingVariant = "panel" | "screen";
 
 const MAX_AVATARS = 7;
 
@@ -110,14 +118,65 @@ function Avatars({
   );
 }
 
+/** La fila del móvil: las caras, cuántas más y la flecha, todo un botón. */
+function GoingRowButton({
+  translate,
+  names,
+  isListOpen,
+  listId,
+  onToggle,
+}: {
+  readonly translate: Translator;
+  readonly names: readonly string[];
+  readonly isListOpen: boolean;
+  readonly listId: string;
+  readonly onToggle: () => void;
+}): React.JSX.Element {
+  const shown = names.slice(0, MAX_AVATARS);
+  const hiddenCount = names.length - shown.length;
+  return (
+    <button
+      type="button"
+      className="agenda-going-row"
+      aria-expanded={isListOpen}
+      aria-controls={listId}
+      onClick={onToggle}
+    >
+      <span className="agenda-avatars" aria-hidden="true">
+        {shown.map((name, index) => (
+          <span key={`${index}-${name}`} className="agenda-avatar">
+            {initialsOf(name)}
+          </span>
+        ))}
+      </span>
+      {hiddenCount > 0 ? (
+        <span className="agenda-avatars-more">
+          {translate("calendar.panel.moreGoing", { count: hiddenCount })}
+        </span>
+      ) : null}
+      <span className="visually-hidden">
+        {translate("calendar.panel.seeAll")}
+      </span>
+      <CaretRight
+        className="agenda-going-caret"
+        aria-hidden="true"
+        focusable="false"
+        size={18}
+      />
+    </button>
+  );
+}
+
 export function EventGoing({
   translate,
   tally,
   opened,
+  variant = "panel",
 }: {
   readonly translate: Translator;
   readonly tally: Pick<EventTally, "goingCount" | "maybeCount">;
   readonly opened: OpenedEvent;
+  readonly variant?: EventGoingVariant;
 }): React.JSX.Element {
   const [isListOpen, setIsListOpen] = useState(false);
   const headingId = useId();
@@ -140,7 +199,16 @@ export function EventGoing({
           {translate("calendar.detail.noResponses")}
         </p>
       )}
-      {hasResponses ? (
+      {hasResponses && variant === "screen" ? (
+        <GoingRowButton
+          translate={translate}
+          names={opened.going}
+          isListOpen={isListOpen}
+          listId={listId}
+          onToggle={() => setIsListOpen((isOpen) => !isOpen)}
+        />
+      ) : null}
+      {hasResponses && variant === "panel" ? (
         <div className="agenda-going-people">
           <Avatars
             translate={translate}

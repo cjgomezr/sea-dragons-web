@@ -14,7 +14,7 @@ import {
 } from "./agenda-client";
 import { AddToCalendarButton } from "./AddToCalendarButton";
 import { EventCover } from "./EventCover";
-import { EventGoing } from "./EventGoing";
+import { EventGoing, type EventGoingVariant } from "./EventGoing";
 import { EventPlaceCard } from "./EventPlaceCard";
 import { EventTypeTag } from "./EventTypeTag";
 import { describeEventWhen, describeSeriesRepeat } from "./event-panel-text";
@@ -54,7 +54,7 @@ function hasNotes(notes: string | null): notes is string {
   return notes !== null && notes.trim() !== "";
 }
 
-function describeAudience(
+export function describeAudience(
   translate: Translator,
   audience: NamedEventAudience,
 ): string {
@@ -67,7 +67,7 @@ function describeAudience(
   return audience.groups.map((group) => group.name).join(AUDIENCE_SEPARATOR);
 }
 
-function openedOf(detail: EventDetailState): OpenedEvent | null {
+export function openedOf(detail: EventDetailState): OpenedEvent | null {
   return detail.kind === "loaded" ? detail.opened : null;
 }
 
@@ -123,7 +123,7 @@ function PanelTags({
   );
 }
 
-function WhenBlocks({
+export function WhenBlocks({
   translate,
   event,
   opened,
@@ -160,16 +160,18 @@ function WhenBlocks({
 }
 
 /** Los que van y las notas, que llegan con el detalle. */
-function OpenedSections({
+export function OpenedSections({
   translate,
   detail,
   tally,
   onRetry,
+  goingVariant = "panel",
 }: {
   readonly translate: Translator;
   readonly detail: EventDetailState;
   readonly tally: EventTally;
   readonly onRetry: () => void;
+  readonly goingVariant?: EventGoingVariant;
 }): React.JSX.Element | null {
   switch (detail.kind) {
     case "idle":
@@ -198,6 +200,7 @@ function OpenedSections({
             translate={translate}
             tally={tally}
             opened={detail.opened}
+            variant={goingVariant}
           />
           {hasNotes(detail.opened.notes) ? (
             <section className="agenda-panel-section">
