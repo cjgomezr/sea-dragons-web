@@ -23,6 +23,15 @@ import { createTranslator, type Translator } from "@/lib/i18n/translator";
  * sale en el idioma nuevo.
  */
 
+/** Lo que avisa al menú de que otra pantalla quiere volver a él: la lista
+ * de la configuración del club en el móvil (#718) vuelve "a la cuenta", y la
+ * cuenta del móvil es este menú, no una ruta. */
+export const OPEN_ACCOUNT_MENU_EVENT = "seadragons:open-account-menu";
+
+export function requestAccountMenu(): void {
+  window.dispatchEvent(new Event(OPEN_ACCOUNT_MENU_EVENT));
+}
+
 /** Lo que se queda con el foco al pulsarlo. */
 const FOCUSABLE_SELECTOR =
   "a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]";
@@ -151,6 +160,12 @@ export function AccountMenu({
       headingRef.current?.focus();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const open = (): void => setIsOpen(true);
+    window.addEventListener(OPEN_ACCOUNT_MENU_EVENT, open);
+    return () => window.removeEventListener(OPEN_ACCOUNT_MENU_EVENT, open);
+  }, []);
 
   const label = translate("account.link");
   return (

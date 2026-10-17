@@ -204,6 +204,12 @@ export const ROLE_REQUEST_MEMBERS = {
     pendingRequest: null,
     columns: { role: "Admin" },
   },
+  /** El Committee que abre la configuración del club (#718): sólo ve los
+   * packs de sesiones, sin pestañas ni lista. */
+  "committee-de-configuracion": {
+    pendingRequest: null,
+    columns: { role: "Committee" },
+  },
   /** Su solicitud es la que un Admin aprueba desde la bandeja. Lleva nombre
    * propio para que el test la señale entre las demás del club. */
   "socio-para-decidir": {
