@@ -1081,6 +1081,33 @@ test.describe("dentro de la aplicación", () => {
     expect(box!.y + box!.height).toBeCloseTo(MOBILE.height, 0);
   });
 
+  // #703: Chrome en el iPhone deja la barra a media altura al esconder la
+  // suya; Chromium de escritorio ya la pega al fondo, así que aquí no se
+  // desplaza ni reserva hueco de raya de inicio. El fallo real sólo se ve en
+  // un iPhone, y eso lo comprueba una persona en la vista previa.
+  test("mobile leaves the tab bar untouched where it already sits on the fold", async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE);
+    await page.goto(`${APP_URL}/dashboard`);
+    const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+    await expect(tabBar).toBeVisible();
+
+    await page.evaluate(() =>
+      window.scrollTo(0, document.documentElement.scrollHeight),
+    );
+
+    await expect(page.locator('meta[name="viewport"]')).toHaveAttribute(
+      "content",
+      /viewport-fit=cover/,
+    );
+    const style = await tabBar.evaluate((bar) => ({
+      transform: bar.style.transform,
+      paddingBottom: getComputedStyle(bar).paddingBottom,
+    }));
+    expect(style).toEqual({ transform: "", paddingBottom: "0px" });
+  });
+
   test("mobile tabs keep the 44px touch target after adding icons", async ({
     page,
   }) => {

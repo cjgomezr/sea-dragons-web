@@ -303,6 +303,9 @@ h6 {
   bottom: 0;
   left: 0;
   z-index: 10;
+  /* El hueco de la raya de inicio del iPhone queda bajo las pestañas, con el
+     fondo de la barra; vale 0 donde no hay raya (#703). */
+  padding-bottom: env(safe-area-inset-bottom);
   background: var(--color-sidebar-background);
   border-top: 1px solid var(--color-sidebar-border);
 }
@@ -1052,9 +1055,9 @@ button.notification-item-content:hover {
   width: 100%;
   max-width: 960px;
   /* The bottom padding clears the fixed tab bar, so the last line of content
-     never ends up underneath it. */
+     never ends up underneath it, home indicator gap included (#703). */
   padding: var(--space-8) var(--space-4)
-    calc(var(--space-8) + var(--touch-target-min));
+    calc(var(--space-8) + var(--touch-target-min) + env(safe-area-inset-bottom));
   margin: 0 auto;
 }
 

@@ -14,6 +14,7 @@ import {
 } from "@/lib/navigation";
 import { NAV_SECTION_ICONS, OverflowIcon } from "@/components/NavIcons";
 import { useDismissal } from "@/components/use-dismissal";
+import { useStickToVisualBottom } from "@/components/use-stick-to-visual-bottom";
 
 const OVERFLOW_PANEL_ID = "app-tabbar-overflow";
 
@@ -54,6 +55,7 @@ export function MobileTabBar({
     onPressOutside: closeOverflow,
     onFocusOutside: closeOverflow,
   });
+  useStickToVisualBottom(navRef);
 
   const hasActiveOverflowSection = overflow.some((section) =>
     isSectionActive(section.href, pathname),
