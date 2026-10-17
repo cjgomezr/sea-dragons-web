@@ -120,6 +120,16 @@ function businessRule(reason: string): Response {
   });
 }
 
+function sessionNotInSeries(): Response {
+  return jsonResponse(409, {
+    error: {
+      code: "conflict",
+      message: "La sesión no es de la serie.",
+      reason: "session_not_in_series",
+    },
+  });
+}
+
 function notFound(): Response {
   return jsonResponse(404, {
     error: { code: "not_found", message: "El evento no existe." },
@@ -134,7 +144,10 @@ function detailOf(event: AgendaEvent): OrganizerEventDetail {
     ...event,
     // La grande no hace falta distinguirla de la miniatura aquí.
     coverUrl: event.coverThumbUrl,
-    series: null,
+    series:
+      event.seriesId === null
+        ? null
+        : { weekdays: [2], endsOn: "2026-12-15", sessionsLeft: 10 },
     notes: null,
     going: ["Ana Pérez"],
     maybe: [],
@@ -336,12 +349,19 @@ async function openDialogNamed(name: string): Promise<HTMLElement> {
   return dialog;
 }
 
-async function chooseScope(
+async function chooseEditScope(
   panel: HTMLElement,
-  action: "Edit" | "Cancel",
+  scope: "This session only" | "This and all following sessions",
+): Promise<void> {
+  await userEvent.click(within(panel).getByRole("button", { name: "Edit" }));
+  await userEvent.click(within(panel).getByRole("button", { name: scope }));
+}
+
+async function chooseCancelScope(
+  panel: HTMLElement,
   scope: "Only this one" | "The whole series from today on",
 ): Promise<void> {
-  await userEvent.click(within(panel).getByRole("button", { name: action }));
+  await userEvent.click(within(panel).getByRole("button", { name: "Cancel" }));
   await userEvent.click(within(panel).getByRole("button", { name: scope }));
 }
 
@@ -537,35 +557,109 @@ describe("editar desde el calendario", () => {
     expect(manageCalls()).toEqual([]);
   });
 
-  it("en una ocurrencia pregunta si es solo esta o toda la serie", async () => {
+  it("en una sesión de una serie pregunta qué editar encima de las acciones, con la fecha, y enfoca la primera opción", async () => {
     stubApi({ events: [TRAINING_OCCURRENCE] });
     renderAgenda();
     const panel = await openPanel(TRAINING_OCCURRENCE.title);
+    const edit = within(panel).getByRole("button", { name: "Edit" });
 
-    await userEvent.click(within(panel).getByRole("button", { name: "Edit" }));
+    await userEvent.click(edit);
 
+    const chooser = within(panel).getByRole("group", {
+      name: "This event repeats. What do you want to edit?",
+    });
+    const sessionOnly = within(chooser).getByRole("button", {
+      name: "This session only",
+    });
+    expect(sessionOnly).toHaveAccessibleDescription(
+      "Changes only Tuesday, October 6. The rest stay the same.",
+    );
     expect(
-      within(panel).getByRole("button", { name: "Only this one" }),
-    ).toBeInTheDocument();
-    expect(
-      within(panel).getByRole("button", {
-        name: "The whole series from today on",
+      within(chooser).getByRole("button", {
+        name: "This and all following sessions",
       }),
     ).toBeInTheDocument();
+    expect(
+      within(chooser).getByRole("button", { name: "Cancel" }),
+    ).toBeInTheDocument();
+    expect(sessionOnly).toHaveFocus();
+    expect(
+      chooser.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("con Solo esta edita la ocurrencia como un evento suelto", async () => {
+  it("pregunta qué editar en español", async () => {
+    stubApi({ events: [TRAINING_OCCURRENCE] });
+    renderAgenda({ locale: "es" });
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Editar" }),
+    );
+
+    const chooser = within(panel).getByRole("group", {
+      name: "Este evento se repite. ¿Qué quieres editar?",
+    });
+    expect(
+      within(chooser).getByRole("button", { name: "Solo esta sesión" }),
+    ).toHaveAccessibleDescription(
+      "Cambia solo el martes, 6 de octubre. Las demás quedan igual.",
+    );
+    expect(
+      within(chooser).getByRole("button", { name: "Esta y las siguientes" }),
+    ).toBeInTheDocument();
+    expect(
+      within(chooser).getByRole("button", { name: "Cancelar" }),
+    ).toBeInTheDocument();
+  });
+
+  it("con Cancelar cierra el selector y devuelve el foco a Editar", async () => {
+    stubApi({ events: [TRAINING_OCCURRENCE] });
+    renderAgenda();
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+    await userEvent.click(within(panel).getByRole("button", { name: "Edit" }));
+    const chooser = within(panel).getByRole("group", {
+      name: "This event repeats. What do you want to edit?",
+    });
+
+    await userEvent.click(
+      within(chooser).getByRole("button", { name: "Cancel" }),
+    );
+
+    expect(chooser).not.toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Edit" })).toHaveFocus();
+  });
+
+  it("con Escape cierra el selector y devuelve el foco a Editar", async () => {
+    stubApi({ events: [TRAINING_OCCURRENCE] });
+    renderAgenda();
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+    await userEvent.click(within(panel).getByRole("button", { name: "Edit" }));
+    const chooser = within(panel).getByRole("group", {
+      name: "This event repeats. What do you want to edit?",
+    });
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(chooser).not.toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Edit" })).toHaveFocus();
+  });
+
+  it("con Solo esta sesión edita la sesión como un evento suelto", async () => {
     stubApi({
       events: [TRAINING_OCCURRENCE],
       respond: () => managedEvent(TRAINING_OCCURRENCE, { startTime: "19:30" }),
     });
     renderAgenda();
     const panel = await openPanel(TRAINING_OCCURRENCE.title);
-    await chooseScope(panel, "Edit", "Only this one");
+    await chooseEditScope(panel, "This session only");
     const dialog = await openDialogNamed("Edit event");
 
     expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-10-06");
+    expect(
+      within(dialog).queryByRole("group", { name: "Repeats on" }),
+    ).not.toBeInTheDocument();
     setValue(dialog, "Starts", "19:30");
     await save(dialog);
 
@@ -581,40 +675,59 @@ describe("editar desde el calendario", () => {
     );
   });
 
-  it("con Toda la serie no deja cambiar la fecha ni los días y advierte que pisa las editadas", async () => {
+  it("con Esta y las siguientes abre la serie con los valores de la sesión, los días y Hasta", async () => {
     stubApi({ events: [TRAINING_OCCURRENCE] });
     renderAgenda();
     const panel = await openPanel(TRAINING_OCCURRENCE.title);
 
-    await chooseScope(panel, "Edit", "The whole series from today on");
+    await chooseEditScope(panel, "This and all following sessions");
     const dialog = await openDialogNamed("Edit series");
 
     expect(within(dialog).queryByLabelText("Date")).not.toBeInTheDocument();
-    expect(
-      within(dialog).queryByLabelText("Starts on"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(dialog).queryByRole("group", { name: "Repeats on" }),
-    ).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Title")).toHaveValue(
+      TRAINING_OCCURRENCE.title,
+    );
     expect(within(dialog).getByLabelText("Starts")).toHaveValue("19:00");
+    const days = within(dialog).getByRole("group", { name: "Repeats on" });
+    expect(
+      within(days).getByRole("checkbox", { name: "Tuesday" }),
+    ).toBeChecked();
+    expect(
+      within(days).getByRole("checkbox", { name: "Thursday" }),
+    ).not.toBeChecked();
+    expect(within(dialog).getByLabelText("Until")).toHaveValue("2026-12-15");
+  });
+
+  it("con Esta y las siguientes advierte que pisa lo editado en las sesiones sueltas", async () => {
+    stubApi({ events: [TRAINING_OCCURRENCE] });
+    renderAgenda();
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+
+    await chooseEditScope(panel, "This and all following sessions");
+    const dialog = await openDialogNamed("Edit series");
+
     expect(
       within(dialog).getByText(
-        "These changes apply to every session from today on, including the ones that were edited on their own.",
+        "These changes apply to this session and every one after it, and replace what was changed in sessions edited on their own.",
       ),
     ).toBeInTheDocument();
   });
 
-  it("con Toda la serie manda lo que cambió a la serie y dice cuántas sesiones cambiaron", async () => {
+  it("con Esta y las siguientes guarda desde la sesión con los días y Hasta nuevos", async () => {
     stubApi({
       events: [TRAINING_OCCURRENCE],
       respond: () => editedSeries(8),
     });
     renderAgenda();
     const panel = await openPanel(TRAINING_OCCURRENCE.title);
-    await chooseScope(panel, "Edit", "The whole series from today on");
+    await chooseEditScope(panel, "This and all following sessions");
     const dialog = await openDialogNamed("Edit series");
 
     setValue(dialog, "Starts", "19:30");
+    await userEvent.click(
+      within(dialog).getByRole("checkbox", { name: "Thursday" }),
+    );
+    setValue(dialog, "Until", "2026-11-30");
     await save(dialog);
 
     await waitFor(() => {
@@ -624,9 +737,111 @@ describe("editar desde el calendario", () => {
       expect.objectContaining({
         method: "PATCH",
         pathname: `${MANAGE_PATH}/series/${SERIES_ID}`,
-        body: { startTime: "19:30" },
+        body: {
+          fromOccurrenceId: TRAINING_OCCURRENCE.id,
+          startTime: "19:30",
+          weekdays: [2, 4],
+          endsOn: "2026-11-30",
+        },
       }),
     ]);
+  });
+
+  it("con Esta y las siguientes no manda los días ni Hasta si no cambiaron", async () => {
+    stubApi({
+      events: [TRAINING_OCCURRENCE],
+      respond: () => editedSeries(8),
+    });
+    renderAgenda();
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+    await chooseEditScope(panel, "This and all following sessions");
+    const dialog = await openDialogNamed("Edit series");
+
+    setValue(dialog, "Title", "Pool Session");
+    await save(dialog);
+
+    await waitFor(() => {
+      expect(manageCalls()).toHaveLength(1);
+    });
+    expect(manageCalls()[0]?.body).toEqual({
+      fromOccurrenceId: TRAINING_OCCURRENCE.id,
+      title: "Pool Session",
+    });
+  });
+
+  it("si otra edición partió la serie, lo dice y ofrece recargar", async () => {
+    stubApi({
+      events: [TRAINING_OCCURRENCE],
+      respond: () => sessionNotInSeries(),
+    });
+    renderAgenda();
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+    await chooseEditScope(panel, "This and all following sessions");
+    const dialog = await openDialogNamed("Edit series");
+    setValue(dialog, "Starts", "19:30");
+    await save(dialog);
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "This series changed while you were editing it. Reload to see the current version.",
+    );
+    const agendaLoadsBefore = agendaCalls().length;
+
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Reload" }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(agendaCalls().length).toBeGreaterThan(agendaLoadsBefore);
+    });
+  });
+
+  it("si otra edición partió la serie, lo dice en español", async () => {
+    stubApi({
+      events: [TRAINING_OCCURRENCE],
+      respond: () => sessionNotInSeries(),
+    });
+    renderAgenda({ locale: "es" });
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Editar" }),
+    );
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Esta y las siguientes" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Editar serie" });
+    await within(dialog).findByRole("radio", { name: "Todo el club" });
+    setValue(dialog, "Empieza", "20:00");
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Guardar cambios" }),
+    );
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Esta serie cambió mientras la editabas. Recarga para ver la versión actual.",
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "Recargar" }),
+    ).toBeInTheDocument();
+  });
+
+  it("si la sesión empezó mientras tanto, lo dice y refresca la agenda", async () => {
+    stubApi({
+      events: [TRAINING_OCCURRENCE],
+      respond: () => businessRule("occurrence_started"),
+    });
+    renderAgenda();
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+    await chooseEditScope(panel, "This and all following sessions");
+    const dialog = await openDialogNamed("Edit series");
+    setValue(dialog, "Starts", "19:30");
+    await save(dialog);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This session has already started, so it can't be changed anymore.",
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("pinta junto a su campo un motivo de la API sin borrar lo escrito", async () => {
@@ -681,7 +896,7 @@ describe("editar desde el calendario", () => {
     );
     await userEvent.click(
       within(panel).getByRole("button", {
-        name: "Toda la serie de hoy en adelante",
+        name: "Esta y las siguientes",
       }),
     );
     const dialog = await screen.findByRole("dialog", { name: "Editar serie" });
@@ -852,7 +1067,7 @@ describe("cancelar desde el calendario", () => {
     }
     await selectRow(row, TRAINING_OCCURRENCE.title);
     const panel = await findLoadedPanel(TRAINING_OCCURRENCE.title);
-    await chooseScope(panel, "Cancel", "The whole series from today on");
+    await chooseCancelScope(panel, "The whole series from today on");
 
     expect(
       within(panel).getByText(
@@ -888,7 +1103,7 @@ describe("cancelar desde el calendario", () => {
     });
     renderAgenda();
     const panel = await openPanel(TRAINING_OCCURRENCE.title);
-    await chooseScope(panel, "Cancel", "Only this one");
+    await chooseCancelScope(panel, "Only this one");
 
     await userEvent.click(
       within(panel).getByRole("button", { name: "Cancel event" }),
@@ -1108,7 +1323,7 @@ describe("el fin y la imagen al editar (#650)", () => {
     renderAgenda();
     const panel = await openPanel(TRAINING_OCCURRENCE.title);
 
-    await chooseScope(panel, "Edit", "The whole series from today on");
+    await chooseEditScope(panel, "This and all following sessions");
     const dialog = await openDialogNamed("Edit series");
 
     expect(within(dialog).getByLabelText("Ends")).toHaveValue("20:30");

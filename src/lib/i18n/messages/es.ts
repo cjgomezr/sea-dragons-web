@@ -1424,10 +1424,16 @@ export const spanishMessages: MessageCatalog = {
   "calendar.edit.titleSeries": "Editar serie",
   "calendar.edit.submit": "Guardar cambios",
   "calendar.edit.seriesWarning":
-    "Estos cambios se aplican a todas las sesiones de hoy en adelante, también a las que se editaron solas.",
+    "Estos cambios se aplican a esta sesión y a todas las siguientes, y pisan lo que se cambió en las sesiones editadas solas.",
   "calendar.manage.edit": "Editar",
   "calendar.manage.cancel": "Cancelar",
-  "calendar.manage.scopeQuestion.edit": "¿Qué sesiones quieres editar?",
+  "calendar.manage.editScope.question":
+    "Este evento se repite. ¿Qué quieres editar?",
+  "calendar.manage.editScope.session": "Solo esta sesión",
+  "calendar.manage.editScope.sessionHint":
+    "Cambia solo el {date}. Las demás quedan igual.",
+  "calendar.manage.editScope.following": "Esta y las siguientes",
+  "calendar.manage.editScope.close": "Cancelar",
   "calendar.manage.scopeQuestion.cancel": "¿Qué sesiones quieres cancelar?",
   "calendar.manage.scope.event": "Solo esta",
   "calendar.manage.scope.series": "Toda la serie de hoy en adelante",
@@ -1462,8 +1468,15 @@ export const spanishMessages: MessageCatalog = {
     "Este evento ya estaba cancelado. Actualizamos el calendario.",
   "calendar.manage.closed.series_without_upcoming":
     "Esta serie ya no tiene sesiones de hoy en adelante. Actualizamos el calendario.",
+  "calendar.manage.closed.occurrence_started":
+    "Esta sesión ya empezó, así que ya no se puede cambiar. Actualizamos el calendario.",
+  "calendar.manage.closed.session_not_in_series":
+    "Esta serie cambió mientras la editabas. Actualizamos el calendario.",
   "calendar.manage.closed.not_found":
     "Este evento ya no existe. Actualizamos el calendario.",
+  "calendar.manage.error.seriesChanged":
+    "Esta serie cambió mientras la editabas. Recarga para ver la versión actual.",
+  "calendar.manage.reload": "Recargar",
   "calendar.manage.error.forbidden": "Tu rol no puede cambiar eventos.",
   "calendar.manage.error.unexpected":
     "No pudimos guardar el cambio. Vuelve a intentarlo.",

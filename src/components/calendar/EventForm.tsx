@@ -19,7 +19,10 @@ import {
   issueFromApi,
   listMissingFields,
 } from "./event-form";
-import { describeManageFailure } from "./event-manage-client";
+import {
+  describeManageFailure,
+  isSeriesChangedFailure,
+} from "./event-manage-client";
 import { type EventEndCheck, evaluateEventEnd } from "./event-end";
 import { EventCoverField, describeCoverIssue } from "./EventCoverField";
 import {
@@ -41,8 +44,9 @@ import { useEventCover } from "./use-event-cover";
  * sesión) va arriba de los botones.
  *
  * Es el mismo para crear y para editar (#316): quien lo abre dice qué campos
- * lleva y qué hacer al guardar. Al editar no hay repetición, y una serie
- * tampoco enseña la fecha: sus días y sus fechas no se editan.
+ * lleva y qué hacer al guardar. Al editar no hay repetición. Una serie se
+ * edita desde una de sus sesiones (#655): no enseña la fecha, que es la de
+ * esa sesión, pero sí sus días y "Hasta".
  */
 
 /** Lo que devuelve guardar: terminado (el diálogo se cierra) o un fallo que
@@ -54,8 +58,8 @@ type Status =
   | { readonly kind: "sending" }
   | ApiRequestFailure;
 
-/** Los días y el final de una serie nueva. La repetición se rehace en
- * #651; aquí queda como estaba. */
+/** Los días y el final de una serie nueva, o de una que se edita desde una
+ * sesión. La repetición se rehace en #651; aquí queda como estaba. */
 function WeeklyFields(props: FieldProps): React.JSX.Element {
   return (
     <>
@@ -91,17 +95,49 @@ function describeEndIssue(
     : null;
 }
 
+/** La serie que cambió mientras se editaba (#655) no se arregla
+ * reintentando: el aviso trae con qué recargarla. */
+function SeriesChangedFailure({
+  translate,
+  status,
+  onReload,
+}: {
+  readonly translate: Translator;
+  readonly status: ApiRequestFailure;
+  readonly onReload: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="event-form-stale" role="alert">
+      <p className="auth-error">{describeManageFailure(translate, status)}</p>
+      <button type="button" className="admin-secondary" onClick={onReload}>
+        {translate("calendar.manage.reload")}
+      </button>
+    </div>
+  );
+}
+
 function SubmitFailure({
   translate,
   layout,
   status,
+  onReload,
 }: {
   readonly translate: Translator;
   readonly layout: EventFormLayout;
   readonly status: Status;
+  readonly onReload: () => void;
 }): React.JSX.Element | null {
   if (status.kind !== "failed") {
     return null;
+  }
+  if (isSeriesChangedFailure(status)) {
+    return (
+      <SeriesChangedFailure
+        translate={translate}
+        status={status}
+        onReload={onReload}
+      />
+    );
   }
   return (
     <p className="auth-error" role="alert">
@@ -147,6 +183,7 @@ export function EventForm({
   currentCoverUrl,
   submit,
   onCancel,
+  onReload,
   onSendingChange,
 }: {
   readonly translate: Translator;
@@ -157,6 +194,8 @@ export function EventForm({
   readonly currentCoverUrl: string | null;
   readonly submit: (form: EventFormValues) => Promise<FormSubmission>;
   readonly onCancel: () => void;
+  /** Cierra y vuelve a pedir lo que se editaba, que cambió por otro lado. */
+  readonly onReload: () => void;
   /** Mientras se guarda, el diálogo no se deja cerrar. */
   readonly onSendingChange: (isSending: boolean) => void;
 }): React.JSX.Element {
@@ -295,7 +334,8 @@ export function EventForm({
           })}
         />
         {layout === "create" ? <RepeatField {...fieldProps} /> : null}
-        {layout === "create" && form.repeat === "weekly" ? (
+        {layout === "series" ||
+        (layout === "create" && form.repeat === "weekly") ? (
           <WeeklyFields {...fieldProps} />
         ) : null}
         <EventPlaceField {...fieldProps} />
@@ -309,7 +349,12 @@ export function EventForm({
           onChange={(audience) => update({ audience })}
         />
       </fieldset>
-      <SubmitFailure translate={translate} layout={layout} status={status} />
+      <SubmitFailure
+        translate={translate}
+        layout={layout}
+        status={status}
+        onReload={onReload}
+      />
       <div className="event-form-actions">
         <button
           type="button"

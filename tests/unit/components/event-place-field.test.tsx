@@ -108,6 +108,7 @@ function renderForm(
       currentCoverUrl={null}
       submit={submit}
       onCancel={() => undefined}
+      onReload={() => undefined}
       onSendingChange={() => undefined}
     />,
   );

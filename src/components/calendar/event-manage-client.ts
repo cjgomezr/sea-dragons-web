@@ -12,7 +12,10 @@ import {
   EVENT_SERIES_MANAGE_API_PATH,
 } from "@/lib/auth/routes";
 import type { EventEdit } from "@/lib/events/event-management";
-import type { SeriesEdit } from "@/lib/events/series-management";
+import type {
+  SeriesEdit,
+  SeriesScheduleEdit,
+} from "@/lib/events/series-management";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
@@ -34,9 +37,19 @@ export type ManageTarget =
 
 export type ManageScope = ManageTarget["scope"];
 
+/** Lo que se manda al editar una serie desde una sesión (#653, #654): los
+ * cambios, y los días y la fecha final sólo si cambiaron. */
+export type SeriesSplitEdit = SeriesEdit &
+  SeriesScheduleEdit & { readonly fromOccurrenceId: string };
+
 /** Por qué una acción ya no se puede hacer sobre lo que enseña la agenda. */
 export type ClosedReason =
-  "event_started" | "event_cancelled" | "series_without_upcoming" | "not_found";
+  | "event_started"
+  | "event_cancelled"
+  | "series_without_upcoming"
+  | "occurrence_started"
+  | "session_not_in_series"
+  | "not_found";
 
 /** Lo que la agenda anuncia cuando una acción termina. */
 export type ManageNotice =
@@ -65,7 +78,7 @@ function managePath(template: string, id: string): string {
   return template.replace("[id]", encodeURIComponent(id));
 }
 
-function patchJson(body: EventEdit | SeriesEdit): RequestInit {
+function patchJson(body: EventEdit | SeriesSplitEdit): RequestInit {
   return {
     method: "PATCH",
     headers: JSON_REQUEST_HEADERS,
@@ -76,7 +89,7 @@ function patchJson(body: EventEdit | SeriesEdit): RequestInit {
 /** Guarda lo que cambió del evento o de la serie. */
 export async function saveChanges(
   target: ManageTarget,
-  changes: EventEdit | SeriesEdit,
+  changes: EventEdit | SeriesSplitEdit,
 ): Promise<ManageSave> {
   if (target.scope === "event") {
     const read = readApiPayload(
@@ -144,6 +157,7 @@ const CLOSED_BUSINESS_REASONS: readonly string[] = [
   "event_started",
   "event_cancelled",
   "series_without_upcoming",
+  "occurrence_started",
 ] satisfies readonly ClosedReason[];
 
 function isClosedBusinessReason(reason: string): reason is ClosedReason {
@@ -169,12 +183,24 @@ export function readClosedNotice({
   return null;
 }
 
+/** Otra edición partió la serie desde antes de esta sesión (#653):
+ * reintentar no sirve, hay que ver la serie como quedó. */
+export function isSeriesChangedFailure({
+  failure,
+  reason,
+}: ApiRequestFailure): boolean {
+  return failure === "conflict" && reason === "session_not_in_series";
+}
+
 /** Por qué no se guardó o no se canceló, cuando reintentar puede servir. */
 export function describeManageFailure(
   translate: Translator,
-  { failure }: ApiRequestFailure,
+  requestFailure: ApiRequestFailure,
 ): string {
-  switch (failure) {
+  if (isSeriesChangedFailure(requestFailure)) {
+    return translate("calendar.manage.error.seriesChanged");
+  }
+  switch (requestFailure.failure) {
     case "network":
       return translate("calendar.form.error.network");
     case "unauthenticated":

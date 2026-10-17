@@ -1,15 +1,21 @@
+import { CalendarBlank } from "@phosphor-icons/react/dist/ssr/CalendarBlank";
+import { Repeat } from "@phosphor-icons/react/dist/ssr/Repeat";
+import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types";
 import { useEffect, useId, useRef, useState } from "react";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import type {
   AgendaEvent,
+  EventSeriesSummary,
   NamedEventAudience,
 } from "@/lib/events/event-agenda";
+import { formatPanelDay } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import {
   type EventForm as EventFormValues,
   formFromEvent,
+  formFromSeriesSession,
   listEventChanges,
-  listSeriesChanges,
+  listFollowingChanges,
 } from "./event-form";
 import {
   type ManageNotice,
@@ -27,9 +33,11 @@ import type { FormSubmission } from "./EventForm";
 /**
  * "Editar" y "Cancelar" en la fila desplegada de un evento futuro (#316,
  * RF-11 y RF-12 del PRD de E7), para Admin y Committee. Editar reutiliza el
- * diálogo de crear (#313) con los datos del evento. En una ocurrencia de una
- * serie, antes se elige si es solo esta o toda la serie de hoy en adelante.
- * Cancelar pide confirmación diciendo cuántos habían dicho que van.
+ * diálogo de crear (#313) con los datos del evento. En una sesión de una
+ * serie, antes se elige si es solo esa o esa y las siguientes (#655, RF-12
+ * del PRD de E24), que parte la serie desde ella. Cancelar pregunta si es
+ * solo esta o toda la serie de hoy en adelante, y pide confirmación diciendo
+ * cuántos habían dicho que van.
  *
  * Lo que termina (bien, o porque el evento ya no admitía cambios) se lo pasa
  * a la agenda, que lo anuncia y se vuelve a pedir: así la fila, o todas las
@@ -75,14 +83,111 @@ function useFocusOnMount<
   return ref;
 }
 
-function ScopeChoice({
+/** Una opción del selector: el nombre es su etiqueta, y la pista, si la
+ * tiene, la describe sin alargar el nombre. */
+function EditScopeOption({
+  Glyph,
+  label,
+  hint,
+  buttonRef,
+  onChoose,
+}: {
+  readonly Glyph: PhosphorGlyph;
+  readonly label: string;
+  readonly hint: string | null;
+  readonly buttonRef?: React.RefObject<HTMLButtonElement | null>;
+  readonly onChoose: () => void;
+}): React.JSX.Element {
+  const labelId = useId();
+  const hintId = useId();
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      className="agenda-edit-scope-option"
+      aria-labelledby={labelId}
+      aria-describedby={hint === null ? undefined : hintId}
+      onClick={onChoose}
+    >
+      <span className="agenda-edit-scope-icon" aria-hidden="true">
+        <Glyph focusable="false" size={18} />
+      </span>
+      <span className="agenda-edit-scope-text">
+        <span id={labelId} className="agenda-edit-scope-label">
+          {label}
+        </span>
+        {hint === null ? null : (
+          <span id={hintId} className="agenda-edit-scope-hint">
+            {hint}
+          </span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+/** Qué se edita de una serie (#655). La primera opción recibe el foco, y
+ * Cancelar o Escape vuelven a Editar; Escape no llega al panel, que si no
+ * se cerraría con él. */
+function EditScopeChoice({
   translate,
-  action,
+  sessionDay,
   onChoose,
   onBack,
 }: {
   readonly translate: Translator;
-  readonly action: OrganizerAction;
+  readonly sessionDay: string;
+  readonly onChoose: (scope: ManageScope) => void;
+  readonly onBack: () => void;
+}): React.JSX.Element {
+  const questionId = useId();
+  const firstOptionRef = useFocusOnMount<HTMLButtonElement>();
+  return (
+    <div
+      className="groups-confirm agenda-organizer-step"
+      role="group"
+      aria-labelledby={questionId}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          onBack();
+        }
+      }}
+    >
+      <p id={questionId} className="agenda-edit-scope-question">
+        {translate("calendar.manage.editScope.question")}
+      </p>
+      <EditScopeOption
+        Glyph={CalendarBlank}
+        label={translate("calendar.manage.editScope.session")}
+        hint={translate("calendar.manage.editScope.sessionHint", {
+          date: formatPanelDay(translate.locale, sessionDay),
+        })}
+        buttonRef={firstOptionRef}
+        onChoose={() => onChoose("event")}
+      />
+      <EditScopeOption
+        Glyph={Repeat}
+        label={translate("calendar.manage.editScope.following")}
+        hint={null}
+        onChoose={() => onChoose("series")}
+      />
+      <div className="groups-actions">
+        <button type="button" className="admin-secondary" onClick={onBack}>
+          {translate("calendar.manage.editScope.close")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CancelScopeChoice({
+  translate,
+  onChoose,
+  onBack,
+}: {
+  readonly translate: Translator;
   readonly onChoose: (scope: ManageScope) => void;
   readonly onBack: () => void;
 }): React.JSX.Element {
@@ -101,7 +206,7 @@ function ScopeChoice({
         className="groups-question"
         tabIndex={-1}
       >
-        {translate(`calendar.manage.scopeQuestion.${action}`)}
+        {translate("calendar.manage.scopeQuestion.cancel")}
       </p>
       <div className="groups-actions">
         {scopes.map((scope) => (
@@ -202,6 +307,8 @@ export function EventOrganizerActions({
     readonly audience: NamedEventAudience;
     /** La imagen grande firmada, o null sin imagen (#644). */
     readonly coverUrl: string | null;
+    /** Los días y la fecha final de su serie; nulo en un evento suelto. */
+    readonly series: EventSeriesSummary | null;
   };
   /** Los que van según la fila, que ya cuenta la respuesta propia. */
   readonly goingCount: number;
@@ -227,7 +334,10 @@ export function EventOrganizerActions({
         ? {
             kind: "editing",
             target,
-            initialForm: formFromEvent(event, details),
+            initialForm:
+              target.scope === "series"
+                ? formFromSeriesSession(event, details)
+                : formFromEvent(event, details),
           }
         : { kind: "cancelling", target, status: { kind: "confirming" } },
     );
@@ -261,6 +371,7 @@ export function EventOrganizerActions({
     return FINISHED;
   }
 
+  /** Una serie se edita desde esta sesión: se parte desde aquí (#653). */
   async function submitEdit(
     target: ManageTarget,
     initialForm: EventFormValues,
@@ -269,11 +380,26 @@ export function EventOrganizerActions({
     const changes =
       target.scope === "event"
         ? listEventChanges(initialForm, form)
-        : listSeriesChanges(initialForm, form);
+        : listFollowingChanges(initialForm, form);
     if (Object.keys(changes).length === 0) {
       return FINISHED;
     }
-    return settle(await saveChanges(target, changes));
+    return settle(
+      await saveChanges(
+        target,
+        target.scope === "event"
+          ? changes
+          : { ...changes, fromOccurrenceId: event.id },
+      ),
+    );
+  }
+
+  /** La serie cambió por otro lado: la agenda la vuelve a pedir. */
+  function reloadSeries(): void {
+    organizer.onSettled(event.id, {
+      kind: "closed",
+      reason: "session_not_in_series",
+    });
   }
 
   async function confirmCancel(target: ManageTarget): Promise<void> {
@@ -294,6 +420,14 @@ export function EventOrganizerActions({
 
   return (
     <div className="agenda-organizer">
+      {step.kind === "choosingScope" && step.action === "edit" ? (
+        <EditScopeChoice
+          translate={translate}
+          sessionDay={event.startsOn}
+          onChoose={(scope) => proceed("edit", scope)}
+          onBack={() => returnTo("edit")}
+        />
+      ) : null}
       <div className="groups-actions">
         <button
           ref={editRef}
@@ -314,12 +448,11 @@ export function EventOrganizerActions({
           {translate("calendar.manage.cancel")}
         </button>
       </div>
-      {step.kind === "choosingScope" ? (
-        <ScopeChoice
+      {step.kind === "choosingScope" && step.action === "cancel" ? (
+        <CancelScopeChoice
           translate={translate}
-          action={step.action}
-          onChoose={(scope) => proceed(step.action, scope)}
-          onBack={() => returnTo(step.action)}
+          onChoose={(scope) => proceed("cancel", scope)}
+          onBack={() => returnTo("cancel")}
         />
       ) : null}
       {step.kind === "cancelling" ? (
@@ -339,6 +472,7 @@ export function EventOrganizerActions({
           initialForm={step.initialForm}
           currentCoverUrl={details.coverUrl}
           submit={(form) => submitEdit(step.target, step.initialForm, form)}
+          onReload={reloadSeries}
           onClosed={() => returnTo("edit")}
         />
       ) : null}
