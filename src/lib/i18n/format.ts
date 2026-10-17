@@ -426,6 +426,16 @@ export function formatPanelShortDay(locale: Locale, isoDate: string): string {
   return `${weekday}, ${formatShortMonthDay(locale, isoDate)}`;
 }
 
+/** Una fecha de una serie que se va a crear (#651), como el resumen del
+ * diseño: "Thu, 17 Dec" en inglés, "jue 17 dic" en español. */
+export function formatSessionDay(locale: Locale, isoDate: string): string {
+  const { weekday, day, month } = formatCalendarDayParts(locale, isoDate);
+  const dayNumber = String(Number(day));
+  return locale === "es"
+    ? `${weekday} ${dayNumber} ${month}`
+    : `${weekday}, ${dayNumber} ${month}`;
+}
+
 const RELATIVE_TIME_FORMATTERS = formattersByLocale(
   (displayLocale) =>
     new Intl.RelativeTimeFormat(displayLocale, { numeric: "auto" }),

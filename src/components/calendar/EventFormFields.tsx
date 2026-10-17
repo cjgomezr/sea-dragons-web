@@ -194,25 +194,36 @@ export function RepeatField({
 function toggleWeekday(
   weekdays: ReadonlySet<IsoWeekday>,
   weekday: IsoWeekday,
-  isChosen: boolean,
 ): ReadonlySet<IsoWeekday> {
   const next = new Set(weekdays);
-  if (isChosen) {
-    next.add(weekday);
-  } else {
+  if (next.has(weekday)) {
     next.delete(weekday);
+  } else {
+    next.add(weekday);
   }
   return next;
 }
 
-/** Los siete días como fichas: se ve el nombre corto y se lee el entero. */
+/** La inicial del día, como en el diseño: "M T W T F S S", "L M M J V S D".
+ * La estrecha de `Intl` escribe la "X" del miércoles en español. */
+function weekdayInitial(translate: Translator, weekday: IsoWeekday): string {
+  const { locale } = translate;
+  return formatWeekdayName(locale, weekday, "long")
+    .charAt(0)
+    .toLocaleUpperCase(locale);
+}
+
+/** Los siete días como botones redondos que se pulsan y se sueltan (#651):
+ * se ve la inicial y se lee el nombre entero. El aviso lo trae quien sabe
+ * por qué no salen sesiones. */
 export function WeekdaysField({
   translate,
   form,
-  issueTextFor,
+  issueText,
   onChange,
-}: FieldProps): React.JSX.Element {
-  const issueText = issueTextFor("weekdays");
+}: Omit<FieldProps, "issueTextFor"> & {
+  readonly issueText: string | null;
+}): React.JSX.Element {
   return (
     <fieldset
       className="event-form-weekdays"
@@ -220,35 +231,22 @@ export function WeekdaysField({
     >
       <legend>{translate("calendar.form.weekdays")}</legend>
       <div className="event-form-days">
-        {ISO_WEEKDAYS.map((weekday) => {
-          const id = `${fieldId("weekdays")}-${weekday}`;
-          return (
-            <div className="event-form-day" key={weekday}>
-              <input
-                id={id}
-                type="checkbox"
-                checked={form.weekdays.has(weekday)}
-                onChange={(event) =>
-                  onChange({
-                    weekdays: toggleWeekday(
-                      form.weekdays,
-                      weekday,
-                      event.target.checked,
-                    ),
-                  })
-                }
-              />
-              <label htmlFor={id}>
-                <span aria-hidden="true">
-                  {formatWeekdayName(translate.locale, weekday, "short")}
-                </span>
-                <span className="visually-hidden">
-                  {formatWeekdayName(translate.locale, weekday, "long")}
-                </span>
-              </label>
-            </div>
-          );
-        })}
+        {ISO_WEEKDAYS.map((weekday) => (
+          <button
+            type="button"
+            className="event-form-day"
+            key={weekday}
+            aria-pressed={form.weekdays.has(weekday)}
+            onClick={() =>
+              onChange({ weekdays: toggleWeekday(form.weekdays, weekday) })
+            }
+          >
+            <span aria-hidden="true">{weekdayInitial(translate, weekday)}</span>
+            <span className="visually-hidden">
+              {formatWeekdayName(translate.locale, weekday, "long")}
+            </span>
+          </button>
+        ))}
       </div>
       <FieldIssue field="weekdays" text={issueText} />
     </fieldset>
