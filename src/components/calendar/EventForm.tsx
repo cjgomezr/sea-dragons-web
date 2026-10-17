@@ -5,6 +5,7 @@ import { AudienceField } from "@/components/AudienceField";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import type { Group } from "@/lib/groups/groups";
 import type { Translator } from "@/lib/i18n/translator";
+import { clubMoment } from "@/lib/time/club-calendar";
 import {
   describeCreateFailure,
   describeEventIssue,
@@ -28,11 +29,12 @@ import {
   NotesField,
   RepeatField,
   TypeField,
-  WeekdaysField,
 } from "./EventFormFields";
 import { EventPlaceField } from "./EventPlaceField";
+import { WeeklyFields } from "./EventWeeklyFields";
 import { EventWhenField } from "./EventWhenField";
 import { useEventCover } from "./use-event-cover";
+import { type WeeklyPreview, previewWeeklySeries } from "./weekly-preview";
 
 /**
  * El formulario del diálogo de evento (#313, RF-9 del PRD de E7). Un fallo
@@ -54,20 +56,10 @@ type Status =
   | { readonly kind: "sending" }
   | ApiRequestFailure;
 
-/** Los días y el final de una serie nueva. La repetición se rehace en
- * #651; aquí queda como estaba. */
-function WeeklyFields(props: FieldProps): React.JSX.Element {
-  return (
-    <>
-      <WeekdaysField {...props} />
-      <InputField
-        {...props}
-        field="endsOn"
-        type="date"
-        label={props.translate("calendar.form.endsOn")}
-      />
-    </>
-  );
+/** Una serie sin días o sin sesiones no se crea: el servidor la rechazaría
+ * igual. */
+function isWeeklyBlocked(preview: WeeklyPreview | null): boolean {
+  return preview?.kind === "noDays" || preview?.kind === "noSessions";
 }
 
 /** El aviso de Termina: el del servidor manda; si no hay, el fin al revés o
@@ -165,6 +157,9 @@ export function EventForm({
   const [issues, setIssues] = useState<readonly EventFormIssue[]>([]);
   const titleRef = useRef<HTMLInputElement>(null);
   const cover = useEventCover(currentCoverUrl);
+  // Desde cuándo cuenta el resumen de una serie: el servidor tampoco crea
+  // las sesiones que ya empezaron.
+  const [openedAt] = useState(() => clubMoment(new Date()));
   // El estado desactiva el botón en el siguiente pintado, pero un doble clic
   // llega antes. La referencia cambia en el acto.
   const isSendingRef = useRef(false);
@@ -244,11 +239,16 @@ export function EventForm({
   // Lo anterior a E24 no tiene hora de fin (D5): guardarlo ahora la pide.
   const isEndNowRequired =
     layout !== "create" && initialForm.endTime === "" && form.endTime === "";
+  const isWeekly = layout === "create" && form.repeat === "weekly";
+  const weeklyPreview = isWeekly
+    ? previewWeeklySeries(translate, form, openedAt)
+    : null;
   const isSubmitBlocked =
     isSending ||
     cover.isUploading ||
     endCheck.kind === "invalid" ||
-    isEndNowRequired;
+    isEndNowRequired ||
+    isWeeklyBlocked(weeklyPreview);
   const fieldProps: FieldProps = {
     translate,
     form,
@@ -295,9 +295,9 @@ export function EventForm({
           })}
         />
         {layout === "create" ? <RepeatField {...fieldProps} /> : null}
-        {layout === "create" && form.repeat === "weekly" ? (
-          <WeeklyFields {...fieldProps} />
-        ) : null}
+        {weeklyPreview === null ? null : (
+          <WeeklyFields {...fieldProps} preview={weeklyPreview} />
+        )}
         <EventPlaceField {...fieldProps} />
         <NotesField {...fieldProps} />
         <AudienceField

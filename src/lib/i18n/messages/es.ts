@@ -1512,7 +1512,22 @@ export const spanishMessages: MessageCatalog = {
   "calendar.form.repeat": "Repetición",
   "calendar.form.repeat.none": "Una vez",
   "calendar.form.repeat.weekly": "Semanal",
-  "calendar.form.weekdays": "Se repite los",
+  "calendar.form.weekdays": "Estos días",
+  "calendar.form.weekly.everyDays": "Todos los {days}",
+  "calendar.form.weekly.everyDay": "Todos los días",
+  "calendar.form.weekly.summary":
+    "{days}, {hours} · {sessions} hasta el {date}",
+  "calendar.form.weekly.sessions": {
+    one: "{count} sesión",
+    other: "{count} sesiones",
+  },
+  "calendar.form.weekly.next": "Próximas:",
+  "calendar.form.weekly.more": "+{count} más",
+  "calendar.form.weekly.hint":
+    "Cada sesión tiene su propio RSVP y su asistencia. Puedes editar o cancelar una sola.",
+  "calendar.form.weekly.noDays": "Elige al menos un día.",
+  "calendar.form.weekly.noSessions":
+    "No cae ninguna sesión entre el inicio y la fecha final.",
   "calendar.form.startsOn": "Empieza el",
   "calendar.form.endsOn": "Hasta",
   "calendar.form.audience": "A quién va",

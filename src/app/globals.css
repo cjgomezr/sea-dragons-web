@@ -11582,7 +11582,7 @@ a.auth-brand-header:focus-visible {
 .event-form-fields:disabled .auth-field select,
 .event-form-fields:disabled .auth-field textarea,
 .event-form-fields:disabled .event-form-segment label,
-.event-form-fields:disabled .event-form-day label {
+.event-form-fields:disabled .event-form-day {
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -11641,8 +11641,7 @@ a.auth-brand-header:focus-visible {
 
 /* El radio queda encima de su etiqueta, transparente: el clic y el foco son
    suyos, y lo que se ve es la etiqueta. */
-.event-form-segment input,
-.event-form-day input {
+.event-form-segment input {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -11669,42 +11668,119 @@ a.auth-brand-header:focus-visible {
 }
 
 .event-form-segment input:focus-visible + label,
-.event-form-day input:focus-visible + label {
+.event-form-day:focus-visible {
   outline: 2px solid var(--color-accent-text);
   outline-offset: 2px;
 }
 
-.event-form-days {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: var(--space-1);
-}
-
-.event-form-day {
-  position: relative;
-}
-
-.event-form-day label {
+/* Semanal (#651): los días, hasta cuándo y el resumen en un panel aparte,
+   como en el punto 5 del "#1c" del handoff. */
+.event-form-weekly {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--touch-target-min);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text);
-  background: var(--color-panel);
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-background);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
 }
 
-.event-form-day input:checked + label {
+.event-form-weekly > .auth-field {
+  max-width: 200px;
+}
+
+.event-form-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.event-form-day {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.event-form-day[aria-pressed="true"] {
   color: var(--color-on-accent);
   background: var(--color-accent);
   border-color: var(--color-accent);
 }
 
-.event-form-weekdays[aria-invalid="true"] .event-form-day label {
+.event-form-weekdays[aria-invalid="true"] .event-form-day {
   border-color: var(--color-danger);
+}
+
+.event-form-weekly-region:empty {
+  display: none;
+}
+
+.event-form-weekly-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.event-form-weekly-total {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.event-form-weekly-total svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-accent-text);
+}
+
+.event-form-weekly-next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.event-form-weekly-next ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event-form-weekly-next li {
+  padding: 3px 9px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.event-form-weekly-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
 }
 
 .event-form-weekdays .auth-field-error {
