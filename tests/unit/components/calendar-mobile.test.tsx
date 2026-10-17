@@ -216,6 +216,9 @@ function detailCalls(event: AgendaEvent): Call[] {
 
 beforeEach(() => {
   stubScreen(true);
+  // jsdom no implementa el scroll; la pantalla del evento lo mueve al abrir
+  // y al volver.
+  vi.stubGlobal("scrollTo", vi.fn());
 });
 
 afterEach(() => {

@@ -422,9 +422,7 @@ describe("hora corta de la tarjeta del móvil (#656)", () => {
   });
 
   it("escribe las dos horas de 24 en español", () => {
-    expect(formatCompactClockRange("es", "18:00", "19:30")).toBe(
-      "18:00–19:30",
-    );
+    expect(formatCompactClockRange("es", "18:00", "19:30")).toBe("18:00–19:30");
   });
 
   it("sin hora de fin escribe sólo el inicio", () => {
