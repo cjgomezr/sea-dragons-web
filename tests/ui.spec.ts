@@ -18054,6 +18054,7 @@ for (const state of MOBILE_EVENT_FORM_STATES) {
 
 const EVENT_FORM_BAR_SUBMIT_PX = 36;
 const EVENT_FORM_COVER_PX = 120;
+const EVENT_FORM_COVER_WITH_IMAGE_PX = 160;
 const EVENT_FORM_TYPE_PX = 46;
 const EVENT_FORM_TIME_PX = 48;
 const EVENT_FORM_CHIP_PX = 40;
@@ -18134,6 +18135,16 @@ test.describe("el formulario de evento en el móvil: barra y medidas (#657)", ()
       Array(4).fill(EVENT_FORM_TYPE_PX),
     );
     expect(new Set(types.map((box) => box.top)).size).toBe(2);
+  });
+
+  test("con imagen elegida la imagen mide 160", async ({ page }) => {
+    await goToCalendar(page, { ...CREATE, ready: showCreateDialogWithImage });
+
+    expect(
+      await heightOf(
+        eventDialog(page).getByRole("img", { name: EVENT_COVER_PREVIEW_NAME }),
+      ),
+    ).toBe(EVENT_FORM_COVER_WITH_IMAGE_PX);
   });
 
   test("Empieza y Termina van lado a lado, de 48, y la fecha a lo ancho", async ({
