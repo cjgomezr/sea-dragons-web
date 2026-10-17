@@ -17731,7 +17731,8 @@ const EVENT_DIALOG_GROUPS_ENDPOINT = "/api/v1/groups";
 // lo que sugiere se sirve desde el test, vacío salvo en sus propios estados.
 const EVENT_PLACES_ENDPOINT = "/api/v1/events/manage/places";
 const EVENT_DIALOG_NAME = /^(New event|Nuevo evento)$/;
-const EVENT_DIALOG_OPEN = /^(Event|Evento)$/;
+// En el móvil el botón es sólo el + (#656), con su nombre entero.
+const EVENT_DIALOG_OPEN = /^(Event|Evento|New event|Nuevo evento)$/;
 const EVENT_DIALOG_SUBMIT = /^(Create event|Crear evento)$/;
 const EVENT_DIALOG_TAB_PRESSES = 30;
 
@@ -18520,13 +18521,25 @@ test.describe("editar y cancelar en el navegador", () => {
     ).toBeFocused();
   });
 
+  // En el móvil la confirmación sale en la hoja ⋯ de la pantalla del evento
+  // (#656).
   test("a 375px los botones de confirmar conservan el objetivo táctil de 44px", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await goToCalendar(page, CONFIRM);
+    await goToCalendar(page, { ...CONFIRM, ready: openFirstPanel });
+    await firstEventPanel(page)
+      .getByRole("button", { name: /^(Event actions|Acciones del evento)$/ })
+      .click();
+    const sheet = page.getByRole("dialog", {
+      name: /^(Event actions|Acciones del evento)$/,
+    });
+    await sheet
+      .getByRole("button", { name: /^(Cancel event|Cancelar evento)$/ })
+      .click();
+    await sheet.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }).click();
 
-    const heights = await firstEventPanel(page)
+    const heights = await sheet
       .getByRole("group", { name: /said they're going|dijo que va|dijeron/ })
       .getByRole("button")
       .evaluateAll((buttons) =>
