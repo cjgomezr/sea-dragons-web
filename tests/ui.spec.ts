@@ -17390,12 +17390,25 @@ async function showOneTimeDialog(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
 }
 
+// El resumen de Semanal cuenta las sesiones desde ahora (#651): con el
+// reloj real, las fechas de la captura acabarían en el pasado.
+const WEEKLY_DIALOG_NOW = new Date("2026-10-01T00:00:00.000Z");
+
+async function pressWeekdays(
+  dialog: Locator,
+  weekdays: readonly RegExp[],
+): Promise<void> {
+  for (const weekday of weekdays) {
+    await dialog.getByRole("button", { name: weekday }).click();
+  }
+}
+
 async function showWeeklyDialog(page: Page): Promise<void> {
+  await page.clock.setFixedTime(WEEKLY_DIALOG_NOW);
   const dialog = await openEventDialog(page);
   await fillEventBasics(dialog);
   await dialog.getByRole("radio", { name: /^(Weekly|Semanal)$/ }).check();
-  await dialog.getByRole("checkbox", { name: /^(Tuesday|martes)$/ }).check();
-  await dialog.getByRole("checkbox", { name: /^(Thursday|jueves)$/ }).check();
+  await pressWeekdays(dialog, [/^(Tuesday|martes)$/, /^(Thursday|jueves)$/]);
   await dialog.getByLabel(/^(Starts on|Empieza el)$/).fill("2026-10-06");
   await dialog.getByLabel(/^(Until|Hasta)$/).fill("2026-12-17");
   await dialog
@@ -17544,6 +17557,30 @@ async function showCreateDialog(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
 }
 
+/** Semanal con lunes y jueves hasta el 17 de diciembre, con el resumen, las
+ * próximas fechas y la pista a la vista (#651). */
+async function showCreateWeeklyDialog(page: Page): Promise<void> {
+  await page.clock.setFixedTime(WEEKLY_DIALOG_NOW);
+  const dialog = await fillCreateDialog(page, {
+    starts: "18:00",
+    ends: "19:30",
+  });
+  await dialog.getByRole("radio", { name: /^(Weekly|Semanal)$/ }).check();
+  await pressWeekdays(dialog, [/^(Monday|lunes)$/, /^(Thursday|jueves)$/]);
+  const until = dialog.getByLabel(/^(Until|Hasta)$/);
+  await until.fill("2026-12-17");
+  await until.blur();
+  const hint = dialog.getByText(
+    /^(Each session gets its own RSVP|Cada sesión tiene su propio RSVP)/,
+  );
+  await expect(
+    dialog.getByText(/(19 sessions until|19 sesiones hasta el)/),
+  ).toBeVisible();
+  // Al centro: el pie pegado de los botones tapa lo que queda justo abajo.
+  await hint.evaluate((element) => element.scrollIntoView({ block: "center" }));
+  await page.mouse.move(0, 0);
+}
+
 async function showCreateDialogWithInvalidEnd(page: Page): Promise<void> {
   const dialog = await fillCreateDialog(page, {
     starts: "18:00",
@@ -17660,6 +17697,7 @@ const REDESIGNED_DIALOG_STATES: readonly CalendarState[] = [
     "calendario-crear-fin-invalido",
     showCreateDialogWithInvalidEnd,
   ),
+  ...inBothLanguages("calendario-crear-semanal", showCreateWeeklyDialog),
   ...inBothLanguages("calendario-crear-con-imagen", showCreateDialogWithImage),
   ...inBothLanguages("calendario-crear-lugar-buscando", showPlaceSearch),
   ...inBothLanguages("calendario-crear-lugar-elegido", showChosenPlace),

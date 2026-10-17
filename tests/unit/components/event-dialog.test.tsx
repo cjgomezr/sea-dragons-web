@@ -6,7 +6,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgendaScreen } from "@/components/calendar/AgendaScreen";
 import type { AgendaEvent } from "@/lib/events/event-agenda";
 
@@ -229,13 +229,18 @@ async function fillWeeklySeries(dialog: HTMLElement): Promise<void> {
   setValue(dialog, "Location", "MSAC Dive Pool");
   await chooseWeekly(dialog);
   await userEvent.click(
-    within(dialog).getByRole("checkbox", { name: "Tuesday" }),
+    within(dialog).getByRole("button", { name: "Tuesday" }),
   );
   await userEvent.click(
-    within(dialog).getByRole("checkbox", { name: "Thursday" }),
+    within(dialog).getByRole("button", { name: "Thursday" }),
   );
   setValue(dialog, "Starts on", "2026-10-06");
   setValue(dialog, "Until", "2026-10-29");
+}
+
+/** La letra que se ve del día; el nombre entero es para el lector. */
+function visibleLetter(toggle: HTMLElement): string | null {
+  return toggle.querySelector('[aria-hidden="true"]')?.textContent ?? null;
 }
 
 async function submit(dialog: HTMLElement): Promise<void> {
@@ -244,9 +249,19 @@ async function submit(dialog: HTMLElement): Promise<void> {
   );
 }
 
+// El resumen de una serie cuenta las sesiones desde ahora (#651): con el
+// reloj real, las fechas de estos tests acabarían en el pasado.
+const BEFORE_THE_SERIES = new Date("2026-10-01T09:00:00+10:00");
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(BEFORE_THE_SERIES);
+});
+
 afterEach(() => {
   calls.length = 0;
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("botón + Evento", () => {
@@ -318,9 +333,7 @@ describe("diálogo de evento", () => {
     expect(within(dialog).getByLabelText("Ends")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Location")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Notes")).toBeInTheDocument();
-    expect(
-      within(dialog).getByRole("radio", { name: "One-time" }),
-    ).toBeChecked();
+    expect(within(dialog).getByRole("radio", { name: "Once" })).toBeChecked();
     expect(
       within(dialog).getByRole("radio", { name: "Weekly" }),
     ).not.toBeChecked();
@@ -361,14 +374,33 @@ describe("diálogo de evento", () => {
     await chooseWeekly(dialog);
 
     expect(within(dialog).queryByLabelText("Date")).not.toBeInTheDocument();
-    const days = within(dialog).getByRole("group", { name: "Repeats on" });
-    expect(within(days).getAllByRole("checkbox")).toHaveLength(7);
+    const days = within(dialog).getByRole("group", { name: "On these days" });
+    const toggles = within(days).getAllByRole("button");
     expect(
-      within(days).getByRole("checkbox", { name: "Monday" }),
-    ).toBeInTheDocument();
+      [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+      ].map((name) => within(days).getByRole("button", { name })),
+    ).toEqual(toggles);
+    expect(toggles.map(visibleLetter)).toEqual([
+      "M",
+      "T",
+      "W",
+      "T",
+      "F",
+      "S",
+      "S",
+    ]);
     expect(
-      within(days).getByRole("checkbox", { name: "Sunday" }),
-    ).toBeInTheDocument();
+      toggles.every(
+        (toggle) => toggle.getAttribute("aria-pressed") === "false",
+      ),
+    ).toBe(true);
     expect(within(dialog).getByLabelText("Starts on")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Until")).toBeInTheDocument();
   });
@@ -529,8 +561,8 @@ describe("diálogo de evento", () => {
     },
   );
 
-  it("pinta el rango sin días junto a los días de la semana", async () => {
-    stubApi({ respondToCreate: () => businessRule("series_weekdays_empty") });
+  it("sin días pide al menos uno y no deja crear", async () => {
+    stubApi({});
     const dialog = await openDialog();
     setValue(dialog, "Title", "Pool Training");
     setValue(dialog, "Starts", "19:00");
@@ -540,15 +572,160 @@ describe("diálogo de evento", () => {
     setValue(dialog, "Starts on", "2026-10-06");
     setValue(dialog, "Until", "2026-10-29");
 
-    await submit(dialog);
+    const days = within(dialog).getByRole("group", { name: "On these days" });
+    expect(days).toHaveAccessibleDescription("Pick at least one day.");
+    expect(days).toHaveAttribute("aria-invalid", "true");
+    expect(
+      within(dialog).getByRole("button", { name: "Create event" }),
+    ).toBeDisabled();
+  });
 
-    const days = within(dialog).getByRole("group", { name: "Repeats on" });
-    await waitFor(() =>
-      expect(days).toHaveAccessibleDescription(
-        "Choose at least one day of the week.",
+  it("marcar un día lo deja pulsado y volver a pulsarlo lo quita", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    await chooseWeekly(dialog);
+    const tuesday = within(dialog).getByRole("button", { name: "Tuesday" });
+
+    await userEvent.click(tuesday);
+    expect(tuesday).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(tuesday);
+    expect(tuesday).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("resume la serie con las primeras fechas y cuántas más", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    await fillWeeklySeries(dialog);
+
+    expect(
+      within(dialog).getByText(
+        "Every Tuesday and Thursday, 7:00 pm – 8:30 pm · 8 sessions until Thu, 29 Oct",
       ),
+    ).toBeInTheDocument();
+    const next = within(dialog).getByRole("list", { name: "Next:" });
+    expect(
+      within(next)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Tue, 6 Oct", "Thu, 8 Oct", "Tue, 13 Oct", "Thu, 15 Oct"]);
+    expect(within(dialog).getByText("+4 more")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(
+        "Each session gets its own RSVP and attendance. You can still edit or cancel a single one.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Create event" }),
+    ).toBeEnabled();
+  });
+
+  it("con todo marcado dice todos los días y sin más fechas no dice más", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    await fillWeeklySeries(dialog);
+    for (const day of ["Monday", "Wednesday", "Friday", "Saturday", "Sunday"]) {
+      await userEvent.click(within(dialog).getByRole("button", { name: day }));
+    }
+    setValue(dialog, "Until", "2026-10-07");
+
+    expect(
+      within(dialog).getByText(
+        "Every day, 7:00 pm – 8:30 pm · 2 sessions until Wed, 7 Oct",
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByText(/more$/)).not.toBeInTheDocument();
+  });
+
+  it("si ningún día cae en el rango lo dice y no deja crear", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    await fillWeeklySeries(dialog);
+
+    setValue(dialog, "Until", "2026-10-07");
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Tuesday" }),
     );
-    expect(within(dialog).getByLabelText("Until")).toHaveValue("2026-10-29");
+
+    expect(
+      within(dialog).getByRole("group", { name: "On these days" }),
+    ).toHaveAccessibleDescription(
+      "No sessions fall between the start and the until date.",
+    );
+    expect(
+      within(dialog).queryByText(/sessions? until/),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Create event" }),
+    ).toBeDisabled();
+  });
+
+  it("con un rango de más de un año lo dice junto al fin y no deja crear", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    await fillWeeklySeries(dialog);
+
+    setValue(dialog, "Until", "2027-10-07");
+
+    expect(within(dialog).getByLabelText("Until")).toHaveAccessibleDescription(
+      "A series can last up to 366 days.",
+    );
+    expect(
+      within(dialog).queryByText(/sessions? until/),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Create event" }),
+    ).toBeDisabled();
+  });
+
+  it("en español resume la serie con sus días en plural", async () => {
+    stubApi({});
+    render(
+      <AgendaScreen
+        locale="es"
+        canManageEvents
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Evento" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Nuevo evento" });
+    await within(dialog).findByRole("radio", { name: "Todo el club" });
+    await userEvent.click(
+      within(dialog).getByRole("radio", { name: "Semanal" }),
+    );
+    const days = within(dialog).getByRole("group", { name: "Estos días" });
+    expect(days).toHaveAccessibleDescription("Elige al menos un día.");
+    expect(within(days).getAllByRole("button").map(visibleLetter)).toEqual([
+      "L",
+      "M",
+      "M",
+      "J",
+      "V",
+      "S",
+      "D",
+    ]);
+
+    await userEvent.click(within(days).getByRole("button", { name: "lunes" }));
+    await userEvent.click(within(days).getByRole("button", { name: "jueves" }));
+    setValue(dialog, "Empieza", "18:00");
+    setValue(dialog, "Termina", "19:30");
+    setValue(dialog, "Empieza el", "2026-10-01");
+    setValue(dialog, "Hasta", "2026-12-17");
+
+    expect(
+      within(dialog).getByText(
+        "Todos los lunes y jueves, 18:00 – 19:30 · 23 sesiones hasta el jue 17 dic",
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("+19 más")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(
+        "Cada sesión tiene su propio RSVP y su asistencia. Puedes editar o cancelar una sola.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it.each([
@@ -577,7 +754,7 @@ describe("diálogo de evento", () => {
 
     await waitFor(() =>
       expect(
-        within(dialog).getByRole("group", { name: "Repeats on" }),
+        within(dialog).getByRole("group", { name: "On these days" }),
       ).toHaveAccessibleDescription(
         "Those days and dates don't give any session. Change the days or the range.",
       ),

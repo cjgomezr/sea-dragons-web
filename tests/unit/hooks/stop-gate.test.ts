@@ -460,6 +460,110 @@ describe("guard de árbol limpio", () => {
   );
 });
 
+/**
+ * Una sesión que sólo deja documentos (un handoff de diseño en docs/, un PRD)
+ * no puede romper lint, tipos ni Playwright, y la suite completa tarda un
+ * cuarto de hora. "Texto" es lo mismo que para `checks` en CI:
+ * `.github/text-only-paths.txt`.
+ */
+describe("guard de sólo texto", () => {
+  let workDir = "";
+  let originDir = "";
+  let stubBinDir = "";
+
+  afterEach(async () => {
+    for (const dir of [workDir, originDir, stubBinDir]) {
+      if (dir) {
+        await rm(dir, REMOVE_TEMP_DIR_OPTIONS);
+      }
+    }
+    workDir = "";
+    originDir = "";
+    stubBinDir = "";
+  });
+
+  async function runGateWithMarker(): Promise<{
+    code: number | null;
+    didRunChecks: boolean;
+  }> {
+    const { binDir, markerFile } = await installChecksRanMarkerBin();
+    stubBinDir = binDir;
+    const { code } = await runStopGate(workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+    });
+    return { code, didRunChecks: await checksRan(markerFile) };
+  }
+
+  it(
+    "pasa sin correr nada cuando sólo hay un handoff nuevo en docs/",
+    async () => {
+      ({ workDir, originDir } = await createFixtureRepo());
+      const handoffDir = path.join(workDir, "docs/design/design_handoff_club");
+      await mkdir(handoffDir, { recursive: true });
+      await writeFile(path.join(handoffDir, "README.md"), "# Club\n");
+      await writeFile(path.join(handoffDir, "club-dark.png"), "png\n");
+
+      const { code, didRunChecks } = await runGateWithMarker();
+
+      expect(code).toBe(0);
+      expect(didRunChecks).toBe(false);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "pasa sin correr nada cuando los commits sin subir sólo tocan docs/",
+    async () => {
+      ({ workDir, originDir } = await createFixtureRepo());
+      await runBashScript(
+        workDir,
+        `mkdir -p docs/prd
+       echo '# PRD' > docs/prd/club.md
+       git add -A
+       git commit -qm "PRD sin pushear"`,
+      );
+
+      const { code, didRunChecks } = await runGateWithMarker();
+
+      expect(code).toBe(0);
+      expect(didRunChecks).toBe(false);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "corre los checks cuando junto a los documentos hay código",
+    async () => {
+      ({ workDir, originDir } = await createFixtureRepo());
+      await mkdir(path.join(workDir, "docs"), { recursive: true });
+      await writeFile(path.join(workDir, "docs/notas.md"), "# Notas\n");
+      await writeFile(
+        path.join(workDir, "src/lib/foo.ts"),
+        "export const foo = 2;\n",
+      );
+
+      const { didRunChecks } = await runGateWithMarker();
+
+      expect(didRunChecks).toBe(true);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "corre los checks ante un .md dentro de src/",
+    async () => {
+      ({ workDir, originDir } = await createFixtureRepo());
+      await writeFile(path.join(workDir, "src/lib/LEEME.md"), "# Ojo\n");
+
+      const { didRunChecks } = await runGateWithMarker();
+
+      expect(didRunChecks).toBe(true);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+});
+
 describe("workflows", () => {
   it("claude-mentions.yml define FACTORY_GATE=off y claude-backlog.yml no", async () => {
     const mentionsYml = await readFile(

@@ -688,13 +688,14 @@ describe("editar desde el calendario", () => {
       TRAINING_OCCURRENCE.title,
     );
     expect(within(dialog).getByLabelText("Starts")).toHaveValue("19:00");
-    const days = within(dialog).getByRole("group", { name: "Repeats on" });
+    // Los días son botones con aria-pressed desde #651.
+    const days = within(dialog).getByRole("group", { name: "On these days" });
     expect(
-      within(days).getByRole("checkbox", { name: "Tuesday" }),
-    ).toBeChecked();
+      within(days).getByRole("button", { name: "Tuesday" }),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(
-      within(days).getByRole("checkbox", { name: "Thursday" }),
-    ).not.toBeChecked();
+      within(days).getByRole("button", { name: "Thursday" }),
+    ).toHaveAttribute("aria-pressed", "false");
     expect(within(dialog).getByLabelText("Until")).toHaveValue("2026-12-15");
   });
 
@@ -725,7 +726,7 @@ describe("editar desde el calendario", () => {
 
     setValue(dialog, "Starts", "19:30");
     await userEvent.click(
-      within(dialog).getByRole("checkbox", { name: "Thursday" }),
+      within(dialog).getByRole("button", { name: "Thursday" }),
     );
     setValue(dialog, "Until", "2026-11-30");
     await save(dialog);

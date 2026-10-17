@@ -76,6 +76,18 @@ if only_generated_noise_is_dirty; then
   fi
 fi
 
+# Text-only guard: a session that only leaves documents (a design handoff in
+# docs/, a PRD, a skill) cannot break lint, types or Playwright, and the full
+# suite takes a quarter of an hour. "Text" is the same list `checks` uses in
+# CI (.github/text-only-paths.txt), committed and uncommitted changes alike.
+# The PR's `checks` still runs the unit tests that read docs/.
+TEXT_ONLY_CHECK="$(dirname "$0")/../../scripts/branch-is-text-only.sh"
+if bash "$TEXT_ONLY_CHECK" --with-worktree; then
+  echo "Stop gate: sólo cambian archivos de texto (.github/text-only-paths.txt); no hay nada que verificar."
+  rm -f "$COUNTER_FILE"
+  exit 0
+fi
+
 fail() {
   echo "$((COUNT + 1))" > "$COUNTER_FILE"
   if [ "$COUNT" -ge "$MAX_GATE_RUNS" ]; then
