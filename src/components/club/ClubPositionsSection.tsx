@@ -171,7 +171,10 @@ function TableHead({
   translate: Translator;
 }): React.JSX.Element {
   return (
-    <div className="club-positions-row club-positions-table-head" aria-hidden="true">
+    <div
+      className="club-positions-row club-positions-table-head"
+      aria-hidden="true"
+    >
       <span />
       <span className="club-positions-rank">#</span>
       <span>{translate("clubSettings.positions.column.position")}</span>
