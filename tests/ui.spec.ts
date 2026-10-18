@@ -9623,12 +9623,18 @@ async function saveAndExpectSavedNotice(page: Page): Promise<void> {
   await expect(page.getByRole("status").getByText("Saved")).toBeVisible();
 }
 
+/** Cuánto adelanta pauseClock el reloj. Entre leer la hora y pausarlo el
+ * reloj sigue andando, y en CI cargado pasa más de 1 ms: pausar en el pasado
+ * falla ("Cannot fast-forward to the past"). Queda muy por debajo de los
+ * 2,5 s de "✓ Guardado". */
+const CLOCK_PAUSE_MARGIN_MS = 200;
+
 /** Para el reloj que instaló la visita: "✓ Guardado" se va a los 2,5 s, a
  * veces antes de la captura. Sólo para la captura: axe también necesita los
  * temporizadores. */
 async function pauseClock(page: Page): Promise<void> {
   const now = await page.evaluate(() => Date.now());
-  await page.clock.pauseAt(now + 1);
+  await page.clock.pauseAt(now + CLOCK_PAUSE_MARGIN_MS);
 }
 
 /* Las posiciones del club (#300) viven en la misma pantalla. También se sirven
