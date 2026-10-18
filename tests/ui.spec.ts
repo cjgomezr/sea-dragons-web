@@ -15927,10 +15927,10 @@ test.describe("calendario-fila-rsvp-titulo-largo", () => {
         (element) => element.scrollWidth > element.clientWidth,
       ),
     ).toBe(true);
-    const going = row
+    const cantGoButton = row
       .getByRole("group")
       .getByRole("button", { name: /^(Can't go|No puedo)$/ });
-    await expect(going).toBeInViewport({ ratio: 1 });
+    await expect(cantGoButton).toBeInViewport({ ratio: 1 });
   });
 });
 

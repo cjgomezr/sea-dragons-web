@@ -261,19 +261,16 @@ function RsvpSection({
   );
 }
 
-/** Voy, Quizás y No puedo en la fila de escritorio (#731), y debajo el fallo
- * de lo que se respondió desde ella. */
+/** Voy, Quizás y No puedo en la fila de escritorio (#731). */
 function RowRsvp({
   translate,
   title,
   rsvp,
-  failure,
   disabledReasonId,
 }: {
   readonly translate: Translator;
   readonly title: string;
   readonly rsvp: RsvpControls;
-  readonly failure: AgendaFailure | null;
   readonly disabledReasonId: string | null;
 }): React.JSX.Element {
   const { state, respond } = rsvp;
@@ -287,11 +284,6 @@ function RowRsvp({
         onRespond={respond}
         disabledReasonId={disabledReasonId}
         variant="compact"
-      />
-      <RsvpFailureLine
-        translate={translate}
-        failure={failure}
-        className="agenda-row-rsvp-error"
       />
     </div>
   );
@@ -408,19 +400,22 @@ function useFocusWhenScreenCloses(
 }
 
 /** La fila de escritorio: la hora, la miniatura, el cuerpo y, a la derecha,
- * mi respuesta y cuántos van. */
+ * mi respuesta y cuántos van. Debajo, a todo lo ancho, el fallo de lo que se
+ * respondió desde la fila: al lado de los botones le quitaba sitio al título. */
 function PanelRowContent({
   translate,
   event,
   title,
   answer,
   goingCount,
+  failure,
 }: {
   readonly translate: Translator;
   readonly event: AgendaEvent;
   readonly title: React.ReactNode;
   readonly answer: React.ReactNode;
   readonly goingCount: number;
+  readonly failure: AgendaFailure | null;
 }): React.JSX.Element {
   return (
     <>
@@ -454,6 +449,11 @@ function PanelRowContent({
           {translate("calendar.event.going", { count: goingCount })}
         </p>
       </div>
+      <RsvpFailureLine
+        translate={translate}
+        failure={failure}
+        className="agenda-row-rsvp-error"
+      />
     </>
   );
 }
@@ -673,7 +673,6 @@ export function AgendaRow({
                 translate={translate}
                 title={event.title}
                 rsvp={rsvpFrom("row")}
-                failure={failureFor("row")}
                 disabledReasonId={rsvpDisabledReasonId}
               />
             ) : (
@@ -681,6 +680,7 @@ export function AgendaRow({
             )
           }
           goingCount={tally.goingCount}
+          failure={failureFor("row")}
         />
       ) : (
         <AgendaCardContent
