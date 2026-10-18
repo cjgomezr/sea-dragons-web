@@ -1838,15 +1838,20 @@ export const englishMessages = {
   // Los textos de la pantalla de entrar que escribe el club (#301).
   "clubSettings.signInTexts.title": "Sign-in screen",
   "clubSettings.signInTexts.lead":
-    "The tagline and welcome paragraph people read before they sign in. Leave a field empty to show the app's own text in that language.",
+    "The headline and paragraph on the sign-in page. Leave a field empty to use the app's text.",
   "clubSettings.signInTexts.loading": "Loading the sign-in texts…",
-  "clubSettings.signInTexts.tagline.en": "Tagline in English",
-  "clubSettings.signInTexts.welcome.en": "Welcome paragraph in English",
-  "clubSettings.signInTexts.tagline.es": "Tagline in Spanish",
-  "clubSettings.signInTexts.welcome.es": "Welcome paragraph in Spanish",
-  "clubSettings.signInTexts.hint": "Up to {max} characters. Plain text.",
+  "clubSettings.signInTexts.language": "Language of the texts",
+  "clubSettings.signInTexts.language.en": "English",
+  "clubSettings.signInTexts.language.es": "Spanish",
+  "clubSettings.signInTexts.tagline": "Headline",
+  "clubSettings.signInTexts.welcome": "Welcome paragraph",
+  "clubSettings.signInTexts.counter": "{count} / {max}",
+  "clubSettings.signInTexts.otherLanguage.own": "{language} has its own text.",
+  "clubSettings.signInTexts.otherLanguage.app":
+    "{language} uses the app's text.",
+  "clubSettings.signInTexts.preview": "Sign-in page · {code}",
   "clubSettings.signInTexts.issue.taglineTooLong":
-    "The tagline can have at most {max} characters.",
+    "The headline can have at most {max} characters.",
   "clubSettings.signInTexts.issue.welcomeTooLong":
     "The welcome paragraph can have at most {max} characters.",
   "clubSettings.sessionPacks.title": "Session packs",

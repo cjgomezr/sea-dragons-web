@@ -1842,15 +1842,21 @@ export const spanishMessages: MessageCatalog = {
     "Algo falló con la configuración del club. Vuelve a intentarlo.",
   "clubSettings.signInTexts.title": "Pantalla de entrar",
   "clubSettings.signInTexts.lead":
-    "El lema y el párrafo de bienvenida que se leen antes de iniciar sesión. Deja un campo vacío para que salga el texto de la aplicación en ese idioma.",
+    "El titular y el párrafo de la página de inicio de sesión. Deja un campo vacío para usar el texto de la app.",
   "clubSettings.signInTexts.loading": "Cargando los textos de entrada…",
-  "clubSettings.signInTexts.tagline.en": "Lema en inglés",
-  "clubSettings.signInTexts.welcome.en": "Párrafo de bienvenida en inglés",
-  "clubSettings.signInTexts.tagline.es": "Lema en español",
-  "clubSettings.signInTexts.welcome.es": "Párrafo de bienvenida en español",
-  "clubSettings.signInTexts.hint": "Hasta {max} caracteres. Texto plano.",
+  "clubSettings.signInTexts.language": "Idioma de los textos",
+  "clubSettings.signInTexts.language.en": "Inglés",
+  "clubSettings.signInTexts.language.es": "Español",
+  "clubSettings.signInTexts.tagline": "Titular",
+  "clubSettings.signInTexts.welcome": "Párrafo de bienvenida",
+  "clubSettings.signInTexts.counter": "{count} / {max}",
+  "clubSettings.signInTexts.otherLanguage.own":
+    "{language} tiene su propio texto.",
+  "clubSettings.signInTexts.otherLanguage.app":
+    "{language} usa el texto de la app.",
+  "clubSettings.signInTexts.preview": "Página de inicio de sesión · {code}",
   "clubSettings.signInTexts.issue.taglineTooLong":
-    "El lema puede tener como mucho {max} caracteres.",
+    "El titular puede tener como mucho {max} caracteres.",
   "clubSettings.signInTexts.issue.welcomeTooLong":
     "El párrafo de bienvenida puede tener como mucho {max} caracteres.",
   "clubSettings.sessionPacks.title": "Packs de sesiones",

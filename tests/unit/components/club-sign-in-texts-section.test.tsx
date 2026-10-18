@@ -1,6 +1,7 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ClubIdentity } from "@/components/club/ClubSettingsList";
 import { ClubSignInTextsSection } from "@/components/club/ClubSignInTextsSection";
 import { NO_SIGN_IN_TEXTS, type SignInTexts } from "@/lib/club/sign-in-texts";
 import type { Locale } from "@/lib/i18n/locale";
@@ -8,10 +9,11 @@ import { createTranslator } from "@/lib/i18n/translator";
 
 /**
  * La sección de los textos del inicio de sesión en la configuración del club
- * (#301, RF-5 del PRD de E18a): el Admin escribe el lema y el párrafo en cada
- * idioma, un texto demasiado largo se rechaza junto a su campo con el límite,
- * y vaciar un campo lo devuelve al texto de la aplicación. El servidor es un
- * doble que guarda en memoria.
+ * (#301, RF-5 del PRD de E18a; rehecha en #721, RF-4 del de E26): el Admin
+ * escribe el titular y el párrafo de un idioma a la vez, con contadores y una
+ * vista previa; un texto demasiado largo se rechaza junto a su campo con el
+ * límite, y vaciar un campo lo devuelve al texto de la aplicación. El
+ * servidor es un doble que guarda en memoria.
  */
 
 const TEXTS_PATH = "/api/v1/club/settings/sign-in-texts";
@@ -65,10 +67,18 @@ function stubApi(): void {
   );
 }
 
+const CLUB: ClubIdentity = {
+  name: "Victoria Seadragons",
+  initials: "VS",
+  logoUrl: null,
+};
+
 async function renderSection(locale: Locale = "en"): Promise<void> {
   render(
     <ClubSignInTextsSection
+      locale={locale}
       translate={createTranslator(locale)}
+      club={CLUB}
       onHasDraftChange={() => undefined}
     />,
   );
@@ -84,6 +94,16 @@ async function write(name: string, text: string): Promise<void> {
   if (text !== "") {
     await userEvent.type(field(name), text);
   }
+}
+
+/** El control Inglés | Español de la sección (RF-4 del PRD de E26). */
+async function chooseLanguage(name: string): Promise<void> {
+  await userEvent.click(screen.getByRole("radio", { name }));
+}
+
+/** La tarjeta de la vista previa, por su rótulo. */
+function preview(caption: RegExp): HTMLElement {
+  return screen.getByRole("figure", { name: caption });
 }
 
 /** Guardar cambios, en la barra que sale con un cambio (#719). */
@@ -108,41 +128,152 @@ afterEach(() => {
 });
 
 describe("textos del inicio de sesión en la configuración", () => {
-  it("enseña los guardados del club en cada idioma", async () => {
+  it("abre en el idioma de la pantalla, con el control Inglés | Español", async () => {
+    await renderSection("es");
+
+    expect(
+      screen.getByRole("radiogroup", { name: "Idioma de los textos" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Español" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Inglés" })).not.toBeChecked();
+  });
+
+  it("enseña sólo los campos del idioma elegido, con lo guardado", async () => {
     stored = {
       en: { tagline: "Dive in.", welcome: null },
       es: { tagline: null, welcome: "Entrena con nosotros." },
     };
-
     await renderSection();
 
-    expect(field("Tagline in English")).toHaveValue("Dive in.");
-    expect(field("Welcome paragraph in Spanish")).toHaveValue(
-      "Entrena con nosotros.",
-    );
-    expect(field("Tagline in Spanish")).toHaveValue("");
+    expect(screen.getAllByRole("textbox")).toHaveLength(2);
+    expect(field("Headline")).toHaveValue("Dive in.");
+    expect(field("Welcome paragraph")).toHaveValue("");
+
+    await chooseLanguage("Spanish");
+
+    expect(field("Headline")).toHaveValue("");
+    expect(field("Welcome paragraph")).toHaveValue("Entrena con nosotros.");
   });
 
-  it("enseña en cada campo vacío el texto de la aplicación que saldrá", async () => {
+  it("pone de marcador el texto de la aplicación en el idioma elegido", async () => {
     await renderSection();
 
-    expect(field("Tagline in English")).toHaveAttribute(
+    expect(field("Headline")).toHaveAttribute(
       "placeholder",
       "Your club, beneath the surface.",
     );
-    expect(field("Tagline in Spanish")).toHaveAttribute(
+
+    await chooseLanguage("Spanish");
+
+    expect(field("Headline")).toHaveAttribute(
       "placeholder",
       "Tu club, bajo la superficie.",
     );
+    expect(field("Welcome paragraph")).toHaveAttribute(
+      "placeholder",
+      expect.stringMatching(/^Entrenamientos, equipos/),
+    );
+  });
+
+  it("da al párrafo cinco filas", async () => {
+    await renderSection();
+
+    expect(field("Welcome paragraph")).toHaveAttribute("rows", "5");
+  });
+
+  it("cuenta los caracteres de cada campo contra su límite", async () => {
+    stored = {
+      en: { tagline: "Dive in.", welcome: null },
+      es: { tagline: null, welcome: null },
+    };
+    await renderSection();
+
+    expect(field("Headline")).toHaveAccessibleDescription("8 / 140");
+    expect(field("Welcome paragraph")).toHaveAccessibleDescription("0 / 320");
+
+    await userEvent.type(field("Welcome paragraph"), "Hola 🤿");
+
+    expect(field("Welcome paragraph")).toHaveAccessibleDescription("6 / 320");
+  });
+
+  it("dice si el otro idioma usa el texto de la aplicación", async () => {
+    await renderSection();
+
+    expect(
+      screen.getByText("Spanish uses the app's text."),
+    ).toBeInTheDocument();
+  });
+
+  it("dice si el otro idioma tiene su propio texto, también sin guardar", async () => {
+    await renderSection();
+    await chooseLanguage("Spanish");
+    await write("Welcome paragraph", "Entrena con nosotros.");
+
+    await chooseLanguage("English");
+
+    expect(screen.getByText("Spanish has its own text.")).toBeInTheDocument();
+  });
+
+  it("habla del inglés cuando el elegido es el español", async () => {
+    stored = {
+      en: { tagline: "Dive in.", welcome: null },
+      es: { tagline: null, welcome: null },
+    };
+    await renderSection("es");
+
+    expect(
+      screen.getByText("Inglés tiene su propio texto."),
+    ).toBeInTheDocument();
+  });
+
+  it("conserva el borrador de los dos idiomas al cambiar de uno a otro", async () => {
+    await renderSection();
+    await write("Headline", "Dive in.");
+
+    await chooseLanguage("Spanish");
+    await write("Headline", "Al agua.");
+    await chooseLanguage("English");
+
+    expect(field("Headline")).toHaveValue("Dive in.");
+    await chooseLanguage("Spanish");
+    expect(field("Headline")).toHaveValue("Al agua.");
+  });
+
+  it("enseña en la vista previa la marca del club y el texto de la aplicación sin texto propio", async () => {
+    await renderSection();
+
+    const card = preview(/^Sign-in page · EN$/);
+
+    expect(within(card).getByText("VS")).toBeInTheDocument();
+    expect(
+      within(card).getByText("Your club, beneath the surface."),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByText(/^Training, teams, assessments and fees\./),
+    ).toBeInTheDocument();
+  });
+
+  it("enseña en la vista previa lo que se escribe, en el idioma elegido", async () => {
+    await renderSection();
+    await chooseLanguage("Spanish");
+
+    await write("Headline", "Al agua.");
+
+    const card = preview(/^Sign-in page · ES$/);
+    expect(within(card).getByText("Al agua.")).toBeInTheDocument();
+    expect(
+      within(card).getByText(/^Entrenamientos, equipos/),
+    ).toBeInTheDocument();
   });
 
   it("guarda el lema y el párrafo en los dos idiomas", async () => {
     await renderSection();
 
-    await write("Tagline in English", "Dive in.");
-    await write("Welcome paragraph in English", "Train with us.");
-    await write("Tagline in Spanish", "Al agua.");
-    await write("Welcome paragraph in Spanish", "Entrena con nosotros.");
+    await write("Headline", "Dive in.");
+    await write("Welcome paragraph", "Train with us.");
+    await chooseLanguage("Spanish");
+    await write("Headline", "Al agua.");
+    await write("Welcome paragraph", "Entrena con nosotros.");
     await save();
 
     expect(await screen.findByText("Saved")).toBeInTheDocument();
@@ -161,24 +292,24 @@ describe("textos del inicio de sesión en la configuración", () => {
     };
     await renderSection();
 
-    await write("Tagline in English", "");
+    await write("Headline", "");
     await save();
 
     await screen.findByText("Saved");
     expect(puts).toEqual([NO_SIGN_IN_TEXTS]);
   });
 
-  it("rechaza junto al campo un lema de más de 140 caracteres, con el límite", async () => {
+  it("rechaza junto al campo un titular de más de 140 caracteres, con el límite", async () => {
     await renderSection();
+    await chooseLanguage("Spanish");
 
-    await userEvent.click(field("Tagline in Spanish"));
+    await userEvent.click(field("Headline"));
     await userEvent.paste("a".repeat(141));
 
     expect(saveButton()).toBeDisabled();
-
-    expect(field("Tagline in Spanish")).toHaveAttribute("aria-invalid", "true");
-    expect(field("Tagline in Spanish")).toHaveAccessibleDescription(
-      /at most 140 characters/,
+    expect(field("Headline")).toHaveAttribute("aria-invalid", "true");
+    expect(field("Headline")).toHaveAccessibleDescription(
+      /^The headline can have at most 140 characters\. 141 \/ 140$/,
     );
     expect(puts).toEqual([]);
   });
@@ -186,15 +317,24 @@ describe("textos del inicio de sesión en la configuración", () => {
   it("rechaza junto al campo un párrafo de más de 320 caracteres, con el límite", async () => {
     await renderSection();
 
-    await userEvent.click(field("Welcome paragraph in English"));
+    await userEvent.click(field("Welcome paragraph"));
     await userEvent.paste("b".repeat(321));
 
     expect(saveButton()).toBeDisabled();
-
-    expect(field("Welcome paragraph in English")).toHaveAccessibleDescription(
+    expect(field("Welcome paragraph")).toHaveAccessibleDescription(
       /at most 320 characters/,
     );
     expect(puts).toEqual([]);
+  });
+
+  it("no deja guardar con el idioma oculto por encima del límite", async () => {
+    await renderSection();
+    await userEvent.click(field("Headline"));
+    await userEvent.paste("a".repeat(141));
+
+    await chooseLanguage("Spanish");
+
+    expect(saveButton()).toBeDisabled();
   });
 
   it("pone junto a su campo el límite que rechazó el servidor", async () => {
@@ -207,17 +347,15 @@ describe("textos del inicio de sesión en la configuración", () => {
         },
       });
     await renderSection();
+    await chooseLanguage("Spanish");
 
-    await write("Welcome paragraph in Spanish", "Hola");
+    await write("Welcome paragraph", "Hola");
     await save();
 
     expect(
       await screen.findByText(/at most 320 characters/),
     ).toBeInTheDocument();
-    expect(field("Welcome paragraph in Spanish")).toHaveAttribute(
-      "aria-invalid",
-      "true",
-    );
+    expect(field("Welcome paragraph")).toHaveAttribute("aria-invalid", "true");
   });
 
   it("avisa a quien ya no es Admin de que no puede cambiarlos", async () => {
@@ -225,7 +363,7 @@ describe("textos del inicio de sesión en la configuración", () => {
       jsonResponse(403, { error: { code: "forbidden", message: "x" } });
     await renderSection();
 
-    await write("Tagline in English", "Dive in.");
+    await write("Headline", "Dive in.");
     await save();
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
@@ -234,7 +372,8 @@ describe("textos del inicio de sesión en la configuración", () => {
   it("habla español a quien eligió español", async () => {
     await renderSection("es");
 
-    expect(field("Lema en español")).toBeInTheDocument();
-    expect(field("Párrafo de bienvenida en inglés")).toBeInTheDocument();
+    expect(field("Titular")).toBeInTheDocument();
+    expect(field("Párrafo de bienvenida")).toBeInTheDocument();
+    expect(preview(/^Página de inicio de sesión · ES$/)).toBeInTheDocument();
   });
 });

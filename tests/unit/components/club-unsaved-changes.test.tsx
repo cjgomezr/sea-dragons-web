@@ -211,7 +211,7 @@ describe("la barra de cambios sin guardar", () => {
 
     await openTab(/^Sign-in page/);
     await userEvent.type(
-      await screen.findByLabelText("Tagline in English"),
+      await screen.findByLabelText("Headline"),
       "Under the surface",
     );
     expect(queryBar("Unsaved changes to the sign-in page")).toBeInTheDocument();
