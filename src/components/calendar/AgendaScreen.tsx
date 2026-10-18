@@ -460,10 +460,15 @@ function PeriodChoice({
   );
 }
 
+/** El primer día al que se puede saltar. Al escribir el año cifra a cifra el
+ * campo pasa por días completos como el 20 de mayo del año 20; con este suelo
+ * no piden nada. El club no tiene eventos de antes. */
+const EARLIEST_JUMP_DATE = "2000-01-01";
+
 /** Saltar a un día de los pasados (#710), de ayer hacia atrás en Melbourne.
  * El campo no se controla: un `<input type="date">` a medio escribir vale
  * "", y devolverle el valor de antes no dejaría corregir una parte. Sólo un
- * día completo que no pase de ayer mueve la agenda. */
+ * día completo entre `EARLIEST_JUMP_DATE` y ayer mueve la agenda. */
 function PastDateJump({
   translate,
   from,
@@ -480,7 +485,7 @@ function PastDateJump({
   const yesterday = subtractClubDays(clubCalendarDate(new Date()), 1);
 
   function jumpTo(date: string): void {
-    if (date !== "" && date <= yesterday) {
+    if (date >= EARLIEST_JUMP_DATE && date <= yesterday) {
       onJump(date);
     }
   }
@@ -506,6 +511,7 @@ function PastDateJump({
         id={fieldId}
         className="agenda-jump-field"
         type="date"
+        min={EARLIEST_JUMP_DATE}
         max={yesterday}
         defaultValue={from ?? ""}
         onChange={(event) => jumpTo(event.target.value)}

@@ -2772,6 +2772,20 @@ describe("saltar a una fecha en pasados", () => {
     expect(screen.getByRole("button", { name: "Most recent" })).toBeDisabled();
   });
 
+  it("no salta con los años a medio escribir", async () => {
+    stubPastFrom([PAST_MATCH]);
+    await openPast();
+    await findRow(PAST_MATCH.title);
+    const requestsBefore = agendaPageRequests().length;
+
+    jumpTo("0002-05-20");
+    jumpTo("0020-05-20");
+    jumpTo("0202-05-20");
+
+    expect(agendaPageRequests()).toHaveLength(requestsBefore);
+    expect(dateField()).toHaveAttribute("min", "2000-01-01");
+  });
+
   it("dice que no hay eventos en esa fecha ni antes, con Lo más reciente", async () => {
     stubPastFrom([PAST_MATCH]);
     await openPast();
