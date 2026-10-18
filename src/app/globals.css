@@ -6564,12 +6564,30 @@ a.auth-brand-header:focus-visible {
   box-shadow: var(--shadow);
 }
 
-.sortable-row-drop-before {
-  box-shadow: inset 0 2px 0 var(--color-accent);
+.sortable-row-drop-before,
+.sortable-row-drop-after {
+  position: relative;
 }
 
-.sortable-row-drop-after {
-  box-shadow: inset 0 -2px 0 var(--color-accent);
+/* Por encima de la fila levantada: con el dedo, esa fila pasa justo sobre
+   la de destino y taparía una línea pintada en ella. */
+.sortable-row-drop-before::before,
+.sortable-row-drop-after::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  z-index: 6;
+  height: 2px;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+
+.sortable-row-drop-before::before {
+  top: 0;
+}
+
+.sortable-row-drop-after::before {
+  bottom: 0;
 }
 
 .club-positions-handle:hover,

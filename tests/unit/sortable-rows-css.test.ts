@@ -36,12 +36,29 @@ describe("arrastrar una fila", () => {
   });
 
   it("una línea de 2 px en el color de acento marca el destino", () => {
-    expect(declarations(".sortable-row-drop-before")).toContain(
-      "box-shadow: inset 0 2px 0 var(--color-accent);",
+    const line = declarations(
+      ".sortable-row-drop-before::before, .sortable-row-drop-after::before",
     );
-    expect(declarations(".sortable-row-drop-after")).toContain(
-      "box-shadow: inset 0 -2px 0 var(--color-accent);",
+
+    expect(line).toContain("height: 2px;");
+    expect(line).toContain("background: var(--color-accent);");
+    expect(declarations(".sortable-row-drop-before::before")).toContain(
+      "top: 0;",
     );
+    expect(declarations(".sortable-row-drop-after::before")).toContain(
+      "bottom: 0;",
+    );
+  });
+
+  it("la línea se ve por encima de la fila levantada que pasa sobre ella", () => {
+    const zIndexOf = (selector: string): number =>
+      Number(/z-index: (\d+);/.exec(declarations(selector))?.[1]);
+
+    expect(
+      zIndexOf(
+        ".sortable-row-drop-before::before, .sortable-row-drop-after::before",
+      ),
+    ).toBeGreaterThan(zIndexOf(".sortable-row-lifted"));
   });
 
   it("el asa no deja hacer scroll a la página mientras se arrastra", () => {
