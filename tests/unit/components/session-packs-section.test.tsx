@@ -7,10 +7,10 @@ import type { ClubPrice } from "@/lib/membership/stripe-prices";
 import { createTranslator } from "@/lib/i18n/translator";
 
 /**
- * La sección "Packs de sesiones" de `/club` (#469, RF-4 del PRD de E13). El
- * Admin o el Committee ve los packs con su precio, añade, quita y ordena en
- * un borrador, y lo guarda entero con la barra de cambios sin guardar
- * (#719).
+ * La sección "Packs de sesiones" de `/club` (#469, RF-4 del PRD de E13; la
+ * tabla de #722, RF-7 del PRD de E26). El Admin o el Committee ve los packs
+ * con su precio, añade, quita y ordena en un borrador con el asa y las
+ * flechas, y lo guarda entero con la barra de cambios sin guardar (#719).
  */
 
 /** No es el precio del club: el de este test, para que nada pase por
@@ -81,28 +81,56 @@ function renderPacks(locale: "en" | "es" = "en"): void {
   );
 }
 
+const ADD_FIELD = "Sessions in the new pack";
+const PACK_LABEL = /^\d+ (sessions?|sesi(ón|ones))$/;
+
 async function renderSection(locale: "en" | "es" = "en"): Promise<void> {
   renderPacks(locale);
-  await screen.findByRole("list", { name: /session packs|packs de sesiones/i });
+  await screen.findByLabelText(
+    locale === "en" ? ADD_FIELD : "Sesiones del pack nuevo",
+  );
 }
 
 function packList(): HTMLElement {
   return screen.getByRole("list", { name: /session packs|packs de sesiones/i });
 }
 
+function packRows(): HTMLElement[] {
+  return within(packList()).getAllByRole("listitem");
+}
+
 function listedPacks(): string[] {
-  return within(packList())
-    .getAllByRole("listitem")
-    .map((item) => within(item).getByRole("heading").textContent ?? "");
+  return packRows().map(
+    (row) => within(row).getByText(PACK_LABEL).textContent ?? "",
+  );
+}
+
+function handle(sessions: number, rank: number, total: number): HTMLElement {
+  return screen.getByRole("button", {
+    name: `Reorder the ${sessions} sessions pack, position ${rank} of ${total}`,
+  });
+}
+
+function removeButton(sessions: number): HTMLElement {
+  return screen.getByRole("button", {
+    name: `Remove the ${sessions} sessions pack`,
+  });
+}
+
+function addField(): HTMLElement {
+  return screen.getByLabelText(ADD_FIELD);
+}
+
+async function typeNewPack(sessions: string): Promise<void> {
+  await userEvent.clear(addField());
+  if (sessions !== "") {
+    await userEvent.type(addField(), sessions);
+  }
 }
 
 async function addPack(sessions: string): Promise<void> {
-  const field = screen.getByLabelText("Sessions in the new pack");
-  await userEvent.clear(field);
-  if (sessions !== "") {
-    await userEvent.type(field, sessions);
-  }
-  await userEvent.click(screen.getByRole("button", { name: "Add pack" }));
+  await typeNewPack(sessions);
+  await userEvent.click(screen.getByRole("button", { name: "Add" }));
 }
 
 /** Guardar cambios, en la barra que sale con un cambio (#719). */
@@ -122,28 +150,78 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("la lista de packs", () => {
+describe("la tabla de packs", () => {
   it("enseña cada pack en orden con el precio del pack entero", async () => {
     stubApi();
 
     await renderSection();
 
     expect(listedPacks()).toEqual(["5 sessions", "10 sessions"]);
-    const [five, ten] = within(packList()).getAllByRole("listitem");
+    const [five, ten] = packRows();
     expect(five).toHaveTextContent("$99.50");
     expect(ten).toHaveTextContent("$199.00");
   });
 
-  it("dice que el precio no está disponible si Stripe no lo da", async () => {
+  it("la entrada dice el precio de una sesión Casual en Stripe", async () => {
+    stubApi();
+
+    await renderSection();
+
+    expect(
+      screen.getByText(
+        "Bundles Casual members can buy. Each pack costs the Casual session price × sessions (now $19.90 per session in Stripe).",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("cada fila tiene el asa con el puesto del pack y el botón de borrar", async () => {
+    stubApi();
+
+    await renderSection();
+
+    const [five, ten] = packRows();
+    expect(five).toContainElement(handle(5, 1, 2));
+    expect(five).toContainElement(removeButton(5));
+    expect(ten).toContainElement(handle(10, 2, 2));
+  });
+
+  it("el pie dice los límites y que los socios ven este orden", async () => {
+    stubApi();
+
+    await renderSection();
+
+    expect(
+      screen.getByText(
+        "From 1 to 50 sessions, no repeats. Members see them in this order.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("sin packs dice que los Casual solo pueden pagar por sesión", async () => {
+    stubApi({ load: () => catalog([]) });
+
+    await renderSection();
+
+    expect(
+      screen.getByText("No packs. Casual members can only pay per session."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("listitem")).toBeNull();
+  });
+
+  it("dice que el precio no está disponible si Stripe no lo da, y deja editar", async () => {
     stubApi({
       sessionPrice: { amountCents: null, reason: "stripe_unavailable" },
     });
-
     await renderSection();
+
+    await typeNewPack("3");
 
     expect(within(packList()).getAllByText("Price not available")).toHaveLength(
       2,
     );
+    expect(addField()).toHaveAccessibleDescription(/Price not available/);
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(listedPacks()).toEqual(["5 sessions", "10 sessions", "3 sessions"]);
   });
 
   it("si no puede cargarlos lo dice con un alert", async () => {
@@ -159,17 +237,26 @@ describe("la lista de packs", () => {
   });
 });
 
-describe("editar la lista", () => {
-  it("añade un pack al final con su precio", async () => {
+describe("la fila de añadir", () => {
+  it("enseña en vivo el precio del pack que se escribe", async () => {
+    stubApi();
+    await renderSection();
+
+    await typeNewPack("3");
+
+    expect(addField()).toHaveAccessibleDescription(/\$59\.70/);
+  });
+
+  it("añade un pack al final del borrador con su precio", async () => {
     stubApi();
     await renderSection();
 
     await addPack("3");
 
     expect(listedPacks()).toEqual(["5 sessions", "10 sessions", "3 sessions"]);
-    expect(within(packList()).getAllByRole("listitem")[2]).toHaveTextContent(
-      "$59.70",
-    );
+    expect(packRows()[2]).toHaveTextContent("$59.70");
+    expect(addField()).toHaveValue(null);
+    expect(savedLists).toEqual([]);
   });
 
   it("habla de una sesión en singular", async () => {
@@ -181,8 +268,8 @@ describe("editar la lista", () => {
     expect(listedPacks()).toContain("1 session");
   });
 
-  it.each(["0", "51", ""])(
-    "no añade un pack de «%s» y explica el límite",
+  it.each(["0", "51", "2.5", ""])(
+    "no añade un pack de «%s» y dice el límite",
     async (sessions) => {
       stubApi();
       await renderSection();
@@ -190,15 +277,25 @@ describe("editar la lista", () => {
       await addPack(sessions);
 
       expect(listedPacks()).toEqual(["5 sessions", "10 sessions"]);
-      expect(
-        screen.getByText("A pack has from 1 to 50 sessions."),
-      ).toBeInTheDocument();
-      expect(screen.getByLabelText("Sessions in the new pack")).toHaveAttribute(
-        "aria-invalid",
-        "true",
+      expect(addField()).toHaveAccessibleDescription(
+        expect.stringContaining("Between 1 and 50."),
       );
+      expect(addField()).toHaveAttribute("aria-invalid", "true");
     },
   );
+
+  it("quita el aviso en cuanto se corrige el número", async () => {
+    stubApi();
+    await renderSection();
+    await addPack("60");
+
+    await typeNewPack("7");
+
+    expect(addField()).toHaveAttribute("aria-invalid", "false");
+    expect(addField()).not.toHaveAccessibleDescription(
+      expect.stringContaining("Between 1 and 50."),
+    );
+  });
 
   it("no añade un tamaño que ya está", async () => {
     stubApi();
@@ -207,47 +304,75 @@ describe("editar la lista", () => {
     await addPack("10");
 
     expect(listedPacks()).toEqual(["5 sessions", "10 sessions"]);
-    expect(
-      screen.getByText("There is already a pack with that many sessions."),
-    ).toBeInTheDocument();
+    expect(addField()).toHaveAccessibleDescription(
+      expect.stringContaining("Already in the list."),
+    );
+  });
+});
+
+describe("borrar", () => {
+  it("saca el pack del borrador y lleva el foco a la fila siguiente", async () => {
+    stubApi({ load: () => catalog([5, 10, 20]) });
+    await renderSection();
+
+    await userEvent.click(removeButton(10));
+
+    expect(listedPacks()).toEqual(["5 sessions", "20 sessions"]);
+    expect(removeButton(20)).toHaveFocus();
+    expect(savedLists).toEqual([]);
   });
 
-  it("quita un pack", async () => {
+  it("al borrar el último lleva el foco a la fila de añadir", async () => {
     stubApi();
     await renderSection();
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Remove the 5 sessions pack" }),
-    );
+    await userEvent.click(removeButton(10));
 
-    expect(listedPacks()).toEqual(["10 sessions"]);
+    expect(addField()).toHaveFocus();
   });
+});
 
-  it("sube y baja un pack, sin mover el primero hacia arriba ni el último hacia abajo", async () => {
-    stubApi();
+describe("mover con el teclado", () => {
+  it("↑ sobre el asa sube el pack, lo anuncia y deja el foco en el asa", async () => {
+    stubApi({ load: () => catalog([5, 10, 20]) });
     await renderSection();
+    handle(20, 3, 3).focus();
 
-    expect(
-      screen.getByRole("button", { name: "Move the 5 sessions pack up" }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "Move the 10 sessions pack down" }),
-    ).toBeDisabled();
+    await userEvent.keyboard("{ArrowUp}");
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Move the 10 sessions pack up" }),
-    );
-
-    expect(listedPacks()).toEqual(["10 sessions", "5 sessions"]);
+    expect(listedPacks()).toEqual(["5 sessions", "20 sessions", "10 sessions"]);
+    expect(handle(20, 2, 3)).toHaveFocus();
     expect(
-      screen.getByText("10 sessions is now number 1 of 2."),
+      screen.getByText("20 sessions is now number 2 of 3."),
     ).toHaveAttribute("role", "status");
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Move the 10 sessions pack down" }),
-    );
+    await userEvent.keyboard("{ArrowUp}");
+
+    expect(listedPacks()).toEqual(["20 sessions", "5 sessions", "10 sessions"]);
+    expect(handle(20, 1, 3)).toHaveFocus();
+  });
+
+  it("↓ sobre el asa baja el pack y deja el foco en el asa", async () => {
+    stubApi();
+    await renderSection();
+    handle(5, 1, 2).focus();
+
+    await userEvent.keyboard("{ArrowDown}");
+
+    expect(listedPacks()).toEqual(["10 sessions", "5 sessions"]);
+    expect(handle(5, 2, 2)).toHaveFocus();
+    expect(saveButton()).toBeEnabled();
+  });
+
+  it("en un extremo no mueve nada ni saca la barra", async () => {
+    stubApi();
+    await renderSection();
+    handle(5, 1, 2).focus();
+
+    await userEvent.keyboard("{ArrowUp}");
 
     expect(listedPacks()).toEqual(["5 sessions", "10 sessions"]);
+    expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
   });
 });
 
@@ -256,9 +381,8 @@ describe("guardar", () => {
     stubApi();
     await renderSection();
     await addPack("20");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Move the 20 sessions pack up" }),
-    );
+    handle(20, 3, 3).focus();
+    await userEvent.keyboard("{ArrowUp}");
 
     await save();
 
@@ -270,13 +394,9 @@ describe("guardar", () => {
   it("no deja guardar una lista vacía y pide dejar al menos uno", async () => {
     stubApi();
     await renderSection();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Remove the 5 sessions pack" }),
-    );
+    await userEvent.click(removeButton(5));
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Remove the 10 sessions pack" }),
-    );
+    await userEvent.click(removeButton(10));
 
     expect(saveButton()).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveTextContent(
@@ -331,16 +451,56 @@ describe("idiomas", () => {
     ).toBeInTheDocument();
     expect(listedPacks()).toEqual(["5 sesiones", "10 sesiones"]);
     expect(
-      screen.getByRole("button", { name: "Subir el pack de 10 sesiones" }),
+      screen.getByText(
+        /^Paquetes que pueden comprar los miembros Casual\. Cada pack cuesta el precio de la sesión Casual × sesiones \(ahora 19,90\sAUD por sesión en Stripe\)\.$/,
+      ),
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText("Sesiones del pack nuevo"),
+      screen.getByRole("button", {
+        name: "Reordenar el pack de 10 sesiones, puesto 2 de 2",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "De 1 a 50 sesiones, sin repetir. Los miembros los ven en este orden.",
+      ),
     ).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole("button", { name: "Quitar el pack de 5 sesiones" }),
     );
     expect(
       screen.getByRole("button", { name: "Guardar cambios" }),
+    ).toBeInTheDocument();
+  });
+
+  it("en español dice el límite y el repetido de la fila de añadir", async () => {
+    stubApi();
+    await renderSection("es");
+    const field = screen.getByLabelText("Sesiones del pack nuevo");
+
+    await userEvent.type(field, "60");
+    await userEvent.click(screen.getByRole("button", { name: "Añadir" }));
+    expect(field).toHaveAccessibleDescription(
+      expect.stringContaining("Entre 1 y 50."),
+    );
+
+    await userEvent.clear(field);
+    await userEvent.type(field, "5");
+    await userEvent.click(screen.getByRole("button", { name: "Añadir" }));
+    expect(field).toHaveAccessibleDescription(
+      expect.stringContaining("Ya está en la lista."),
+    );
+  });
+
+  it("sin packs, en español", async () => {
+    stubApi({ load: () => catalog([]) });
+
+    await renderSection("es");
+
+    expect(
+      screen.getByText(
+        "Sin packs. Los miembros Casual solo pueden pagar por sesión.",
+      ),
     ).toBeInTheDocument();
   });
 });

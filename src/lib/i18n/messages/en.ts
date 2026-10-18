@@ -1858,22 +1858,27 @@ export const englishMessages = {
     "The welcome paragraph can have at most {max} characters.",
   "clubSettings.sessionPacks.title": "Session packs",
   "clubSettings.sessionPacks.lead":
-    "What Casual members can buy. Each pack costs the Casual session price set in Stripe, times its sessions.",
+    "Bundles Casual members can buy. Each pack costs the Casual session price × sessions (now {price} per session in Stripe).",
+  "clubSettings.sessionPacks.lead.noPrice":
+    "Bundles Casual members can buy. Each pack costs the Casual session price × sessions.",
   "clubSettings.sessionPacks.loading": "Loading the session packs…",
   "clubSettings.sessionPacks.pack": {
     one: "{count} session",
     other: "{count} sessions",
   },
-  "clubSettings.sessionPacks.move.up": "Move the {pack} pack up",
-  "clubSettings.sessionPacks.move.down": "Move the {pack} pack down",
-  "clubSettings.sessionPacks.move.up.text": "Up",
-  "clubSettings.sessionPacks.move.down.text": "Down",
-  "clubSettings.sessionPacks.remove": "Remove",
+  "clubSettings.sessionPacks.empty":
+    "No packs. Casual members can only pay per session.",
+  "clubSettings.sessionPacks.handle":
+    "Reorder the {pack} pack, position {rank} of {total}",
   "clubSettings.sessionPacks.remove.label": "Remove the {pack} pack",
-  "clubSettings.sessionPacks.add.title": "Add a pack",
   "clubSettings.sessionPacks.add.label": "Sessions in the new pack",
-  "clubSettings.sessionPacks.add.hint": "From {min} to {max}.",
-  "clubSettings.sessionPacks.add.submit": "Add pack",
+  "clubSettings.sessionPacks.add.placeholder": "Sessions",
+  "clubSettings.sessionPacks.add.unit": "sessions",
+  "clubSettings.sessionPacks.add.submit": "Add",
+  "clubSettings.sessionPacks.add.issue.outOfRange": "Between {min} and {max}.",
+  "clubSettings.sessionPacks.add.issue.repeated": "Already in the list.",
+  "clubSettings.sessionPacks.footer":
+    "From {min} to {max} sessions, no repeats. Members see them in this order.",
   "clubSettings.sessionPacks.moved": "{pack} is now number {rank} of {total}.",
   "clubSettings.sessionPacks.added": "{pack} pack added. Save to offer it.",
   "clubSettings.sessionPacks.removed":

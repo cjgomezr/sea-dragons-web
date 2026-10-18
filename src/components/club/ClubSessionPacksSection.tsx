@@ -1,5 +1,8 @@
 "use client";
 
+import { DotsSixVertical } from "@phosphor-icons/react/dist/ssr/DotsSixVertical";
+import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
+import { Trash } from "@phosphor-icons/react/dist/ssr/Trash";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import {
@@ -30,13 +33,13 @@ import {
 
 /**
  * Los packs de sesiones que el club ofrece a sus Casual (#469, RF-4 del PRD
- * de E13). El Admin o el Committee añade, quita y ordena en un borrador, y lo
- * guarda entero con la barra de cambios sin guardar (#719): la API cambia la
- * lista de una vez.
+ * de E13), en la tabla de #722 (RF-7 del PRD de E26). El Admin o el
+ * Committee añade, quita y ordena en un borrador, y lo guarda entero con la
+ * barra de cambios sin guardar (#719): la API cambia la lista de una vez.
  *
  * El precio de cada pack es el de una sesión Casual en Stripe por su tamaño.
  * Lo calcula la pantalla con el precio que trae el endpoint, así que un pack
- * recién añadido ya enseña el suyo antes de guardarse.
+ * que se está escribiendo ya enseña el suyo antes de añadirse.
  */
 
 type Direction = "up" | "down";
@@ -46,15 +49,24 @@ type LoadState =
   | { readonly kind: "loaded" }
   | ApiRequestFailure;
 
-type PackControl = Direction | "remove";
+type PackControl = "handle" | "remove";
 
 /** El `data-focus-key` del control que recibe el foco cuando la sección se
- * vuelve a pintar. */
-type FocusTarget = string;
+ * vuelve a pintar. Un objeto nuevo en cada petición: mover dos veces el
+ * mismo pack pide el mismo control, y el efecto tiene que repetirse. */
+type FocusTarget = { readonly key: string };
+
+/** Lo que dice la fila de añadir mientras el número no vale. */
+const NO_LIVE_PRICE = "–";
+
+const MOVE_KEYS: Readonly<Record<string, Direction>> = {
+  ArrowUp: "up",
+  ArrowDown: "down",
+};
 
 const NEW_PACK_FIELD_ID = "club-packs-nuevo";
 const NEW_PACK_ISSUE_ID = `${NEW_PACK_FIELD_ID}-aviso`;
-const NEW_PACK_HINT_ID = `${NEW_PACK_FIELD_ID}-ayuda`;
+const NEW_PACK_PRICE_ID = `${NEW_PACK_FIELD_ID}-precio`;
 const NO_SESSION_PRICE: ClubPrice = {
   amountCents: null,
   reason: "not_configured",
@@ -70,22 +82,41 @@ function describePrice(translate: Translator, price: ClubPrice): string {
     : formatAudCents(translate.locale, price.amountCents);
 }
 
-function focusKey(sessions: number, control: PackControl): FocusTarget {
+function focusKey(sessions: number, control: PackControl): string {
   return `pack-${sessions}-${control}`;
 }
 
-/** Cambia de sitio el pack de `sessions` con su vecino. En un extremo la
- * lista queda igual: el botón de ese sentido ya está desactivado. */
+/** El aviso de la fila de añadir, más corto que el de la lista entera: se
+ * lee junto al número que se escribió. */
+function describeNewPackIssue(
+  translate: Translator,
+  issue: SessionPackIssueCode,
+): string {
+  switch (issue) {
+    case "pack_sessions_out_of_range":
+      return translate("clubSettings.sessionPacks.add.issue.outOfRange", {
+        min: MIN_PACK_SESSIONS,
+        max: MAX_PACK_SESSIONS,
+      });
+    case "pack_sessions_repeated":
+      return translate("clubSettings.sessionPacks.add.issue.repeated");
+    case "packs_required":
+      return describeSessionPackIssue(translate, issue);
+  }
+}
+
+/** La lista con el pack de `sessions` cambiado de sitio con su vecino, o
+ * nulo si ya está en ese extremo. */
 function swapWithNeighbour(
   sizes: readonly number[],
   sessions: number,
   direction: Direction,
-): readonly number[] {
+): readonly number[] | null {
   const index = sizes.indexOf(sessions);
   const neighbourIndex = direction === "up" ? index - 1 : index + 1;
   const neighbour = sizes[neighbourIndex];
   if (index === -1 || neighbour === undefined) {
-    return sizes;
+    return null;
   }
   return sizes.map((size, position) => {
     if (position === index) {
@@ -93,19 +124,6 @@ function swapWithNeighbour(
     }
     return position === neighbourIndex ? sessions : size;
   });
-}
-
-/** Tras mover, el foco se queda en el mismo botón si sigue activo, y si el
- * pack llegó a un extremo, en el del otro sentido. */
-function focusAfterMove(
-  sessions: number,
-  newIndex: number,
-  total: number,
-  direction: Direction,
-): FocusTarget {
-  const isAtEdge = direction === "up" ? newIndex === 0 : newIndex === total - 1;
-  const opposite = direction === "up" ? "down" : "up";
-  return focusKey(sessions, isAtEdge ? opposite : direction);
 }
 
 type SessionPacksEditor = {
@@ -121,6 +139,7 @@ type SessionPacksEditor = {
   readonly move: (sessions: number, direction: Direction) => void;
   readonly remove: (sessions: number) => void;
   readonly add: (sessions: number) => boolean;
+  readonly clearAddIssue: () => void;
   readonly discard: () => void;
   readonly save: () => Promise<void>;
 };
@@ -204,16 +223,18 @@ function useSessionPacksEditor(
 
   function move(sessions: number, direction: Direction): void {
     const moved = swapWithNeighbour(sizes, sessions, direction);
-    const newIndex = moved.indexOf(sessions);
+    if (moved === null) {
+      return;
+    }
     change(
       moved,
       translate("clubSettings.sessionPacks.moved", {
         pack: packName(translate, sessions),
-        rank: newIndex + 1,
+        rank: moved.indexOf(sessions) + 1,
         total: moved.length,
       }),
     );
-    setFocusTarget(focusAfterMove(sessions, newIndex, moved.length, direction));
+    setFocusTarget({ key: focusKey(sessions, "handle") });
   }
 
   function remove(sessions: number): void {
@@ -226,12 +247,11 @@ function useSessionPacksEditor(
       }),
     );
     // El botón pulsado desaparece: el foco pasa al pack que ocupa su sitio,
-    // o al anterior si era el último, o al campo de añadir si no queda
-    // ninguno.
-    const next = left[Math.min(index, left.length - 1)];
-    setFocusTarget(
-      next === undefined ? NEW_PACK_FIELD_ID : focusKey(next, "remove"),
-    );
+    // o a la fila de añadir si era el último.
+    const next = left[index];
+    setFocusTarget({
+      key: next === undefined ? NEW_PACK_FIELD_ID : focusKey(next, "remove"),
+    });
   }
 
   function add(sessions: number): boolean {
@@ -249,9 +269,14 @@ function useSessionPacksEditor(
     return true;
   }
 
+  function clearAddIssue(): void {
+    setAddIssue(null);
+  }
+
   function discard(): void {
     packs.discard();
     setNotice(null);
+    clearAddIssue();
   }
 
   async function save(): Promise<void> {
@@ -272,12 +297,13 @@ function useSessionPacksEditor(
     move,
     remove,
     add,
+    clearAddIssue,
     discard,
     save,
   };
 }
 
-function PackItem({
+function PackRow({
   translate,
   sessions,
   index,
@@ -297,51 +323,50 @@ function PackItem({
   onRemove: () => void;
 }): React.JSX.Element {
   const pack = packName(translate, sessions);
-  const isAtEdge = (direction: Direction): boolean =>
-    direction === "up" ? index === 0 : index === total - 1;
-  const moveButton = (direction: Direction): React.JSX.Element => (
-    <button
-      type="button"
-      className="admin-secondary"
-      data-focus-key={focusKey(sessions, direction)}
-      aria-label={translate(`clubSettings.sessionPacks.move.${direction}`, {
-        pack,
-      })}
-      disabled={isBusy || isAtEdge(direction)}
-      onClick={() => onMove(direction)}
-    >
-      {translate(`clubSettings.sessionPacks.move.${direction}.text`)}
-    </button>
-  );
   return (
-    <li className="groups-item club-positions-item">
-      <div className="club-positions-head">
-        <span className="club-positions-rank" aria-hidden="true">
-          {index + 1}
+    <li className="club-packs-row">
+      <button
+        type="button"
+        className="club-packs-handle"
+        data-focus-key={focusKey(sessions, "handle")}
+        aria-label={translate("clubSettings.sessionPacks.handle", {
+          pack,
+          rank: index + 1,
+          total,
+        })}
+        disabled={isBusy}
+        onKeyDown={(event) => {
+          const direction = MOVE_KEYS[event.key];
+          if (direction === undefined) {
+            return;
+          }
+          event.preventDefault();
+          onMove(direction);
+        }}
+      >
+        <DotsSixVertical aria-hidden="true" weight="bold" />
+      </button>
+      <span className="club-packs-label">
+        <span className="club-packs-badge" aria-hidden="true">
+          {sessions}
         </span>
-        <div className="club-positions-names">
-          <h3 className="club-positions-name">{pack}</h3>
-          <p className="club-positions-note">
-            {describePrice(translate, priceSessionPack(sessionPrice, sessions))}
-          </p>
-        </div>
-      </div>
-      <div className="groups-actions">
-        {moveButton("up")}
-        {moveButton("down")}
-        <button
-          type="button"
-          className="admin-secondary"
-          data-focus-key={focusKey(sessions, "remove")}
-          aria-label={translate("clubSettings.sessionPacks.remove.label", {
-            pack,
-          })}
-          disabled={isBusy}
-          onClick={onRemove}
-        >
-          {translate("clubSettings.sessionPacks.remove")}
-        </button>
-      </div>
+        <span className="club-packs-name">{pack}</span>
+      </span>
+      <span className="club-packs-price">
+        {describePrice(translate, priceSessionPack(sessionPrice, sessions))}
+      </span>
+      <button
+        type="button"
+        className="club-packs-remove"
+        data-focus-key={focusKey(sessions, "remove")}
+        aria-label={translate("clubSettings.sessionPacks.remove.label", {
+          pack,
+        })}
+        disabled={isBusy}
+        onClick={onRemove}
+      >
+        <Trash aria-hidden="true" />
+      </button>
     </li>
   );
 }
@@ -353,22 +378,41 @@ function parseSessions(text: string): number {
   return trimmed === "" ? Number.NaN : Number(trimmed);
 }
 
-function AddPackForm({
+/** El precio del pack que se está escribiendo, o una raya si el número no
+ * vale como pack. */
+function describeLivePrice(
+  translate: Translator,
+  sessionPrice: ClubPrice,
+  text: string,
+): string {
+  const sessions = parseSessions(text);
+  if (findSessionPackIssue([sessions]) !== null) {
+    return NO_LIVE_PRICE;
+  }
+  return describePrice(translate, priceSessionPack(sessionPrice, sessions));
+}
+
+function AddPackRow({
   translate,
+  sessionPrice,
   issue,
   isBusy,
   onAdd,
+  onEdit,
 }: {
   translate: Translator;
+  sessionPrice: ClubPrice;
   issue: SessionPackIssueCode | null;
   isBusy: boolean;
   onAdd: (sessions: number) => boolean;
+  /** Un número nuevo deja viejo el aviso del anterior. */
+  onEdit: () => void;
 }): React.JSX.Element {
   const [text, setText] = useState("");
   const isInvalid = issue !== null;
   return (
     <form
-      className="club-positions-form"
+      className="club-packs-add"
       onSubmit={(event) => {
         event.preventDefault();
         if (onAdd(parseSessions(text))) {
@@ -377,8 +421,9 @@ function AddPackForm({
       }}
       noValidate
     >
-      <div className="auth-field">
-        <label htmlFor={NEW_PACK_FIELD_ID}>
+      <Plus className="club-packs-add-icon" aria-hidden="true" />
+      <span className="club-packs-add-field">
+        <label htmlFor={NEW_PACK_FIELD_ID} className="visually-hidden">
           {translate("clubSettings.sessionPacks.add.label")}
         </label>
         <input
@@ -389,30 +434,37 @@ function AddPackForm({
           min={MIN_PACK_SESSIONS}
           max={MAX_PACK_SESSIONS}
           step={1}
+          placeholder={translate("clubSettings.sessionPacks.add.placeholder")}
           value={text}
           aria-invalid={isInvalid}
           aria-describedby={
             isInvalid
-              ? `${NEW_PACK_ISSUE_ID} ${NEW_PACK_HINT_ID}`
-              : NEW_PACK_HINT_ID
+              ? `${NEW_PACK_ISSUE_ID} ${NEW_PACK_PRICE_ID}`
+              : NEW_PACK_PRICE_ID
           }
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            setText(event.target.value);
+            onEdit();
+          }}
         />
-        {isInvalid ? (
-          <p className="auth-field-error" id={NEW_PACK_ISSUE_ID}>
-            {describeSessionPackIssue(translate, issue)}
-          </p>
-        ) : null}
-        <p className="auth-hint" id={NEW_PACK_HINT_ID}>
-          {translate("clubSettings.sessionPacks.add.hint", {
-            min: MIN_PACK_SESSIONS,
-            max: MAX_PACK_SESSIONS,
-          })}
-        </p>
-      </div>
-      <button type="submit" className="admin-secondary" disabled={isBusy}>
-        {translate("clubSettings.sessionPacks.add.submit")}
+        <span className="club-packs-add-unit" aria-hidden="true">
+          {translate("clubSettings.sessionPacks.add.unit")}
+        </span>
+      </span>
+      <span className="club-packs-price" id={NEW_PACK_PRICE_ID}>
+        {describeLivePrice(translate, sessionPrice, text)}
+      </span>
+      <button type="submit" className="club-packs-add-submit" disabled={isBusy}>
+        <Plus className="club-packs-add-submit-icon" aria-hidden="true" />
+        <span className="club-packs-add-submit-text">
+          {translate("clubSettings.sessionPacks.add.submit")}
+        </span>
       </button>
+      {isInvalid ? (
+        <p className="club-packs-add-issue" id={NEW_PACK_ISSUE_ID}>
+          {describeNewPackIssue(translate, issue)}
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -445,7 +497,7 @@ function SaveError({
   );
 }
 
-/** Lleva el foco al botón que se pidió cuando la lista ya se pintó. */
+/** Lleva el foco al control que se pidió cuando la tabla ya se pintó. */
 function useFocusTarget(
   container: React.RefObject<HTMLElement | null>,
   target: FocusTarget | null,
@@ -455,9 +507,56 @@ function useFocusTarget(
       return;
     }
     container.current
-      ?.querySelector<HTMLElement>(`[data-focus-key="${target}"]`)
+      ?.querySelector<HTMLElement>(`[data-focus-key="${target.key}"]`)
       ?.focus();
   }, [container, target]);
+}
+
+function PacksTable({
+  translate,
+  editor,
+}: {
+  translate: Translator;
+  editor: SessionPacksEditor;
+}): React.JSX.Element {
+  const { sizes } = editor;
+  const isSending = editor.status.kind === "sending";
+  return (
+    <div className="club-packs-table">
+      {sizes.length === 0 ? (
+        <p className="club-packs-empty">
+          {translate("clubSettings.sessionPacks.empty")}
+        </p>
+      ) : (
+        <ol
+          className="club-packs-list"
+          aria-label={translate("clubSettings.sessionPacks.title")}
+        >
+          {sizes.map((sessions, index) => (
+            <PackRow
+              key={sessions}
+              translate={translate}
+              sessions={sessions}
+              index={index}
+              total={sizes.length}
+              sessionPrice={editor.sessionPrice}
+              isBusy={isSending}
+              onMove={(direction) => editor.move(sessions, direction)}
+              onRemove={() => editor.remove(sessions)}
+            />
+          ))}
+        </ol>
+      )}
+      <AddPackRow
+        translate={translate}
+        sessionPrice={editor.sessionPrice}
+        issue={editor.addIssue}
+        isBusy={isSending}
+        onAdd={editor.add}
+        onEdit={editor.clearAddIssue}
+      />
+    </div>
+  );
 }
 
 function SessionPacksEditorView({
@@ -467,40 +566,20 @@ function SessionPacksEditorView({
   translate: Translator;
   editor: SessionPacksEditor;
 }): React.JSX.Element {
-  const { sizes, status, notice, addIssue } = editor;
+  const { status, notice } = editor;
   const editorRef = useRef<HTMLDivElement>(null);
   useFocusTarget(editorRef, editor.focusTarget);
   const isSending = status.kind === "sending";
-  const listIssue = editor.hasDraft ? findSessionPackIssue(sizes) : null;
+  const listIssue = editor.hasDraft ? findSessionPackIssue(editor.sizes) : null;
   return (
     <div className="club-session-packs" ref={editorRef}>
-      <ol
-        className="groups-items"
-        aria-label={translate("clubSettings.sessionPacks.title")}
-      >
-        {sizes.map((sessions, index) => (
-          <PackItem
-            key={sessions}
-            translate={translate}
-            sessions={sessions}
-            index={index}
-            total={sizes.length}
-            sessionPrice={editor.sessionPrice}
-            isBusy={isSending}
-            onMove={(direction) => editor.move(sessions, direction)}
-            onRemove={() => editor.remove(sessions)}
-          />
-        ))}
-      </ol>
-      <div className="club-positions-group">
-        <h3>{translate("clubSettings.sessionPacks.add.title")}</h3>
-        <AddPackForm
-          translate={translate}
-          issue={addIssue}
-          isBusy={isSending}
-          onAdd={editor.add}
-        />
-      </div>
+      <PacksTable translate={translate} editor={editor} />
+      <p className="auth-hint">
+        {translate("clubSettings.sessionPacks.footer", {
+          min: MIN_PACK_SESSIONS,
+          max: MAX_PACK_SESSIONS,
+        })}
+      </p>
       {notice === null ? null : (
         <p className="auth-note" role="status">
           {notice}
@@ -526,6 +605,16 @@ function SessionPacksEditorView({
   );
 }
 
+/** La entrada con el precio de una sesión, si Stripe lo da. */
+function describeLead(translate: Translator, sessionPrice: ClubPrice): string {
+  if (sessionPrice.amountCents === null) {
+    return translate("clubSettings.sessionPacks.lead.noPrice");
+  }
+  return translate("clubSettings.sessionPacks.lead", {
+    price: formatAudCents(translate.locale, sessionPrice.amountCents),
+  });
+}
+
 export function ClubSessionPacksSection({
   translate,
   onHasDraftChange,
@@ -537,11 +626,16 @@ export function ClubSessionPacksSection({
   const { load } = editor;
 
   return (
-    <section className="auth-fields" aria-labelledby="club-packs-sesiones">
+    <section
+      className="auth-fields club-packs-section"
+      aria-labelledby="club-packs-sesiones"
+    >
       <h2 id="club-packs-sesiones" tabIndex={-1}>
         {translate("clubSettings.sessionPacks.title")}
       </h2>
-      <p className="auth-hint">{translate("clubSettings.sessionPacks.lead")}</p>
+      <p className="auth-hint">
+        {describeLead(translate, editor.sessionPrice)}
+      </p>
       {load.kind === "loading" ? (
         <p className="admin-empty">
           {translate("clubSettings.sessionPacks.loading")}
