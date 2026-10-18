@@ -6053,21 +6053,288 @@ a.auth-brand-header:focus-visible {
   margin: 0;
 }
 
-/* Los packs de sesiones (#469): la lista con la forma de las posiciones, y
-   debajo el alta y el botón de guardar, cada uno a su ancho. */
+/* Los packs de sesiones (#469), en la tabla de #722 (RF-7 del PRD de E26,
+   02-desktop-packs-unsaved.png y 10-mobile-packs-unsaved.png del handoff).
+   En el móvil las filas van en una tarjeta y la de añadir queda debajo,
+   suelta; en escritorio las dos forman una sola tabla de 620 px. */
+.club-packs-section {
+  max-width: 620px;
+}
+
 .club-session-packs {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
-.club-session-packs .club-positions-form .admin-secondary,
-.club-session-packs > .auth-submit {
-  align-self: flex-start;
-}
-
+.club-session-packs > .auth-hint,
 .club-session-packs > .auth-note {
   margin: 0;
+}
+
+.club-packs-list,
+.club-packs-empty {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.club-packs-empty {
+  padding: var(--space-4);
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.club-packs-row {
+  display: grid;
+  grid-template-columns: var(--touch-target-min) minmax(0, 1fr) auto var(
+      --touch-target-min
+    );
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 60px;
+  padding: 0 var(--space-2);
+}
+
+.club-packs-row + .club-packs-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.club-packs-handle,
+.club-packs-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  font-size: 18px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.club-packs-handle {
+  cursor: grab;
+}
+
+.club-packs-remove:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+
+.club-packs-handle:disabled,
+.club-packs-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.club-packs-handle:focus-visible,
+.club-packs-remove:focus-visible,
+.club-packs-add-submit:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
+.club-packs-label {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.club-packs-badge {
+  flex: none;
+  min-width: 30px;
+  padding: var(--space-1) 6px;
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  background: var(--color-segment-selected);
+  border-radius: 6px;
+}
+
+.club-packs-name {
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* "Precio no disponible" parte en dos líneas antes que empujar la fila. */
+.club-packs-price {
+  font-family: var(--font-family-mono);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.club-packs-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  margin-top: var(--space-3);
+}
+
+/* El + de delante y "sesiones" detrás son del escritorio; en el móvil el
+   campo lleva su nombre dentro. */
+.club-packs-add-icon,
+.club-packs-add-unit,
+.club-packs-add-submit-icon {
+  display: none;
+}
+
+.club-packs-add-field {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.club-packs-add input {
+  box-sizing: border-box;
+  width: 120px;
+  height: 48px;
+  padding: 0 var(--space-3);
+  font-family: var(--font-family-mono);
+  font-size: 16px;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.club-packs-add input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.club-packs-add .club-packs-price {
+  flex: 1;
+  text-align: left;
+}
+
+.club-packs-add-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  height: 48px;
+  padding: 0 var(--space-4);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-segment-selected);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.club-packs-add-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.club-packs-add-issue {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-danger);
+}
+
+@media (min-width: 768px) {
+  .club-packs-table {
+    overflow: hidden;
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+  }
+
+  .club-packs-list,
+  .club-packs-empty {
+    border: none;
+    border-radius: 0;
+  }
+
+  .club-packs-row {
+    grid-template-columns: 36px minmax(0, 1fr) 110px 40px;
+    gap: var(--space-3);
+    min-height: 46px;
+    padding: 0 var(--space-3) 0 var(--space-2);
+  }
+
+  .club-packs-handle,
+  .club-packs-remove {
+    width: 36px;
+    height: 36px;
+  }
+
+  .club-packs-add {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 110px 40px;
+    gap: var(--space-2) var(--space-3);
+    margin-top: 0;
+    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .club-packs-add-icon {
+    display: block;
+    justify-self: center;
+    font-size: 16px;
+    color: var(--color-text-secondary);
+  }
+
+  .club-packs-add-unit {
+    display: inline;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+  }
+
+  .club-packs-add input {
+    width: 80px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .club-packs-add .club-packs-price {
+    text-align: right;
+  }
+
+  /* `relative`: el texto escondido se queda dentro del botón y no ensancha
+     la página. */
+  .club-packs-add-submit {
+    position: relative;
+    justify-self: end;
+    min-width: 0;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+
+  .club-packs-add-submit-icon {
+    display: block;
+    font-size: 16px;
+  }
+
+  .club-packs-add-submit-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .club-packs-add-issue {
+    grid-column: 2 / -1;
+  }
 }
 
 .club-positions-fields {

@@ -1855,20 +1855,27 @@ export const spanishMessages: MessageCatalog = {
     "El párrafo de bienvenida puede tener como mucho {max} caracteres.",
   "clubSettings.sessionPacks.title": "Packs de sesiones",
   "clubSettings.sessionPacks.lead":
-    "Lo que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual en Stripe por sus sesiones.",
+    "Paquetes que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual × sesiones (ahora {price} por sesión en Stripe).",
+  "clubSettings.sessionPacks.lead.noPrice":
+    "Paquetes que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual × sesiones.",
   "clubSettings.sessionPacks.loading": "Cargando los packs de sesiones…",
   "clubSettings.sessionPacks.pack": {
     one: "{count} sesión",
     other: "{count} sesiones",
   },
-  "clubSettings.sessionPacks.move.up": "Subir el pack de {pack}",
-  "clubSettings.sessionPacks.move.down": "Bajar el pack de {pack}",
-  "clubSettings.sessionPacks.remove": "Quitar",
+  "clubSettings.sessionPacks.empty":
+    "Sin packs. Los miembros Casual solo pueden pagar por sesión.",
+  "clubSettings.sessionPacks.handle":
+    "Reordenar el pack de {pack}, puesto {rank} de {total}",
   "clubSettings.sessionPacks.remove.label": "Quitar el pack de {pack}",
-  "clubSettings.sessionPacks.add.title": "Añadir un pack",
   "clubSettings.sessionPacks.add.label": "Sesiones del pack nuevo",
-  "clubSettings.sessionPacks.add.hint": "De {min} a {max}.",
-  "clubSettings.sessionPacks.add.submit": "Añadir pack",
+  "clubSettings.sessionPacks.add.placeholder": "Sesiones",
+  "clubSettings.sessionPacks.add.unit": "sesiones",
+  "clubSettings.sessionPacks.add.submit": "Añadir",
+  "clubSettings.sessionPacks.add.issue.outOfRange": "Entre {min} y {max}.",
+  "clubSettings.sessionPacks.add.issue.repeated": "Ya está en la lista.",
+  "clubSettings.sessionPacks.footer":
+    "De {min} a {max} sesiones, sin repetir. Los miembros los ven en este orden.",
   "clubSettings.sessionPacks.moved":
     "El pack de {pack} es ahora el {rank} de {total}.",
   "clubSettings.sessionPacks.added":
