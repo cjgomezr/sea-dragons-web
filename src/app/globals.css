@@ -10660,6 +10660,7 @@ a.auth-brand-header:focus-visible {
 }
 
 .agenda-jump-latest {
+  min-height: var(--touch-target-min);
   padding: 0 var(--space-4);
   font-size: 14px;
 }
@@ -10668,6 +10669,15 @@ a.auth-brand-header:focus-visible {
   .agenda-jump-field,
   .agenda-jump-latest {
     min-height: 36px;
+  }
+}
+
+/* En la tableta no caben Próximos | Pasados, el selector y "+ Evento" en una
+   fila: el selector baja a la suya y el control de periodo no se queda solo
+   con un hueco a su derecha. */
+@media (768px <= width < 1024px) {
+  .agenda-jump {
+    order: 1;
   }
 }
 
