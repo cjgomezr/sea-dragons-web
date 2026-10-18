@@ -7119,6 +7119,20 @@ a.auth-brand-header:focus-visible {
   background: var(--color-border);
 }
 
+/* La raya separa los sugeridos del código sólo si caben en una fila: cuando
+   el código salta a la siguiente, se quedaría colgando al final. Los anchos
+   son los de la fila entera: cinco muestras, la raya, el código y el
+   selector, con sus huecos. */
+.club-accent-field {
+  container-type: inline-size;
+}
+
+@container (width < 400px) {
+  .club-accent-divider {
+    display: none;
+  }
+}
+
 /* Cabe un código de siete caracteres en mono, sin estirarse. */
 .club-accent-field .club-accent-code {
   width: 110px;
@@ -7323,6 +7337,12 @@ a.auth-brand-header:focus-visible {
   .club-accent-swatch-color {
     width: var(--touch-target-min);
     height: var(--touch-target-min);
+  }
+
+  @container (width < 460px) {
+    .club-accent-divider {
+      display: none;
+    }
   }
 
   .club-logo-actions .auth-secondary {
