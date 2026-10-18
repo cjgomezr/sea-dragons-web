@@ -6201,12 +6201,21 @@ a.auth-brand-header:focus-visible {
   width: 120px;
   height: 48px;
   padding: 0 var(--space-3);
+  appearance: textfield;
   font-family: var(--font-family-mono);
   font-size: 16px;
   color: var(--color-text);
   background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+}
+
+/* Sin las flechas del navegador: en los 80 px de escritorio tapan el
+   número. */
+.club-packs-add input::-webkit-inner-spin-button,
+.club-packs-add input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 .club-packs-add input[aria-invalid="true"] {
@@ -6300,6 +6309,11 @@ a.auth-brand-header:focus-visible {
     width: 80px;
     height: 32px;
     font-size: 14px;
+  }
+
+  /* "sesiones" ya va detrás del campo, y "Sesiones" no cabe en 80 px. */
+  .club-packs-add input::placeholder {
+    color: transparent;
   }
 
   .club-packs-add .club-packs-price {

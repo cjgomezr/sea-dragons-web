@@ -9826,7 +9826,10 @@ const STUBBED_SESSION_PRICE = { amountCents: 1500, currency: "AUD" } as const;
 /** Los packs de inicio y uno grande, para ver un precio de cuatro cifras. */
 const STUBBED_SESSION_PACKS: readonly number[] = [5, 10, 50];
 
-async function stubSessionPacks(page: Page): Promise<void> {
+async function stubSessionPacks(
+  page: Page,
+  sizes: readonly number[] = STUBBED_SESSION_PACKS,
+): Promise<void> {
   await page.route(
     (url) => url.pathname === CLUB_SESSION_PACKS_ENDPOINT,
     async (route, request) => {
@@ -9836,7 +9839,7 @@ async function stubSessionPacks(page: Page): Promise<void> {
           contentType: "application/json",
           body: JSON.stringify({
             data: {
-              packs: STUBBED_SESSION_PACKS.map((sessions) => ({
+              packs: sizes.map((sessions) => ({
                 sessions,
                 price: {
                   ...STUBBED_SESSION_PRICE,
@@ -9898,6 +9901,9 @@ type ClubSettingsState = {
   readonly save?: ClubSettingsSave;
   /** Lo que sirve el endpoint fingido de los textos de entrada (#301). */
   readonly signInTexts?: StubbedSignInTexts;
+  /** Los packs que sirve el endpoint fingido (#722). Sin ellos, los de
+   * siempre. */
+  readonly sessionPacks?: readonly number[];
   /** El catálogo que sirve el endpoint fingido de las posiciones (#300). */
   readonly positions?: readonly StubbedPosition[];
   readonly createPosition?: PositionCreate;
@@ -10052,7 +10058,7 @@ async function stubClubSettingsSections(
     create: state.createPosition ?? "hangs",
   });
   await stubSignInTexts(page, state.signInTexts ?? NO_STUBBED_SIGN_IN_TEXTS);
-  await stubSessionPacks(page);
+  await stubSessionPacks(page, state.sessionPacks);
 }
 
 async function goToClubSettings(
@@ -10626,9 +10632,20 @@ for (const state of CLUB_SIGN_IN_TEXTS_STATES) {
   });
 }
 
+/** Escribe un pack de 60 sesiones y lo intenta añadir: la fila dice el
+ * límite (#722, D2). */
+async function addOutOfRangeSessionPack(page: Page): Promise<void> {
+  const section = sessionPacksSection(page);
+  await section.getByLabel("Sessions in the new pack").fill("60");
+  await section.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(section.getByText("Between 1 and 50.")).toBeVisible();
+}
+
 const CLUB_SESSION_PACKS_STATES = inClubSection("packs", [
   { name: "club-packs" },
   { name: "club-packs-es", beforeVisit: chooseSpanish },
+  { name: "club-packs-vacio", sessionPacks: [] },
+  { name: "club-packs-error-al-anadir", prepare: addOutOfRangeSessionPack },
 ]);
 
 /* #469: como las posiciones, la sección se fotografía sola, sin la barra de
@@ -10679,6 +10696,46 @@ for (const state of CLUB_SESSION_PACKS_STATES) {
     });
   });
 }
+
+/* #722: las medidas del móvil (10-mobile-packs-unsaved.png del handoff de
+   E26), medidas en el navegador y no sólo escritas en la hoja. */
+const PACK_ROW_HEIGHT_PX = 60;
+const PACK_ADD_FIELD_HEIGHT_PX = 48;
+/** --touch-target-min en globals.css. */
+const PACK_CONTROL_SIZE_PX = 44;
+
+test.describe("club-packs en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: viewports[0].width, height: viewports[0].height },
+  });
+
+  test("filas de 60 px, asa y borrar de 44 px y campo de 48 px", async ({
+    page,
+  }) => {
+    await goToClubSettings(page, { name: "club-packs", tab: "packs" });
+    const section = sessionPacksSection(page);
+    const firstRow = section.getByRole("listitem").first();
+
+    expect(await heightOf(firstRow)).toBeGreaterThanOrEqual(PACK_ROW_HEIGHT_PX);
+    for (const control of [
+      firstRow.getByRole("button", { name: /^Reorder the/ }),
+      firstRow.getByRole("button", { name: /^Remove the/ }),
+    ]) {
+      const box = await control.boundingBox();
+      expect(box?.width).toBe(PACK_CONTROL_SIZE_PX);
+      expect(box?.height).toBe(PACK_CONTROL_SIZE_PX);
+    }
+    expect(await heightOf(section.getByLabel("Sessions in the new pack"))).toBe(
+      PACK_ADD_FIELD_HEIGHT_PX,
+    );
+    await expect(
+      section.getByRole("button", { name: "Add", exact: true }),
+    ).toHaveText("Add");
+  });
+});
 
 /* #301: la pantalla de entrar con los textos del club. Se ponen sobre la
    página ya servida, como el logo y el acento: guardarlos en la base
