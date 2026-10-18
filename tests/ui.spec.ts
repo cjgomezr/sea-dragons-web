@@ -9859,15 +9859,18 @@ function sessionPacksSection(page: Page): Locator {
   });
 }
 
-/** Un lema de 141 caracteres: la pantalla lo rechaza junto al campo y la
- * barra no deja guardar (#719). */
+/** Un titular en español de 141 caracteres: la pantalla lo rechaza junto al
+ * campo y la barra no deja guardar (#719). Antes se elige el español en el
+ * control de la sección (#721). */
 function writeTooLongTagline(labels: {
+  readonly language: string;
   readonly field: string;
   readonly submit: string;
   readonly issue: RegExp;
 }) {
   return async (page: Page): Promise<void> => {
     const section = signInTextsSection(page);
+    await section.getByRole("radio", { name: labels.language }).check();
     await section.getByLabel(labels.field).fill("a".repeat(141));
     await expect(section.getByText(labels.issue)).toBeVisible();
     await expect(
@@ -10585,18 +10588,20 @@ const CLUB_SIGN_IN_TEXTS_STATES = inClubSection("sign-in", [
   {
     name: "club-textos-entrada-demasiado-largo",
     prepare: writeTooLongTagline({
-      field: "Tagline in Spanish",
+      language: "Spanish",
+      field: "Headline",
       submit: ENGLISH_SAVE_SETTINGS,
-      issue: /The tagline can have at most 140 characters/,
+      issue: /The headline can have at most 140 characters/,
     }),
   },
   {
     name: "club-textos-entrada-demasiado-largo-es",
     beforeVisit: chooseSpanish,
     prepare: writeTooLongTagline({
-      field: "Lema en español",
+      language: "Español",
+      field: "Titular",
       submit: SPANISH_SAVE_SETTINGS,
-      issue: /El lema puede tener como mucho 140 caracteres/,
+      issue: /El titular puede tener como mucho 140 caracteres/,
     }),
   },
 ]);

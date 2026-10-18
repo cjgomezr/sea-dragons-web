@@ -122,8 +122,9 @@ export class SignInTextsValidationError extends Error {
   }
 }
 
-/** Como `char_length` de Postgres: un emoji es un carácter, no dos. */
-function countCharacters(text: string): number {
+/** Como `char_length` de Postgres: un emoji es un carácter, no dos. El
+ * contador de la configuración cuenta igual (#721). */
+export function countCharacters(text: string): number {
   return [...text].length;
 }
 
