@@ -38,6 +38,28 @@ export function renameFocusKey(positionId: string): string {
   return `${positionId}:rename`;
 }
 
+/** El idioma al que le falta el nombre, empezando por el de la pantalla, o
+ * `null` si tiene los dos. */
+export function missingNameLocale(
+  position: ClubPosition,
+  locale: Locale,
+): Locale | null {
+  const other = otherLocale(locale);
+  if (position.names[locale] === null) {
+    return locale;
+  }
+  return position.names[other] === null ? other : null;
+}
+
+export function describeMissingName(
+  translate: Translator,
+  missing: Locale,
+): string {
+  return translate("clubSettings.positions.missingName", {
+    language: translate(`clubSettings.positions.language.${missing}`),
+  });
+}
+
 /** El nombre en el otro idioma ("ES · Portero"), o el aviso de que a uno le
  * falta. */
 function OtherLanguageNote({
@@ -61,12 +83,12 @@ function OtherLanguageNote({
       </span>
     );
   }
-  const missing = position.names[locale] === null ? locale : other;
   return (
     <span className="club-positions-note club-positions-note-missing">
-      {translate("clubSettings.positions.missingName", {
-        language: translate(`clubSettings.positions.language.${missing}`),
-      })}
+      {describeMissingName(
+        translate,
+        position.names[locale] === null ? locale : other,
+      )}
     </span>
   );
 }
@@ -94,7 +116,7 @@ function NamesCell({
   );
 }
 
-function ReorderHandle({
+export function ReorderHandle({
   translate,
   positionId,
   name,

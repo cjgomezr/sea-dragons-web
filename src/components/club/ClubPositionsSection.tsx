@@ -5,6 +5,7 @@ import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { X } from "@phosphor-icons/react/dist/ssr/X";
 import { useEffect, useId, useRef, useState } from "react";
 import { usePendingAction } from "@/components/groups/use-pending-action";
+import { useIsPhone } from "@/components/use-is-phone";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import {
   type ClubPosition,
@@ -38,6 +39,13 @@ import {
   type Direction,
 } from "./ClubPositionItems";
 import {
+  openSheetFocusKey,
+  PhoneAddPosition,
+  PhonePositionRow,
+  type PositionSheetChanges,
+  PositionSheet,
+} from "./ClubPositionsPhone";
+import {
   coverageFocusKey,
   describeCoverage,
   PositionCoverageControl,
@@ -61,6 +69,10 @@ import {
  * Nada cambia en la pantalla hasta que el servidor lo confirma: cada
  * respuesta trae el catálogo tal como quedó, y eso es lo que se pinta.
  * Entonces sale arriba a la derecha un aviso corto, además del anuncio.
+ *
+ * En el móvil (#724, RF-6) la tabla no cabe: cada activa es una fila que abre
+ * una hoja con sus nombres y su rol (`ClubPositionsPhone`). Lo que se manda y
+ * lo que se anuncia es lo mismo.
  */
 
 type LoadState = { readonly kind: "loading" } | ManagedPositionsRead;
@@ -90,6 +102,13 @@ const CREATE_ACTION = "create";
 const SAVED_NOTICE_MS = 2500;
 
 const EMPTY_NAMES: PositionNamesInput = { en: null, es: null };
+
+function haveSameNames(
+  position: ClubPosition,
+  names: PositionNamesInput,
+): boolean {
+  return position.names.en === names.en && position.names.es === names.es;
+}
 
 function activeOf(positions: ManagedPositions): ManagedPositions {
   return positions.filter((position) => !position.isArchived);
@@ -210,6 +229,8 @@ export function ClubPositionsSection({
   const [announcement, setAnnouncement] = useState("");
   const [notice, showNotice] = useSavedNotice();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const isPhone = useIsPhone();
   const { pending, run } = usePendingAction<string>();
   const sectionRef = useRef<HTMLElement>(null);
   const focusAfterUpdate = useRef<string | null>(null);
@@ -238,7 +259,7 @@ export function ClubPositionsSection({
         ?.querySelector<HTMLElement>(`[${FOCUS_KEY_ATTRIBUTE}="${key}"]`)
         ?.focus();
     }
-  }, [state, editingId, listFailure]);
+  }, [state, editingId, sheetId, listFailure]);
 
   const nameOf = (position: ClubPosition): string =>
     positionName(position.names, locale);
@@ -262,7 +283,9 @@ export function ClubPositionsSection({
       setState(result);
       setAnnouncement(done);
       showNotice(
-        translate("clubSettings.positions.savedNotice", { change: done }),
+        isPhone
+          ? translate("clubSettings.positions.phone.savedNotice")
+          : translate("clubSettings.positions.savedNotice", { change: done }),
       );
     }
     return result;
@@ -316,8 +339,11 @@ export function ClubPositionsSection({
     );
   }
 
-  function setArchived(position: ClubPosition, isArchived: boolean): void {
-    void runListAction({
+  function archiveAction(
+    position: ClubPosition,
+    isArchived: boolean,
+  ): PositionsAction {
+    return {
       key: `${position.id}:archive`,
       send: () => setManagedPositionArchived(position.id, isArchived),
       describeDone: () =>
@@ -327,7 +353,44 @@ export function ClubPositionsSection({
             : "clubSettings.positions.reactivated",
           { name: nameOf(position) },
         ),
-    });
+    };
+  }
+
+  function coverageAction(
+    position: ManagedPosition,
+    coverage: PositionCoverage | null,
+  ): PositionsAction {
+    return {
+      key: coverageFocusKey(position.id),
+      send: () => setManagedPositionCoverage(position.id, coverage),
+      describeDone: () =>
+        coverage === null
+          ? translate("clubSettings.positions.coverage.cleared", {
+              name: nameOf(position),
+            })
+          : translate("clubSettings.positions.coverage.saved", {
+              name: nameOf(position),
+              coverage: describeCoverage(translate, coverage),
+            }),
+    };
+  }
+
+  function renameAction(
+    position: ClubPosition,
+    names: PositionNamesInput,
+  ): PositionsAction {
+    return {
+      key: `${position.id}:rename`,
+      send: () => renameManagedPosition(position.id, names),
+      describeDone: () =>
+        translate("clubSettings.positions.renamed", {
+          name: positionName(names, locale),
+        }),
+    };
+  }
+
+  function setArchived(position: ClubPosition, isArchived: boolean): void {
+    void runListAction(archiveAction(position, isArchived));
   }
 
   function saveCoverage(
@@ -335,19 +398,7 @@ export function ClubPositionsSection({
     coverage: PositionCoverage | null,
   ): void {
     void runListAction(
-      {
-        key: coverageFocusKey(position.id),
-        send: () => setManagedPositionCoverage(position.id, coverage),
-        describeDone: () =>
-          coverage === null
-            ? translate("clubSettings.positions.coverage.cleared", {
-                name: nameOf(position),
-              })
-            : translate("clubSettings.positions.coverage.saved", {
-                name: nameOf(position),
-                coverage: describeCoverage(translate, coverage),
-              }),
-      },
+      coverageAction(position, coverage),
       coverageFocusKey(position.id),
     );
   }
@@ -361,18 +412,35 @@ export function ClubPositionsSection({
     position: ClubPosition,
     names: PositionNamesInput,
   ): Promise<PositionFormOutcome> {
-    const outcome = await runFormAction({
-      key: `${position.id}:rename`,
-      send: () => renameManagedPosition(position.id, names),
-      describeDone: () =>
-        translate("clubSettings.positions.renamed", {
-          name: positionName(names, locale),
-        }),
-    });
+    const outcome = await runFormAction(renameAction(position, names));
     if (outcome?.kind === "done") {
       closeEditor(position.id);
     }
     return outcome;
+  }
+
+  /** Lo que cambió en la hoja, uno detrás de otro: si el nombre falla, el rol
+   * no sale. Un reintento compara con lo ya guardado y sólo manda lo que
+   * falta. */
+  async function saveFromSheet(
+    position: ManagedPosition,
+    { names, coverage }: PositionSheetChanges,
+  ): Promise<PositionFormOutcome> {
+    if (!haveSameNames(position, names)) {
+      const renamed = await runFormAction(renameAction(position, names));
+      if (renamed?.kind !== "done") {
+        return renamed;
+      }
+    }
+    if (coverage !== position.coverage) {
+      return runFormAction(coverageAction(position, coverage));
+    }
+    return { kind: "done" };
+  }
+
+  function closeSheet(positionId: string): void {
+    focusAfterUpdate.current = openSheetFocusKey(positionId);
+    setSheetId(null);
   }
 
   function create(names: PositionNamesInput): Promise<PositionFormOutcome> {
@@ -527,16 +595,89 @@ export function ClubPositionsSection({
     );
   }
 
+  function renderPhoneActive(active: ManagedPositions): React.JSX.Element {
+    if (active.length === 0) {
+      return (
+        <p className="club-positions-empty club-positions-phone-card">
+          {translate("clubSettings.positions.active.empty")}
+        </p>
+      );
+    }
+    return (
+      <ol
+        className="club-positions-rows club-positions-phone-card"
+        aria-label={translate("clubSettings.positions.active.title")}
+      >
+        {active.map((position, index) => (
+          <PhonePositionRow
+            key={position.id}
+            translate={translate}
+            locale={locale}
+            position={position}
+            rank={index + 1}
+            total={active.length}
+            handleHintId={handleHintId}
+            onMove={(direction) => move(active, position, direction)}
+            onOpen={() => setSheetId(position.id)}
+          />
+        ))}
+      </ol>
+    );
+  }
+
+  /** Se busca entre todas: al archivarla desde la hoja, sigue abierta hasta
+   * que se cierra. */
+  function renderSheet(positions: ManagedPositions): React.JSX.Element | null {
+    const position = positions.find(({ id }) => id === sheetId);
+    if (position === undefined) {
+      return null;
+    }
+    return (
+      <PositionSheet
+        key={position.id}
+        translate={translate}
+        locale={locale}
+        position={position}
+        isBusy={isBusy}
+        onSave={(changes) => saveFromSheet(position, changes)}
+        onArchive={() => send(archiveAction(position, true))}
+        onReloadLatest={reload}
+        onClosed={() => closeSheet(position.id)}
+      />
+    );
+  }
+
+  function renderPhoneList(positions: ManagedPositions): React.JSX.Element {
+    return (
+      <>
+        {renderPhoneActive(activeOf(positions))}
+        <PhoneAddPosition
+          translate={translate}
+          locale={locale}
+          isBusy={isBusy}
+          onSubmit={create}
+        />
+        {renderSheet(positions)}
+      </>
+    );
+  }
+
+  function renderTable(positions: ManagedPositions): React.JSX.Element {
+    return (
+      <div className="club-positions-table-scroll">
+        <div className="club-positions-table">
+          <TableHead translate={translate} />
+          {renderActive(activeOf(positions))}
+          {renderAddRow()}
+        </div>
+      </div>
+    );
+  }
+
   function renderCatalog(positions: ManagedPositions): React.JSX.Element {
     return (
       <>
-        <div className="club-positions-table-scroll">
-          <div className="club-positions-table">
-            <TableHead translate={translate} />
-            {renderActive(activeOf(positions))}
-            {renderAddRow()}
-          </div>
-        </div>
+        {isPhone ? renderPhoneList(positions) : renderTable(positions)}
         <p className="visually-hidden" id={handleHintId}>
           {translate("clubSettings.positions.handle.hint")}
         </p>
@@ -567,7 +708,11 @@ export function ClubPositionsSection({
     >
       <h2 id={TITLE_ID}>{translate("clubSettings.positions.title")}</h2>
       <p className="auth-hint club-positions-lead">
-        {translate("clubSettings.positions.lead")}
+        {translate(
+          isPhone
+            ? "clubSettings.positions.phone.hint"
+            : "clubSettings.positions.lead",
+        )}
       </p>
       {state.kind === "loading" ? (
         <p className="admin-empty">

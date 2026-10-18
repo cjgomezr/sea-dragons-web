@@ -1952,6 +1952,14 @@ export const englishMessages = {
   "clubSettings.positions.coverage.saved": "{name} now counts as {coverage}",
   "clubSettings.positions.coverage.cleared":
     "{name} no longer counts as any role",
+  // El móvil (#724): la lista con su hoja de edición.
+  "clubSettings.positions.phone.hint": "Hold ⋮⋮ and drag to reorder",
+  "clubSettings.positions.phone.savedNotice": "✓ Saved",
+  "clubSettings.positions.phone.createPlaceholder": "New position",
+  "clubSettings.positions.sheet.close": "Close the sheet",
+  "clubSettings.positions.sheet.name.en": "English",
+  "clubSettings.positions.sheet.name.es": "Español",
+  "clubSettings.positions.sheet.save": "Save",
   "clubSettings.positions.retry": "Try again",
   "clubSettings.positions.reloadLatest": "Load the latest positions",
   "clubSettings.positions.issue.nameRequired":

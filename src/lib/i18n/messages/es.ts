@@ -1961,6 +1961,14 @@ export const spanishMessages: MessageCatalog = {
     "{name} ahora cuenta como {coverage}",
   "clubSettings.positions.coverage.cleared":
     "{name} ya no cuenta con ninguna función",
+  // El móvil (#724): la lista con su hoja de edición.
+  "clubSettings.positions.phone.hint": "Mantén ⋮⋮ y arrastra para reordenar",
+  "clubSettings.positions.phone.savedNotice": "✓ Guardado",
+  "clubSettings.positions.phone.createPlaceholder": "Nueva posición",
+  "clubSettings.positions.sheet.close": "Cerrar la hoja",
+  "clubSettings.positions.sheet.name.en": "Inglés",
+  "clubSettings.positions.sheet.name.es": "Español",
+  "clubSettings.positions.sheet.save": "Guardar",
   "clubSettings.positions.retry": "Volver a intentarlo",
   "clubSettings.positions.reloadLatest": "Cargar las últimas posiciones",
   "clubSettings.positions.issue.nameRequired":

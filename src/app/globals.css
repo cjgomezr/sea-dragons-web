@@ -6668,6 +6668,249 @@ a.auth-brand-header:focus-visible {
   box-shadow: var(--shadow);
 }
 
+/* Las posiciones en el móvil (#724, RF-6 del PRD de E26; docs/design/
+   design_handoff_club_settings, "08-mobile-positions" y "09-mobile-position-
+   sheet"). Las pinta otro componente, no una consulta de medios: sus clases
+   sólo salen por debajo de 768px. Una tarjeta con filas de 60px: el asa de
+   44px, el nombre con el rol debajo y la flecha. */
+.club-positions-phone-card {
+  margin: 0;
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.club-positions-phone-row {
+  display: flex;
+  align-items: center;
+  min-height: 60px;
+  padding-left: var(--space-1);
+}
+
+.club-positions-phone-row + .club-positions-phone-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.club-positions-phone-row .club-positions-handle {
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  font-size: 20px;
+}
+
+.club-positions-phone-open {
+  display: flex;
+  flex: 1;
+  gap: var(--space-2);
+  align-items: center;
+  align-self: stretch;
+  min-width: 0;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-1);
+  font-family: inherit;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.club-positions-phone-open:hover {
+  background: var(--color-hover);
+}
+
+.club-positions-phone-open:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
+.club-positions-phone-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.club-positions .club-positions-phone-row .club-positions-name {
+  font-size: 15px;
+}
+
+.club-positions-phone-caret {
+  flex: none;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+}
+
+/* "Nueva posición" con Añadir: un campo de 48px y su botón al lado. El aviso
+   de un nombre, debajo del campo. */
+.club-positions .club-positions-phone-add .club-positions-form {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.club-positions-phone-add .club-positions-names-cell {
+  flex: 1;
+}
+
+.club-positions-phone-add .club-positions-input,
+.club-positions-sheet .club-positions-input {
+  height: 48px;
+  padding: 0 var(--space-3);
+  font-size: 16px;
+  background: var(--color-background);
+}
+
+.club-positions-phone-add-button.auth-submit {
+  min-height: 48px;
+  padding: 0 var(--space-4);
+}
+
+/* Las archivadas en el móvil: filas de 56px con Reactivar de 44px. */
+.club-positions-phone-card
+  ~ .club-positions-archived
+  .club-positions-archived-row {
+  min-height: 56px;
+}
+
+.club-positions-phone-card
+  ~ .club-positions-archived
+  .club-positions-archived-row
+  .admin-secondary {
+  min-height: var(--touch-target-min);
+}
+
+.club-positions-phone-card
+  ~ .club-positions-archived
+  .club-positions-archived-toggle {
+  min-height: var(--touch-target-min);
+}
+
+/* La hoja de una posición: los dos nombres uno al lado del otro con su
+   etiqueta, el rol en 2×2 y, abajo, Archivar con borde y Guardar. La hoja
+   cuelga de la sección, así que gana a sus reglas de la tabla. */
+.club-positions .club-positions-sheet .club-positions-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.club-positions .club-positions-sheet .club-positions-fields {
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+}
+
+.club-positions-sheet .club-positions-name-field {
+  flex: 1 1 0;
+}
+
+.club-positions-name-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.club-positions-sheet-coverage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.club-positions-sheet-coverage legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+
+.club-positions-sheet-coverage-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+/* El radio no se ve, pero recibe el foco y las flechas; lo que se pinta es
+   el botón, como los segmentos del rol del directorio. */
+.club-positions-sheet-coverage-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.club-positions-sheet-coverage-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.club-positions-sheet-coverage-option:hover {
+  background: var(--color-hover);
+}
+
+.club-positions-sheet-coverage-option:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.club-positions-sheet-coverage-option:has(input:checked) {
+  background: var(--color-segment-selected);
+  border-color: var(--color-accent);
+}
+
+.club-positions-sheet-coverage:disabled .club-positions-sheet-coverage-option {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.club-positions-sheet-failure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.club-positions-sheet-failure .auth-error {
+  margin: 0;
+}
+
+.club-positions-sheet-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.club-positions-sheet-archive.auth-secondary {
+  display: inline-flex;
+  flex: none;
+  align-self: auto;
+  color: var(--color-text);
+  border-color: var(--color-border);
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 var(--space-4);
+}
+
+.club-positions-sheet-save.auth-submit {
+  flex: 1;
+  min-height: 48px;
+}
+
 .club-settings-brand {
   display: flex;
   flex-direction: column;

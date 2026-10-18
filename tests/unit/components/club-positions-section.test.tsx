@@ -1,4 +1,10 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClubPositionsSection } from "@/components/club/ClubPositionsSection";
@@ -829,5 +835,508 @@ describe("lo que pasa al guardar", () => {
     ).toBeDisabled();
     expect(coverageOf("Forward")).toBeDisabled();
     expect(requests).toHaveLength(1);
+  });
+});
+
+/* El móvil (#724, RF-6 del PRD de E26): por debajo de 768 px la tabla no
+   cabe. Cada activa es una fila con su asa y, al tocarla, una hoja inferior
+   con sus nombres, su rol, Archivar y Guardar. El ancho lo dice
+   `matchMedia`, que aquí se simula; cómo se ve lo prueba Playwright. */
+
+const PHONE_QUERY = "(width < 768px)";
+
+function stubPhoneScreen(): void {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === PHONE_QUERY,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }));
+}
+
+function phoneRow(name: string): HTMLElement {
+  return within(activeList()).getByRole("button", { name });
+}
+
+function sheet(name: string): HTMLElement {
+  return screen.getByRole("dialog", { name });
+}
+
+async function openSheet(name: string): Promise<HTMLElement> {
+  await userEvent.click(phoneRow(name));
+  return sheet(name);
+}
+
+function roleOption(dialog: HTMLElement, role: string): HTMLElement {
+  return within(
+    within(dialog).getByRole("group", { name: "Role in auto-balance" }),
+  ).getByRole("radio", { name: role });
+}
+
+async function saveSheet(dialog: HTMLElement): Promise<void> {
+  await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+}
+
+describe("en el móvil", () => {
+  beforeEach(() => {
+    stubPhoneScreen();
+  });
+
+  describe("la lista", () => {
+    it("indica cómo se reordena", async () => {
+      await renderSection();
+
+      expect(
+        screen.getByText("Hold ⋮⋮ and drag to reorder"),
+      ).toBeInTheDocument();
+    });
+
+    it("en español indica cómo se reordena", async () => {
+      await renderSection("es");
+
+      expect(
+        screen.getByText("Mantén ⋮⋮ y arrastra para reordenar"),
+      ).toBeInTheDocument();
+    });
+
+    it("pinta una fila por activa, en su orden, con su asa", async () => {
+      await renderSection();
+
+      expect(activeNames()).toEqual(["Goalkeeper", "Defender", "Forward"]);
+      expect(phoneRow("Defender")).toBeInTheDocument();
+    });
+
+    it("debajo del nombre dice el rol", async () => {
+      await renderSection();
+
+      expect(phoneRow("Defender")).toHaveAccessibleDescription("Defender");
+    });
+
+    it("dice también el nombre que falta y el rol vacío", async () => {
+      catalog = [GOALKEEPER, { ...UTILITY, isArchived: false }];
+
+      await renderSection();
+
+      expect(phoneRow("Utility")).toHaveAccessibleDescription(
+        "No role · No Spanish name",
+      );
+    });
+
+    it("no pinta los controles de la tabla de escritorio", async () => {
+      await renderSection();
+
+      expect(screen.queryByRole("combobox", { name: /^Role of / })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Rename / })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Archive / })).toBeNull();
+    });
+
+    it("el asa reordena con ↑ como en escritorio", async () => {
+      await renderSection();
+
+      handleOf("Forward").focus();
+      await userEvent.keyboard("{ArrowUp}");
+
+      await vi.waitFor(() =>
+        expect(activeNames()).toEqual(["Goalkeeper", "Forward", "Defender"]),
+      );
+      expect(requests[0]?.body).toEqual({
+        positionIds: [GOALKEEPER.id, FORWARD.id, DEFENDER.id],
+      });
+      expect(handleOf("Forward")).toHaveFocus();
+    });
+
+    it("el asa reordena con ↓ como en escritorio", async () => {
+      await renderSection();
+
+      handleOf("Goalkeeper").focus();
+      await userEvent.keyboard("{ArrowDown}");
+
+      await vi.waitFor(() =>
+        expect(activeNames()).toEqual(["Defender", "Goalkeeper", "Forward"]),
+      );
+    });
+  });
+
+  describe("debajo de la lista", () => {
+    it("el campo Nueva posición añade con un solo nombre en el idioma de la pantalla", async () => {
+      await renderSection();
+
+      const form = createForm();
+      const field = within(form).getByRole("textbox");
+      expect(field).toHaveAttribute("placeholder", "New position");
+      await userEvent.type(field, "Centre");
+      await userEvent.click(within(form).getByRole("button", { name: "Add" }));
+
+      await vi.waitFor(() => expect(activeNames()).toContain("Centre"));
+      expect(requests).toEqual([
+        {
+          method: "POST",
+          url: POSITIONS_PATH,
+          body: { names: { en: "Centre", es: null } },
+        },
+      ]);
+    });
+
+    it("en español el nombre nuevo es el español", async () => {
+      await renderSection("es");
+
+      const form = screen.getByRole("form", { name: "Añadir una posición" });
+      await userEvent.type(within(form).getByRole("textbox"), "Centro");
+      await userEvent.click(
+        within(form).getByRole("button", { name: "Añadir" }),
+      );
+
+      await vi.waitFor(() => expect(requests).toHaveLength(1));
+      expect(requests[0]?.body).toEqual({ names: { en: null, es: "Centro" } });
+    });
+
+    it("las archivadas van plegadas y se reactivan", async () => {
+      await renderSection();
+
+      const list = await openArchived();
+      await userEvent.click(
+        within(list).getByRole("button", { name: "Reactivate Utility" }),
+      );
+
+      await vi.waitFor(() => expect(activeNames()).toContain("Utility"));
+    });
+  });
+
+  describe("la hoja de una posición", () => {
+    it("tocar la fila abre la hoja con sus nombres y su rol", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+
+      expect(
+        within(dialog).getByRole("heading", { name: "Forward" }),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByLabelText("English")).toHaveValue("Forward");
+      expect(within(dialog).getByLabelText("Español")).toHaveValue("Ataque");
+      expect(roleOption(dialog, "Forward")).toBeChecked();
+      expect(
+        within(
+          within(dialog).getByRole("group", { name: "Role in auto-balance" }),
+        )
+          .getAllByRole("radio")
+          .map((radio) => radio.closest("label")?.textContent),
+      ).toEqual(["No role", "Goalkeeper", "Defender", "Forward"]);
+      expect(
+        within(dialog).getByRole("button", { name: "Archive" }),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByRole("button", { name: "Save" }),
+      ).toBeInTheDocument();
+    });
+
+    it("en español los campos son Inglés y Español", async () => {
+      await renderSection("es");
+
+      await userEvent.click(
+        within(
+          screen.getByRole("list", { name: "Posiciones activas" }),
+        ).getByRole("button", { name: "Ataque" }),
+      );
+      const dialog = sheet("Ataque");
+
+      expect(within(dialog).getByLabelText("Inglés")).toHaveValue("Forward");
+      expect(within(dialog).getByLabelText("Español")).toHaveValue("Ataque");
+    });
+
+    it("tocar el asa no abre la hoja", async () => {
+      await renderSection();
+
+      await userEvent.click(handleOf("Forward"));
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("guarda el nombre cambiado, cierra y devuelve el foco a la fila", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+      await userEvent.clear(within(dialog).getByLabelText("English"));
+      await userEvent.type(within(dialog).getByLabelText("English"), "Striker");
+      await saveSheet(dialog);
+
+      await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(requests).toEqual([
+        {
+          method: "PATCH",
+          url: `${POSITIONS_PATH}/${FORWARD.id}`,
+          body: { names: { en: "Striker", es: "Ataque" } },
+        },
+      ]);
+      expect(phoneRow("Striker")).toHaveFocus();
+      expect(screen.getByText("✓ Saved")).toBeInTheDocument();
+    });
+
+    it("en español el aviso dice guardado", async () => {
+      await renderSection("es");
+
+      await userEvent.click(
+        within(
+          screen.getByRole("list", { name: "Posiciones activas" }),
+        ).getByRole("button", { name: "Ataque" }),
+      );
+      const dialog = sheet("Ataque");
+      await userEvent.click(
+        within(
+          within(dialog).getByRole("group", { name: "Rol en el reparto" }),
+        ).getByRole("radio", { name: "Defensa" }),
+      );
+      await userEvent.click(
+        within(dialog).getByRole("button", { name: "Guardar" }),
+      );
+
+      expect(await screen.findByText("✓ Guardado")).toBeInTheDocument();
+    });
+
+    it("guarda el rol cambiado", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+      await userEvent.click(roleOption(dialog, "Defender"));
+      await saveSheet(dialog);
+
+      await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(requests).toEqual([
+        {
+          method: "PATCH",
+          url: `${POSITIONS_PATH}/${FORWARD.id}`,
+          body: { coverage: "defender" },
+        },
+      ]);
+      expect(phoneRow("Forward")).toHaveAccessibleDescription("Defender");
+      expect(phoneRow("Forward")).toHaveFocus();
+    });
+
+    it("le quita el rol con Sin rol", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+      await userEvent.click(roleOption(dialog, "No role"));
+      await saveSheet(dialog);
+
+      await vi.waitFor(() => expect(requests).toHaveLength(1));
+      expect(requests[0]?.body).toEqual({ coverage: null });
+    });
+
+    it("guarda el nombre y el rol cuando cambiaron los dos", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+      await userEvent.type(within(dialog).getByLabelText("English"), "s");
+      await userEvent.click(roleOption(dialog, "Goalkeeper"));
+      await saveSheet(dialog);
+
+      await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(requests.map((request) => request.body)).toEqual([
+        { names: { en: "Forwards", es: "Ataque" } },
+        { coverage: "goalkeeper" },
+      ]);
+      expect(phoneRow("Forwards")).toHaveAccessibleDescription("Goalkeeper");
+    });
+
+    it("sin cambios, Guardar cierra la hoja sin mandar nada", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+      await saveSheet(dialog);
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(requests).toEqual([]);
+      expect(phoneRow("Forward")).toHaveFocus();
+    });
+
+    it("con un nombre inválido enseña el aviso en la hoja y no la cierra", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+      await userEvent.clear(within(dialog).getByLabelText("English"));
+      await userEvent.clear(within(dialog).getByLabelText("Español"));
+      await saveSheet(dialog);
+
+      expect(
+        within(dialog).getByLabelText("English"),
+      ).toHaveAccessibleDescription(
+        expect.stringContaining("at least one language"),
+      );
+      expect(sheet("Forward")).toBe(dialog);
+      expect(requests).toEqual([]);
+    });
+
+    it("enseña en la hoja el nombre repetido que rechaza el servidor", async () => {
+      await renderSection();
+      nextWriteResponse = () =>
+        errorResponse(400, "validation_error", "name_en_taken");
+
+      const dialog = await openSheet("Forward");
+      await userEvent.clear(within(dialog).getByLabelText("English"));
+      await userEvent.type(
+        within(dialog).getByLabelText("English"),
+        "Defender",
+      );
+      await saveSheet(dialog);
+
+      await vi.waitFor(() =>
+        expect(
+          within(dialog).getByLabelText("English"),
+        ).toHaveAccessibleDescription(
+          expect.stringContaining("Another position already has this name"),
+        ),
+      );
+      expect(sheet("Forward")).toBe(dialog);
+    });
+
+    it("Archivar archiva, cierra la hoja y la pasa a las archivadas", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Defender");
+      await userEvent.click(
+        within(dialog).getByRole("button", { name: "Archive" }),
+      );
+
+      await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(requests).toEqual([
+        {
+          method: "PATCH",
+          url: `${POSITIONS_PATH}/${DEFENDER.id}`,
+          body: { isArchived: true },
+        },
+      ]);
+      expect(activeNames()).toEqual(["Goalkeeper", "Forward"]);
+      expect(archivedNames(await openArchived())).toEqual([
+        "Defender",
+        "Utility",
+      ]);
+    });
+
+    it("Escape la cierra sin cambiar nada y devuelve el foco a la fila", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+      await userEvent.type(within(dialog).getByLabelText("English"), "s");
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(requests).toEqual([]);
+      expect(activeNames()).toEqual(["Goalkeeper", "Defender", "Forward"]);
+      expect(phoneRow("Forward")).toHaveFocus();
+    });
+
+    it("un toque fuera la cierra sin cambiar nada y devuelve el foco a la fila", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+      await userEvent.click(roleOption(dialog, "Goalkeeper"));
+      fireEvent.mouseDown(document.body);
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(requests).toEqual([]);
+      expect(phoneRow("Forward")).toHaveFocus();
+    });
+
+    it("arrastrarla hacia abajo la cierra sin cambiar nada", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+      const grip = within(dialog).getByRole("button", {
+        name: "Close the sheet",
+      });
+      fireEvent.pointerDown(grip, { clientX: 180, clientY: 400, pointerId: 1 });
+      fireEvent.pointerMove(grip, { clientX: 182, clientY: 520, pointerId: 1 });
+      fireEvent.pointerUp(grip, { clientX: 182, clientY: 520, pointerId: 1 });
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(requests).toEqual([]);
+      expect(phoneRow("Forward")).toHaveFocus();
+    });
+
+    it("al reabrirla tras cerrarla sin guardar, empieza por lo guardado", async () => {
+      await renderSection();
+
+      const first = await openSheet("Forward");
+      await userEvent.type(within(first).getByLabelText("English"), "s");
+      await userEvent.keyboard("{Escape}");
+      const dialog = await openSheet("Forward");
+
+      expect(within(dialog).getByLabelText("English")).toHaveValue("Forward");
+    });
+
+    it("un fallo de red al guardar sale en la hoja y la deja abierta", async () => {
+      await renderSection();
+      nextWriteResponse = networkFailure;
+
+      const dialog = await openSheet("Forward");
+      await userEvent.click(roleOption(dialog, "Defender"));
+      await saveSheet(dialog);
+
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+        /couldn't reach the server/i,
+      );
+      expect(sheet("Forward")).toBe(dialog);
+      expect(roleOption(dialog, "Defender")).toBeChecked();
+    });
+
+    it("un fallo de red al archivar sale en la hoja y la deja abierta", async () => {
+      await renderSection();
+      nextWriteResponse = networkFailure;
+
+      const dialog = await openSheet("Forward");
+      await userEvent.click(
+        within(dialog).getByRole("button", { name: "Archive" }),
+      );
+
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+        /couldn't reach the server/i,
+      );
+      expect(sheet("Forward")).toBe(dialog);
+      expect(activeNames()).toEqual(["Goalkeeper", "Defender", "Forward"]);
+    });
+
+    it("si otro Admin cambió las posiciones, ofrece cargar las últimas", async () => {
+      await renderSection();
+      nextWriteResponse = () =>
+        errorResponse(409, "conflict", "club_positions_changed");
+
+      const dialog = await openSheet("Forward");
+      await userEvent.click(roleOption(dialog, "Defender"));
+      await saveSheet(dialog);
+
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+        /another admin changed the positions/i,
+      );
+      catalog = [FORWARD, GOALKEEPER, DEFENDER, UTILITY];
+      await userEvent.click(
+        within(dialog).getByRole("button", {
+          name: "Load the latest positions",
+        }),
+      );
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      await vi.waitFor(() =>
+        expect(activeNames()).toEqual(["Forward", "Goalkeeper", "Defender"]),
+      );
+    });
+
+    it("con el guardado esperando al servidor, sus botones esperan", async () => {
+      await renderSection();
+      nextWriteResponse = neverAnswers;
+
+      const dialog = await openSheet("Forward");
+      await userEvent.click(roleOption(dialog, "Defender"));
+      await saveSheet(dialog);
+
+      expect(
+        within(dialog).getByRole("button", { name: "Save" }),
+      ).toBeDisabled();
+      expect(
+        within(dialog).getByRole("button", { name: "Archive" }),
+      ).toBeDisabled();
+      expect(roleOption(dialog, "Goalkeeper")).toBeDisabled();
+    });
   });
 });

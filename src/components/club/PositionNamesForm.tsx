@@ -28,6 +28,10 @@ import {
  *
  * Un fallo que no es de un campo, como uno de red, se queda aquí con todo lo
  * escrito: reintentar es volver a pulsar el botón.
+ *
+ * En el móvil (#724) es también el de la hoja de una posición, con las
+ * etiquetas a la vista, y el de añadir, con un solo campo: el del idioma de
+ * la pantalla.
  */
 
 /** Qué pasó con lo que se mandó. `done` vacía el formulario (al crear) o lo
@@ -63,10 +67,12 @@ function hasAnyName(draft: Draft): boolean {
   return LOCALES.some((locale) => draft[locale].trim() !== "");
 }
 
-/** Un nombre de 32 px: la etiqueta no cabe en la fila y se lee, no se ve. */
+/** En la fila de la tabla la etiqueta no cabe y se lee, no se ve; en la hoja
+ * del móvil se ve. */
 function NameField({
   id,
   label,
+  isLabelVisible,
   placeholder,
   value,
   issueText,
@@ -74,6 +80,7 @@ function NameField({
 }: {
   id: string;
   label: string;
+  isLabelVisible: boolean;
   placeholder: string;
   value: string;
   issueText: string | null;
@@ -82,7 +89,12 @@ function NameField({
   const issueId = `${id}-aviso`;
   return (
     <div className="club-positions-name-field">
-      <label className="visually-hidden" htmlFor={id}>
+      <label
+        className={
+          isLabelVisible ? "club-positions-name-label" : "visually-hidden"
+        }
+        htmlFor={id}
+      >
         {label}
       </label>
       <input
@@ -112,6 +124,8 @@ export function PositionNamesForm({
   initialNames,
   isDisabled,
   shouldFocusOnOpen = false,
+  locales = LOCALES,
+  visibleLabels,
   onSubmit,
   children,
 }: {
@@ -124,6 +138,10 @@ export function PositionNamesForm({
   isDisabled: boolean;
   /** Al abrir el de renombrar, el foco va al primer campo. */
   shouldFocusOnOpen?: boolean;
+  /** Los idiomas que tienen campo; el de un idioma sin campo viaja vacío. */
+  locales?: readonly [Locale, ...Locale[]];
+  /** Con ellas, las etiquetas se ven, y son estas en vez de las de siempre. */
+  visibleLabels?: Readonly<Record<Locale, string>>;
   onSubmit: (names: PositionNamesInput) => Promise<PositionFormOutcome>;
   /** Las celdas que siguen a los nombres; saben si hay alguno escrito. */
   children: (hasName: boolean) => React.ReactNode;
@@ -169,8 +187,12 @@ export function PositionNamesForm({
     setFailure(code === null ? outcome : null);
   }
 
+  /** Si el campo de un aviso no está, el aviso va en el primero que hay. */
+  const fieldOfIssue = (code: PositionIssueCode): Locale =>
+    locales.includes(FIELD_OF_ISSUE[code]) ? FIELD_OF_ISSUE[code] : locales[0];
+
   const issueTextFor = (locale: Locale): string | null =>
-    issueCode !== null && FIELD_OF_ISSUE[issueCode] === locale
+    issueCode !== null && fieldOfIssue(issueCode) === locale
       ? describePositionIssue(translate, issueCode)
       : null;
 
@@ -184,11 +206,15 @@ export function PositionNamesForm({
     >
       <div className="club-positions-cell club-positions-names-cell">
         <fieldset className="club-positions-fields" disabled={isDisabled}>
-          {LOCALES.map((locale) => (
+          {locales.map((locale) => (
             <NameField
               key={locale}
               id={`${idPrefix}-${locale}`}
-              label={translate(`clubSettings.positions.name.${locale}`)}
+              label={
+                visibleLabels?.[locale] ??
+                translate(`clubSettings.positions.name.${locale}`)
+              }
+              isLabelVisible={visibleLabels !== undefined}
               placeholder={placeholders[locale]}
               value={draft[locale]}
               issueText={issueTextFor(locale)}
