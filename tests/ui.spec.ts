@@ -15833,6 +15833,115 @@ for (const state of AGENDA_REDESIGN_STATES) {
   });
 }
 
+// Voy, Quizás y No puedo en la fila de escritorio (#731): responder desde la
+// fila sin elegirla. Toda respuesta recibe el 422 de evento empezado, así que
+// el aviso sale bajo los botones de la fila. El móvil no tiene esos botones:
+// sólo 768 y 1440.
+async function showRowRsvpError(page: Page): Promise<void> {
+  await waitForRedesignedAgenda(page);
+  const row = agendaRow(page, AGENDA_REDESIGN_EVENTS[2].title);
+  await row
+    .getByRole("group")
+    .getByRole("button", { name: /^(Can't go|No puedo)$/ })
+    .click();
+  await expect(row.getByRole("alert")).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+const ROW_RSVP_ERROR_STATE: CalendarState = {
+  name: "calendario-fila-rsvp-error",
+  events: AGENDA_REDESIGN_EVENTS,
+  beforeVisit: fixAgendaClock,
+  ready: showRowRsvpError,
+};
+
+test.describe(ROW_RSVP_ERROR_STATE.name, () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const vp of AGENDA_REDESIGN_VIEWPORTS) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToCalendar(page, ROW_RSVP_ERROR_STATE, theme);
+          const snapshot = `${ROW_RSVP_ERROR_STATE.name}-${vp.name}-${theme}.png`;
+          await createMissingLocalBaseline(snapshot, () =>
+            page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+          );
+          await expect(page).toHaveScreenshot(snapshot, {
+            ...SCREENSHOT_OPTIONS,
+            fullPage: true,
+            maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          });
+        });
+
+        test(`has no accessibility violations (axe-core, ${theme})`, async ({
+          page,
+        }) => {
+          await goToCalendar(page, ROW_RSVP_ERROR_STATE, theme);
+          await expectNoAxeViolations(page);
+        });
+      }
+    });
+  }
+
+  test("has no horizontal scroll at 768px", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 812 });
+    await goToCalendar(page, ROW_RSVP_ERROR_STATE);
+    expect(await hasHorizontalScroll(page)).toBe(false);
+  });
+});
+
+// Un título tres veces más largo de lo normal a 768 (#731): se corta con
+// puntos suspensivos antes de empujar los botones fuera de la fila.
+const LONG_TITLE_EVENT = {
+  ...AGENDA_REDESIGN_EVENTS[2],
+  title:
+    "Inter-club scrimmage and skills clinic with the Geelong Krakens and the Ballarat Barracudas",
+} as const;
+
+test.describe("calendario-fila-rsvp-titulo-largo", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("corta el título y deja los botones a la vista a 768px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 768, height: 812 });
+    await goToCalendar(page, {
+      name: "calendario-fila-rsvp-titulo-largo",
+      events: [AGENDA_REDESIGN_EVENTS[0], LONG_TITLE_EVENT],
+      beforeVisit: fixAgendaClock,
+      ready: waitForAgendaRowsOf(LONG_TITLE_EVENT.title),
+    });
+
+    expect(await hasHorizontalScroll(page)).toBe(false);
+    const row = agendaRow(page, LONG_TITLE_EVENT.title);
+    const title = row.locator(".agenda-title-text");
+    expect(
+      await title.evaluate(
+        (element) => element.scrollWidth > element.clientWidth,
+      ),
+    ).toBe(true);
+    const going = row
+      .getByRole("group")
+      .getByRole("button", { name: /^(Can't go|No puedo)$/ });
+    await expect(going).toBeInViewport({ ratio: 1 });
+  });
+});
+
+function waitForAgendaRowsOf(title: string): (page: Page) => Promise<void> {
+  return async (page) => {
+    await expect(
+      page.getByRole("heading", { level: 3, name: title }),
+    ).toBeVisible();
+  };
+}
+
 // El mapa de la tarjeta del lugar (#658, RF-15 y D3 del PRD de E24; la zona
 // "MAP PREVIEW" de calendar-redesign-agenda-dark.png). El panel de la cena
 // del club, que tiene coordenadas, a 1440 y a 375.

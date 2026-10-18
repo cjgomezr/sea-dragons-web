@@ -2574,10 +2574,7 @@ describe("fila de la agenda", () => {
     const row = await findRow(WITH_END_AND_COVER.title);
     expect(within(row).getByText("19:00")).toBeInTheDocument();
     expect(within(row).getByText("20:30")).toBeInTheDocument();
-    expect(rsvpButton(row, "No puedo")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(rsvpButton(row, "No puedo")).toHaveAttribute("aria-pressed", "true");
     expect(within(row).getByText("Se repite")).toBeInTheDocument();
     expect(
       within(row).getByRole("link", {
