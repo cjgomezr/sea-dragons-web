@@ -9911,7 +9911,9 @@ type ClubSettingsState = {
   readonly tab?: ClubSettingsSection;
   /** Sin ellos, los tres. */
   readonly viewports?: readonly (typeof viewports)[number][];
-  /** Lo último antes de la captura, que no hace falta para axe. */
+  /** Lo último antes de la captura, que no hace falta para axe. Lo fijo
+   * abajo pide `fitViewportToPage`: si la página no cabe, la captura entera
+   * lo deja a media página. */
   readonly beforeCapture?: (page: Page) => Promise<void>;
 };
 
@@ -9999,6 +10001,7 @@ const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
     name: "club-cambios-sin-guardar",
     tab: "packs",
     prepare: removeLargestSessionPack,
+    beforeCapture: fitViewportToPage,
   },
   {
     name: "club-guardado",
@@ -10006,7 +10009,10 @@ const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
     viewports: viewports.filter((vp) => vp.name === "desktop"),
     beforeVisit: (page) => page.clock.install(),
     prepare: saveAndExpectSavedNotice,
-    beforeCapture: pauseClock,
+    beforeCapture: async (page) => {
+      await pauseClock(page);
+      await fitViewportToPage(page);
+    },
   },
 ];
 
