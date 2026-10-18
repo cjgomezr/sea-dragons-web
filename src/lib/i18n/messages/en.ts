@@ -1849,6 +1849,8 @@ export const englishMessages = {
   "clubSettings.signInTexts.otherLanguage.own": "{language} has its own text.",
   "clubSettings.signInTexts.otherLanguage.app":
     "{language} uses the app's text.",
+  "clubSettings.signInTexts.otherLanguage.tooLong":
+    "{language} has a text over the limit.",
   "clubSettings.signInTexts.preview": "Sign-in page · {code}",
   "clubSettings.signInTexts.issue.taglineTooLong":
     "The headline can have at most {max} characters.",

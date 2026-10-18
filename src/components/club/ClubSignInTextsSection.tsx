@@ -176,19 +176,38 @@ function languageOptions(translate: Translator): SegmentedOption<Locale>[] {
   }));
 }
 
-/** "Español tiene su propio texto.": lo que no se ve del otro idioma. */
-function OtherLanguageNote({
-  translate,
-  draft,
-  language,
-}: {
-  translate: Translator;
-  draft: Draft;
-  language: Locale;
-}): React.JSX.Element {
+function otherLanguageOf(language: Locale): Locale {
   const other = SUPPORTED_LOCALES.find((locale) => locale !== language);
   if (other === undefined) {
     throw new Error("La aplicación habla un solo idioma.");
+  }
+  return other;
+}
+
+/** "Español tiene su propio texto.": lo que no se ve del otro idioma. Si
+ * allí hay un campo por encima del límite, se avisa: es lo que impide
+ * guardar, y su aviso no está a la vista. */
+function OtherLanguageNote({
+  translate,
+  draft,
+  other,
+  hasIssue,
+}: {
+  translate: Translator;
+  draft: Draft;
+  other: Locale;
+  hasIssue: boolean;
+}): React.JSX.Element {
+  const language = translate(`clubSettings.signInTexts.language.${other}`);
+  if (hasIssue) {
+    return (
+      <p className="club-sign-in-other-language auth-field-error" role="alert">
+        <Icon glyph={Translate} />
+        {translate("clubSettings.signInTexts.otherLanguage.tooLong", {
+          language,
+        })}
+      </p>
+    );
   }
   const hasOwnText = SIGN_IN_TEXT_KINDS.some(
     (kind) => draft[other][kind].trim() !== "",
@@ -200,7 +219,7 @@ function OtherLanguageNote({
         hasOwnText
           ? "clubSettings.signInTexts.otherLanguage.own"
           : "clubSettings.signInTexts.otherLanguage.app",
-        { language: translate(`clubSettings.signInTexts.language.${other}`) },
+        { language },
       )}
     </p>
   );
@@ -310,6 +329,7 @@ function SignInTextsForm({
   const isInvalid = (field: SignInTextField): boolean =>
     localIssues.some((issue) => isSameField(issue, field)) ||
     (serverIssue !== null && isSameField(serverIssue, field));
+  const other = otherLanguageOf(language);
   const isSending = status.kind === "sending";
   const update = (field: SignInTextField, text: string): void =>
     texts.change((current) => ({
@@ -353,7 +373,10 @@ function SignInTextsForm({
           <OtherLanguageNote
             translate={translate}
             draft={draft}
-            language={language}
+            other={other}
+            hasIssue={SIGN_IN_TEXT_KINDS.some((kind) =>
+              isInvalid({ locale: other, kind }),
+            )}
           />
           <SaveFailure translate={translate} status={status} />
         </div>

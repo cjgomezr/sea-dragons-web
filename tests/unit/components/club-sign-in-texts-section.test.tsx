@@ -337,6 +337,37 @@ describe("textos del inicio de sesión en la configuración", () => {
     expect(saveButton()).toBeDisabled();
   });
 
+  it("avisa de que el idioma oculto se pasa del límite", async () => {
+    await renderSection();
+    await userEvent.click(field("Headline"));
+    await userEvent.paste("a".repeat(141));
+
+    await chooseLanguage("Spanish");
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "English has a text over the limit.",
+    );
+  });
+
+  it("avisa del límite que rechazó el servidor en el idioma oculto", async () => {
+    nextPutResponse = () =>
+      jsonResponse(400, {
+        error: {
+          code: "validation_error",
+          message: "x",
+          reason: "es.welcome_too_long",
+        },
+      });
+    await renderSection();
+
+    await write("Headline", "Dive in.");
+    await save();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Spanish has a text over the limit.",
+    );
+  });
+
   it("pone junto a su campo el límite que rechazó el servidor", async () => {
     nextPutResponse = () =>
       jsonResponse(400, {

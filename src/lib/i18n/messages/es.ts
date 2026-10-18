@@ -1854,6 +1854,8 @@ export const spanishMessages: MessageCatalog = {
     "{language} tiene su propio texto.",
   "clubSettings.signInTexts.otherLanguage.app":
     "{language} usa el texto de la app.",
+  "clubSettings.signInTexts.otherLanguage.tooLong":
+    "{language} tiene un texto por encima del límite.",
   "clubSettings.signInTexts.preview": "Página de inicio de sesión · {code}",
   "clubSettings.signInTexts.issue.taglineTooLong":
     "El titular puede tener como mucho {max} caracteres.",
