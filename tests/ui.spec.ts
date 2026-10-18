@@ -9650,7 +9650,9 @@ type StubbedPosition = {
   readonly coverage: "goalkeeper" | "defender" | "forward" | null;
 };
 
-type PositionCreate = "hangs" | "rejects_name_taken";
+/** Lo que responde el endpoint fingido a cualquier escritura: crear, y
+ * desde #724 también guardar desde la hoja del móvil. */
+type PositionCreate = "hangs" | "rejects_name_taken" | "rejects_as_conflict";
 
 const STUBBED_ACTIVE_POSITIONS: readonly StubbedPosition[] = [
   {
@@ -9701,6 +9703,13 @@ const REJECTED_POSITION_NAME = {
   reason: "name_es_taken",
 } as const;
 
+/** Otro Admin cambió las posiciones mientras tanto (#724). */
+const POSITIONS_CHANGED = {
+  code: "conflict",
+  message: "Las posiciones cambiaron.",
+  reason: "club_positions_changed",
+} as const;
+
 async function stubClubPositions(
   page: Page,
   stub: {
@@ -9724,6 +9733,13 @@ async function stubClubPositions(
           status: 400,
           contentType: "application/json",
           body: JSON.stringify({ error: REJECTED_POSITION_NAME }),
+        });
+      }
+      if (stub.create === "rejects_as_conflict") {
+        await route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ error: POSITIONS_CHANGED }),
         });
       }
       // "hangs": sin respuesta, la sección se queda guardando.
@@ -10477,15 +10493,32 @@ test.describe("la lista de la configuración en el móvil", () => {
   });
 });
 
+/* La tabla es de 768px para arriba; por debajo, la lista del móvil (#724),
+   con sus propios estados. Las archivadas se ven igual en los tres. */
+const TABLE_VIEWPORTS = viewports.filter((vp) => vp.name !== "mobile");
+const PHONE_VIEWPORTS = viewports.filter((vp) => vp.name === "mobile");
+
 const CLUB_POSITIONS_STATES = inClubSection("positions", [
-  { name: "club-posiciones" },
-  { name: "club-posiciones-es", beforeVisit: chooseSpanish },
+  { name: "club-posiciones", viewports: TABLE_VIEWPORTS },
+  {
+    name: "club-posiciones-es",
+    viewports: TABLE_VIEWPORTS,
+    beforeVisit: chooseSpanish,
+  },
+  { name: "club-posiciones-movil", viewports: PHONE_VIEWPORTS },
+  {
+    name: "club-posiciones-movil-es",
+    viewports: PHONE_VIEWPORTS,
+    beforeVisit: chooseSpanish,
+  },
   {
     name: "club-posiciones-renombrando",
+    viewports: TABLE_VIEWPORTS,
     prepare: openPositionRename("Rename Defender"),
   },
   {
     name: "club-posiciones-renombrando-es",
+    viewports: TABLE_VIEWPORTS,
     beforeVisit: chooseSpanish,
     prepare: openPositionRename("Renombrar Defensa"),
   },
@@ -10502,6 +10535,7 @@ const CLUB_POSITIONS_STATES = inClubSection("positions", [
   },
   {
     name: "club-posiciones-nombre-repetido",
+    viewports: TABLE_VIEWPORTS,
     createPosition: "rejects_name_taken",
     prepare: addPositionWithTakenName({
       english: "Name in English",
@@ -10512,6 +10546,7 @@ const CLUB_POSITIONS_STATES = inClubSection("positions", [
   },
   {
     name: "club-posiciones-nombre-repetido-es",
+    viewports: TABLE_VIEWPORTS,
     createPosition: "rejects_name_taken",
     beforeVisit: chooseSpanish,
     prepare: addPositionWithTakenName({
@@ -10536,7 +10571,7 @@ for (const state of CLUB_POSITIONS_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of state.viewports ?? viewports) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -10581,6 +10616,85 @@ for (const state of CLUB_POSITIONS_STATES) {
       ).toBeVisible();
       await expectNoAxeViolations(page);
     });
+  });
+}
+
+/* La hoja de una posición en el móvil (#724, 09-mobile-position-sheet.png
+   del handoff de E26). Es un `<dialog>` modal sobre la lista oscurecida: se
+   fotografía la pantalla, no la sección, porque la hoja no cabe en la caja
+   de la sección. */
+function positionSheet(page: Page): Locator {
+  return page.getByRole("dialog", { name: "Forward" });
+}
+
+async function openForwardSheet(page: Page): Promise<void> {
+  await positionsSection(page)
+    .getByRole("button", { name: "Forward", exact: true })
+    .click();
+  await expect(positionSheet(page)).toBeVisible();
+}
+
+/** Cambia el rol y guarda: el servidor fingido dice que otro Admin cambió
+ * las posiciones, y la hoja lo enseña sin cerrarse. */
+async function saveForwardSheetAgainstConflict(page: Page): Promise<void> {
+  await openForwardSheet(page);
+  const sheet = positionSheet(page);
+  await sheet.locator("label", { hasText: /^Defender$/ }).click();
+  await sheet.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(
+    sheet.getByRole("button", { name: "Load the latest positions" }),
+  ).toBeVisible();
+}
+
+const CLUB_POSITION_SHEET_STATES = inClubSection("positions", [
+  { name: "club-posiciones-hoja", prepare: openForwardSheet },
+  {
+    name: "club-posiciones-hoja-error",
+    createPosition: "rejects_as_conflict",
+    prepare: saveForwardSheetAgainstConflict,
+  },
+]);
+
+for (const state of CLUB_POSITION_SHEET_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of PHONE_VIEWPORTS) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToClubSettings(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot(SCREENSHOT_OPTIONS),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToClubSettings(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+
+        test("has no accessibility violations (axe-core)", async ({ page }) => {
+          await goToClubSettings(page, state);
+          await expectNoAxeViolations(page);
+        });
+      });
+    }
   });
 }
 
