@@ -11403,9 +11403,9 @@ const FIXTURES_DIR = path.join(__dirname, "support", "fixtures");
  * `.club-logo` le da a un logo apaisado. */
 const LOGO_BOX_HEIGHT_PX = 32;
 const LOGO_BOX_MAX_WIDTH_PX = LOGO_BOX_HEIGHT_PX * 4;
-/** El recuadro de la fila del logo en General (#720): un apaisado se
- * estrecha a su ancho. */
-const CLUB_SETTINGS_LOGO_BOX_PX = 56;
+/** Lo que cabe dentro del recuadro de 56px de la fila del logo en General
+ * (#720), sin su borde de 1px: un apaisado se estrecha a ese ancho. */
+const CLUB_SETTINGS_LOGO_BOX_PX = 56 - 2;
 
 /** La fila del logo en General, y no la vista previa de al lado. */
 function clubLogoField(page: Page): Locator {
