@@ -1,6 +1,6 @@
 import { MapPin } from "@phosphor-icons/react/dist/ssr/MapPin";
 import Link from "next/link";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ATTENDANCE_PATH,
@@ -20,7 +20,7 @@ import type { Translator } from "@/lib/i18n/translator";
 import { BUILDABLE_EVENT_TYPES } from "@/lib/teams/team-ids";
 import { clubMoment } from "@/lib/time/club-calendar";
 import { AgendaCardContent, RepeatMark } from "./AgendaCard";
-import { describeRsvpFailure } from "./agenda-client";
+import { type AgendaFailure, describeRsvpFailure } from "./agenda-client";
 import { EventCover } from "./EventCover";
 import { EventDetailPanel, openedOf } from "./EventDetailPanel";
 import {
@@ -58,6 +58,10 @@ import { useEventTeam } from "./use-event-team";
  * Responde quien es de la audiencia de un evento que sigue en pie. A un
  * cancelado no se le responde, y quien organiza ve también los eventos que no
  * son para él (B7): esos no llevan botones. A un pasado tampoco (#312).
+ *
+ * En escritorio se responde también desde la fila (#731), sin elegirla: los
+ * botones pintan el mismo estado que "¿Vas?" del panel. Un fallo lo dice
+ * sólo donde se pulsó, para que el lector de pantalla no lo oiga dos veces.
  *
  * A quien organiza, el panel de un evento futuro que sigue en pie le ofrece
  * editarlo y cancelarlo (#316).
@@ -189,19 +193,46 @@ function PlaceLink({
   );
 }
 
+/** Desde dónde se respondió por última vez: ahí se dice el fallo. */
+type RsvpOrigin = "row" | "panel";
+
+type RsvpControls = {
+  readonly state: EventRsvpState;
+  readonly respond: (response: RsvpResponse) => void;
+};
+
+function RsvpFailureLine({
+  translate,
+  failure,
+  className,
+}: {
+  readonly translate: Translator;
+  readonly failure: AgendaFailure | null;
+  readonly className: string;
+}): React.JSX.Element | null {
+  if (failure === null) {
+    return null;
+  }
+  return (
+    <p className={`auth-error ${className}`} role="alert">
+      {describeRsvpFailure(translate, failure)}
+    </p>
+  );
+}
+
 /** "¿Vas?" en el panel, con lo que se está guardando y el fallo. */
 function RsvpSection({
   translate,
   title,
   rsvp,
+  failure,
   disabledReasonId,
 }: {
   readonly translate: Translator;
   readonly title: string;
-  readonly rsvp: {
-    readonly state: EventRsvpState;
-    readonly respond: (response: RsvpResponse) => void;
-  };
+  readonly rsvp: RsvpControls;
+  /** El fallo de lo que se respondió en el panel, no en la fila. */
+  readonly failure: AgendaFailure | null;
   readonly disabledReasonId: string | null;
 }): React.JSX.Element {
   const { state, respond } = rsvp;
@@ -221,11 +252,39 @@ function RsvpSection({
           ? null
           : translate("calendar.rsvp.saving")}
       </p>
-      {state.failure === null ? null : (
-        <p className="auth-error agenda-rsvp-error" role="alert">
-          {describeRsvpFailure(translate, state.failure)}
-        </p>
-      )}
+      <RsvpFailureLine
+        translate={translate}
+        failure={failure}
+        className="agenda-rsvp-error"
+      />
+    </div>
+  );
+}
+
+/** Voy, Quizás y No puedo en la fila de escritorio (#731). */
+function RowRsvp({
+  translate,
+  title,
+  rsvp,
+  disabledReasonId,
+}: {
+  readonly translate: Translator;
+  readonly title: string;
+  readonly rsvp: RsvpControls;
+  readonly disabledReasonId: string | null;
+}): React.JSX.Element {
+  const { state, respond } = rsvp;
+  return (
+    <div className="agenda-row-rsvp">
+      <EventRsvp
+        translate={translate}
+        title={title}
+        savedResponse={state.tally.myResponse}
+        pendingResponse={state.pendingResponse}
+        onRespond={respond}
+        disabledReasonId={disabledReasonId}
+        variant="compact"
+      />
     </div>
   );
 }
@@ -341,19 +400,22 @@ function useFocusWhenScreenCloses(
 }
 
 /** La fila de escritorio: la hora, la miniatura, el cuerpo y, a la derecha,
- * mi respuesta y cuántos van. */
+ * mi respuesta y cuántos van. Debajo, a todo lo ancho, el fallo de lo que se
+ * respondió desde la fila: al lado de los botones le quitaba sitio al título. */
 function PanelRowContent({
   translate,
   event,
   title,
   answer,
   goingCount,
+  failure,
 }: {
   readonly translate: Translator;
   readonly event: AgendaEvent;
   readonly title: React.ReactNode;
   readonly answer: React.ReactNode;
   readonly goingCount: number;
+  readonly failure: AgendaFailure | null;
 }): React.JSX.Element {
   return (
     <>
@@ -387,6 +449,11 @@ function PanelRowContent({
           {translate("calendar.event.going", { count: goingCount })}
         </p>
       </div>
+      <RsvpFailureLine
+        translate={translate}
+        failure={failure}
+        className="agenda-row-rsvp-error"
+      />
     </>
   );
 }
@@ -435,6 +502,7 @@ export function AgendaRow({
   const { detail, open, retry, receive } = useEventDetail(event.id);
   const rsvp = useEventRsvp(event, receive);
   const { tally } = rsvp.state;
+  const [rsvpOrigin, setRsvpOrigin] = useState<RsvpOrigin>("panel");
   const teams = useEventTeam(event.id);
   // Los equipos son de socio (#453): sin la membresía al día la frontera los
   // cierra, así que ni se piden.
@@ -450,6 +518,23 @@ export function AgendaRow({
   const isPanel = target.kind === "panel";
   useFocusWhenScreenCloses(!isPanel && isSelected, toggleRef);
   const focusRow = useCallback(() => toggleRef.current?.focus(), []);
+
+  function rsvpFrom(origin: RsvpOrigin): RsvpControls {
+    return {
+      state: rsvp.state,
+      respond: (response) => {
+        // Mientras guarda, el toque no cuenta: el fallo sigue donde se pulsó.
+        if (rsvp.state.pendingResponse === null) {
+          setRsvpOrigin(origin);
+        }
+        rsvp.respond(response);
+      },
+    };
+  }
+
+  function failureFor(origin: RsvpOrigin): AgendaFailure | null {
+    return rsvpOrigin === origin ? rsvp.state.failure : null;
+  }
 
   // Elegida, la fila pide su detalle y sus equipos. Los dos se guardan y sólo
   // se piden la primera vez: volver a elegirla no pide otra vez.
@@ -474,7 +559,8 @@ export function AgendaRow({
       <RsvpSection
         translate={translate}
         title={event.title}
-        rsvp={rsvp}
+        rsvp={rsvpFrom("panel")}
+        failure={failureFor("panel")}
         disabledReasonId={rsvpDisabledReasonId}
       />
     ) : null,
@@ -581,8 +667,20 @@ export function AgendaRow({
           translate={translate}
           event={event}
           title={title}
-          answer={answer}
+          answer={
+            canRespond ? (
+              <RowRsvp
+                translate={translate}
+                title={event.title}
+                rsvp={rsvpFrom("row")}
+                disabledReasonId={rsvpDisabledReasonId}
+              />
+            ) : (
+              answer
+            )
+          }
           goingCount={tally.goingCount}
+          failure={failureFor("row")}
         />
       ) : (
         <AgendaCardContent

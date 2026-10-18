@@ -9763,6 +9763,40 @@ a.auth-brand-header:focus-visible {
   border-color: var(--color-danger);
 }
 
+/* Voy, Quizás y No puedo en la fila de escritorio (#731): tres botones de
+   icono, por encima del ::after que hace pulsable la fila, como el enlace del
+   lugar. El elegido toma el tinte de su respuesta, como en el panel. El fallo
+   va en su propia línea bajo la fila, del cuerpo al borde derecho: en la
+   columna de los botones le quitaba el sitio al título. */
+.agenda-row-rsvp {
+  position: relative;
+  z-index: 1;
+}
+
+.agenda-rsvp.agenda-rsvp-compact {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.agenda-rsvp-compact .agenda-rsvp-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.agenda-row-rsvp-error {
+  grid-column: 4 / -1;
+  justify-self: end;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1) var(--space-2);
+  font-size: 12px;
+}
+
 /* Hasta siete avatares de 30px montados unos sobre otros. */
 .agenda-going-people {
   display: flex;
