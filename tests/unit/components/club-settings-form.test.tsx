@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClubSettingsScreen } from "@/components/club/ClubSettingsScreen";
 import {
+  DEFAULT_ACCENT_COLOR,
   evaluateAccentColor,
   SUGGESTED_ACCENT_COLORS,
 } from "@/lib/club/accent-color";
@@ -314,6 +315,14 @@ describe("General: vista previa", () => {
 
     expect(hexField()).toHaveAccessibleDescription("Use a code like #33A1E0.");
     expect(preview()).toHaveStyle(previewVariablesOf("#1c6ea4"));
+  });
+
+  it("con un acento guardado sin texto legible, carga con el de por defecto", async () => {
+    stubApi({ ...STORED, accentColor: "#777777" });
+    await renderScreen();
+
+    expect(hexField()).toHaveValue("#777777");
+    expect(preview()).toHaveStyle(previewVariablesOf(DEFAULT_ACCENT_COLOR));
   });
 
   it("con un color sin texto legible encima, se queda en el guardado", async () => {

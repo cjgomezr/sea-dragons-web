@@ -1,5 +1,6 @@
 import {
   type AccentPalette,
+  DEFAULT_ACCENT_COLOR,
   evaluateAccentColor,
   normalizeAccentInput,
 } from "@/lib/club/accent-color";
@@ -33,18 +34,23 @@ function styleOf({ light, dark }: AccentPalette): AccentPreviewStyle {
 }
 
 /** Lo escrito si vale como acento, y si no, el color guardado: un código a
- * medio escribir o uno sin texto legible encima no se enseña. */
+ * medio escribir o uno sin texto legible encima no se enseña. Un guardado
+ * que tampoco se lee (puesto por SQL, o de antes de la regla del #346) no
+ * tumba la pantalla donde se arregla: cae al de por defecto, como el correo. */
 export function accentPreviewStyleOf(
   typedColor: string,
   savedColor: string,
 ): AccentPreviewStyle {
-  const typed = evaluateAccentColor(normalizeAccentInput(typedColor));
-  if (typed.kind === "accepted") {
-    return styleOf(typed.palette);
+  const candidates = [
+    normalizeAccentInput(typedColor),
+    savedColor,
+    DEFAULT_ACCENT_COLOR,
+  ];
+  for (const candidate of candidates) {
+    const evaluation = evaluateAccentColor(candidate);
+    if (evaluation.kind === "accepted") {
+      return styleOf(evaluation.palette);
+    }
   }
-  const saved = evaluateAccentColor(savedColor);
-  if (saved.kind === "accepted") {
-    return styleOf(saved.palette);
-  }
-  throw new Error(`El acento guardado no vale como acento: ${savedColor}`);
+  throw new Error(`El acento por defecto no se lee: ${DEFAULT_ACCENT_COLOR}`);
 }

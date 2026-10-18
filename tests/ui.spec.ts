@@ -9488,11 +9488,7 @@ const SPANISH_SAVE_SETTINGS = "Guardar cambios";
 const EDITED_CLUB_NAME = "Victoria Seadragons Underwater Rugby";
 
 type ClubSettingsSave =
-  | "rejects_as_conflict"
-  | "rejects_accent_contrast"
-  | "hangs"
-  | "drops_connection"
-  | "accepts";
+  "rejects_as_conflict" | "hangs" | "drops_connection" | "accepts";
 
 /** Lo que el servidor fingido responde a cada guardado que rechaza. */
 const REJECTED_CLUB_SETTINGS_SAVES = {
@@ -9502,15 +9498,6 @@ const REJECTED_CLUB_SETTINGS_SAVES = {
       code: "conflict",
       message: "Otro Admin cambió la configuración.",
       reason: "club_settings_changed",
-    },
-  },
-  // #346: la pantalla ya descarta estos colores, pero el servidor decide.
-  rejects_accent_contrast: {
-    status: 400,
-    error: {
-      code: "validation_error",
-      message: "Ningún texto se lee sobre el acento.",
-      reason: "accent_color_no_readable_text",
     },
   },
 } as const;
@@ -9544,10 +9531,7 @@ async function stubClubSettings(
         });
         return;
       }
-      if (
-        save === "rejects_as_conflict" ||
-        save === "rejects_accent_contrast"
-      ) {
+      if (save === "rejects_as_conflict") {
         const { status, error } = REJECTED_CLUB_SETTINGS_SAVES[save];
         await route.fulfill({
           status,
@@ -9574,9 +9558,12 @@ function submitEmptyName(saveLabel: string, issueText: RegExp) {
   };
 }
 
-/** Un morado que se lee con texto blanco encima: el acento que se elige en
- * las capturas del #346. */
-const CHOSEN_CLUB_ACCENT = "#7B3FA0";
+/** Un sugerido distinto del guardado (#720): el que se elige en la captura
+ * de General. Sale marcado, en el campo y en la vista previa. */
+const CHOSEN_SUGGESTED_ACCENT = "#8C7AE6";
+
+/** Un gris medio: ni el blanco ni el texto oscuro llegan a AA encima. */
+const UNREADABLE_CLUB_ACCENT = "#777777";
 
 function clubAccentField(page: Page): Locator {
   return page.getByRole("textbox", {
@@ -9584,23 +9571,23 @@ function clubAccentField(page: Page): Locator {
   });
 }
 
-/** Escribe un acento sin guardarlo y espera a que la muestra lo siga. */
-function chooseAccent(sampleText: RegExp) {
+/** Elige un sugerido con el teclado, como un radio, y espera a la barra. */
+function chooseSuggestedAccent(saveLabel: string) {
   return async (page: Page): Promise<void> => {
-    await clubAccentField(page).fill(CHOSEN_CLUB_ACCENT);
-    await expect(page.getByText(sampleText)).toHaveCSS(
-      "background-color",
-      "rgb(123, 63, 160)",
-    );
+    const swatch = page.getByRole("radio", { name: CHOSEN_SUGGESTED_ACCENT });
+    await swatch.check();
+    await expect(clubAccentField(page)).toHaveValue(CHOSEN_SUGGESTED_ACCENT);
+    await expect(page.getByRole("button", { name: saveLabel })).toBeEnabled();
   };
 }
 
-/** Elige un acento y lo guarda; el servidor fingido lo rechaza. */
-function chooseAccentAndSave(saveLabel: string, outcome: RegExp) {
+/** Escribe un color sin texto legible encima: lo rechaza la pantalla, antes
+ * que el servidor, y la barra no deja guardar. */
+function typeUnreadableAccent(saveLabel: string, issueText: RegExp) {
   return async (page: Page): Promise<void> => {
-    await clubAccentField(page).fill(CHOSEN_CLUB_ACCENT);
-    await page.getByRole("button", { name: saveLabel }).click();
-    await expect(page.getByText(outcome)).toBeVisible();
+    await clubAccentField(page).fill(UNREADABLE_CLUB_ACCENT);
+    await expect(page.getByText(issueText)).toBeVisible();
+    await expect(page.getByRole("button", { name: saveLabel })).toBeDisabled();
   };
 }
 
@@ -9983,8 +9970,37 @@ function clubSettingsPath(tab: ClubSettingsSection): string {
 }
 
 const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
-  { name: "club-cargada" },
-  { name: "club-cargada-es", beforeVisit: chooseSpanish },
+  // La pestaña General (#720, 03-desktop-general.png del handoff de E26):
+  // un sugerido elegido, con la vista previa y la barra.
+  {
+    name: "club-general",
+    prepare: chooseSuggestedAccent(ENGLISH_SAVE_SETTINGS),
+    beforeCapture: fitViewportToPage,
+  },
+  {
+    name: "club-general-es",
+    beforeVisit: chooseSpanish,
+    prepare: chooseSuggestedAccent(SPANISH_SAVE_SETTINGS),
+    beforeCapture: fitViewportToPage,
+  },
+  { name: "club-general-sin-logo" },
+  {
+    name: "club-general-color-rechazado",
+    prepare: typeUnreadableAccent(
+      ENGLISH_SAVE_SETTINGS,
+      /No text colour reaches the minimum contrast/,
+    ),
+    beforeCapture: fitViewportToPage,
+  },
+  {
+    name: "club-general-color-rechazado-es",
+    beforeVisit: chooseSpanish,
+    prepare: typeUnreadableAccent(
+      SPANISH_SAVE_SETTINGS,
+      /Ningún color de texto llega al contraste mínimo/,
+    ),
+    beforeCapture: fitViewportToPage,
+  },
   {
     name: "club-aviso-validacion",
     prepare: submitEmptyName(ENGLISH_SAVE_SETTINGS, /The club needs a name/),
@@ -10014,29 +10030,6 @@ const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
     prepare: submitAndExpect(
       SPANISH_SAVE_SETTINGS,
       /No pudimos hablar con el servidor/,
-    ),
-  },
-  { name: "club-acento-elegido", prepare: chooseAccent(/^Sample text$/) },
-  {
-    name: "club-acento-elegido-es",
-    beforeVisit: chooseSpanish,
-    prepare: chooseAccent(/^Texto de ejemplo$/),
-  },
-  {
-    name: "club-acento-rechazado",
-    save: "rejects_accent_contrast",
-    prepare: chooseAccentAndSave(
-      ENGLISH_SAVE_SETTINGS,
-      /No text colour reaches the minimum contrast/,
-    ),
-  },
-  {
-    name: "club-acento-rechazado-es",
-    save: "rejects_accent_contrast",
-    beforeVisit: chooseSpanish,
-    prepare: chooseAccentAndSave(
-      SPANISH_SAVE_SETTINGS,
-      /Ningún color de texto llega al contraste mínimo/,
     ),
   },
   {
@@ -11410,6 +11403,14 @@ const FIXTURES_DIR = path.join(__dirname, "support", "fixtures");
  * `.club-logo` le da a un logo apaisado. */
 const LOGO_BOX_HEIGHT_PX = 32;
 const LOGO_BOX_MAX_WIDTH_PX = LOGO_BOX_HEIGHT_PX * 4;
+/** El recuadro de la fila del logo en General (#720): un apaisado se
+ * estrecha a su ancho. */
+const CLUB_SETTINGS_LOGO_BOX_PX = 56;
+
+/** La fila del logo en General, y no la vista previa de al lado. */
+function clubLogoField(page: Page): Locator {
+  return page.locator(".club-logo-field");
+}
 /** En la barra lateral de escritorio el logo va junto al nombre y su tope
  * baja a 2,5 veces el alto, para que el nombre conserve 120px (#352). */
 const SIDEBAR_LOGO_MAX_WIDTH_PX = 80;
@@ -11461,10 +11462,12 @@ async function serveClubLogos(page: Page): Promise<void> {
   });
 }
 
-async function expectLogoLoaded(page: Page): Promise<void> {
+/** `root` acota la búsqueda donde hay más de un logo: en General (#720)
+ * también lo enseña la vista previa. */
+async function expectLogoLoaded(root: Page | Locator): Promise<void> {
   await expect
     .poll(() =>
-      page
+      root
         .locator("img.club-logo")
         .evaluate((image: HTMLImageElement) =>
           image.complete ? image.naturalWidth : 0,
@@ -11504,10 +11507,10 @@ async function showLogoOnServedPage(
  * su proporción hasta el tope, encajado sin deformarse si llega a él, y sin
  * salirse de su contenedor. */
 async function expectLogoFitsItsBox(
-  page: Page,
+  root: Page | Locator,
   maxWidth: number = LOGO_BOX_MAX_WIDTH_PX,
 ): Promise<void> {
-  const fit = await page
+  const fit = await root
     .locator("img.club-logo")
     .evaluate((image: HTMLImageElement) => {
       const box = image.getBoundingClientRect();
@@ -11868,7 +11871,7 @@ test.describe("club-con-logo", () => {
             logoUrlOf(PHOTOGRAPHED_LOGO),
             theme,
           );
-          await expectLogoLoaded(page);
+          await expectLogoLoaded(clubLogoField(page));
           const snapshot = `club-con-logo-${vp.name}-${theme}.png`;
           await createMissingLocalBaseline(snapshot, () =>
             page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
@@ -11886,9 +11889,12 @@ test.describe("club-con-logo", () => {
           page,
         }) => {
           await goToClubSettingsWithLogo(page, logoUrlOf(logo));
-          await expectLogoLoaded(page);
+          await expectLogoLoaded(clubLogoField(page));
 
-          await expectLogoFitsItsBox(page);
+          await expectLogoFitsItsBox(
+            clubLogoField(page),
+            CLUB_SETTINGS_LOGO_BOX_PX,
+          );
           await expectNoHorizontalScroll(page);
         });
       }
@@ -11897,7 +11903,7 @@ test.describe("club-con-logo", () => {
 
   test("has no accessibility violations (axe-core)", async ({ page }) => {
     await goToClubSettingsWithLogo(page, logoUrlOf(PHOTOGRAPHED_LOGO));
-    await expectLogoLoaded(page);
+    await expectLogoLoaded(clubLogoField(page));
 
     await expectNoAxeViolations(page);
   });
@@ -11908,7 +11914,7 @@ test.describe("club-con-logo", () => {
     await goToClubSettingsWithLogo(page, `${LOGO_HOST}/borrado.png`);
 
     await expect(
-      page.locator(".club-logo-preview .auth-brand-mark"),
+      page.locator(".club-logo-preview .club-logo-initials"),
     ).toHaveText(STUBBED_CLUB_SETTINGS.initials);
     await expect(page.locator("img.club-logo")).toHaveCount(0);
   });
