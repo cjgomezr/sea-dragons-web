@@ -142,6 +142,18 @@ export function normalizeSignInTexts(texts: SignInTexts): SignInTexts {
   return { en: normalizeLocale("en"), es: normalizeLocale("es") };
 }
 
+/** Si un borrador de los textos guardaría lo mismo que `stored` (#719). */
+export function isSameSignInTexts(
+  draft: SignInTexts,
+  stored: SignInTexts,
+): boolean {
+  const a = normalizeSignInTexts(draft);
+  const b = normalizeSignInTexts(stored);
+  return SIGN_IN_TEXT_FIELDS.every(
+    ({ locale, kind }) => a[locale][kind] === b[locale][kind],
+  );
+}
+
 export function findSignInTextsIssues(
   texts: SignInTexts,
 ): readonly SignInTextsIssue[] {

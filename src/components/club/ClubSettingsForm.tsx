@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { TextField } from "@/components/directory/record-fields";
 import { normalizeAccentInput } from "@/lib/club/accent-color";
 import { deriveInitials } from "@/lib/club/club-brand";
@@ -14,10 +14,10 @@ import {
   type ClubSettingsIssue,
   type ClubSettingsIssueCode,
   findClubSettingsIssues,
+  isSameClubIdentity,
 } from "@/lib/club/club-settings";
 import type { Translator } from "@/lib/i18n/translator";
 import {
-  type ClubSettingsFailure,
   describeClubSettingsFailure,
   describeClubSettingsIssue,
   isSettingsConflict,
@@ -26,23 +26,25 @@ import {
 } from "./club-settings-client";
 import { ACCENT_FIELD_ID, ClubAccentField } from "./ClubAccentField";
 import { ClubLogoField } from "./ClubLogoField";
+import { SavedNotice, UnsavedChangesBar } from "./ClubUnsavedChangesBar";
+import {
+  type ClubDraft,
+  type ClubDraftStatus,
+  type DraftSaveOutcome,
+  useClubDraft,
+} from "./use-club-draft";
 
 /**
  * El formulario de la configuración del club (#296). Sigue a la ficha del
  * miembro (`MemberRecordForm`): da un cambio por hecho sólo cuando el servidor
- * lo confirma, y entonces enseña lo que el servidor guardó.
+ * lo confirma, y entonces enseña lo que el servidor guardó. Se guarda con la
+ * barra de cambios sin guardar (#719), que sólo sale con un borrador.
  *
  * Cada guardado lleva lo que el Admin tenía delante. Si otro Admin guardó
  * entretanto, el servidor responde 409 y la pantalla ofrece cargar lo último
  * en vez de pisarlo. Tras guardar se refresca la página en el servidor, que
  * es lo que redibuja la cabecera con el nombre nuevo.
  */
-
-type Status =
-  | { readonly kind: "editing" }
-  | { readonly kind: "sending" }
-  | { readonly kind: "saved" }
-  | ClubSettingsFailure;
 
 /** Lo que hay en los controles. Unas iniciales vacías se mandan como null, y
  * el acento se manda como lo guarda la base, escriba lo que escriba el Admin. */
@@ -83,8 +85,20 @@ function toIdentity(draft: Draft): ClubIdentity {
   };
 }
 
+function identityOf(settings: ClubSettings): ClubIdentity {
+  return {
+    name: settings.name,
+    initials: settings.initials,
+    accentColor: settings.accentColor,
+  };
+}
+
+function isSameDraft(draft: Draft, saved: Draft): boolean {
+  return isSameClubIdentity(toIdentity(draft), toIdentity(saved));
+}
+
 /** Los avisos de campo del último envío que el servidor rechazó por uno. */
-function serverIssuesOf(status: Status): readonly ClubSettingsIssue[] {
+function serverIssuesOf(status: ClubDraftStatus): readonly ClubSettingsIssue[] {
   if (status.kind !== "failed") {
     return [];
   }
@@ -95,22 +109,15 @@ function serverIssuesOf(status: Status): readonly ClubSettingsIssue[] {
   return [{ field: FIELD_OF_ISSUE[code], code }];
 }
 
-function SaveOutcome({
+function SaveFailure({
   translate,
   status,
   onReloadRequested,
 }: {
   translate: Translator;
-  status: Status;
+  status: ClubDraftStatus;
   onReloadRequested: () => void;
 }): React.JSX.Element | null {
-  if (status.kind === "saved") {
-    return (
-      <p className="auth-note" role="status">
-        {translate("clubSettings.saved")}
-      </p>
-    );
-  }
   // Un 400 de un campo ya se enseña junto a ese campo.
   if (status.kind !== "failed" || readIssueCode(status) !== null) {
     return null;
@@ -187,69 +194,68 @@ function BrandSummary({
   );
 }
 
+/** El borrador de la identidad. Guardar manda lo que el Admin tenía delante
+ * (`expected`): si otro Admin guardó entretanto, el servidor dice 409. */
+function useIdentityDraft(
+  initialSettings: ClubSettings,
+  onHasDraftChange: (hasDraft: boolean) => void,
+): {
+  readonly settings: ClubSettings;
+  readonly setLogoUrl: (logoUrl: string | null) => void;
+  readonly identity: ClubDraft<Draft>;
+} {
+  const router = useRouter();
+  const [settings, setSettings] = useState(initialSettings);
+
+  async function send(draft: Draft): Promise<DraftSaveOutcome<Draft>> {
+    const result = await saveClubSettings({
+      identity: toIdentity(draft),
+      expected: identityOf(settings),
+    });
+    if (result.kind === "failed") {
+      return result;
+    }
+    setSettings(result.settings);
+    router.refresh();
+    return { kind: "saved", value: toDraft(result.settings) };
+  }
+
+  const identity = useClubDraft<Draft>({
+    initial: toDraft(initialSettings),
+    isSame: isSameDraft,
+    send,
+    onHasDraftChange,
+  });
+  function setLogoUrl(logoUrl: string | null): void {
+    setSettings((current) => ({ ...current, logoUrl }));
+    // Como al guardar: redibuja la cabecera con el logo nuevo.
+    router.refresh();
+  }
+  return { settings, setLogoUrl, identity };
+}
+
 export function ClubSettingsForm({
   translate,
   settings: initialSettings,
   onReloadRequested,
+  onHasDraftChange,
 }: {
   translate: Translator;
   settings: ClubSettings;
   onReloadRequested: () => void;
+  onHasDraftChange: (hasDraft: boolean) => void;
 }): React.JSX.Element {
-  const router = useRouter();
-  const [settings, setSettings] = useState(initialSettings);
-  const [draft, setDraft] = useState<Draft>(() => toDraft(initialSettings));
-  const [status, setStatus] = useState<Status>({ kind: "editing" });
-  const [localIssues, setLocalIssues] = useState<readonly ClubSettingsIssue[]>(
-    [],
+  const { settings, setLogoUrl, identity } = useIdentityDraft(
+    initialSettings,
+    onHasDraftChange,
   );
-  // El estado desactiva el botón en el siguiente pintado, pero un doble clic
-  // llega antes. La referencia cambia en el acto.
-  const isSendingRef = useRef(false);
-
-  function update(change: Partial<Draft>): void {
-    setDraft((current) => ({ ...current, ...change }));
-    setLocalIssues([]);
-    setStatus((current) =>
-      current.kind === "sending" ? current : { kind: "editing" },
-    );
-  }
-
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>,
-  ): Promise<void> {
-    event.preventDefault();
-    if (isSendingRef.current) {
-      return;
-    }
-    const identity = toIdentity(draft);
-    const expected: ClubIdentity = {
-      name: settings.name,
-      initials: settings.initials,
-      accentColor: settings.accentColor,
-    };
-    const issues = findClubSettingsIssues({ identity, expected });
-    if (issues.length > 0) {
-      setLocalIssues(issues);
-      return;
-    }
-    isSendingRef.current = true;
-    setStatus({ kind: "sending" });
-    const result = await saveClubSettings({
-      identity,
-      expected,
-    });
-    isSendingRef.current = false;
-    if (result.kind === "failed") {
-      setStatus(result);
-      return;
-    }
-    setSettings(result.settings);
-    setDraft(toDraft(result.settings));
-    setStatus({ kind: "saved" });
-    router.refresh();
-  }
-
+  const { draft, status } = identity;
+  // El borrador se valida mientras se escribe: Guardar cambios se desactiva
+  // y el error sale junto a su campo.
+  const localIssues = findClubSettingsIssues({
+    identity: toIdentity(draft),
+    expected: identityOf(settings),
+  });
   const issues = localIssues.length > 0 ? localIssues : serverIssuesOf(status);
   const issueTextFor = (field: ClubIdentityField): string | null => {
     const issue = issues.find((candidate) => candidate.field === field);
@@ -258,18 +264,21 @@ export function ClubSettingsForm({
       : describeClubSettingsIssue(translate, issue.code);
   };
   const isSending = status.kind === "sending";
+  const canSave = localIssues.length === 0;
+  const update = (change: Partial<Draft>): void =>
+    identity.change((current) => ({ ...current, ...change }));
 
   return (
     <form
       className="auth-pending club-settings-form"
-      onSubmit={handleSubmit}
+      onSubmit={(event) => event.preventDefault()}
       noValidate
     >
       {/* Mientras se guarda no se edita: lo que se escribiera ahora lo
           pisaría lo que devuelva el servidor. */}
       <fieldset className="member-record-fields" disabled={isSending}>
         <section className="auth-fields" aria-labelledby="club-identidad">
-          <h2 id="club-identidad">
+          <h2 id="club-identidad" tabIndex={-1}>
             {translate("clubSettings.identity.title")}
           </h2>
           <TextField
@@ -309,20 +318,28 @@ export function ClubSettingsForm({
           isDisabled: isSending,
           onChange: (accentColor) => update({ accentColor }),
         }}
-        onLogoChanged={(logoUrl) => {
-          setSettings((current) => ({ ...current, logoUrl }));
-          // Como al guardar: redibuja la cabecera con el logo nuevo.
-          router.refresh();
-        }}
+        onLogoChanged={setLogoUrl}
       />
-      <SaveOutcome
+      <SaveFailure
         translate={translate}
         status={status}
         onReloadRequested={onReloadRequested}
       />
-      <button type="submit" className="auth-submit" disabled={isSending}>
-        {translate(isSending ? "clubSettings.saving" : "clubSettings.save")}
-      </button>
+      {identity.hasDraft ? (
+        <UnsavedChangesBar
+          translate={translate}
+          section="general"
+          headingId="club-identidad"
+          canSave={canSave}
+          isSaving={isSending}
+          onDiscard={identity.discard}
+          onSave={() => void identity.save()}
+        />
+      ) : null}
+      <SavedNotice
+        translate={translate}
+        isShowing={identity.isSavedNoticeShowing}
+      />
     </form>
   );
 }

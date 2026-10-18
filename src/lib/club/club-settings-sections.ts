@@ -19,6 +19,10 @@ export type ClubSettingsSection = (typeof CLUB_SETTINGS_SECTIONS)[number];
 
 export const CLUB_SETTINGS_SECTION_QUERY_PARAM = "tab";
 
+/** Las secciones que juntan un borrador y lo guardan con la barra de
+ * cambios sin guardar (#719, D10). Posiciones guarda cada cambio al momento. */
+export type ClubDraftSection = Exclude<ClubSettingsSection, "positions">;
+
 /** La única sección de quien no es Admin. */
 const COMMITTEE_SECTION: ClubSettingsSection = "packs";
 

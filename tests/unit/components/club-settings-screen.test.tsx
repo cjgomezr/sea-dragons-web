@@ -12,7 +12,8 @@ import { stubScreenWidth } from "../../support/screen-width";
  * La pantalla de configuración del club (#296, RF-6 del PRD de E18a): carga
  * lo guardado por la API v1, guarda nombre, iniciales y acento (#346) con lo
  * que el Admin tenía delante, y refresca la cabecera cuando el servidor lo
- * confirma.
+ * confirma. Desde #719 se guarda con la barra de cambios sin guardar, que
+ * sólo sale con un cambio.
  */
 
 const SETTINGS_PATH = "/api/v1/club/settings";
@@ -113,13 +114,12 @@ function stubApi(stub: Stub = {}): void {
 
 async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
   render(<ClubSettingsScreen locale={locale} canManageClub club={CLUB} />);
-  await screen.findByRole("button", {
-    name: /save settings|guardar la configuración/i,
-  });
+  await screen.findByLabelText(/^(Club name|Nombre del club)$/);
 }
 
+/** Guardar cambios, en la barra que sale con un cambio (#719). */
 function saveButton(): HTMLElement {
-  return screen.getByRole("button", { name: /save settings|saving/i });
+  return screen.getByRole("button", { name: /^(Save changes|Saving…)$/ });
 }
 
 function accentField(): HTMLElement {
@@ -257,9 +257,7 @@ describe("pantalla de configuración: guardar", () => {
     await typeName("Bay Barracudas");
     await userEvent.click(saveButton());
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Settings saved.",
-    );
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
     expect(patches).toEqual([
       {
         name: "Bay Barracudas",
@@ -281,7 +279,7 @@ describe("pantalla de configuración: guardar", () => {
 
     await typeName("Bay Barracudas");
     await userEvent.click(saveButton());
-    await screen.findByRole("status");
+    await screen.findByText("Saved");
 
     expect(refresh).toHaveBeenCalledOnce();
   });
@@ -293,7 +291,7 @@ describe("pantalla de configuración: guardar", () => {
     await userEvent.clear(screen.getByLabelText("Initials"));
     await userEvent.click(saveButton());
 
-    await screen.findByRole("status");
+    await screen.findByText("Saved");
     expect(patches).toMatchObject([{ initials: null }]);
   });
 
@@ -302,7 +300,7 @@ describe("pantalla de configuración: guardar", () => {
     await renderScreen();
     await typeName("Bay Barracudas");
     await userEvent.click(saveButton());
-    await screen.findByRole("status");
+    await screen.findByText("Saved");
 
     await typeName("Bay Barracudas II");
     await userEvent.click(saveButton());
@@ -316,6 +314,7 @@ describe("pantalla de configuración: guardar", () => {
   it("desactiva el botón y los campos mientras guarda", async () => {
     stubApi({ save: () => new Promise<Response>(() => undefined) });
     await renderScreen();
+    await typeName("Bay Barracudas");
 
     await userEvent.click(saveButton());
 
@@ -328,6 +327,7 @@ describe("pantalla de configuración: guardar", () => {
     stubApi({ save: () => new Promise<Response>(() => undefined) });
     const user = userEvent.setup();
     await renderScreen();
+    await typeName("Bay Barracudas");
 
     await user.dblClick(saveButton());
 
@@ -344,14 +344,14 @@ describe("pantalla de configuración: errores", () => {
       "The name can have at most 60 characters.",
     ],
   ])(
-    "explica %s junto al campo, sin mandar nada",
+    "explica %s junto al campo y no deja guardarlo",
     async (_case, name, text) => {
       stubApi();
       await renderScreen();
 
       await typeName(name);
-      await userEvent.click(saveButton());
 
+      expect(saveButton()).toBeDisabled();
       const field = screen.getByLabelText("Club name");
       expect(field).toHaveAccessibleDescription(new RegExp(`^${text}`));
       expect(field).toHaveAttribute("aria-invalid", "true");
@@ -364,7 +364,8 @@ describe("pantalla de configuración: errores", () => {
     await renderScreen();
 
     await userEvent.type(screen.getByLabelText("Initials"), "QQ");
-    await userEvent.click(saveButton());
+
+    expect(saveButton()).toBeDisabled();
 
     expect(screen.getByLabelText("Initials")).toHaveAccessibleDescription(
       /^Initials can have at most 3 characters\./,
@@ -427,9 +428,7 @@ describe("pantalla de configuración: errores", () => {
 
     await userEvent.click(saveButton());
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Settings saved.",
-    );
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
     expect(patches).toHaveLength(2);
   });
 
@@ -468,6 +467,7 @@ describe("pantalla de configuración: errores", () => {
   ])("avisa de %s", async (_case, save, text) => {
     stubApi({ save });
     await renderScreen();
+    await typeName("Bay Barracudas");
 
     await userEvent.click(saveButton());
 
@@ -557,7 +557,7 @@ describe("elegir el color", () => {
     await typeAccent(PURPLE);
     await userEvent.click(saveButton());
 
-    await screen.findByRole("status");
+    await screen.findByText("Saved");
     expect(patches).toMatchObject([
       { accentColor: PURPLE, expected: { accentColor: "#1c6ea4" } },
     ]);
@@ -573,7 +573,7 @@ describe("elegir el color", () => {
     await typeAccent(typed);
     await userEvent.click(saveButton());
 
-    await screen.findByRole("status");
+    await screen.findByText("Saved");
     expect(patches).toMatchObject([{ accentColor: PURPLE }]);
   });
 
@@ -582,13 +582,14 @@ describe("elegir el color", () => {
     ["con letras que no son hexadecimales", "#12345g"],
     ["con un nombre de color", "purple"],
   ])(
-    "rechaza junto al campo un código %s, sin mandar nada",
+    "rechaza junto al campo un código %s y no deja guardarlo",
     async (_case, typed) => {
       stubApi();
       await renderScreen();
 
       await typeAccent(typed);
-      await userEvent.click(saveButton());
+
+      expect(saveButton()).toBeDisabled();
 
       expect(accentField()).toHaveAttribute("aria-invalid", "true");
       expect(accentField()).toHaveAccessibleDescription(INVALID_ACCENT_TEXT);
@@ -596,12 +597,13 @@ describe("elegir el color", () => {
     },
   );
 
-  it("rechaza sin mandar nada un color sobre el que ningún texto se lee", async () => {
+  it("no deja guardar un color sobre el que ningún texto se lee", async () => {
     stubApi();
     await renderScreen();
 
     await typeAccent(UNREADABLE_GREY);
-    await userEvent.click(saveButton());
+
+    expect(saveButton()).toBeDisabled();
 
     expect(accentField()).toHaveAccessibleDescription(NO_READABLE_TEXT);
     expect(patches).toEqual([]);
@@ -614,7 +616,7 @@ describe("elegir el color", () => {
     await typeAccent(PURPLE);
     await userEvent.click(saveButton());
 
-    await screen.findByRole("status");
+    await screen.findByText("Saved");
     expect(refresh).toHaveBeenCalledOnce();
     expect(accentField()).toHaveValue("#7B3FA0");
   });
@@ -629,9 +631,11 @@ describe("elegir el color", () => {
     expect(accentPicker()).toHaveFocus();
     await user.tab();
     await user.clear(accentField());
-    await user.type(accentField(), `${PURPLE}{Enter}`);
+    await user.type(accentField(), PURPLE);
+    saveButton().focus();
+    await user.keyboard("{Enter}");
 
-    await screen.findByRole("status");
+    await screen.findByText("Saved");
     expect(patches).toMatchObject([{ accentColor: PURPLE }]);
   });
 });
@@ -678,7 +682,7 @@ describe("rechazos del servidor", () => {
     await typeAccent(YELLOW);
     await userEvent.click(saveButton());
 
-    await screen.findByRole("status");
+    await screen.findByText("Saved");
     expect(patches[1]).toMatchObject({
       accentColor: YELLOW,
       expected: { accentColor: "#1c6ea4" },
