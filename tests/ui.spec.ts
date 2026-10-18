@@ -8878,7 +8878,12 @@ for (const state of BELL_STATES) {
           } else {
             await expect(bell).toHaveText(state.badge);
           }
-          const header = page.locator(".app-sidebar-header");
+          // En escritorio la campana vive en la barra de arriba (#717).
+          const header = page.locator(
+            vp.name === "mobile"
+              ? ".app-sidebar-header"
+              : ".app-topbar-actions",
+          );
           const snapshot = `${state.name}-${vp.name}-${theme}.png`;
           await createMissingLocalBaseline(snapshot, () =>
             header.screenshot(SCREENSHOT_OPTIONS),
@@ -8993,32 +8998,34 @@ test.describe("la campana de avisos", () => {
     await expect(notificationsRegion(page)).toHaveCount(0);
   });
 
-  // La barra lateral mide 240px: la campana y el botón de la cuenta (#287)
-  // caben en ella en una sola fila, sin salirse.
+  // La campana y el botón de la cuenta (#287) van en una sola fila, dentro de
+  // la barra de arriba desde #717.
   for (const width of [768, 1440]) {
-    test(`los controles de la cabecera caben en una fila de la barra lateral a ${width}px`, async ({
+    test(`los controles de la cabecera caben en una fila de la barra de arriba a ${width}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
 
-      const sidebar = await page.locator(".app-sidebar").boundingBox();
+      const topbar = await page.locator(".app-topbar").boundingBox();
       const bell = await page
         .getByRole("button", { name: BELL_NAME })
         .boundingBox();
       const account = await page
         .getByRole("button", { name: ACCOUNT_BUTTON_NAME })
         .boundingBox();
-      if (sidebar === null || bell === null || account === null) {
-        throw new Error("la barra lateral no dibujó sus controles");
+      if (topbar === null || bell === null || account === null) {
+        throw new Error("la barra de arriba no dibujó sus controles");
       }
 
+      // El botón de la cuenta (38px) es más bajo que la campana (44px): los
+      // dos van centrados en la misma fila.
       expect(
-        Math.round(account.y),
+        Math.round(account.y + account.height / 2),
         "los controles se parten en dos filas",
-      ).toBe(Math.round(bell.y));
+      ).toBe(Math.round(bell.y + bell.height / 2));
       expect(account.x + account.width).toBeLessThanOrEqual(
-        sidebar.x + sidebar.width,
+        topbar.x + topbar.width,
       );
     });
   }
@@ -10302,6 +10309,187 @@ test.describe("menú de la cuenta sobre la configuración del club (#716)", () =
 });
 
 /* ---------------------------------------------------------------------------
+   La campana y la cuenta en la barra de arriba de escritorio (#717, RF-10 del
+   PRD de E26). Mockups:
+   docs/design/design_handoff_club_settings/screenshots/01-desktop-positions.png
+   y 05-desktop-account-menu.png. Con el Committee, que tiene nombre fijo: sus
+   iniciales salen en el botón.
+   --------------------------------------------------------------------------- */
+
+const DESKTOP_HEADER_VIEWPORTS = viewports.filter((vp) => vp.name !== "mobile");
+/** El círculo del botón de la cuenta del handoff. */
+const ACCOUNT_BUTTON_SIZE_PX = 38;
+/** Lo que separa el desplegable de la cuenta de su botón. */
+const ACCOUNT_MENU_GAP_PX = 6;
+const HEADER_TOLERANCE_PX = 1;
+
+type DesktopHeaderBoxes = {
+  readonly topbar: DOMRect;
+  readonly search: DOMRect;
+  readonly bell: DOMRect;
+  readonly account: DOMRect;
+};
+
+async function readDesktopHeaderBoxes(page: Page): Promise<DesktopHeaderBoxes> {
+  const boxOf = async (locator: Locator): Promise<DOMRect> =>
+    locator.evaluate((element) => element.getBoundingClientRect().toJSON());
+  return {
+    topbar: await boxOf(page.locator(".app-topbar")),
+    search: await boxOf(page.getByRole("search")),
+    bell: await boxOf(page.getByRole("button", { name: BELL_NAME })),
+    account: await boxOf(
+      page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
+    ),
+  };
+}
+
+/** Lo que vale un color del tema, ya resuelto como lo da `getComputedStyle`. */
+async function resolveThemeColor(page: Page, token: string): Promise<string> {
+  return page.evaluate((variable) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${variable})`;
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  }, token);
+}
+
+test.describe("la cabecera de escritorio (#717)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: CLUB_COMMITTEE_STORAGE_STATE });
+
+  test.describe("@ desktop", () => {
+    test.use({ viewport: { width: 1440, height: 900 } });
+
+    for (const theme of themes) {
+      test(`cabecera-menu-abierto: matches approved baseline (${theme})`, async ({
+        page,
+      }) => {
+        await goToWithTheme(page, "/dashboard", theme);
+        await openAccountMenu(page);
+        await page.mouse.move(0, 0);
+
+        const snapshot = `cabecera-menu-abierto-${theme}.png`;
+        await createMissingLocalBaseline(snapshot, () =>
+          page.screenshot(SCREENSHOT_OPTIONS),
+        );
+        await expect(page).toHaveScreenshot(snapshot, {
+          ...SCREENSHOT_OPTIONS,
+          maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        });
+      });
+
+      test(`cabecera-menu-abierto: has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await goToWithTheme(page, "/dashboard", theme);
+        await openAccountMenu(page);
+
+        await expectNoAxeViolations(page);
+      });
+    }
+  });
+
+  for (const vp of DESKTOP_HEADER_VIEWPORTS) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      test("la campana y la cuenta van a la derecha de la barra, tras el buscador", async ({
+        page,
+      }) => {
+        await page.goto(`${APP_URL}/dashboard`);
+
+        const boxes = await readDesktopHeaderBoxes(page);
+        expect(boxes.search.right).toBeLessThan(boxes.bell.left);
+        expect(boxes.bell.right).toBeLessThanOrEqual(boxes.account.left);
+        for (const control of [boxes.bell, boxes.account]) {
+          expect(control.top).toBeGreaterThanOrEqual(boxes.topbar.top);
+          expect(control.bottom).toBeLessThanOrEqual(boxes.topbar.bottom);
+        }
+        const rightGap = boxes.topbar.right - boxes.account.right;
+        expect(rightGap).toBeLessThan(boxes.topbar.width / 10);
+        await expect(
+          page.locator(".app-sidebar-header").getByRole("button"),
+        ).toHaveCount(0);
+      });
+
+      test("el botón de la cuenta es un círculo de 38 px con las iniciales", async ({
+        page,
+      }) => {
+        await page.goto(`${APP_URL}/dashboard`);
+        const button = page.getByRole("button", { name: ACCOUNT_BUTTON_NAME });
+
+        const box = await button.boundingBox();
+        expect(box?.width).toBe(ACCOUNT_BUTTON_SIZE_PX);
+        expect(box?.height).toBe(ACCOUNT_BUTTON_SIZE_PX);
+        await expect(button).toHaveCSS("border-radius", "50%");
+        await expect(button).toHaveText(/^[A-Z]{1,2}$/);
+      });
+
+      test("abierto, el botón lleva el fondo de lo elegido y un anillo de acento", async ({
+        page,
+      }) => {
+        await page.goto(`${APP_URL}/dashboard`);
+        const button = page.getByRole("button", { name: ACCOUNT_BUTTON_NAME });
+
+        await openAccountMenu(page);
+
+        await expect(button).toHaveAttribute("aria-expanded", "true");
+        await expect(button).toHaveCSS(
+          "background-color",
+          await resolveThemeColor(page, "--color-segment-selected"),
+        );
+        await expect(button).toHaveCSS(
+          "box-shadow",
+          `${await resolveThemeColor(page, "--color-accent")} 0px 0px 0px 2px`,
+        );
+      });
+
+      test("el menú cuelga del borde derecho del botón, 6 px por debajo", async ({
+        page,
+      }) => {
+        await page.goto(`${APP_URL}/dashboard`);
+        const button = page.getByRole("button", { name: ACCOUNT_BUTTON_NAME });
+
+        const menu = await openAccountMenu(page);
+
+        const buttonBox = await button.boundingBox();
+        const menuBox = await menu.boundingBox();
+        if (buttonBox === null || menuBox === null) {
+          throw new Error("el botón o el menú no tienen caja");
+        }
+        expect(
+          Math.abs(menuBox.x + menuBox.width - (buttonBox.x + buttonBox.width)),
+        ).toBeLessThanOrEqual(HEADER_TOLERANCE_PX);
+        expect(
+          Math.abs(menuBox.y - (buttonBox.y + buttonBox.height)),
+        ).toBeCloseTo(ACCOUNT_MENU_GAP_PX, 0);
+      });
+
+      test("la lista de avisos se ve entera dentro de la ventana", async ({
+        page,
+      }) => {
+        await page.goto(`${APP_URL}/dashboard`);
+
+        await openNotifications(page);
+
+        const panel = await notificationsRegion(page).boundingBox();
+        if (panel === null) {
+          throw new Error("la lista de avisos no tiene caja");
+        }
+        expect(panel.x).toBeGreaterThanOrEqual(0);
+        expect(panel.y).toBeGreaterThanOrEqual(0);
+        expect(panel.x + panel.width).toBeLessThanOrEqual(vp.width);
+        expect(panel.y + panel.height).toBeLessThanOrEqual(vp.height);
+        await expectNoHorizontalScroll(page);
+      });
+    });
+  }
+});
+
+/* ---------------------------------------------------------------------------
    Las secciones de la configuración (#718, RF-1 del PRD de E26): la barra de
    pestañas en escritorio (docs/design/design_handoff_club_settings,
    01-desktop-positions.png), la lista y la pantalla de una sección en el
@@ -11479,7 +11667,9 @@ type SidebarBrandGeometry = {
   readonly name: DOMRect;
   readonly nameLineCount: number;
   readonly isNameOverflowing: boolean;
-  readonly actions: DOMRect;
+  /** Los botones que se ven en la cabecera de la barra lateral: ninguno en
+   * escritorio, donde la campana y la cuenta van arriba (#717). */
+  readonly visibleHeaderButtonCount: number;
   readonly sidebar: DOMRect;
 };
 
@@ -11509,7 +11699,9 @@ async function readSidebarBrandGeometry(
         name.getBoundingClientRect().height / lineHeight,
       ),
       isNameOverflowing: name.scrollWidth > name.clientWidth,
-      actions: boxOf(".app-sidebar-actions"),
+      visibleHeaderButtonCount: Array.from(
+        document.querySelectorAll(".app-sidebar-header button"),
+      ).filter((button) => button.getClientRects().length > 0).length,
       sidebar: boxOf(".app-sidebar"),
     };
   });
@@ -11547,10 +11739,9 @@ function expectLogoBesideName(geometry: SidebarBrandGeometry): void {
   );
 }
 
-function expectControlsBelowBrand(geometry: SidebarBrandGeometry): void {
-  expect(geometry.actions.top).toBeGreaterThanOrEqual(geometry.lockup.bottom);
+function expectHeaderIsOnlyBrand(geometry: SidebarBrandGeometry): void {
+  expect(geometry.visibleHeaderButtonCount).toBe(0);
   expectHorizontallyInside(geometry.lockup, geometry.sidebar);
-  expectHorizontallyInside(geometry.actions, geometry.sidebar);
 }
 
 /* La barra lateral de escritorio con el logo junto al nombre (#352). */
@@ -11573,7 +11764,7 @@ test.describe("logo-cabecera: el logo en la misma fila que el nombre", () => {
 
           const geometry = await readSidebarBrandGeometry(page);
           expectLogoBesideName(geometry);
-          expectControlsBelowBrand(geometry);
+          expectHeaderIsOnlyBrand(geometry);
           await expectNoHorizontalScroll(page);
         });
       }
@@ -11592,7 +11783,7 @@ test.describe("logo-cabecera: el logo en la misma fila que el nombre", () => {
         expect(geometry.nameLineCount).toBe(2);
         expect(geometry.isNameOverflowing).toBe(false);
         expectLogoBesideName(geometry);
-        expectControlsBelowBrand(geometry);
+        expectHeaderIsOnlyBrand(geometry);
         await expectNoHorizontalScroll(page);
       });
 
@@ -11604,7 +11795,7 @@ test.describe("logo-cabecera: el logo en la misma fila que el nombre", () => {
         const geometry = await readSidebarBrandGeometry(page);
         expect(geometry.logo).toBeNull();
         expect(geometry.name.left).toBe(geometry.lockup.left);
-        expectControlsBelowBrand(geometry);
+        expectHeaderIsOnlyBrand(geometry);
       });
 
       // El apaisado lo fotografía `logo-cabecera: la marca con logo`; el

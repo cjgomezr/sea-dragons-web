@@ -30,7 +30,12 @@ export default defineConfig({
   // captura pueda saltársela (#606, ver tests/support/screenshot-tolerance.ts).
   expect: {
     timeout: process.env.CI ? 15_000 : 5_000,
-    toHaveScreenshot: { threshold: SCREENSHOT_COLOR_THRESHOLD },
+    toHaveScreenshot: {
+      threshold: SCREENSHOT_COLOR_THRESHOLD,
+      // Esconde lo que cambia con cada corrida, como las iniciales del Admin
+      // sembrado, que llevan el runId (#717).
+      stylePath: "./tests/support/screenshot-volatile.css",
+    },
   },
   reporter: process.env.CI ? "github" : "list",
   use: {

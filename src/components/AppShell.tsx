@@ -1,13 +1,17 @@
 import type { ReactNode } from "react";
-import { AccountMenu } from "@/components/AccountMenu";
+import {
+  AccountMenu,
+  type AccountIdentity,
+  type AccountMenuTrigger,
+} from "@/components/AccountMenu";
 import { ClubBrandMark } from "@/components/ClubBrandMark";
 import { FailedPaymentNotice } from "@/components/FailedPaymentNotice";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { MobileSearch } from "@/components/search/MobileSearch";
+import { ScreenOnly } from "@/components/ScreenOnly";
 import { SidebarNav } from "@/components/SidebarNav";
-import type { MemberIdentity } from "@/lib/auth/caller-identity";
 import { CLUB_SETTINGS_PATH, SEARCH_API_PATH } from "@/lib/auth/routes";
 import {
   type ActiveAccess,
@@ -16,6 +20,34 @@ import {
 import type { ClubBrand } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
 import type { FailedPaymentAlert } from "@/lib/membership/failed-payment-alert";
+
+/** La campana y la cuenta, los dos controles que en el móvil van en la
+ * cabecera y en escritorio en la barra de arriba (#717). La campana va fuera
+ * del menú de la cuenta (#287): lleva el número de avisos sin leer, y dentro
+ * de un menú no avisaría de nada. */
+function HeaderActions({
+  locale,
+  account,
+  trigger,
+  canConfigureClub,
+}: {
+  locale: Locale;
+  account: AccountIdentity;
+  trigger: AccountMenuTrigger;
+  canConfigureClub: boolean;
+}): React.JSX.Element {
+  return (
+    <>
+      <NotificationBell locale={locale} />
+      <AccountMenu
+        locale={locale}
+        account={account}
+        trigger={trigger}
+        canConfigureClub={canConfigureClub}
+      />
+    </>
+  );
+}
 
 export function AppShell({
   locale,
@@ -33,8 +65,9 @@ export function AppShell({
   /** Quien tiene la sesión, leído en el servidor: la búsqueda lo lleva a su
    * perfil cuando se encuentra a sí mismo (#427). */
   viewerId: string;
-  /** El nombre y el correo de quien mira, para el menú de la cuenta (#716). */
-  account: MemberIdentity;
+  /** El nombre, el correo y la foto de quien mira, para el menú de la cuenta
+   * (#716) y su botón (#717). */
+  account: Omit<AccountIdentity, "role">;
   /** La que leyó el servidor de la base (#292). */
   brand: ClubBrand;
   /** El cobro fallido de quien mira, decidido en el servidor (#474); nulo
@@ -46,6 +79,13 @@ export function AppShell({
   // La búsqueda encuentra socios y noticias de todo el club, y la frontera
   // se la cierra a quien no tiene la membresía al día (#453).
   const canSearch = isAllowedForAccess(SEARCH_API_PATH, access);
+  // Con la misma regla que la frontera, como la navegación: el menú no ofrece
+  // lo que la frontera no dejaría abrir.
+  const headerActions = {
+    locale,
+    account: { ...account, role: access.role },
+    canConfigureClub: isAllowedForAccess(CLUB_SETTINGS_PATH, access),
+  };
   return (
     <div className="app-shell">
       <aside className="app-sidebar">
@@ -61,34 +101,37 @@ export function AppShell({
               {brand.name}
             </span>
           </div>
-          {/* La campana va fuera del menú de la cuenta (#287): lleva el número
-              de avisos sin leer, y dentro de un menú no avisaría de nada. */}
+          {/* Sólo en el móvil (#717): en escritorio la cabecera de la barra
+              lateral es la marca, y la lupa no hace falta porque el cuadro
+              ya está en la barra de arriba (#427). */}
           <div className="app-sidebar-actions">
-            {/* La lupa sólo se ve en el móvil (#427): en escritorio el cuadro
-                ya está en la barra de arriba del contenido. */}
-            {canSearch ? (
-              <MobileSearch locale={locale} viewer={viewer} />
-            ) : null}
-            <NotificationBell locale={locale} />
-            {/* Con la misma regla que la frontera, como la navegación: el
-                menú no ofrece lo que la frontera no dejaría abrir. */}
-            <AccountMenu
-              locale={locale}
-              account={{ ...account, role: access.role }}
-              canConfigureClub={isAllowedForAccess(CLUB_SETTINGS_PATH, access)}
-            />
+            <ScreenOnly screen="phone">
+              {canSearch ? (
+                <MobileSearch locale={locale} viewer={viewer} />
+              ) : null}
+              <HeaderActions {...headerActions} trigger="icon" />
+            </ScreenOnly>
           </div>
         </div>
         <SidebarNav locale={locale} access={access} />
       </aside>
       <div className="app-content">
-        {/* El cuadro de búsqueda del mockup del panel (#427). En el móvil no
-            se pinta: lo abre la lupa de la cabecera a pantalla completa. */}
-        {canSearch ? (
-          <div className="app-topbar" role="search">
-            <GlobalSearch locale={locale} viewer={viewer} layout="bar" />
+        {/* La barra de arriba de escritorio: el cuadro de búsqueda del mockup
+            del panel (#427) a la izquierda, y la campana y la cuenta a la
+            derecha (#717). En el móvil no se ve: la búsqueda la abre la lupa
+            de la cabecera, y los dos botones viven en ella. */}
+        <div className="app-topbar">
+          {canSearch ? (
+            <div className="app-topbar-search" role="search">
+              <GlobalSearch locale={locale} viewer={viewer} layout="bar" />
+            </div>
+          ) : null}
+          <div className="app-topbar-actions">
+            <ScreenOnly screen="desktop">
+              <HeaderActions {...headerActions} trigger="avatar" />
+            </ScreenOnly>
           </div>
-        ) : null}
+        </div>
         {/* Arriba del contenido de cualquier pantalla y fuera de la
             navegación, para no taparla (#474). */}
         {failedPayment === null ? null : (

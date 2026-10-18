@@ -31,3 +31,14 @@ function isPhoneOnServer(): boolean {
 export function useIsPhone(): boolean {
   return useSyncExternalStore(subscribe, isPhoneNow, isPhoneOnServer);
 }
+
+function isUnknownOnServer(): null {
+  return null;
+}
+
+/** Como `useIsPhone`, pero sin adivinar: null en el servidor y al hidratar,
+ * para quien prefiere pintar los dos tamaños y que la hoja de estilos esconda
+ * el que sobra hasta saberlo (#717). */
+export function useIsPhoneOnceKnown(): boolean | null {
+  return useSyncExternalStore(subscribe, isPhoneNow, isUnknownOnServer);
+}

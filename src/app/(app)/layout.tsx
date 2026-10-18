@@ -4,6 +4,7 @@ import { readCallerIdentity } from "@/lib/auth/caller-identity";
 import { readCallerAccess, readCallerId } from "@/lib/auth/caller-role";
 import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
+import { readCallerPhotoUrl } from "@/lib/members/caller-photo";
 import { readCallerFailedPayment } from "@/lib/membership/caller-failed-payment";
 
 /** La cáscara con menú lateral y barra de pestañas envuelve sólo las
@@ -13,12 +14,13 @@ import { readCallerFailedPayment } from "@/lib/membership/caller-failed-payment"
 export default async function AppLayout({
   children,
 }: Readonly<{ children: ReactNode }>): Promise<React.JSX.Element> {
-  const [locale, access, viewerId, account, brand, failedPayment] =
+  const [locale, access, viewerId, identity, photoUrl, brand, failedPayment] =
     await Promise.all([
       readRequestLocale(),
       readCallerAccess(),
       readCallerId(),
       readCallerIdentity(),
+      readCallerPhotoUrl(),
       readClubBrand(),
       readCallerFailedPayment(),
     ]);
@@ -27,7 +29,7 @@ export default async function AppLayout({
       locale={locale}
       access={access}
       viewerId={viewerId}
-      account={account}
+      account={{ ...identity, photoUrl }}
       brand={brand}
       failedPayment={failedPayment}
     >

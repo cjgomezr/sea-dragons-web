@@ -887,20 +887,21 @@ button.notification-item-content:hover {
 }
 
 @media (min-width: 768px) {
-  /* El desplegable cuelga de la fila de acciones y no de la campana: la barra
-     lateral mide 240px y un panel alineado con la campana se saldría de ella
-     por la izquierda sin motivo. */
+  /* En escritorio la campana y la cuenta viven en la barra de arriba (#717):
+     la cabecera de la barra lateral se queda con la marca. Hasta hidratar se
+     pintan en los dos sitios, y esto esconde la copia del móvil. */
   .app-sidebar-actions {
-    position: relative;
-    gap: var(--space-2);
+    display: none;
   }
 
+  /* Los dos desplegables cuelgan del borde derecho de la barra, que es el de
+     la ventana menos su margen: alineados a la izquierda se saldrían de ella. */
   .notification-panel,
   .account-menu {
     position: absolute;
     inset: auto;
     top: calc(100% + var(--space-2));
-    left: 0;
+    right: 0;
     width: 340px;
     max-height: 420px;
     padding: 0;
@@ -913,6 +914,7 @@ button.notification-item-content:hover {
   /* El desplegable del handoff (#1a): 300 px, marco de 12 y 6 px por dentro.
      Es más alto que la lista de avisos, así que su tope es la ventana. */
   .account-menu {
+    top: calc(100% + 6px);
     gap: 0;
     width: 300px;
     max-height: calc(100vh - 80px);
@@ -1271,9 +1273,74 @@ button.notification-item-content:hover {
   .app-topbar {
     display: flex;
     align-items: center;
+    gap: var(--space-4);
     padding: var(--space-3) var(--space-8);
     background: var(--color-panel);
     border-bottom: 1px solid var(--color-border);
+  }
+
+  .app-topbar-search {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* La campana y la cuenta a la derecha de la barra (#717), también cuando
+     quien mira no tiene búsqueda y la barra no lleva nada más. */
+  .app-topbar-actions {
+    position: relative;
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  /* El desplegable de la cuenta cuelga de su botón, 6 px por debajo. */
+  .app-topbar-actions .account-menu-anchor {
+    position: relative;
+  }
+
+  /* Sobre el fondo de la barra la campana va sin marco, como en el handoff;
+     el hover le da el fondo en su lugar. */
+  .app-topbar-actions .app-header-icon {
+    color: var(--color-text);
+    border-color: transparent;
+  }
+
+  .app-topbar-actions .app-header-icon:hover {
+    background: var(--color-hover);
+  }
+
+  /* El botón de la cuenta del handoff: un círculo de 38 px con la foto o las
+     iniciales. Abierto, el fondo de lo elegido y un anillo de acento. */
+  .account-avatar-button {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    overflow: hidden;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--color-text);
+    background: var(--color-hover);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .account-avatar-button[aria-expanded="true"] {
+    background: var(--color-segment-selected);
+    box-shadow: 0 0 0 2px var(--color-accent);
+  }
+
+  .account-avatar-face {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .global-search-bar {

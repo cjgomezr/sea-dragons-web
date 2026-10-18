@@ -1,0 +1,10 @@
+/* Lo que cambia de una corrida a otra y Playwright esconde en cada captura
+   (stylePath en playwright.config.ts).
+
+   Las iniciales del botón de la cuenta (#717): el Admin sembrado se llama
+   "Admin de administración <runId>", y su segunda inicial sale del runId,
+   que es aleatorio. El círculo se queda; sólo la letra se vuelve invisible.
+   Las iniciales ya las prueban los tests unitarios de MemberAvatar. */
+.account-avatar-face {
+  color: transparent !important;
+}
