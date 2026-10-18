@@ -139,6 +139,7 @@ type SessionPacksEditor = {
   readonly move: (sessions: number, direction: Direction) => void;
   readonly remove: (sessions: number) => void;
   readonly add: (sessions: number) => boolean;
+  readonly clearAddIssue: () => void;
   readonly discard: () => void;
   readonly save: () => Promise<void>;
 };
@@ -268,9 +269,14 @@ function useSessionPacksEditor(
     return true;
   }
 
+  function clearAddIssue(): void {
+    setAddIssue(null);
+  }
+
   function discard(): void {
     packs.discard();
     setNotice(null);
+    clearAddIssue();
   }
 
   async function save(): Promise<void> {
@@ -291,6 +297,7 @@ function useSessionPacksEditor(
     move,
     remove,
     add,
+    clearAddIssue,
     discard,
     save,
   };
@@ -391,12 +398,15 @@ function AddPackRow({
   issue,
   isBusy,
   onAdd,
+  onEdit,
 }: {
   translate: Translator;
   sessionPrice: ClubPrice;
   issue: SessionPackIssueCode | null;
   isBusy: boolean;
   onAdd: (sessions: number) => boolean;
+  /** Un número nuevo deja viejo el aviso del anterior. */
+  onEdit: () => void;
 }): React.JSX.Element {
   const [text, setText] = useState("");
   const isInvalid = issue !== null;
@@ -432,7 +442,10 @@ function AddPackRow({
               ? `${NEW_PACK_ISSUE_ID} ${NEW_PACK_PRICE_ID}`
               : NEW_PACK_PRICE_ID
           }
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            setText(event.target.value);
+            onEdit();
+          }}
         />
         <span className="club-packs-add-unit" aria-hidden="true">
           {translate("clubSettings.sessionPacks.add.unit")}
@@ -540,6 +553,7 @@ function PacksTable({
         issue={editor.addIssue}
         isBusy={isSending}
         onAdd={editor.add}
+        onEdit={editor.clearAddIssue}
       />
     </div>
   );

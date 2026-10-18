@@ -284,6 +284,19 @@ describe("la fila de añadir", () => {
     },
   );
 
+  it("quita el aviso en cuanto se corrige el número", async () => {
+    stubApi();
+    await renderSection();
+    await addPack("60");
+
+    await typeNewPack("7");
+
+    expect(addField()).toHaveAttribute("aria-invalid", "false");
+    expect(addField()).not.toHaveAccessibleDescription(
+      expect.stringContaining("Between 1 and 50."),
+    );
+  });
+
   it("no añade un tamaño que ya está", async () => {
     stubApi();
     await renderSection();
