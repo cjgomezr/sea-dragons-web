@@ -2436,11 +2436,13 @@ describe("fila de la agenda", () => {
     expect(detailRequests(POOL_TRAINING)).toEqual([]);
   });
 
+  // Desde #731 la fila de un evento al que se responde lleva botones: la
+  // píldora queda para los que ya no se pueden responder.
   it("enseña mi respuesta en una píldora", async () => {
     stubAgenda([
-      POOL_TRAINING,
-      { ...SCRIMMAGE, myResponse: "maybe" },
-      { ...CANCELLED_SOCIAL, status: "scheduled", myResponse: "no" },
+      { ...POOL_TRAINING, status: "cancelled" },
+      { ...SCRIMMAGE, myResponse: "maybe", inAudience: false },
+      { ...CANCELLED_SOCIAL, myResponse: "no" },
     ]);
 
     render(
@@ -2468,7 +2470,7 @@ describe("fila de la agenda", () => {
     ).toHaveClass("agenda-answer-no");
   });
 
-  it("sin respuesta pide el RSVP y dice cuántos van", async () => {
+  it("sin respuesta no marca ningún botón y dice cuántos van", async () => {
     stubAgenda([SCRIMMAGE]);
 
     render(
@@ -2481,9 +2483,12 @@ describe("fila de la agenda", () => {
     );
 
     const row = await findRow(SCRIMMAGE.title);
+    for (const name of ["Going", "Maybe", "Can't go"]) {
+      expect(rsvpButton(row, name)).toHaveAttribute("aria-pressed", "false");
+    }
     expect(
-      within(row).getByText("RSVP", { selector: MISSING_ANSWER }),
-    ).toBeInTheDocument();
+      within(row).queryByText("RSVP", { selector: MISSING_ANSWER }),
+    ).not.toBeInTheDocument();
     expect(within(row).getByText("18 going")).toBeInTheDocument();
   });
 
@@ -2505,7 +2510,7 @@ describe("fila de la agenda", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("la píldora cambia al guardar otra respuesta", async () => {
+  it("los botones de la fila marcan la respuesta guardada en el panel", async () => {
     stubApi(({ method, url }) =>
       method === "PUT"
         ? savedResponse(SCRIMMAGE.id, "yes")
@@ -2529,12 +2534,9 @@ describe("fila de la agenda", () => {
 
     await userEvent.click(rsvpButton(panel, "Going"));
 
-    expect(
-      await within(row).findByText("Going", { selector: PILL }),
-    ).toHaveClass("agenda-answer-yes");
-    expect(
-      within(row).queryByText("RSVP", { selector: MISSING_ANSWER }),
-    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(rsvpButton(row, "Going")).toHaveAttribute("aria-pressed", "true"),
+    );
   });
 
   it("marca el cancelado con la palabra y lo atenúa", async () => {
@@ -2572,9 +2574,10 @@ describe("fila de la agenda", () => {
     const row = await findRow(WITH_END_AND_COVER.title);
     expect(within(row).getByText("19:00")).toBeInTheDocument();
     expect(within(row).getByText("20:30")).toBeInTheDocument();
-    expect(
-      within(row).getByText("No puedo", { selector: PILL }),
-    ).toBeInTheDocument();
+    expect(rsvpButton(row, "No puedo")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(within(row).getByText("Se repite")).toBeInTheDocument();
     expect(
       within(row).getByRole("link", {
