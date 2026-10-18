@@ -119,9 +119,13 @@ function isVisible(event: FakeEvent, query: AgendaQuery): boolean {
 }
 
 function isInPeriod(event: FakeEvent, query: AgendaQuery): boolean {
-  return query.period === "upcoming"
-    ? event.startsOn >= query.today
-    : event.startsOn < query.today;
+  if (query.period === "upcoming") {
+    return event.startsOn >= query.today;
+  }
+  return (
+    event.startsOn < query.today &&
+    (query.pastFrom === null || event.startsOn <= query.pastFrom)
+  );
 }
 
 function hasRequestedType(event: FakeEvent, query: AgendaQuery): boolean {

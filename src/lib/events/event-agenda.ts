@@ -95,6 +95,9 @@ export type AgendaQuery = {
   /** `YYYY-MM-DD` de Melbourne: los próximos empiezan este día, los pasados
    * terminan el anterior. */
   readonly today: string;
+  /** `YYYY-MM-DD`: los pasados empiezan este día, inclusive, en vez de ayer
+   * (#710). Nulo sin salto y siempre en los próximos. */
+  readonly pastFrom: string | null;
   /** Sólo los eventos de estos tipos, o nulo para todos (D8 de E24). */
   readonly eventTypes: readonly EventType[] | null;
   readonly after: AgendaPosition | null;
@@ -380,6 +383,9 @@ export async function listAgenda(
     /** Sin tipos, o con la lista vacía, son todos. La página siguiente se
      * pide con los mismos: el cursor no los recuerda. */
     readonly eventTypes?: readonly EventType[];
+    /** El día por el que empiezan los pasados (#710). Como los tipos, la
+     * página siguiente se pide con el mismo. */
+    readonly from?: string;
   },
 ): Promise<AgendaPage> {
   const after =
@@ -392,6 +398,7 @@ export async function listAgenda(
     visibility: eventVisibilityFor(viewer.role, viewer.groupIds),
     period: request.period,
     today: clubCalendarDate(request.now),
+    pastFrom: request.from ?? null,
     eventTypes: eventTypes.length === 0 ? null : eventTypes,
     after,
     limit: AGENDA_PAGE_SIZE + 1,
