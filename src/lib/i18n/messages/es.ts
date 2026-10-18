@@ -1608,6 +1608,10 @@ export const spanishMessages: MessageCatalog = {
   "calendar.period.past": "Pasados",
   "calendar.pastTitle": "Eventos pasados",
   "calendar.pastEmpty": "No hay eventos pasados.",
+  // Saltar a una fecha en Pasados (#710).
+  "calendar.jump.label": "Ir a una fecha",
+  "calendar.jump.latest": "Lo más reciente",
+  "calendar.jump.empty": "No hay eventos en esa fecha ni antes.",
   "calendar.detail.loading": "Cargando el detalle…",
   "calendar.detail.notes": "Notas",
   "calendar.detail.noNotes": "Este evento no tiene notas.",

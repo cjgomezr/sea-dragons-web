@@ -15,10 +15,15 @@ import {
 } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
-import { calendarYearOf, clubCalendarDate } from "@/lib/time/club-calendar";
+import {
+  calendarYearOf,
+  clubCalendarDate,
+  subtractClubDays,
+} from "@/lib/time/club-calendar";
 import {
   type AgendaFailure,
   type AgendaLoad,
+  type AgendaRequest,
   describeAgendaFailure,
   loadAgenda,
 } from "./agenda-client";
@@ -83,6 +88,10 @@ import type { EventOrganizer } from "./EventOrganizerActions";
  * cargado y las respuestas, sin pedir nada. Abrirla deja una entrada en el
  * historial para que volver del navegador (o el gesto de Android) la cierre
  * en vez de salir del calendario; el scroll de la agenda se guarda y vuelve.
+ *
+ * En Pasados un selector salta a un día (#710): la vista de los pasados se
+ * vuelve a montar y pide desde ese día con `from`. La fecha se queda al ir a
+ * Próximos y volver, como el filtro, y "Lo más reciente" la quita.
  */
 
 /** Lo que la agenda anuncia tras crear, editar o cancelar. */
@@ -173,11 +182,10 @@ const MAX_PAGES_TO_FIND_EVENT = 4;
  * hasta encontrarlo o llegar al tope. Un fallo en una página de más no tumba
  * la agenda: se enseña lo que ya llegó. */
 async function loadFirstPages(
-  period: AgendaPeriod,
-  eventTypes: readonly EventType[],
+  request: Omit<AgendaRequest, "cursor">,
   soughtEventId: string | null,
 ): Promise<AgendaLoad> {
-  const first = await loadAgenda(period, null, eventTypes);
+  const first = await loadAgenda({ ...request, cursor: null });
   if (first.kind === "failed" || soughtEventId === null) {
     return first;
   }
@@ -189,7 +197,7 @@ async function loadFirstPages(
     !events.some((event) => event.id === soughtEventId);
     pages += 1
   ) {
-    const next = await loadAgenda(period, nextCursor, eventTypes);
+    const next = await loadAgenda({ ...request, cursor: nextCursor });
     if (next.kind === "failed") {
       break;
     }
@@ -452,6 +460,74 @@ function PeriodChoice({
   );
 }
 
+/** El primer día al que se puede saltar. Al escribir el año cifra a cifra el
+ * campo pasa por días completos como el 20 de mayo del año 20; con este suelo
+ * no piden nada. El club no tiene eventos de antes. */
+const EARLIEST_JUMP_DATE = "2000-01-01";
+
+/** Saltar a un día de los pasados (#710), de ayer hacia atrás en Melbourne.
+ * El campo no se controla: un `<input type="date">` a medio escribir vale
+ * "", y devolverle el valor de antes no dejaría corregir una parte. Sólo un
+ * día completo entre `EARLIEST_JUMP_DATE` y ayer mueve la agenda. */
+function PastDateJump({
+  translate,
+  from,
+  onJump,
+  onLatest,
+}: {
+  readonly translate: Translator;
+  readonly from: string | null;
+  readonly onJump: (date: string) => void;
+  readonly onLatest: () => void;
+}): React.JSX.Element {
+  const fieldId = useId();
+  const fieldRef = useRef<HTMLInputElement>(null);
+  const yesterday = subtractClubDays(clubCalendarDate(new Date()), 1);
+
+  function jumpTo(date: string): void {
+    if (date >= EARLIEST_JUMP_DATE && date <= yesterday) {
+      onJump(date);
+    }
+  }
+
+  // El botón se desactiva al pulsarlo: el foco pasa al campo en vez de
+  // perderse.
+  function showLatest(): void {
+    const field = fieldRef.current;
+    if (field !== null) {
+      field.value = "";
+      field.focus();
+    }
+    onLatest();
+  }
+
+  return (
+    <div className="agenda-jump">
+      <label className="agenda-jump-label" htmlFor={fieldId}>
+        {translate("calendar.jump.label")}
+      </label>
+      <input
+        ref={fieldRef}
+        id={fieldId}
+        className="agenda-jump-field"
+        type="date"
+        min={EARLIEST_JUMP_DATE}
+        max={yesterday}
+        defaultValue={from ?? ""}
+        onChange={(event) => jumpTo(event.target.value)}
+      />
+      <button
+        type="button"
+        className="admin-secondary agenda-jump-latest"
+        disabled={from === null}
+        onClick={showLatest}
+      >
+        {translate("calendar.jump.latest")}
+      </button>
+    </div>
+  );
+}
+
 /** Un chip por tipo, con su punto de color. Encendido lleva el tinte del
  * tipo; el color acompaña, `aria-pressed` es lo que se anuncia. */
 function TypeChips({
@@ -528,6 +604,7 @@ function AgendaView({
   translate,
   period,
   eventTypes,
+  from,
   isActive,
   focusOnLoad,
   organizer,
@@ -539,6 +616,8 @@ function AgendaView({
   readonly period: AgendaPeriod;
   /** Los tipos que se piden; ninguno, todos. */
   readonly eventTypes: readonly EventType[];
+  /** El día por el que empiezan los pasados tras un salto (#710). */
+  readonly from: string | null;
   readonly isActive: boolean;
   /** El evento cuyo título recibe el foco con la primera página. */
   readonly focusOnLoad: string | null;
@@ -563,7 +642,8 @@ function AgendaView({
   useEffect(() => {
     let isCurrent = true;
     const soughtEventId = reloads === 0 ? focusOnLoad : null;
-    void loadFirstPages(period, eventTypes, soughtEventId).then((outcome) => {
+    const request = { period, eventTypes, from };
+    void loadFirstPages(request, soughtEventId).then((outcome) => {
       if (!isCurrent) {
         return;
       }
@@ -582,7 +662,7 @@ function AgendaView({
     return () => {
       isCurrent = false;
     };
-  }, [period, eventTypes, reloads, focusOnLoad]);
+  }, [period, eventTypes, from, reloads, focusOnLoad]);
 
   function reloadAgenda(): void {
     setState({ kind: "loading" });
@@ -595,7 +675,7 @@ function AgendaView({
         ? { ...current, more: { kind: "loading" } }
         : current,
     );
-    const outcome = await loadAgenda(period, cursor, eventTypes);
+    const outcome = await loadAgenda({ period, cursor, eventTypes, from });
     setState((current) => {
       if (current.kind !== "ready") {
         return current;
@@ -660,7 +740,11 @@ function AgendaView({
         />
       ) : null}
       {state.kind === "ready" && state.events.length === 0 ? (
-        <p className="admin-empty">{translate(PERIOD_TEXTS[period].empty)}</p>
+        <p className="admin-empty">
+          {translate(
+            from === null ? PERIOD_TEXTS[period].empty : "calendar.jump.empty",
+          )}
+        </p>
       ) : null}
       {state.kind === "ready" && state.events.length > 0 ? (
         <div className="agenda-columns">
@@ -840,6 +924,7 @@ export function AgendaScreen({
   const membershipNoticeId = useId();
   const rsvpDisabledReasonId = canRespond ? null : membershipNoticeId;
   const [period, setPeriod] = useState<AgendaPeriod>(initialPeriod);
+  const [pastFrom, setPastFrom] = useState<string | null>(null);
   const [notice, setNotice] = useState<AgendaNotice | null>(null);
   // En el navegador manda la dirección: al volver atrás, el router pinta la
   // página con los props de antes de filtrar, sin `?types=`. Fuera de un
@@ -920,6 +1005,14 @@ export function AgendaScreen({
               period={period}
               onChoose={choosePeriod}
             />
+            {period === "past" ? (
+              <PastDateJump
+                translate={translate}
+                from={pastFrom}
+                onJump={setPastFrom}
+                onLatest={() => setPastFrom(null)}
+              />
+            ) : null}
             {canManageEvents ? (
               <CreateEventButton
                 translate={translate}
@@ -972,10 +1065,13 @@ export function AgendaScreen({
           : PERIODS.filter((choice) => openedPeriods.has(choice)).map(
               (choice) => (
                 <AgendaView
-                  key={`${choice}-${agendaVersion.number}`}
+                  // Un salto también la vuelve a montar: llega de cero desde
+                  // el día elegido, con su "Cargando".
+                  key={`${choice}-${agendaVersion.number}-${choice === "past" ? (pastFrom ?? "") : ""}`}
                   translate={translate}
                   period={choice}
                   eventTypes={agendaRequestTypes(chosenTypes)}
+                  from={choice === "past" ? pastFrom : null}
                   isActive={choice === period}
                   focusOnLoad={agendaVersion.focusEventId}
                   organizer={organizer}

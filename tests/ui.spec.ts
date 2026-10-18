@@ -15419,11 +15419,18 @@ async function stubCalendarReads(
       const isPast = searchParams.get("period") === "past";
       // Los chips de tipo (#647) piden `types`: la API filtra, el stub también.
       const types = searchParams.get("types")?.split(",") ?? null;
-      const events = (isPast ? pastEvents : reads.events).filter(
-        (event) =>
-          types === null ||
-          types.includes((event as { readonly eventType: string }).eventType),
-      );
+      // El salto a una fecha (#710) pide `from`: los de ese día o antes.
+      const from = searchParams.get("from");
+      const events = (isPast ? pastEvents : reads.events).filter((event) => {
+        const { eventType, startsOn } = event as {
+          readonly eventType: string;
+          readonly startsOn: string;
+        };
+        return (
+          (types === null || types.includes(eventType)) &&
+          (from === null || startsOn <= from)
+        );
+      });
       return route.fulfill(jsonBody({ events, nextCursor: null }));
     },
   );
@@ -16064,6 +16071,129 @@ test.describe(ROW_RSVP_ERROR_STATE.name, () => {
     await page.setViewportSize({ width: 768, height: 812 });
     await goToCalendar(page, ROW_RSVP_ERROR_STATE);
     expect(await hasHorizontalScroll(page)).toBe(false);
+  });
+});
+
+// Saltar a una fecha en Pasados (#710): tras saltar a un día sin eventos la
+// lista empieza en el anterior que sí tiene; antes de todo, el vacío. Con el
+// reloj fijo, para que "ayer" y las etiquetas de los días no cambien. A 375
+// el selector baja a todo el ancho de la cabecera del móvil (#656).
+const PAST_JUMP_DATE = "2026-05-28";
+const PAST_JUMP_BEFORE_EVERYTHING = "2026-01-10";
+
+function jumpToPastDate(
+  date: string,
+  shown: (page: Page) => Promise<void>,
+): (page: Page) => Promise<void> {
+  return async (page) => {
+    await showPastEvents(page);
+    const field = page.getByLabel(/^(Go to a date|Ir a una fecha)$/);
+    await field.fill(date);
+    // Sin el cursor del campo: parpadea y movería la captura.
+    await field.blur();
+    await shown(page);
+    await page.mouse.move(0, 0);
+  };
+}
+
+const PAST_JUMPED_STATE: CalendarState = {
+  name: "calendario-pasados-saltar-fecha",
+  events: STUBBED_AGENDA_EVENTS,
+  pastEvents: STUBBED_PAST_EVENTS,
+  beforeVisit: fixAgendaClock,
+  ready: jumpToPastDate(PAST_JUMP_DATE, async (page) => {
+    await expect(
+      page.getByRole("heading", {
+        level: 3,
+        name: STUBBED_PAST_EVENTS[0].title,
+      }),
+    ).toBeHidden();
+    await expect(
+      page.getByRole("heading", {
+        level: 3,
+        name: STUBBED_PAST_EVENTS[1].title,
+      }),
+    ).toBeVisible();
+  }),
+};
+
+const PAST_JUMP_STATES: readonly CalendarState[] = [
+  PAST_JUMPED_STATE,
+  {
+    name: "calendario-pasados-saltar-vacio",
+    events: STUBBED_AGENDA_EVENTS,
+    pastEvents: STUBBED_PAST_EVENTS,
+    beforeVisit: fixAgendaClock,
+    ready: jumpToPastDate(PAST_JUMP_BEFORE_EVERYTHING, async (page) => {
+      await expect(
+        page.getByText("No events on or before that date."),
+      ).toBeVisible();
+    }),
+  },
+];
+
+for (const state of PAST_JUMP_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToCalendar(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+
+          test(`has no accessibility violations (axe-core, ${theme})`, async ({
+            page,
+          }) => {
+            await goToCalendar(page, state, theme);
+            await expectNoAxeViolations(page);
+          });
+        }
+      });
+    }
+
+    test("has no horizontal scroll at 375px", async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await goToCalendar(page, state);
+      expect(await hasHorizontalScroll(page)).toBe(false);
+    });
+  });
+}
+
+test.describe("calendario-pasados-saltar-movil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("el selector ocupa el ancho de la cabecera con zona táctil de 44px a 375px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToCalendar(page, PAST_JUMPED_STATE);
+
+    const header = await page.locator(".agenda-header").boundingBox();
+    const jump = await page.locator(".agenda-jump").boundingBox();
+    const field = await page.getByLabel("Go to a date").boundingBox();
+    const latest = await page
+      .getByRole("button", { name: "Most recent" })
+      .boundingBox();
+    expect(jump?.width).toBeCloseTo(header?.width ?? 0, 0);
+    expect(field?.height).toBeGreaterThanOrEqual(44);
+    expect(latest?.height).toBeGreaterThanOrEqual(44);
   });
 });
 

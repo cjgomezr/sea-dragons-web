@@ -1603,6 +1603,10 @@ export const englishMessages = {
   "calendar.period.past": "Past",
   "calendar.pastTitle": "Past events",
   "calendar.pastEmpty": "There are no past events.",
+  // Saltar a una fecha en Pasados (#710).
+  "calendar.jump.label": "Go to a date",
+  "calendar.jump.latest": "Most recent",
+  "calendar.jump.empty": "No events on or before that date.",
   "calendar.detail.loading": "Loading the details…",
   "calendar.detail.notes": "Notes",
   "calendar.detail.noNotes": "This event has no notes.",

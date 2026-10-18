@@ -1,4 +1,10 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgendaScreen } from "@/components/calendar/AgendaScreen";
@@ -8,6 +14,7 @@ import type {
   MemberEventDetail,
   OrganizerEventDetail,
 } from "@/lib/events/event-agenda";
+import type { EventType } from "@/lib/events/event-creation";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
 
 /**
@@ -2583,5 +2590,260 @@ describe("fila de la agenda", () => {
     ).toBeInTheDocument();
     const single = await findRow(SCRIMMAGE.title);
     expect(within(single).getByText("1 va")).toBeInTheDocument();
+  });
+});
+
+// Saltar a una fecha en Pasados (#710): el selector pide los pasados desde
+// ese día con `from`, y "Lo más reciente" vuelve a empezar por ayer.
+describe("saltar a una fecha en pasados", () => {
+  // El sábado 20 de junio de 2026 a las 10:00 de Melbourne: ayer es el 19.
+  const SATURDAY_MORNING = new Date("2026-06-20T00:00:00Z");
+  const YESTERDAY = "2026-06-19";
+  const JUMP_DATE = "2026-05-20";
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(SATURDAY_MORNING);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Los pasados enteros sin `from`, y desde `from` sólo los de ese día o
+   * antes, como la API. */
+  function stubPastFrom(past: readonly AgendaEvent[]): void {
+    stubApi(({ url }) => {
+      if (url.searchParams.get("period") !== "past") {
+        return agendaOrDetail(url, [POOL_TRAINING]);
+      }
+      const from = url.searchParams.get("from");
+      return agendaOrDetail(
+        url,
+        from === null ? past : past.filter((event) => event.startsOn <= from),
+      );
+    });
+  }
+
+  function dateField(name = "Go to a date"): HTMLInputElement {
+    const field = screen.getByLabelText(name);
+    if (!(field instanceof HTMLInputElement)) {
+      throw new Error("El selector de fecha no es un input.");
+    }
+    return field;
+  }
+
+  function jumpTo(date: string, name?: string): void {
+    fireEvent.change(dateField(name), { target: { value: date } });
+  }
+
+  async function openPast(
+    locale: "en" | "es" = "en",
+    props: { readonly initialTypes?: readonly EventType[] } = {},
+  ): Promise<void> {
+    render(
+      <AgendaScreen
+        locale={locale}
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+        {...props}
+      />,
+    );
+    await findRow(POOL_TRAINING.title);
+    await userEvent.click(periodButton(locale === "en" ? "Past" : "Pasados"));
+  }
+
+  function pastTitles(): readonly (string | null)[] {
+    const list = screen.getByRole("list", { name: "Past events" });
+    return within(list)
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent);
+  }
+
+  it("no pinta el selector en Próximos", async () => {
+    stubPastFrom([PAST_MATCH]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    await findRow(POOL_TRAINING.title);
+    expect(screen.queryByLabelText("Go to a date")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Most recent" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("en Pasados pinta el selector con máximo ayer y Lo más reciente desactivado", async () => {
+    stubPastFrom([PAST_MATCH]);
+
+    await openPast();
+
+    await findRow(PAST_MATCH.title);
+    expect(dateField()).toHaveAttribute("type", "date");
+    expect(dateField()).toHaveAttribute("max", YESTERDAY);
+    expect(screen.getByRole("button", { name: "Most recent" })).toBeDisabled();
+  });
+
+  it("al elegir un día pide los pasados desde ese día y los pinta", async () => {
+    stubPastFrom([PAST_MATCH, OLDER_PAST_TRAINING]);
+    await openPast();
+    await findRow(PAST_MATCH.title);
+
+    jumpTo(JUMP_DATE);
+
+    await waitFor(() =>
+      expect(pastTitles()).toEqual([OLDER_PAST_TRAINING.title]),
+    );
+    expect(agendaPageRequests().at(-1)).toEqual({
+      method: "GET",
+      path: `${AGENDA_PATH}?period=past&from=${JUMP_DATE}`,
+    });
+    expect(screen.getByRole("button", { name: "Most recent" })).toBeEnabled();
+  });
+
+  it("tras un salto Ver más sigue con el cursor y la misma fecha", async () => {
+    stubApi(({ url }) => {
+      if (url.searchParams.get("period") !== "past") {
+        return pageResponse({ events: [POOL_TRAINING], nextCursor: null });
+      }
+      if (url.searchParams.get("from") === null) {
+        return pageResponse({ events: [PAST_MATCH], nextCursor: null });
+      }
+      return url.searchParams.get("cursor") === "salto-2"
+        ? pageResponse({ events: [OLDER_PAST_TRAINING], nextCursor: null })
+        : pageResponse({ events: [PAST_MATCH], nextCursor: "salto-2" });
+    });
+    await openPast();
+    await findRow(PAST_MATCH.title);
+    jumpTo(JUMP_DATE);
+    const seeMore = await screen.findByRole("button", { name: "See more" });
+
+    await userEvent.click(seeMore);
+
+    expect(await findRow(OLDER_PAST_TRAINING.title)).toBeInTheDocument();
+    expect(agendaPageRequests().at(-1)).toEqual({
+      method: "GET",
+      path: `${AGENDA_PATH}?period=past&from=${JUMP_DATE}&cursor=salto-2`,
+    });
+  });
+
+  it("Lo más reciente vuelve a empezar por ayer y vacía el selector", async () => {
+    stubPastFrom([PAST_MATCH, OLDER_PAST_TRAINING]);
+    await openPast();
+    await findRow(PAST_MATCH.title);
+    jumpTo(JUMP_DATE);
+    await waitFor(() =>
+      expect(pastTitles()).toEqual([OLDER_PAST_TRAINING.title]),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Most recent" }));
+
+    await waitFor(() =>
+      expect(pastTitles()).toEqual([
+        PAST_MATCH.title,
+        OLDER_PAST_TRAINING.title,
+      ]),
+    );
+    expect(agendaPageRequests().at(-1)).toEqual({
+      method: "GET",
+      path: `${AGENDA_PATH}?period=past`,
+    });
+    expect(dateField()).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Most recent" })).toBeDisabled();
+  });
+
+  it("no salta a hoy ni a una fecha futura", async () => {
+    stubPastFrom([PAST_MATCH]);
+    await openPast();
+    await findRow(PAST_MATCH.title);
+    const requestsBefore = agendaPageRequests().length;
+
+    jumpTo("2026-06-20");
+    jumpTo("2026-07-01");
+
+    expect(agendaPageRequests()).toHaveLength(requestsBefore);
+    expect(screen.getByRole("button", { name: "Most recent" })).toBeDisabled();
+  });
+
+  it("no salta con los años a medio escribir", async () => {
+    stubPastFrom([PAST_MATCH]);
+    await openPast();
+    await findRow(PAST_MATCH.title);
+    const requestsBefore = agendaPageRequests().length;
+
+    jumpTo("0002-05-20");
+    jumpTo("0020-05-20");
+    jumpTo("0202-05-20");
+
+    expect(agendaPageRequests()).toHaveLength(requestsBefore);
+    expect(dateField()).toHaveAttribute("min", "2000-01-01");
+  });
+
+  it("dice que no hay eventos en esa fecha ni antes, con Lo más reciente", async () => {
+    stubPastFrom([PAST_MATCH]);
+    await openPast();
+    await findRow(PAST_MATCH.title);
+
+    jumpTo("2020-01-01");
+
+    expect(
+      await screen.findByText("No events on or before that date."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Most recent" })).toBeEnabled();
+  });
+
+  it("conserva el filtro de tipo al saltar", async () => {
+    stubPastFrom([OLDER_PAST_TRAINING]);
+    await openPast("en", { initialTypes: ["training"] });
+    await findRow(OLDER_PAST_TRAINING.title);
+
+    jumpTo(JUMP_DATE);
+
+    await waitFor(() =>
+      expect(agendaPageRequests().at(-1)).toEqual({
+        method: "GET",
+        path: `${AGENDA_PATH}?period=past&from=${JUMP_DATE}&types=training`,
+      }),
+    );
+  });
+
+  it("conserva la fecha elegida al ir a Próximos y volver", async () => {
+    stubPastFrom([PAST_MATCH, OLDER_PAST_TRAINING]);
+    await openPast();
+    await findRow(PAST_MATCH.title);
+    jumpTo(JUMP_DATE);
+    await waitFor(() =>
+      expect(pastTitles()).toEqual([OLDER_PAST_TRAINING.title]),
+    );
+    const requestsBefore = agendaPageRequests().length;
+
+    await userEvent.click(periodButton("Upcoming"));
+    await userEvent.click(periodButton("Past"));
+
+    expect(dateField()).toHaveValue(JUMP_DATE);
+    expect(pastTitles()).toEqual([OLDER_PAST_TRAINING.title]);
+    expect(agendaPageRequests()).toHaveLength(requestsBefore);
+  });
+
+  it("escribe el selector y el vacío en español", async () => {
+    stubPastFrom([PAST_MATCH]);
+    await openPast("es");
+    await findRow(PAST_MATCH.title);
+
+    jumpTo("2020-01-01", "Ir a una fecha");
+
+    expect(
+      await screen.findByText("No hay eventos en esa fecha ni antes."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Lo más reciente" }),
+    ).toBeEnabled();
   });
 });

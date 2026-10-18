@@ -37,6 +37,7 @@ import type { Translator } from "@/lib/i18n/translator";
 const CURSOR_PARAM = "cursor";
 const PERIOD_PARAM = "period";
 const TYPES_PARAM = "types";
+const FROM_PARAM = "from";
 const TYPES_SEPARATOR = ",";
 
 /** Un evento como lo sirve la agenda; el inicio lo lee igual (#426). */
@@ -142,22 +143,31 @@ export type RsvpSave =
     }
   | AgendaFailure;
 
-/** Los próximos van sin `period`, y todos los tipos sin `types`: es lo que
- * la API da por defecto. */
-function agendaPath(
-  period: AgendaPeriod,
-  cursor: string | null,
-  eventTypes: readonly EventType[],
-): string {
+/** Qué página de la agenda se pide. `from` es el día por el que empiezan los
+ * pasados tras un salto (#710), y nulo sin él. */
+export type AgendaRequest = {
+  readonly period: AgendaPeriod;
+  readonly cursor: string | null;
+  /** Ninguno son todos. */
+  readonly eventTypes: readonly EventType[];
+  readonly from: string | null;
+};
+
+/** Los próximos van sin `period`, todos los tipos sin `types` y los pasados
+ * desde ayer sin `from`: es lo que la API da por defecto. */
+function agendaPath(request: AgendaRequest): string {
   const params = new URLSearchParams();
-  if (period === "past") {
-    params.set(PERIOD_PARAM, period);
+  if (request.period === "past") {
+    params.set(PERIOD_PARAM, request.period);
   }
-  if (cursor !== null) {
-    params.set(CURSOR_PARAM, cursor);
+  if (request.from !== null) {
+    params.set(FROM_PARAM, request.from);
   }
-  if (eventTypes.length > 0) {
-    params.set(TYPES_PARAM, eventTypes.join(TYPES_SEPARATOR));
+  if (request.cursor !== null) {
+    params.set(CURSOR_PARAM, request.cursor);
+  }
+  if (request.eventTypes.length > 0) {
+    params.set(TYPES_PARAM, request.eventTypes.join(TYPES_SEPARATOR));
   }
   const query = params.toString();
   return query === "" ? EVENTS_API_PATH : `${EVENTS_API_PATH}?${query}`;
@@ -168,15 +178,11 @@ function eventPath(template: string, eventId: string): string {
 }
 
 /** Una página de los próximos o de los pasados: la primera sin cursor, las
- * demás con el `nextCursor` de la anterior y los mismos tipos. Sin tipos son
- * todos. Nunca rechaza: un fallo de red sale como fallo. */
-export async function loadAgenda(
-  period: AgendaPeriod,
-  cursor: string | null,
-  eventTypes: readonly EventType[] = [],
-): Promise<AgendaLoad> {
+ * demás con el `nextCursor` de la anterior y los mismos tipos y `from`.
+ * Nunca rechaza: un fallo de red sale como fallo. */
+export async function loadAgenda(request: AgendaRequest): Promise<AgendaLoad> {
   const read = readApiPayload(
-    await requestApi(agendaPath(period, cursor, eventTypes)),
+    await requestApi(agendaPath(request)),
     agendaResponseSchema,
   );
   return read.kind === "failed"

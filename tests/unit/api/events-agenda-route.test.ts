@@ -145,6 +145,63 @@ describe("endpoints de agenda y detalle", () => {
     });
   });
 
+  it("la agenda responde los pasados desde una fecha con `from`", async () => {
+    mockWiring({
+      events: [
+        clubEvent("2027-06-01", { title: "1 de junio" }),
+        clubEvent("2027-06-08", { title: "8 de junio" }),
+        clubEvent("2027-06-14", { title: "ayer" }),
+      ],
+    });
+
+    const response = await requestAgenda("?period=past&from=2027-06-08");
+
+    expect(response.status).toBe(200);
+    expect(await titlesIn(response)).toEqual(["8 de junio", "1 de junio"]);
+  });
+
+  it("la agenda sigue el cursor tras un salto con el mismo `from`", async () => {
+    const events = Array.from({ length: EVENTS_PAST_A_PAGE }, (_, index) =>
+      clubEvent("2027-06-05", { title: `evento ${index}` }),
+    );
+    mockWiring({ events: [...events, clubEvent("2027-06-10")] });
+    const query = "?period=past&from=2027-06-08";
+
+    const first = await readPage(await requestAgenda(query));
+    const second = await readPage(
+      await requestAgenda(`${query}&cursor=${first.nextCursor ?? ""}`),
+    );
+
+    expect(second.nextCursor).toBeNull();
+    expect([...first.titles, ...second.titles]).toEqual(
+      events.map((event) => event.title).reverse(),
+    );
+  });
+
+  it("la agenda responde 400 a un `from` mal formado", async () => {
+    mockWiring();
+
+    const response = await requestAgenda("?period=past&from=2027-13-40");
+
+    await expectError(response, 400, "validation_error");
+  });
+
+  it("la agenda responde 400 a `from` con los próximos", async () => {
+    mockWiring();
+
+    const response = await requestAgenda("?period=upcoming&from=2027-06-08");
+
+    await expectError(response, 400, "validation_error");
+  });
+
+  it("la agenda responde 400 a `from` sin periodo, que son los próximos", async () => {
+    mockWiring();
+
+    const response = await requestAgenda("?from=2027-06-08");
+
+    await expectError(response, 400, "validation_error");
+  });
+
   it("la agenda responde 400 a un periodo que no existe", async () => {
     mockWiring();
 

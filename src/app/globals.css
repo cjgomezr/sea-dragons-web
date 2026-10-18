@@ -11078,6 +11078,58 @@ a.auth-brand-header:focus-visible {
   flex: none;
 }
 
+/* Saltar a una fecha en Pasados (#710). Sin mockup: va junto a Próximos |
+   Pasados con la misma altura, y en el móvil baja a todo el ancho. */
+.agenda-jump {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.agenda-jump-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.agenda-jump-field {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.agenda-jump-field:hover {
+  border-color: var(--color-accent);
+}
+
+.agenda-jump-latest {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  .agenda-jump-field,
+  .agenda-jump-latest {
+    min-height: 36px;
+  }
+}
+
+/* En la tableta no caben Próximos | Pasados, el selector y "+ Evento" en una
+   fila: el selector baja a la suya y el control de periodo no se queda solo
+   con un hueco a su derecha. */
+@media (768px <= width < 1024px) {
+  .agenda-jump {
+    order: 1;
+  }
+}
+
 /* Como `.agenda-rsvp-status`: vacía no ocupa sitio, pero sigue en el DOM
    para que el aviso se anuncie al llegar. */
 .agenda-notice {
@@ -11147,6 +11199,21 @@ a.auth-brand-header:focus-visible {
     content: "";
     position: absolute;
     inset: -3px 0;
+  }
+
+  /* La etiqueta encima; el campo ocupa lo que deja "Lo más reciente". */
+  .agenda-jump {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .agenda-jump-label {
+    grid-column: 1 / -1;
+  }
+
+  .agenda-jump-field {
+    min-width: 0;
   }
 
   .agenda-chips {

@@ -35,6 +35,8 @@ import {
 
 const FAR_DAY = "2099-03-02";
 const NEXT_FAR_DAY = "2099-03-03";
+// Un "hoy" posterior a los dos, para leerlos como pasados (#710).
+const LATER_FAR_DAY = "2099-03-10";
 const SERIES_LAST_DAY = "2099-06-29";
 const TALLIES_RPC_PATH = "/rpc/event_rsvp_tallies";
 
@@ -222,6 +224,7 @@ function farAgendaQuery(
     visibility: { kind: "club" },
     period: "upcoming",
     today: FAR_DAY,
+    pastFrom: null,
     eventTypes: null,
     after: null,
     limit: AGENDA_PAGE_SIZE,
@@ -299,6 +302,41 @@ describeRls("agenda y detalle contra la base", () => {
 
         expect(first?.id).toBe(world.groupEventId);
         expect(rest.map((row) => row.id)).toEqual([world.clubEventId]);
+      }),
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "los pasados desde una fecha empiezan en ese día y aplican la audiencia",
+    () =>
+      withAgendaWorld(async (world) => {
+        const gateways = createEventAgendaGateways(world.serviceClient.client);
+        const titles = async (overrides: Partial<AgendaQuery>) =>
+          (
+            await gateways.agenda.findAgendaPage(
+              farAgendaQuery(world, {
+                period: "past",
+                today: LATER_FAR_DAY,
+                ...overrides,
+              }),
+            )
+          ).map((row) => row.title);
+
+        // Lo pasado real del club también entra: por eso se mira sólo el
+        // principio de la página, que es lo sembrado.
+        await expect(
+          titles({ pastFrom: NEXT_FAR_DAY, limit: 2 }),
+        ).resolves.toEqual(["De todo el club", "Del grupo"]);
+        await expect(titles({ pastFrom: FAR_DAY, limit: 1 })).resolves.toEqual([
+          "Del grupo",
+        ]);
+        await expect(
+          titles({
+            pastFrom: NEXT_FAR_DAY,
+            visibility: { kind: "audience", groupIds: [] },
+            limit: 1,
+          }),
+        ).resolves.toEqual(["De todo el club"]);
       }),
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
