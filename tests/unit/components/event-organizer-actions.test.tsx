@@ -24,6 +24,10 @@ import type {
 const AGENDA_PATH = "/api/v1/events";
 const GROUPS_PATH = "/api/v1/groups";
 const MANAGE_PATH = "/api/v1/events/manage";
+/** El buscador de lugares del diálogo (#652) cuelga de la misma ruta, pero
+ * sólo lee: no es un cambio del evento. Sale 300 ms después de escribir el
+ * lugar, así que en una máquina cargada llega antes de guardar. */
+const PLACES_PATH = `${MANAGE_PATH}/places`;
 
 const SENIOR = {
   id: "9a9a9a9a-0000-4000-8000-000000000009",
@@ -231,6 +235,11 @@ function stubApi(options: {
       if (url.pathname === GROUPS_PATH) {
         return jsonResponse(200, { data: { groups: [SENIOR, MASTERS] } });
       }
+      if (url.pathname === PLACES_PATH) {
+        return jsonResponse(200, {
+          data: { places: [], searchAvailable: true },
+        });
+      }
       if (url.pathname.startsWith(MANAGE_PATH)) {
         if (respond === undefined) {
           throw new Error(`Petición inesperada: ${method} ${url.pathname}`);
@@ -270,7 +279,10 @@ function agendaNotice(): HTMLElement {
 }
 
 function manageCalls(): Call[] {
-  return calls.filter((call) => call.pathname.startsWith(MANAGE_PATH));
+  return calls.filter(
+    (call) =>
+      call.pathname.startsWith(MANAGE_PATH) && call.pathname !== PLACES_PATH,
+  );
 }
 
 function agendaCalls(): Call[] {
@@ -503,6 +515,11 @@ describe("editar desde el calendario", () => {
     const dialog = await openEditDialog(SCRIMMAGE.title, "Edit event");
 
     setValue(dialog, "Location", moved.location);
+    // Espera a que salga la búsqueda del lugar: en una máquina cargada sale
+    // antes de guardar, y lo que se manda sigue siendo sólo el PATCH.
+    await waitFor(() => {
+      expect(calls.map((call) => call.pathname)).toContain(PLACES_PATH);
+    });
     await save(dialog);
 
     await waitFor(() => {
