@@ -148,11 +148,13 @@ function SectionContent({
   section,
   locale,
   translate,
+  club,
   reporters,
 }: {
   section: ClubSettingsSection;
   locale: Locale;
   translate: Translator;
+  club: ClubIdentity;
   reporters: DraftReporters;
 }): React.JSX.Element {
   switch (section) {
@@ -166,7 +168,9 @@ function SectionContent({
     case "sign-in":
       return (
         <ClubSignInTextsSection
+          locale={locale}
           translate={translate}
+          club={club}
           onHasDraftChange={reporters["sign-in"]}
         />
       );
@@ -335,6 +339,7 @@ function AdminClubSettings({
               section={section}
               locale={locale}
               translate={translate}
+              club={club}
               reporters={reporters}
             />
           ) : null}

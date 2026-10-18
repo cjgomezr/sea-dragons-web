@@ -1608,6 +1608,10 @@ export const spanishMessages: MessageCatalog = {
   "calendar.period.past": "Pasados",
   "calendar.pastTitle": "Eventos pasados",
   "calendar.pastEmpty": "No hay eventos pasados.",
+  // Saltar a una fecha en Pasados (#710).
+  "calendar.jump.label": "Ir a una fecha",
+  "calendar.jump.latest": "Lo más reciente",
+  "calendar.jump.empty": "No hay eventos en esa fecha ni antes.",
   "calendar.detail.loading": "Cargando el detalle…",
   "calendar.detail.notes": "Notas",
   "calendar.detail.noNotes": "Este evento no tiene notas.",
@@ -1842,35 +1846,48 @@ export const spanishMessages: MessageCatalog = {
     "Algo falló con la configuración del club. Vuelve a intentarlo.",
   "clubSettings.signInTexts.title": "Pantalla de entrar",
   "clubSettings.signInTexts.lead":
-    "El lema y el párrafo de bienvenida que se leen antes de iniciar sesión. Deja un campo vacío para que salga el texto de la aplicación en ese idioma.",
+    "El titular y el párrafo de la página de inicio de sesión. Deja un campo vacío para usar el texto de la app.",
   "clubSettings.signInTexts.loading": "Cargando los textos de entrada…",
-  "clubSettings.signInTexts.tagline.en": "Lema en inglés",
-  "clubSettings.signInTexts.welcome.en": "Párrafo de bienvenida en inglés",
-  "clubSettings.signInTexts.tagline.es": "Lema en español",
-  "clubSettings.signInTexts.welcome.es": "Párrafo de bienvenida en español",
-  "clubSettings.signInTexts.hint": "Hasta {max} caracteres. Texto plano.",
+  "clubSettings.signInTexts.language": "Idioma de los textos",
+  "clubSettings.signInTexts.language.en": "Inglés",
+  "clubSettings.signInTexts.language.es": "Español",
+  "clubSettings.signInTexts.tagline": "Titular",
+  "clubSettings.signInTexts.welcome": "Párrafo de bienvenida",
+  "clubSettings.signInTexts.counter": "{count} / {max}",
+  "clubSettings.signInTexts.otherLanguage.own":
+    "{language} tiene su propio texto.",
+  "clubSettings.signInTexts.otherLanguage.app":
+    "{language} usa el texto de la app.",
+  "clubSettings.signInTexts.otherLanguage.tooLong":
+    "{language} tiene un texto por encima del límite.",
+  "clubSettings.signInTexts.preview": "Página de inicio de sesión · {code}",
   "clubSettings.signInTexts.issue.taglineTooLong":
-    "El lema puede tener como mucho {max} caracteres.",
+    "El titular puede tener como mucho {max} caracteres.",
   "clubSettings.signInTexts.issue.welcomeTooLong":
     "El párrafo de bienvenida puede tener como mucho {max} caracteres.",
   "clubSettings.sessionPacks.title": "Packs de sesiones",
   "clubSettings.sessionPacks.lead":
-    "Lo que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual en Stripe por sus sesiones.",
+    "Paquetes que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual × sesiones (ahora {price} por sesión en Stripe).",
+  "clubSettings.sessionPacks.lead.noPrice":
+    "Paquetes que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual × sesiones.",
   "clubSettings.sessionPacks.loading": "Cargando los packs de sesiones…",
   "clubSettings.sessionPacks.pack": {
     one: "{count} sesión",
     other: "{count} sesiones",
   },
-  "clubSettings.sessionPacks.move.up": "Subir el pack de {pack}",
-  "clubSettings.sessionPacks.move.down": "Bajar el pack de {pack}",
-  "clubSettings.sessionPacks.move.up.text": "Subir",
-  "clubSettings.sessionPacks.move.down.text": "Bajar",
-  "clubSettings.sessionPacks.remove": "Quitar",
+  "clubSettings.sessionPacks.empty":
+    "Sin packs. Los miembros Casual solo pueden pagar por sesión.",
+  "clubSettings.sessionPacks.handle":
+    "Reordenar el pack de {pack}, puesto {rank} de {total}",
   "clubSettings.sessionPacks.remove.label": "Quitar el pack de {pack}",
-  "clubSettings.sessionPacks.add.title": "Añadir un pack",
   "clubSettings.sessionPacks.add.label": "Sesiones del pack nuevo",
-  "clubSettings.sessionPacks.add.hint": "De {min} a {max}.",
-  "clubSettings.sessionPacks.add.submit": "Añadir pack",
+  "clubSettings.sessionPacks.add.placeholder": "Sesiones",
+  "clubSettings.sessionPacks.add.unit": "sesiones",
+  "clubSettings.sessionPacks.add.submit": "Añadir",
+  "clubSettings.sessionPacks.add.issue.outOfRange": "Entre {min} y {max}.",
+  "clubSettings.sessionPacks.add.issue.repeated": "Ya está en la lista.",
+  "clubSettings.sessionPacks.footer":
+    "De {min} a {max} sesiones, sin repetir. Los miembros los ven en este orden.",
   "clubSettings.sessionPacks.moved":
     "El pack de {pack} es ahora el {rank} de {total}.",
   "clubSettings.sessionPacks.added":

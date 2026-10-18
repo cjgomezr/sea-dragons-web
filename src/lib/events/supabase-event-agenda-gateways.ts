@@ -171,6 +171,9 @@ async function findAgendaPage(
     query.period === "upcoming"
       ? request.gte("starts_on", query.today)
       : request.lt("starts_on", query.today);
+  if (query.pastFrom !== null) {
+    request = request.lte("starts_on", query.pastFrom);
+  }
   if (query.eventTypes !== null) {
     request = request.in("event_type", query.eventTypes);
   }

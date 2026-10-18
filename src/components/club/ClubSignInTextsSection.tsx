@@ -1,19 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Translate } from "@phosphor-icons/react/dist/ssr/Translate";
+import { useEffect, useId, useState } from "react";
+import { ClubBrandMark } from "@/components/ClubBrandMark";
+import { Icon } from "@/components/Icon";
+import {
+  type SegmentedOption,
+  SegmentedChoice,
+} from "@/components/SegmentedChoice";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import {
+  countCharacters,
   findSignInTextsIssues,
   isSameSignInTexts,
   NO_SIGN_IN_TEXTS,
-  SIGN_IN_TEXT_FIELDS,
+  SIGN_IN_TEXT_KINDS,
   type SignInTextField,
   type SignInTextKind,
   type SignInTexts,
   signInTextMaxLength,
 } from "@/lib/club/sign-in-texts";
-import type { Locale } from "@/lib/i18n/locale";
+import { type Locale, SUPPORTED_LOCALES } from "@/lib/i18n/locale";
 import { createTranslator, type Translator } from "@/lib/i18n/translator";
+import type { ClubIdentity } from "./ClubSettingsList";
 import { describeClubSettingsFailure } from "./club-settings-client";
 import {
   describeSignInTextTooLong,
@@ -34,6 +43,10 @@ import {
  * del PRD de E18a). Cada campo vacío enseña de muestra el texto de la
  * aplicación que saldrá en su lugar, y vaciarlo es volver a él.
  *
+ * Se edita un idioma a la vez, con una vista previa al lado (#721, RF-4 del
+ * PRD de E26). El borrador es de los dos idiomas: cambiar de uno a otro no
+ * pierde nada, y guardar los manda juntos, como antes.
+ *
  * Se guarda con la barra de cambios sin guardar de la sección (#719), no
  * con la de General: es otro recurso de la API, y un fallo aquí no debe
  * perder el nombre escrito allí.
@@ -47,6 +60,9 @@ type LoadState =
 type Draft = {
   readonly [L in Locale]: { readonly [K in SignInTextKind]: string };
 };
+
+/** Las filas del párrafo de bienvenida en el handoff (#721). */
+const WELCOME_ROWS = 5;
 
 /** De qué clave del catálogo sale el texto cuando el club no escribe uno. */
 const FALLBACK_KEY_OF_KIND = {
@@ -88,6 +104,14 @@ async function sendTexts(draft: Draft): Promise<DraftSaveOutcome<Draft>> {
     : { kind: "saved", value: toDraft(result.texts) };
 }
 
+/** El texto que sale en la pantalla de entrar: el del club o, si no
+ * escribió uno, el de la aplicación en ese idioma. */
+function shownText(text: string, locale: Locale, kind: SignInTextKind): string {
+  return text.trim() === ""
+    ? createTranslator(locale)(FALLBACK_KEY_OF_KIND[kind])
+    : text;
+}
+
 function SignInTextInput({
   translate,
   field,
@@ -103,42 +127,149 @@ function SignInTextInput({
 }): React.JSX.Element {
   const id = `club-texto-entrada-${field.kind}-${field.locale}`;
   const issueId = `${id}-aviso`;
-  const hintId = `${id}-ayuda`;
+  const counterId = `${id}-contador`;
   const control = {
     id,
     value,
+    lang: field.locale,
     // El texto de la aplicación en el idioma del campo, no en el de la
     // pantalla: es el que saldrá si se deja vacío.
-    placeholder: createTranslator(field.locale)(
-      FALLBACK_KEY_OF_KIND[field.kind],
-    ),
+    placeholder: shownText("", field.locale, field.kind),
     "aria-invalid": isInvalid,
-    "aria-describedby": isInvalid ? `${issueId} ${hintId}` : hintId,
+    "aria-describedby": isInvalid ? `${issueId} ${counterId}` : counterId,
     onChange: (
       event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     ) => onChange(event.target.value),
   };
   return (
     <div className="auth-field">
-      <label htmlFor={id}>
-        {translate(`clubSettings.signInTexts.${field.kind}.${field.locale}`)}
-      </label>
+      <div className="club-sign-in-field-heading">
+        <label htmlFor={id}>
+          {translate(`clubSettings.signInTexts.${field.kind}`)}
+        </label>
+        <span
+          className={
+            isInvalid
+              ? "club-sign-in-counter club-sign-in-counter-over"
+              : "club-sign-in-counter"
+          }
+          id={counterId}
+        >
+          {translate("clubSettings.signInTexts.counter", {
+            count: countCharacters(value),
+            max: signInTextMaxLength(field.kind),
+          })}
+        </span>
+      </div>
       {field.kind === "tagline" ? (
         <input type="text" autoComplete="off" {...control} />
       ) : (
-        <textarea rows={4} {...control} />
+        <textarea rows={WELCOME_ROWS} {...control} />
       )}
       {isInvalid ? (
         <p className="auth-field-error" id={issueId}>
           {describeSignInTextTooLong(translate, field.kind)}
         </p>
       ) : null}
-      <p className="auth-hint" id={hintId}>
-        {translate("clubSettings.signInTexts.hint", {
-          max: signInTextMaxLength(field.kind),
+    </div>
+  );
+}
+
+function languageOptions(translate: Translator): SegmentedOption<Locale>[] {
+  return SUPPORTED_LOCALES.map((locale) => ({
+    value: locale,
+    label: translate(`clubSettings.signInTexts.language.${locale}`),
+    icon: null,
+  }));
+}
+
+function otherLanguageOf(language: Locale): Locale {
+  const other = SUPPORTED_LOCALES.find((locale) => locale !== language);
+  if (other === undefined) {
+    throw new Error("La aplicación habla un solo idioma.");
+  }
+  return other;
+}
+
+/** "Español tiene su propio texto.": lo que no se ve del otro idioma. Si
+ * allí hay un campo por encima del límite, se avisa: es lo que impide
+ * guardar, y su aviso no está a la vista. */
+function OtherLanguageNote({
+  translate,
+  draft,
+  other,
+  hasIssue,
+}: {
+  translate: Translator;
+  draft: Draft;
+  other: Locale;
+  hasIssue: boolean;
+}): React.JSX.Element {
+  const language = translate(`clubSettings.signInTexts.language.${other}`);
+  if (hasIssue) {
+    return (
+      <p className="club-sign-in-other-language auth-field-error" role="alert">
+        <Icon glyph={Translate} />
+        {translate("clubSettings.signInTexts.otherLanguage.tooLong", {
+          language,
         })}
       </p>
-    </div>
+    );
+  }
+  const hasOwnText = SIGN_IN_TEXT_KINDS.some(
+    (kind) => draft[other][kind].trim() !== "",
+  );
+  return (
+    <p className="club-sign-in-other-language">
+      <Icon glyph={Translate} />
+      {translate(
+        hasOwnText
+          ? "clubSettings.signInTexts.otherLanguage.own"
+          : "clubSettings.signInTexts.otherLanguage.app",
+        { language },
+      )}
+    </p>
+  );
+}
+
+/** La tarjeta de la página de entrar con lo que se está escribiendo. */
+function SignInPreview({
+  translate,
+  club,
+  texts,
+  language,
+}: {
+  translate: Translator;
+  club: ClubIdentity;
+  texts: Draft[Locale];
+  language: Locale;
+}): React.JSX.Element {
+  const captionId = useId();
+  return (
+    <figure className="club-sign-in-preview" aria-labelledby={captionId}>
+      <figcaption id={captionId}>
+        {translate("clubSettings.signInTexts.preview", {
+          code: language.toUpperCase(),
+        })}
+      </figcaption>
+      <div className="club-sign-in-preview-card" lang={language}>
+        <ClubBrandMark
+          logoUrl={club.logoUrl}
+          logoAlt={translate("club.logoAlt", { club: club.name })}
+          fallback={
+            <span className="auth-brand-mark" aria-hidden="true">
+              {club.initials}
+            </span>
+          }
+        />
+        <p className="club-sign-in-preview-headline">
+          {shownText(texts.tagline, language, "tagline")}
+        </p>
+        <p className="club-sign-in-preview-copy">
+          {shownText(texts.welcome, language, "welcome")}
+        </p>
+      </div>
+    </figure>
   );
 }
 
@@ -186,19 +317,26 @@ function useInitialLoad(replaceSaved: (draft: Draft) => void): LoadState {
 
 function SignInTextsForm({
   translate,
+  club,
   texts,
+  initialLanguage,
 }: {
   translate: Translator;
+  club: ClubIdentity;
   texts: ClubDraft<Draft>;
+  initialLanguage: Locale;
 }): React.JSX.Element {
   const { draft, status } = texts;
-  // El borrador se valida mientras se escribe (#719).
+  const [language, setLanguage] = useState(initialLanguage);
+  // El borrador se valida mientras se escribe (#719), los dos idiomas: el
+  // que no se ve también puede impedir guardar.
   const localIssues = findSignInTextsIssues(toTexts(draft));
   const serverIssue =
     status.kind === "failed" ? readSignInTextIssueField(status) : null;
   const isInvalid = (field: SignInTextField): boolean =>
     localIssues.some((issue) => isSameField(issue, field)) ||
     (serverIssue !== null && isSameField(serverIssue, field));
+  const other = otherLanguageOf(language);
   const isSending = status.kind === "sending";
   const update = (field: SignInTextField, text: string): void =>
     texts.change((current) => ({
@@ -212,21 +350,50 @@ function SignInTextsForm({
       onSubmit={(event) => event.preventDefault()}
       noValidate
     >
-      {/* Mientras se guarda no se edita: lo que se escribiera ahora lo
-          pisaría lo que devuelva el servidor. */}
-      <fieldset className="member-record-fields" disabled={isSending}>
-        {SIGN_IN_TEXT_FIELDS.map((field) => (
-          <SignInTextInput
-            key={`${field.locale}-${field.kind}`}
+      <div className="club-sign-in-texts">
+        <div className="club-sign-in-editor">
+          <div className="club-sign-in-intro">
+            <p className="app-lead">
+              {translate("clubSettings.signInTexts.lead")}
+            </p>
+            <SegmentedChoice
+              label={translate("clubSettings.signInTexts.language")}
+              options={languageOptions(translate)}
+              selected={language}
+              onChoose={setLanguage}
+            />
+          </div>
+          {/* Mientras se guarda no se edita: lo que se escribiera ahora lo
+              pisaría lo que devuelva el servidor. */}
+          <fieldset className="member-record-fields" disabled={isSending}>
+            {SIGN_IN_TEXT_KINDS.map((kind) => (
+              <SignInTextInput
+                key={`${language}-${kind}`}
+                translate={translate}
+                field={{ locale: language, kind }}
+                value={draft[language][kind]}
+                isInvalid={isInvalid({ locale: language, kind })}
+                onChange={(text) => update({ locale: language, kind }, text)}
+              />
+            ))}
+          </fieldset>
+          <OtherLanguageNote
             translate={translate}
-            field={field}
-            value={draft[field.locale][field.kind]}
-            isInvalid={isInvalid(field)}
-            onChange={(text) => update(field, text)}
+            draft={draft}
+            other={other}
+            hasIssue={SIGN_IN_TEXT_KINDS.some((kind) =>
+              isInvalid({ locale: other, kind }),
+            )}
           />
-        ))}
-      </fieldset>
-      <SaveFailure translate={translate} status={status} />
+          <SaveFailure translate={translate} status={status} />
+        </div>
+        <SignInPreview
+          translate={translate}
+          club={club}
+          texts={draft[language]}
+          language={language}
+        />
+      </div>
       {texts.hasDraft ? (
         <UnsavedChangesBar
           translate={translate}
@@ -247,10 +414,16 @@ function SignInTextsForm({
 }
 
 export function ClubSignInTextsSection({
+  locale,
   translate,
+  club,
   onHasDraftChange,
 }: {
+  /** El de la pantalla: el idioma de los textos con que se abre. */
+  locale: Locale;
   translate: Translator;
+  /** La marca de la vista previa. */
+  club: ClubIdentity;
   onHasDraftChange: (hasDraft: boolean) => void;
 }): React.JSX.Element {
   const texts = useClubDraft<Draft>({
@@ -266,7 +439,6 @@ export function ClubSignInTextsSection({
       <h2 id="club-textos-entrada" tabIndex={-1}>
         {translate("clubSettings.signInTexts.title")}
       </h2>
-      <p className="app-lead">{translate("clubSettings.signInTexts.lead")}</p>
       {load.kind === "loading" ? (
         <p className="admin-empty">
           {translate("clubSettings.signInTexts.loading")}
@@ -278,7 +450,12 @@ export function ClubSignInTextsSection({
         </p>
       ) : null}
       {load.kind === "loaded" ? (
-        <SignInTextsForm translate={translate} texts={texts} />
+        <SignInTextsForm
+          translate={translate}
+          club={club}
+          texts={texts}
+          initialLanguage={locale}
+        />
       ) : null}
     </section>
   );

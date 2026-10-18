@@ -1603,6 +1603,10 @@ export const englishMessages = {
   "calendar.period.past": "Past",
   "calendar.pastTitle": "Past events",
   "calendar.pastEmpty": "There are no past events.",
+  // Saltar a una fecha en Pasados (#710).
+  "calendar.jump.label": "Go to a date",
+  "calendar.jump.latest": "Most recent",
+  "calendar.jump.empty": "No events on or before that date.",
   "calendar.detail.loading": "Loading the details…",
   "calendar.detail.notes": "Notes",
   "calendar.detail.noNotes": "This event has no notes.",
@@ -1838,35 +1842,47 @@ export const englishMessages = {
   // Los textos de la pantalla de entrar que escribe el club (#301).
   "clubSettings.signInTexts.title": "Sign-in screen",
   "clubSettings.signInTexts.lead":
-    "The tagline and welcome paragraph people read before they sign in. Leave a field empty to show the app's own text in that language.",
+    "The headline and paragraph on the sign-in page. Leave a field empty to use the app's text.",
   "clubSettings.signInTexts.loading": "Loading the sign-in texts…",
-  "clubSettings.signInTexts.tagline.en": "Tagline in English",
-  "clubSettings.signInTexts.welcome.en": "Welcome paragraph in English",
-  "clubSettings.signInTexts.tagline.es": "Tagline in Spanish",
-  "clubSettings.signInTexts.welcome.es": "Welcome paragraph in Spanish",
-  "clubSettings.signInTexts.hint": "Up to {max} characters. Plain text.",
+  "clubSettings.signInTexts.language": "Language of the texts",
+  "clubSettings.signInTexts.language.en": "English",
+  "clubSettings.signInTexts.language.es": "Spanish",
+  "clubSettings.signInTexts.tagline": "Headline",
+  "clubSettings.signInTexts.welcome": "Welcome paragraph",
+  "clubSettings.signInTexts.counter": "{count} / {max}",
+  "clubSettings.signInTexts.otherLanguage.own": "{language} has its own text.",
+  "clubSettings.signInTexts.otherLanguage.app":
+    "{language} uses the app's text.",
+  "clubSettings.signInTexts.otherLanguage.tooLong":
+    "{language} has a text over the limit.",
+  "clubSettings.signInTexts.preview": "Sign-in page · {code}",
   "clubSettings.signInTexts.issue.taglineTooLong":
-    "The tagline can have at most {max} characters.",
+    "The headline can have at most {max} characters.",
   "clubSettings.signInTexts.issue.welcomeTooLong":
     "The welcome paragraph can have at most {max} characters.",
   "clubSettings.sessionPacks.title": "Session packs",
   "clubSettings.sessionPacks.lead":
-    "What Casual members can buy. Each pack costs the Casual session price set in Stripe, times its sessions.",
+    "Bundles Casual members can buy. Each pack costs the Casual session price × sessions (now {price} per session in Stripe).",
+  "clubSettings.sessionPacks.lead.noPrice":
+    "Bundles Casual members can buy. Each pack costs the Casual session price × sessions.",
   "clubSettings.sessionPacks.loading": "Loading the session packs…",
   "clubSettings.sessionPacks.pack": {
     one: "{count} session",
     other: "{count} sessions",
   },
-  "clubSettings.sessionPacks.move.up": "Move the {pack} pack up",
-  "clubSettings.sessionPacks.move.down": "Move the {pack} pack down",
-  "clubSettings.sessionPacks.move.up.text": "Up",
-  "clubSettings.sessionPacks.move.down.text": "Down",
-  "clubSettings.sessionPacks.remove": "Remove",
+  "clubSettings.sessionPacks.empty":
+    "No packs. Casual members can only pay per session.",
+  "clubSettings.sessionPacks.handle":
+    "Reorder the {pack} pack, position {rank} of {total}",
   "clubSettings.sessionPacks.remove.label": "Remove the {pack} pack",
-  "clubSettings.sessionPacks.add.title": "Add a pack",
   "clubSettings.sessionPacks.add.label": "Sessions in the new pack",
-  "clubSettings.sessionPacks.add.hint": "From {min} to {max}.",
-  "clubSettings.sessionPacks.add.submit": "Add pack",
+  "clubSettings.sessionPacks.add.placeholder": "Sessions",
+  "clubSettings.sessionPacks.add.unit": "sessions",
+  "clubSettings.sessionPacks.add.submit": "Add",
+  "clubSettings.sessionPacks.add.issue.outOfRange": "Between {min} and {max}.",
+  "clubSettings.sessionPacks.add.issue.repeated": "Already in the list.",
+  "clubSettings.sessionPacks.footer":
+    "From {min} to {max} sessions, no repeats. Members see them in this order.",
   "clubSettings.sessionPacks.moved": "{pack} is now number {rank} of {total}.",
   "clubSettings.sessionPacks.added": "{pack} pack added. Save to offer it.",
   "clubSettings.sessionPacks.removed":

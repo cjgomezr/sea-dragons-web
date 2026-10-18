@@ -9833,7 +9833,10 @@ const STUBBED_SESSION_PRICE = { amountCents: 1500, currency: "AUD" } as const;
 /** Los packs de inicio y uno grande, para ver un precio de cuatro cifras. */
 const STUBBED_SESSION_PACKS: readonly number[] = [5, 10, 50];
 
-async function stubSessionPacks(page: Page): Promise<void> {
+async function stubSessionPacks(
+  page: Page,
+  sizes: readonly number[] = STUBBED_SESSION_PACKS,
+): Promise<void> {
   await page.route(
     (url) => url.pathname === CLUB_SESSION_PACKS_ENDPOINT,
     async (route, request) => {
@@ -9843,7 +9846,7 @@ async function stubSessionPacks(page: Page): Promise<void> {
           contentType: "application/json",
           body: JSON.stringify({
             data: {
-              packs: STUBBED_SESSION_PACKS.map((sessions) => ({
+              packs: sizes.map((sessions) => ({
                 sessions,
                 price: {
                   ...STUBBED_SESSION_PRICE,
@@ -9866,15 +9869,18 @@ function sessionPacksSection(page: Page): Locator {
   });
 }
 
-/** Un lema de 141 caracteres: la pantalla lo rechaza junto al campo y la
- * barra no deja guardar (#719). */
+/** Un titular en español de 141 caracteres: la pantalla lo rechaza junto al
+ * campo y la barra no deja guardar (#719). Antes se elige el español en el
+ * control de la sección (#721). */
 function writeTooLongTagline(labels: {
+  readonly language: string;
   readonly field: string;
   readonly submit: string;
   readonly issue: RegExp;
 }) {
   return async (page: Page): Promise<void> => {
     const section = signInTextsSection(page);
+    await section.getByRole("radio", { name: labels.language }).check();
     await section.getByLabel(labels.field).fill("a".repeat(141));
     await expect(section.getByText(labels.issue)).toBeVisible();
     await expect(
@@ -9928,6 +9934,9 @@ type ClubSettingsState = {
   readonly save?: ClubSettingsSave;
   /** Lo que sirve el endpoint fingido de los textos de entrada (#301). */
   readonly signInTexts?: StubbedSignInTexts;
+  /** Los packs que sirve el endpoint fingido (#722). Sin ellos, los de
+   * siempre. */
+  readonly sessionPacks?: readonly number[];
   /** El catálogo que sirve el endpoint fingido de las posiciones (#300). */
   readonly positions?: readonly StubbedPosition[];
   readonly createPosition?: PositionCreate;
@@ -10082,7 +10091,7 @@ async function stubClubSettingsSections(
     create: state.createPosition ?? "hangs",
   });
   await stubSignInTexts(page, state.signInTexts ?? NO_STUBBED_SIGN_IN_TEXTS);
-  await stubSessionPacks(page);
+  await stubSessionPacks(page, state.sessionPacks);
 }
 
 async function goToClubSettings(
@@ -10773,18 +10782,20 @@ const CLUB_SIGN_IN_TEXTS_STATES = inClubSection("sign-in", [
   {
     name: "club-textos-entrada-demasiado-largo",
     prepare: writeTooLongTagline({
-      field: "Tagline in Spanish",
+      language: "Spanish",
+      field: "Headline",
       submit: ENGLISH_SAVE_SETTINGS,
-      issue: /The tagline can have at most 140 characters/,
+      issue: /The headline can have at most 140 characters/,
     }),
   },
   {
     name: "club-textos-entrada-demasiado-largo-es",
     beforeVisit: chooseSpanish,
     prepare: writeTooLongTagline({
-      field: "Lema en español",
+      language: "Español",
+      field: "Titular",
       submit: SPANISH_SAVE_SETTINGS,
-      issue: /El lema puede tener como mucho 140 caracteres/,
+      issue: /El titular puede tener como mucho 140 caracteres/,
     }),
   },
 ]);
@@ -10848,9 +10859,20 @@ for (const state of CLUB_SIGN_IN_TEXTS_STATES) {
   });
 }
 
+/** Escribe un pack de 60 sesiones y lo intenta añadir: la fila dice el
+ * límite (#722, D2). */
+async function addOutOfRangeSessionPack(page: Page): Promise<void> {
+  const section = sessionPacksSection(page);
+  await section.getByLabel("Sessions in the new pack").fill("60");
+  await section.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(section.getByText("Between 1 and 50.")).toBeVisible();
+}
+
 const CLUB_SESSION_PACKS_STATES = inClubSection("packs", [
   { name: "club-packs" },
   { name: "club-packs-es", beforeVisit: chooseSpanish },
+  { name: "club-packs-vacio", sessionPacks: [] },
+  { name: "club-packs-error-al-anadir", prepare: addOutOfRangeSessionPack },
 ]);
 
 /* #469: como las posiciones, la sección se fotografía sola, sin la barra de
@@ -10901,6 +10923,46 @@ for (const state of CLUB_SESSION_PACKS_STATES) {
     });
   });
 }
+
+/* #722: las medidas del móvil (10-mobile-packs-unsaved.png del handoff de
+   E26), medidas en el navegador y no sólo escritas en la hoja. */
+const PACK_ROW_HEIGHT_PX = 60;
+const PACK_ADD_FIELD_HEIGHT_PX = 48;
+/** --touch-target-min en globals.css. */
+const PACK_CONTROL_SIZE_PX = 44;
+
+test.describe("club-packs en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: viewports[0].width, height: viewports[0].height },
+  });
+
+  test("filas de 60 px, asa y borrar de 44 px y campo de 48 px", async ({
+    page,
+  }) => {
+    await goToClubSettings(page, { name: "club-packs", tab: "packs" });
+    const section = sessionPacksSection(page);
+    const firstRow = section.getByRole("listitem").first();
+
+    expect(await heightOf(firstRow)).toBeGreaterThanOrEqual(PACK_ROW_HEIGHT_PX);
+    for (const control of [
+      firstRow.getByRole("button", { name: /^Reorder the/ }),
+      firstRow.getByRole("button", { name: /^Remove the/ }),
+    ]) {
+      const box = await control.boundingBox();
+      expect(box?.width).toBe(PACK_CONTROL_SIZE_PX);
+      expect(box?.height).toBe(PACK_CONTROL_SIZE_PX);
+    }
+    expect(await heightOf(section.getByLabel("Sessions in the new pack"))).toBe(
+      PACK_ADD_FIELD_HEIGHT_PX,
+    );
+    await expect(
+      section.getByRole("button", { name: "Add", exact: true }),
+    ).toHaveText("Add");
+  });
+});
 
 /* #301: la pantalla de entrar con los textos del club. Se ponen sobre la
    página ya servida, como el logo y el acento: guardarlos en la base
@@ -15548,11 +15610,18 @@ async function stubCalendarReads(
       const isPast = searchParams.get("period") === "past";
       // Los chips de tipo (#647) piden `types`: la API filtra, el stub también.
       const types = searchParams.get("types")?.split(",") ?? null;
-      const events = (isPast ? pastEvents : reads.events).filter(
-        (event) =>
-          types === null ||
-          types.includes((event as { readonly eventType: string }).eventType),
-      );
+      // El salto a una fecha (#710) pide `from`: los de ese día o antes.
+      const from = searchParams.get("from");
+      const events = (isPast ? pastEvents : reads.events).filter((event) => {
+        const { eventType, startsOn } = event as {
+          readonly eventType: string;
+          readonly startsOn: string;
+        };
+        return (
+          (types === null || types.includes(eventType)) &&
+          (from === null || startsOn <= from)
+        );
+      });
       return route.fulfill(jsonBody({ events, nextCursor: null }));
     },
   );
@@ -16193,6 +16262,129 @@ test.describe(ROW_RSVP_ERROR_STATE.name, () => {
     await page.setViewportSize({ width: 768, height: 812 });
     await goToCalendar(page, ROW_RSVP_ERROR_STATE);
     expect(await hasHorizontalScroll(page)).toBe(false);
+  });
+});
+
+// Saltar a una fecha en Pasados (#710): tras saltar a un día sin eventos la
+// lista empieza en el anterior que sí tiene; antes de todo, el vacío. Con el
+// reloj fijo, para que "ayer" y las etiquetas de los días no cambien. A 375
+// el selector baja a todo el ancho de la cabecera del móvil (#656).
+const PAST_JUMP_DATE = "2026-05-28";
+const PAST_JUMP_BEFORE_EVERYTHING = "2026-01-10";
+
+function jumpToPastDate(
+  date: string,
+  shown: (page: Page) => Promise<void>,
+): (page: Page) => Promise<void> {
+  return async (page) => {
+    await showPastEvents(page);
+    const field = page.getByLabel(/^(Go to a date|Ir a una fecha)$/);
+    await field.fill(date);
+    // Sin el cursor del campo: parpadea y movería la captura.
+    await field.blur();
+    await shown(page);
+    await page.mouse.move(0, 0);
+  };
+}
+
+const PAST_JUMPED_STATE: CalendarState = {
+  name: "calendario-pasados-saltar-fecha",
+  events: STUBBED_AGENDA_EVENTS,
+  pastEvents: STUBBED_PAST_EVENTS,
+  beforeVisit: fixAgendaClock,
+  ready: jumpToPastDate(PAST_JUMP_DATE, async (page) => {
+    await expect(
+      page.getByRole("heading", {
+        level: 3,
+        name: STUBBED_PAST_EVENTS[0].title,
+      }),
+    ).toBeHidden();
+    await expect(
+      page.getByRole("heading", {
+        level: 3,
+        name: STUBBED_PAST_EVENTS[1].title,
+      }),
+    ).toBeVisible();
+  }),
+};
+
+const PAST_JUMP_STATES: readonly CalendarState[] = [
+  PAST_JUMPED_STATE,
+  {
+    name: "calendario-pasados-saltar-vacio",
+    events: STUBBED_AGENDA_EVENTS,
+    pastEvents: STUBBED_PAST_EVENTS,
+    beforeVisit: fixAgendaClock,
+    ready: jumpToPastDate(PAST_JUMP_BEFORE_EVERYTHING, async (page) => {
+      await expect(
+        page.getByText("No events on or before that date."),
+      ).toBeVisible();
+    }),
+  },
+];
+
+for (const state of PAST_JUMP_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToCalendar(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+
+          test(`has no accessibility violations (axe-core, ${theme})`, async ({
+            page,
+          }) => {
+            await goToCalendar(page, state, theme);
+            await expectNoAxeViolations(page);
+          });
+        }
+      });
+    }
+
+    test("has no horizontal scroll at 375px", async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await goToCalendar(page, state);
+      expect(await hasHorizontalScroll(page)).toBe(false);
+    });
+  });
+}
+
+test.describe("calendario-pasados-saltar-movil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("el selector ocupa el ancho de la cabecera con zona táctil de 44px a 375px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToCalendar(page, PAST_JUMPED_STATE);
+
+    const header = await page.locator(".agenda-header").boundingBox();
+    const jump = await page.locator(".agenda-jump").boundingBox();
+    const field = await page.getByLabel("Go to a date").boundingBox();
+    const latest = await page
+      .getByRole("button", { name: "Most recent" })
+      .boundingBox();
+    expect(jump?.width).toBeCloseTo(header?.width ?? 0, 0);
+    expect(field?.height).toBeGreaterThanOrEqual(44);
+    expect(latest?.height).toBeGreaterThanOrEqual(44);
   });
 });
 
