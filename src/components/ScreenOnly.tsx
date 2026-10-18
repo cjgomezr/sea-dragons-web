@@ -13,7 +13,9 @@ type ScreenKind = "phone" | "desktop";
  *
  * Hasta hidratar no se sabe el ancho y se pintan las dos copias: cada una vive
  * en un contenedor que la hoja de estilos ya esconde en el otro tamaño, así
- * que ninguno de los dos ve la cabecera vacía mientras carga.
+ * que ninguno de los dos ve la cabecera vacía mientras carga. El precio es
+ * que la copia que sobra alcanza a correr sus efectos al hidratar: la campana
+ * pide el número una vez de más en cada carga, antes de desmontarse.
  */
 export function ScreenOnly({
   screen,

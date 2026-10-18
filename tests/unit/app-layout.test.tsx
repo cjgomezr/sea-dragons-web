@@ -263,4 +263,14 @@ describe("disposición de la aplicación", () => {
 
     await expect(renderAppLayout()).rejects.toThrow(/NEXT_PUBLIC_SUPABASE_URL/);
   });
+
+  // #717: la fila desapareció entre leer el id y leer la foto.
+  it("lleva a entrar si la ficha ya no está al leer la foto", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
+    photoGateways.members.findPhotoOwner.mockResolvedValue(null);
+
+    await expect(renderAppLayout()).rejects.toEqual(
+      new RedirectSignal(SIGN_IN_PATH),
+    );
+  });
 });

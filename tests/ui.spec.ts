@@ -8998,32 +8998,34 @@ test.describe("la campana de avisos", () => {
     await expect(notificationsRegion(page)).toHaveCount(0);
   });
 
-  // La barra lateral mide 240px: la campana y el botón de la cuenta (#287)
-  // caben en ella en una sola fila, sin salirse.
+  // La campana y el botón de la cuenta (#287) van en una sola fila, dentro de
+  // la barra de arriba desde #717.
   for (const width of [768, 1440]) {
-    test(`los controles de la cabecera caben en una fila de la barra lateral a ${width}px`, async ({
+    test(`los controles de la cabecera caben en una fila de la barra de arriba a ${width}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
 
-      const sidebar = await page.locator(".app-sidebar").boundingBox();
+      const topbar = await page.locator(".app-topbar").boundingBox();
       const bell = await page
         .getByRole("button", { name: BELL_NAME })
         .boundingBox();
       const account = await page
         .getByRole("button", { name: ACCOUNT_BUTTON_NAME })
         .boundingBox();
-      if (sidebar === null || bell === null || account === null) {
-        throw new Error("la barra lateral no dibujó sus controles");
+      if (topbar === null || bell === null || account === null) {
+        throw new Error("la barra de arriba no dibujó sus controles");
       }
 
+      // El botón de la cuenta (38px) es más bajo que la campana (44px): los
+      // dos van centrados en la misma fila.
       expect(
-        Math.round(account.y),
+        Math.round(account.y + account.height / 2),
         "los controles se parten en dos filas",
-      ).toBe(Math.round(bell.y));
+      ).toBe(Math.round(bell.y + bell.height / 2));
       expect(account.x + account.width).toBeLessThanOrEqual(
-        sidebar.x + sidebar.width,
+        topbar.x + topbar.width,
       );
     });
   }
