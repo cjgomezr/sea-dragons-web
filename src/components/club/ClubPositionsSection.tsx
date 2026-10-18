@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Check } from "@phosphor-icons/react/dist/ssr/Check";
+import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
+import { X } from "@phosphor-icons/react/dist/ssr/X";
+import { useEffect, useId, useRef, useState } from "react";
 import { usePendingAction } from "@/components/groups/use-pending-action";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import {
@@ -27,10 +30,10 @@ import {
   setManagedPositionCoverage,
 } from "./club-positions-admin-client";
 import {
-  ActivePositionItem,
-  ArchivedPositionItem,
+  ActivePositionRow,
+  ArchivedPositions,
   FOCUS_KEY_ATTRIBUTE,
-  moveFocusKey,
+  handleFocusKey,
   renameFocusKey,
   type Direction,
 } from "./ClubPositionItems";
@@ -46,22 +49,24 @@ import {
 
 /**
  * Las posiciones del club dentro de su configuración (#300, RF-7 del PRD de
- * E18a). El Admin ve las activas en su orden y las archivadas aparte, y las
- * crea, renombra, reordena, archiva y reactiva. Cada una lleva además su
- * función en el auto-balance (#404), que sólo se ve aquí.
+ * E18a), en una tabla desde #723 (RF-5 del PRD de E26). Cada activa es una
+ * fila con su asa, su número, sus nombres, su función en el auto-balance
+ * (#404) y sus acciones; la última fila es la de añadir, y las archivadas van
+ * plegadas debajo.
  *
- * Reordenar se hace con botones de subir y bajar, no arrastrando, para que
- * se pueda con el teclado. Cada movimiento manda la lista entera en el orden
- * nuevo, y el foco se queda en la posición que se movió.
+ * Todo se guarda al momento: la función al cambiarla, el orden con ↑ y ↓
+ * sobre el asa, y renombrar con ✓ en la misma fila. Cada movimiento manda la
+ * lista entera en el orden nuevo, y el foco se queda en el asa.
  *
  * Nada cambia en la pantalla hasta que el servidor lo confirma: cada
  * respuesta trae el catálogo tal como quedó, y eso es lo que se pinta.
+ * Entonces sale arriba a la derecha un aviso corto, además del anuncio.
  */
 
 type LoadState = { readonly kind: "loading" } | ManagedPositionsRead;
 
-/** Una acción de la lista (mover, archivar, reactivar) que falló: se puede
- * repetir tal cual con el botón de reintentar. */
+/** Una acción de la lista (mover, el rol, archivar, reactivar) que falló:
+ * se puede repetir tal cual con el botón de reintentar. */
 type ListFailure = {
   readonly failure: ApiRequestFailure;
   readonly retry: () => void;
@@ -74,11 +79,15 @@ type PositionsAction = {
   readonly describeDone: (positions: ManagedPositions) => string;
 };
 
+/** El aviso de guardado. Un objeto nuevo en cada guardado para que el
+ * temporizador vuelva a empezar aunque el texto se repita. */
+type SavedNotice = { readonly text: string };
+
 const TITLE_ID = "club-posiciones";
-const ACTIVE_TITLE_ID = "club-posiciones-activas";
-const ARCHIVED_TITLE_ID = "club-posiciones-archivadas";
-const CREATE_TITLE_ID = "club-posiciones-nueva";
 const CREATE_ACTION = "create";
+/** Lo que dura a la vista el aviso de guardado: lo bastante para leerlo, y
+ * el anuncio `aria-live` no depende de él. */
+const SAVED_NOTICE_MS = 2500;
 
 const EMPTY_NAMES: PositionNamesInput = { en: null, es: null };
 
@@ -97,10 +106,6 @@ function movedOrder(
   const reordered = ids.filter((id) => id !== positionId);
   reordered.splice(direction === "up" ? from - 1 : from + 1, 0, positionId);
   return reordered;
-}
-
-function opposite(direction: Direction): Direction {
-  return direction === "up" ? "down" : "up";
 }
 
 function LoadFailure({
@@ -159,6 +164,39 @@ function ActionFailure({
   );
 }
 
+/** La cabecera se ve pero no se lee: cada control ya dice de qué es. */
+function TableHead({
+  translate,
+}: {
+  translate: Translator;
+}): React.JSX.Element {
+  return (
+    <div
+      className="club-positions-row club-positions-table-head"
+      aria-hidden="true"
+    >
+      <span />
+      <span className="club-positions-rank">#</span>
+      <span>{translate("clubSettings.positions.column.position")}</span>
+      <span>{translate("clubSettings.positions.column.coverage")}</span>
+      <span />
+    </div>
+  );
+}
+
+/** Lo que dura el aviso de guardado a la vista. */
+function useSavedNotice(): [SavedNotice | null, (text: string) => void] {
+  const [notice, setNotice] = useState<SavedNotice | null>(null);
+  useEffect(() => {
+    if (notice === null) {
+      return;
+    }
+    const timer = setTimeout(() => setNotice(null), SAVED_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
+  return [notice, (text) => setNotice({ text })];
+}
+
 export function ClubPositionsSection({
   locale,
   translate,
@@ -170,10 +208,12 @@ export function ClubPositionsSection({
   const [reloads, setReloads] = useState(0);
   const [listFailure, setListFailure] = useState<ListFailure | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [notice, showNotice] = useSavedNotice();
   const [editingId, setEditingId] = useState<string | null>(null);
   const { pending, run } = usePendingAction<string>();
   const sectionRef = useRef<HTMLElement>(null);
   const focusAfterUpdate = useRef<string | null>(null);
+  const handleHintId = useId();
 
   useEffect(() => {
     let isCurrent = true;
@@ -188,7 +228,8 @@ export function ClubPositionsSection({
   }, [reloads]);
 
   // El foco vuelve a su sitio cuando la lista nueva ya está pintada: mientras
-  // esperaba, el botón pulsado estaba desactivado y lo había perdido.
+  // esperaba, el control estaba desactivado, o su fila cambió de sitio, y lo
+  // había perdido.
   useEffect(() => {
     const key = focusAfterUpdate.current;
     focusAfterUpdate.current = null;
@@ -197,7 +238,7 @@ export function ClubPositionsSection({
         ?.querySelector<HTMLElement>(`[${FOCUS_KEY_ATTRIBUTE}="${key}"]`)
         ?.focus();
     }
-  }, [state, editingId]);
+  }, [state, editingId, listFailure]);
 
   const nameOf = (position: ClubPosition): string =>
     positionName(position.names, locale);
@@ -216,22 +257,33 @@ export function ClubPositionsSection({
   ): Promise<ManagedPositionsRead | null> {
     const result = await run(action.key, action.send);
     if (result?.kind === "loaded") {
+      const done = action.describeDone(result.positions);
       setListFailure(null);
       setState(result);
-      setAnnouncement(action.describeDone(result.positions));
+      setAnnouncement(done);
+      showNotice(
+        translate("clubSettings.positions.savedNotice", { change: done }),
+      );
     }
     return result;
   }
 
-  async function runListAction(action: PositionsAction): Promise<boolean> {
+  /** Al terminar, salga bien o mal, el foco vuelve a `focusKey`. */
+  async function runListAction(
+    action: PositionsAction,
+    focusKey: string | null = null,
+  ): Promise<void> {
     const result = await send(action);
-    if (result?.kind === "failed") {
+    if (result === null) {
+      return;
+    }
+    focusAfterUpdate.current = focusKey;
+    if (result.kind === "failed") {
       setListFailure({
         failure: result,
-        retry: () => void runListAction(action),
+        retry: () => void runListAction(action, focusKey),
       });
     }
-    return result?.kind === "loaded";
   }
 
   async function runFormAction(
@@ -241,34 +293,27 @@ export function ClubPositionsSection({
     return result?.kind === "loaded" ? { kind: "done" } : result;
   }
 
-  async function move(
+  function move(
     active: ManagedPositions,
     position: ManagedPosition,
     direction: Direction,
-  ): Promise<void> {
-    const isMoved = await runListAction({
-      key: moveFocusKey(position.id, direction),
-      send: () =>
-        reorderManagedPositions(movedOrder(active, position.id, direction)),
-      describeDone: (positions) => {
-        const nowActive = activeOf(positions);
-        return translate("clubSettings.positions.moved", {
-          name: nameOf(position),
-          rank: nowActive.findIndex(({ id }) => id === position.id) + 1,
-          total: nowActive.length,
-        });
+  ): void {
+    void runListAction(
+      {
+        key: `${position.id}:move`,
+        send: () =>
+          reorderManagedPositions(movedOrder(active, position.id, direction)),
+        describeDone: (positions) => {
+          const nowActive = activeOf(positions);
+          return translate("clubSettings.positions.moved", {
+            name: nameOf(position),
+            rank: nowActive.findIndex(({ id }) => id === position.id) + 1,
+            total: nowActive.length,
+          });
+        },
       },
-    });
-    if (isMoved) {
-      // En la primera o la última, el botón pulsado queda desactivado: el
-      // foco pasa al de la otra dirección.
-      const newRank = active.indexOf(position) + (direction === "up" ? -1 : 1);
-      const isAtEdge = newRank === 0 || newRank === active.length - 1;
-      focusAfterUpdate.current = moveFocusKey(
-        position.id,
-        isAtEdge ? opposite(direction) : direction,
-      );
-    }
+      handleFocusKey(position.id),
+    );
   }
 
   function setArchived(position: ClubPosition, isArchived: boolean): void {
@@ -285,27 +330,26 @@ export function ClubPositionsSection({
     });
   }
 
-  async function saveCoverage(
+  function saveCoverage(
     position: ManagedPosition,
     coverage: PositionCoverage | null,
-  ): Promise<void> {
-    const isSaved = await runListAction({
-      key: coverageFocusKey(position.id),
-      send: () => setManagedPositionCoverage(position.id, coverage),
-      describeDone: () =>
-        coverage === null
-          ? translate("clubSettings.positions.coverage.cleared", {
-              name: nameOf(position),
-            })
-          : translate("clubSettings.positions.coverage.saved", {
-              name: nameOf(position),
-              coverage: describeCoverage(translate, coverage),
-            }),
-    });
-    if (isSaved) {
-      // El botón pulsado queda desactivado: el foco vuelve a la función.
-      focusAfterUpdate.current = coverageFocusKey(position.id);
-    }
+  ): void {
+    void runListAction(
+      {
+        key: coverageFocusKey(position.id),
+        send: () => setManagedPositionCoverage(position.id, coverage),
+        describeDone: () =>
+          coverage === null
+            ? translate("clubSettings.positions.coverage.cleared", {
+                name: nameOf(position),
+              })
+            : translate("clubSettings.positions.coverage.saved", {
+                name: nameOf(position),
+                coverage: describeCoverage(translate, coverage),
+              }),
+      },
+      coverageFocusKey(position.id),
+    );
   }
 
   function closeEditor(positionId: string): void {
@@ -320,7 +364,10 @@ export function ClubPositionsSection({
     const outcome = await runFormAction({
       key: `${position.id}:rename`,
       send: () => renameManagedPosition(position.id, names),
-      describeDone: () => translate("clubSettings.positions.renamed"),
+      describeDone: () =>
+        translate("clubSettings.positions.renamed", {
+          name: positionName(names, locale),
+        }),
     });
     if (outcome?.kind === "done") {
       closeEditor(position.id);
@@ -332,21 +379,16 @@ export function ClubPositionsSection({
     return runFormAction({
       key: CREATE_ACTION,
       send: () => createManagedPosition(names),
-      // La nueva va detrás de todas: es la última del catálogo.
-      describeDone: (positions) => {
-        const created = positions.at(-1);
-        return created === undefined
-          ? ""
-          : translate("clubSettings.positions.created", {
-              name: nameOf(created),
-            });
-      },
+      describeDone: () =>
+        translate("clubSettings.positions.created", {
+          name: positionName(names, locale),
+        }),
     });
   }
 
   const isBusy = pending !== null;
 
-  /** Se monta otra vez cuando cambia la función guardada, y así el borrador
+  /** Se monta otra vez cuando cambia la función guardada, y así lo elegido
    * empieza por la del servidor. */
   function renderCoverage(position: ManagedPosition): React.JSX.Element {
     return (
@@ -357,97 +399,147 @@ export function ClubPositionsSection({
         name={nameOf(position)}
         coverage={position.coverage}
         isBusy={isBusy}
-        isSaving={pending === coverageFocusKey(position.id)}
-        onSave={(coverage) => void saveCoverage(position, coverage)}
+        onSave={(coverage) => saveCoverage(position, coverage)}
       />
+    );
+  }
+
+  function renderRenameForm(position: ManagedPosition): React.JSX.Element {
+    return (
+      <PositionNamesForm
+        translate={translate}
+        formLabel={translate("clubSettings.positions.rename.label", {
+          name: nameOf(position),
+        })}
+        placeholders={{
+          en: translate("clubSettings.positions.name.placeholder.en"),
+          es: translate("clubSettings.positions.name.placeholder.es"),
+        }}
+        initialNames={position.names}
+        isDisabled={isBusy}
+        shouldFocusOnOpen
+        onSubmit={(names) => rename(position, names)}
+      >
+        {() => (
+          <>
+            {renderCoverage(position)}
+            <div className="club-positions-cell club-positions-actions">
+              <button
+                type="submit"
+                className="club-positions-icon-button club-positions-icon-button-primary"
+                aria-label={translate("clubSettings.positions.rename.submit")}
+                disabled={isBusy}
+              >
+                <Check aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="club-positions-icon-button"
+                aria-label={translate("clubSettings.positions.cancel")}
+                disabled={isBusy}
+                onClick={() => closeEditor(position.id)}
+              >
+                <X aria-hidden="true" />
+              </button>
+            </div>
+          </>
+        )}
+      </PositionNamesForm>
     );
   }
 
   function renderActive(active: ManagedPositions): React.JSX.Element {
     if (active.length === 0) {
       return (
-        <p className="admin-empty">
+        <p className="club-positions-empty">
           {translate("clubSettings.positions.active.empty")}
         </p>
       );
     }
     return (
-      <ol className="groups-items" aria-labelledby={ACTIVE_TITLE_ID}>
+      <ol
+        className="club-positions-rows"
+        aria-label={translate("clubSettings.positions.active.title")}
+      >
         {active.map((position, index) => (
-          <ActivePositionItem
+          <ActivePositionRow
             key={position.id}
             translate={translate}
             locale={locale}
             position={position}
             rank={index + 1}
             total={active.length}
+            handleHintId={handleHintId}
             isBusy={isBusy}
-            isEditing={editingId === position.id}
             coverageControl={renderCoverage(position)}
-            onMove={(direction) => void move(active, position, direction)}
-            onToggleRename={() =>
-              editingId === position.id
-                ? closeEditor(position.id)
-                : setEditingId(position.id)
+            renameForm={
+              editingId === position.id ? renderRenameForm(position) : null
             }
+            onMove={(direction) => move(active, position, direction)}
+            onRename={() => setEditingId(position.id)}
             onArchive={() => setArchived(position, true)}
-          >
-            {editingId === position.id ? (
-              <PositionNamesForm
-                translate={translate}
-                formLabel={translate("clubSettings.positions.rename.label", {
-                  name: nameOf(position),
-                })}
-                submitText={translate("clubSettings.positions.rename.submit")}
-                savingText={translate("clubSettings.positions.rename.saving")}
-                initialNames={position.names}
-                isDisabled={isBusy}
-                isSaving={pending === `${position.id}:rename`}
-                shouldFocusOnOpen
-                onSubmit={(names) => rename(position, names)}
-                onCancel={() => closeEditor(position.id)}
-              />
-            ) : null}
-          </ActivePositionItem>
+          />
         ))}
       </ol>
     );
   }
 
-  function renderArchived(archived: ManagedPositions): React.JSX.Element {
-    if (archived.length === 0) {
-      return (
-        <p className="admin-empty">
-          {translate("clubSettings.positions.archived.empty")}
-        </p>
-      );
-    }
+  function renderAddRow(): React.JSX.Element {
     return (
-      <ul className="groups-items" aria-labelledby={ARCHIVED_TITLE_ID}>
-        {archived.map((position) => (
-          <ArchivedPositionItem
-            key={position.id}
-            translate={translate}
-            locale={locale}
-            position={position}
-            isBusy={isBusy}
-            coverageControl={renderCoverage(position)}
-            onReactivate={() => setArchived(position, false)}
-          />
-        ))}
-      </ul>
+      <div className="club-positions-row club-positions-add-row">
+        <span className="club-positions-cell club-positions-add-icon">
+          <Plus aria-hidden="true" />
+        </span>
+        <span className="club-positions-cell" />
+        <PositionNamesForm
+          translate={translate}
+          formLabel={translate("clubSettings.positions.create.title")}
+          placeholders={{
+            en: translate("clubSettings.positions.create.placeholder"),
+            es: translate("clubSettings.positions.name.placeholder.es"),
+          }}
+          initialNames={EMPTY_NAMES}
+          isDisabled={isBusy}
+          onSubmit={create}
+        >
+          {(hasName) => (
+            <>
+              <p className="club-positions-cell club-positions-add-hint">
+                {translate("clubSettings.positions.create.hint")}
+              </p>
+              <div className="club-positions-cell club-positions-actions">
+                <button
+                  type="submit"
+                  className="auth-submit club-positions-add-button"
+                  disabled={isBusy || !hasName}
+                >
+                  {translate(
+                    pending === CREATE_ACTION
+                      ? "clubSettings.positions.create.saving"
+                      : "clubSettings.positions.create.submit",
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </PositionNamesForm>
+      </div>
     );
   }
 
   function renderCatalog(positions: ManagedPositions): React.JSX.Element {
     return (
       <>
-        <div className="club-positions-group">
-          <h3 id={ACTIVE_TITLE_ID}>
-            {translate("clubSettings.positions.active.title")}
-          </h3>
-          {renderActive(activeOf(positions))}
+        <div className="club-positions-table-scroll">
+          <div className="club-positions-table">
+            <TableHead translate={translate} />
+            {renderActive(activeOf(positions))}
+            {renderAddRow()}
+          </div>
         </div>
+        <p className="visually-hidden" id={handleHintId}>
+          {translate("clubSettings.positions.handle.hint")}
+        </p>
         {listFailure === null ? null : (
           <ActionFailure
             translate={translate}
@@ -456,27 +548,13 @@ export function ClubPositionsSection({
             onReload={reload}
           />
         )}
-        <div className="club-positions-group">
-          <h3 id={CREATE_TITLE_ID}>
-            {translate("clubSettings.positions.create.title")}
-          </h3>
-          <PositionNamesForm
-            translate={translate}
-            formLabel={translate("clubSettings.positions.create.title")}
-            submitText={translate("clubSettings.positions.create.submit")}
-            savingText={translate("clubSettings.positions.create.saving")}
-            initialNames={EMPTY_NAMES}
-            isDisabled={isBusy}
-            isSaving={pending === CREATE_ACTION}
-            onSubmit={create}
-          />
-        </div>
-        <div className="club-positions-group">
-          <h3 id={ARCHIVED_TITLE_ID}>
-            {translate("clubSettings.positions.archived.title")}
-          </h3>
-          {renderArchived(positions.filter((position) => position.isArchived))}
-        </div>
+        <ArchivedPositions
+          translate={translate}
+          locale={locale}
+          archived={positions.filter((position) => position.isArchived)}
+          isBusy={isBusy}
+          onReactivate={(position) => setArchived(position, false)}
+        />
       </>
     );
   }
@@ -488,9 +566,8 @@ export function ClubPositionsSection({
       aria-labelledby={TITLE_ID}
     >
       <h2 id={TITLE_ID}>{translate("clubSettings.positions.title")}</h2>
-      <p className="auth-hint">{translate("clubSettings.positions.lead")}</p>
-      <p className="auth-hint">
-        {translate("clubSettings.positions.coverage.hint")}
+      <p className="auth-hint club-positions-lead">
+        {translate("clubSettings.positions.lead")}
       </p>
       {state.kind === "loading" ? (
         <p className="admin-empty">
@@ -501,6 +578,13 @@ export function ClubPositionsSection({
         <LoadFailure translate={translate} failure={state} onRetry={reload} />
       ) : null}
       {state.kind === "loaded" ? renderCatalog(state.positions) : null}
+      {/* El aviso se ve pero no se lee: lo que dice ya lo anuncia la región
+          viva de abajo. */}
+      {notice === null ? null : (
+        <p className="club-positions-notice" aria-hidden="true">
+          {notice.text}
+        </p>
+      )}
       {/* Una región viva sin el rol `status`: la pantalla ya tiene los suyos
           (el guardado del formulario, el del logo), y éste sólo anuncia. */}
       <p className="visually-hidden" aria-live="polite">

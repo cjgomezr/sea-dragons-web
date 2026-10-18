@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import {
   isPositionCoverage,
   POSITION_COVERAGES,
@@ -10,10 +10,10 @@ import type { Translator } from "@/lib/i18n/translator";
 
 /**
  * La función de una posición en el auto-balance (#404, RF-2 del PRD de E10):
- * portero, defensa, ataque o ninguna. Como el rol en el directorio, lo que se
- * elige es un borrador hasta que se guarda con su botón.
+ * portero, defensa, ataque o ninguna. Desde #723 se guarda al cambiarla, sin
+ * botón aparte.
  *
- * El borrador vive aquí: la sección monta el control otra vez cuando la
+ * Lo elegido vive aquí: la sección monta el control otra vez cuando la
  * función guardada cambia, así que empieza siempre por lo que dijo el
  * servidor. Si el guardado falla, la función elegida se queda puesta para
  * reintentarlo.
@@ -43,7 +43,6 @@ export function PositionCoverageControl({
   name,
   coverage,
   isBusy,
-  isSaving,
   onSave,
 }: {
   translate: Translator;
@@ -53,26 +52,27 @@ export function PositionCoverageControl({
   /** La que tiene guardada. */
   coverage: PositionCoverage | null;
   isBusy: boolean;
-  isSaving: boolean;
   onSave: (coverage: PositionCoverage | null) => void;
 }): React.JSX.Element {
-  const [draft, setDraft] = useState(coverage);
-  const selectId = useId();
+  const [chosen, setChosen] = useState(coverage);
+
+  function choose(value: string): void {
+    const next = readCoverage(value);
+    setChosen(next);
+    onSave(next);
+  }
+
   return (
-    <div className="club-positions-coverage">
-      <label htmlFor={selectId}>
-        {translate("clubSettings.positions.coverage.label")}
-      </label>
+    <div className="club-positions-cell club-positions-coverage">
       <select
-        id={selectId}
-        className="admin-member-role"
+        className="club-positions-select"
         data-focus-key={coverageFocusKey(positionId)}
         aria-label={translate("clubSettings.positions.coverage.control.label", {
           name,
         })}
-        value={draft ?? NO_COVERAGE}
+        value={chosen ?? NO_COVERAGE}
         disabled={isBusy}
-        onChange={(event) => setDraft(readCoverage(event.target.value))}
+        onChange={(event) => choose(event.target.value)}
       >
         <option value={NO_COVERAGE}>{describeCoverage(translate, null)}</option>
         {POSITION_COVERAGES.map((option) => (
@@ -81,21 +81,6 @@ export function PositionCoverageControl({
           </option>
         ))}
       </select>
-      <button
-        type="button"
-        className="admin-secondary"
-        aria-label={translate("clubSettings.positions.coverage.save.label", {
-          name,
-        })}
-        disabled={isBusy || draft === coverage}
-        onClick={() => onSave(draft)}
-      >
-        {translate(
-          isSaving
-            ? "clubSettings.positions.coverage.saving"
-            : "clubSettings.positions.coverage.save",
-        )}
-      </button>
     </div>
   );
 }
