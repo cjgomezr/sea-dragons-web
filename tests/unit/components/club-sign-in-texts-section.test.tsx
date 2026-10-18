@@ -66,10 +66,13 @@ function stubApi(): void {
 }
 
 async function renderSection(locale: Locale = "en"): Promise<void> {
-  render(<ClubSignInTextsSection translate={createTranslator(locale)} />);
-  await screen.findByRole("button", {
-    name: locale === "en" ? "Save sign-in texts" : "Guardar los textos",
-  });
+  render(
+    <ClubSignInTextsSection
+      translate={createTranslator(locale)}
+      onHasDraftChange={() => undefined}
+    />,
+  );
+  await screen.findAllByRole("textbox");
 }
 
 function field(name: string): HTMLElement {
@@ -83,10 +86,13 @@ async function write(name: string, text: string): Promise<void> {
   }
 }
 
+/** Guardar cambios, en la barra que sale con un cambio (#719). */
+function saveButton(): HTMLElement {
+  return screen.getByRole("button", { name: "Save changes" });
+}
+
 async function save(): Promise<void> {
-  await userEvent.click(
-    screen.getByRole("button", { name: "Save sign-in texts" }),
-  );
+  await userEvent.click(saveButton());
 }
 
 beforeEach(() => {
@@ -139,9 +145,7 @@ describe("textos del inicio de sesión en la configuración", () => {
     await write("Welcome paragraph in Spanish", "Entrena con nosotros.");
     await save();
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Sign-in texts saved.",
-    );
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
     expect(puts).toEqual([
       {
         en: { tagline: "Dive in.", welcome: "Train with us." },
@@ -160,7 +164,7 @@ describe("textos del inicio de sesión en la configuración", () => {
     await write("Tagline in English", "");
     await save();
 
-    await screen.findByRole("status");
+    await screen.findByText("Saved");
     expect(puts).toEqual([NO_SIGN_IN_TEXTS]);
   });
 
@@ -169,7 +173,8 @@ describe("textos del inicio de sesión en la configuración", () => {
 
     await userEvent.click(field("Tagline in Spanish"));
     await userEvent.paste("a".repeat(141));
-    await save();
+
+    expect(saveButton()).toBeDisabled();
 
     expect(field("Tagline in Spanish")).toHaveAttribute("aria-invalid", "true");
     expect(field("Tagline in Spanish")).toHaveAccessibleDescription(
@@ -183,7 +188,8 @@ describe("textos del inicio de sesión en la configuración", () => {
 
     await userEvent.click(field("Welcome paragraph in English"));
     await userEvent.paste("b".repeat(321));
-    await save();
+
+    expect(saveButton()).toBeDisabled();
 
     expect(field("Welcome paragraph in English")).toHaveAccessibleDescription(
       /at most 320 characters/,

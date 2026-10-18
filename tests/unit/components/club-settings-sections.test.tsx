@@ -194,7 +194,8 @@ describe("las pestañas de un Admin en escritorio", () => {
     await userEvent.type(name, "Borrador");
 
     await userEvent.click(tab("Session packs"));
-    await userEvent.click(tab("General"));
+    // Con borrador, la pestaña dice también "Unsaved" (#719).
+    await userEvent.click(tab("General Unsaved"));
 
     expect(screen.getByLabelText("Club name")).toHaveValue("Borrador");
   });

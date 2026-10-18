@@ -1748,6 +1748,15 @@ export const englishMessages = {
   "clubSettings.list.adminsOnly": "Only Admins see this.",
   "clubSettings.list.backToAccount": "Back to My account",
   "clubSettings.list.backToList": "Settings",
+  "clubSettings.draft.unsaved.general": "Unsaved changes to the club details",
+  "clubSettings.draft.unsaved.sign-in": "Unsaved changes to the sign-in page",
+  "clubSettings.draft.unsaved.packs": "Unsaved changes to session packs",
+  "clubSettings.draft.discard": "Discard",
+  "clubSettings.draft.save": "Save changes",
+  "clubSettings.draft.saving": "Saving…",
+  "clubSettings.draft.saved": "Saved",
+  "clubSettings.draft.marker": "Unsaved",
+  "clubSettings.draft.leaveQuestion": "Leave without saving?",
   "clubSettings.summary.general.name": "Name",
   "clubSettings.summary.general.initials": "initials",
   "clubSettings.summary.general.colour": "colour {colour}",
@@ -1809,9 +1818,6 @@ export const englishMessages = {
   "clubSettings.logo.issue.logoUndecodable":
     "This file cannot be read as an image. Choose another logo.",
   "club.logoAlt": "{club} logo",
-  "clubSettings.save": "Save settings",
-  "clubSettings.saving": "Saving…",
-  "clubSettings.saved": "Settings saved.",
   "clubSettings.reloadLatest": "Load the latest settings",
   "clubSettings.issue.nameRequired": "The club needs a name.",
   "clubSettings.issue.nameTooLong":
@@ -1843,9 +1849,6 @@ export const englishMessages = {
     "The tagline can have at most {max} characters.",
   "clubSettings.signInTexts.issue.welcomeTooLong":
     "The welcome paragraph can have at most {max} characters.",
-  "clubSettings.signInTexts.save": "Save sign-in texts",
-  "clubSettings.signInTexts.saving": "Saving texts…",
-  "clubSettings.signInTexts.saved": "Sign-in texts saved.",
   "clubSettings.sessionPacks.title": "Session packs",
   "clubSettings.sessionPacks.lead":
     "What Casual members can buy. Each pack costs the Casual session price set in Stripe, times its sessions.",
@@ -1866,9 +1869,6 @@ export const englishMessages = {
   "clubSettings.sessionPacks.added": "{pack} pack added. Save to offer it.",
   "clubSettings.sessionPacks.removed":
     "{pack} pack removed. Save to stop offering it.",
-  "clubSettings.sessionPacks.save": "Save packs",
-  "clubSettings.sessionPacks.saving": "Saving…",
-  "clubSettings.sessionPacks.saved": "Packs saved.",
   "clubSettings.sessionPacks.issue.required": "Keep at least one pack.",
   "clubSettings.sessionPacks.issue.outOfRange":
     "A pack has from {min} to {max} sessions.",

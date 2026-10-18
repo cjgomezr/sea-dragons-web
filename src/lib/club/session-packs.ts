@@ -99,6 +99,18 @@ export function findSessionPackIssue(
   return null;
 }
 
+/** Si dos listas de packs son la misma (#719). El orden cuenta: es el que
+ * ven los socios. */
+export function isSamePackList(
+  draft: readonly number[],
+  stored: readonly number[],
+): boolean {
+  return (
+    draft.length === stored.length &&
+    draft.every((sessions, index) => sessions === stored[index])
+  );
+}
+
 /** El precio de un pack: el de una sesión por cuántas trae. */
 export function priceSessionPack(
   sessionPrice: ClubPrice,

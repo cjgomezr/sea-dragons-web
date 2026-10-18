@@ -1750,6 +1750,17 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.list.adminsOnly": "Solo los Admin ven esto.",
   "clubSettings.list.backToAccount": "Volver a Mi cuenta",
   "clubSettings.list.backToList": "Configuración",
+  "clubSettings.draft.unsaved.general":
+    "Cambios sin guardar en los datos del club",
+  "clubSettings.draft.unsaved.sign-in":
+    "Cambios sin guardar en la página de inicio de sesión",
+  "clubSettings.draft.unsaved.packs": "Cambios sin guardar en los packs",
+  "clubSettings.draft.discard": "Descartar",
+  "clubSettings.draft.save": "Guardar cambios",
+  "clubSettings.draft.saving": "Guardando…",
+  "clubSettings.draft.saved": "Guardado",
+  "clubSettings.draft.marker": "Sin guardar",
+  "clubSettings.draft.leaveQuestion": "¿Salir sin guardar?",
   "clubSettings.summary.general.name": "Nombre",
   "clubSettings.summary.general.initials": "iniciales",
   "clubSettings.summary.general.colour": "color {colour}",
@@ -1811,9 +1822,6 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.logo.issue.logoUndecodable":
     "Este archivo no se puede leer como imagen. Elige otro logo.",
   "club.logoAlt": "Logo de {club}",
-  "clubSettings.save": "Guardar la configuración",
-  "clubSettings.saving": "Guardando…",
-  "clubSettings.saved": "Configuración guardada.",
   "clubSettings.reloadLatest": "Cargar la configuración más reciente",
   "clubSettings.issue.nameRequired": "El club necesita un nombre.",
   "clubSettings.issue.nameTooLong":
@@ -1845,9 +1853,6 @@ export const spanishMessages: MessageCatalog = {
     "El lema puede tener como mucho {max} caracteres.",
   "clubSettings.signInTexts.issue.welcomeTooLong":
     "El párrafo de bienvenida puede tener como mucho {max} caracteres.",
-  "clubSettings.signInTexts.save": "Guardar los textos",
-  "clubSettings.signInTexts.saving": "Guardando los textos…",
-  "clubSettings.signInTexts.saved": "Textos de entrada guardados.",
   "clubSettings.sessionPacks.title": "Packs de sesiones",
   "clubSettings.sessionPacks.lead":
     "Lo que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual en Stripe por sus sesiones.",
@@ -1870,9 +1875,6 @@ export const spanishMessages: MessageCatalog = {
     "Pack de {pack} añadido. Guarda para ofrecerlo.",
   "clubSettings.sessionPacks.removed":
     "Pack de {pack} quitado. Guarda para dejar de ofrecerlo.",
-  "clubSettings.sessionPacks.save": "Guardar los packs",
-  "clubSettings.sessionPacks.saving": "Guardando…",
-  "clubSettings.sessionPacks.saved": "Packs guardados.",
   "clubSettings.sessionPacks.issue.required": "Deja al menos un pack.",
   "clubSettings.sessionPacks.issue.outOfRange":
     "Un pack tiene de {min} a {max} sesiones.",
