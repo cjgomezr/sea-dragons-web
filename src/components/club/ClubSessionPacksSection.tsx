@@ -24,6 +24,7 @@ import {
   saveSessionPacks,
 } from "./club-session-packs-client";
 import { SavedNotice, UnsavedChangesBar } from "./ClubUnsavedChangesBar";
+import { SortableList, useSortableRow } from "./SortableRows";
 import {
   type ClubDraft,
   type ClubDraftStatus,
@@ -40,6 +41,9 @@ import {
  * El precio de cada pack es el de una sesión Casual en Stripe por su tamaño.
  * Lo calcula la pantalla con el precio que trae el endpoint, así que un pack
  * que se está escribiendo ya enseña el suyo antes de añadirse.
+ *
+ * Se ordenan con ↑ y ↓ sobre el asa o arrastrándola (#725); las dos cosas
+ * cambian sólo el borrador.
  */
 
 type Direction = "up" | "down";
@@ -137,6 +141,8 @@ type SessionPacksEditor = {
   readonly addIssue: SessionPackIssueCode | null;
   readonly focusTarget: FocusTarget | null;
   readonly move: (sessions: number, direction: Direction) => void;
+  /** Deja la lista en `order` tras soltar `sessions` en otro puesto. */
+  readonly reorder: (order: readonly number[], sessions: number) => void;
   readonly remove: (sessions: number) => void;
   readonly add: (sessions: number) => boolean;
   readonly clearAddIssue: () => void;
@@ -221,20 +227,23 @@ function useSessionPacksEditor(
     setNotice(announcement);
   }
 
-  function move(sessions: number, direction: Direction): void {
-    const moved = swapWithNeighbour(sizes, sessions, direction);
-    if (moved === null) {
-      return;
-    }
+  function reorder(order: readonly number[], sessions: number): void {
     change(
-      moved,
+      order,
       translate("clubSettings.sessionPacks.moved", {
         pack: packName(translate, sessions),
-        rank: moved.indexOf(sessions) + 1,
-        total: moved.length,
+        rank: order.indexOf(sessions) + 1,
+        total: order.length,
       }),
     );
     setFocusTarget({ key: focusKey(sessions, "handle") });
+  }
+
+  function move(sessions: number, direction: Direction): void {
+    const moved = swapWithNeighbour(sizes, sessions, direction);
+    if (moved !== null) {
+      reorder(moved, sessions);
+    }
   }
 
   function remove(sessions: number): void {
@@ -295,6 +304,7 @@ function useSessionPacksEditor(
     addIssue,
     focusTarget,
     move,
+    reorder,
     remove,
     add,
     clearAddIssue,
@@ -323,9 +333,16 @@ function PackRow({
   onRemove: () => void;
 }): React.JSX.Element {
   const pack = packName(translate, sessions);
+  const { setRowNode, rowClassName, rowStyle, setHandleNode, handleListeners } =
+    useSortableRow(sessions);
   return (
-    <li className="club-packs-row">
+    <li
+      ref={setRowNode}
+      className={`club-packs-row ${rowClassName}`.trimEnd()}
+      style={rowStyle}
+    >
       <button
+        ref={setHandleNode}
         type="button"
         className="club-packs-handle"
         data-focus-key={focusKey(sessions, "handle")}
@@ -335,6 +352,7 @@ function PackRow({
           total,
         })}
         disabled={isBusy}
+        {...handleListeners}
         onKeyDown={(event) => {
           const direction = MOVE_KEYS[event.key];
           if (direction === undefined) {
@@ -528,24 +546,37 @@ function PacksTable({
           {translate("clubSettings.sessionPacks.empty")}
         </p>
       ) : (
-        <ol
-          className="club-packs-list"
-          aria-label={translate("clubSettings.sessionPacks.title")}
+        <SortableList
+          translate={translate}
+          items={sizes}
+          idOf={(sessions) => sessions}
+          describeItem={(sessions) =>
+            translate("clubSettings.sessionPacks.dragItem", {
+              pack: packName(translate, sessions),
+            })
+          }
+          isDisabled={isSending}
+          onDrop={editor.reorder}
         >
-          {sizes.map((sessions, index) => (
-            <PackRow
-              key={sessions}
-              translate={translate}
-              sessions={sessions}
-              index={index}
-              total={sizes.length}
-              sessionPrice={editor.sessionPrice}
-              isBusy={isSending}
-              onMove={(direction) => editor.move(sessions, direction)}
-              onRemove={() => editor.remove(sessions)}
-            />
-          ))}
-        </ol>
+          <ol
+            className="club-packs-list"
+            aria-label={translate("clubSettings.sessionPacks.title")}
+          >
+            {sizes.map((sessions, index) => (
+              <PackRow
+                key={sessions}
+                translate={translate}
+                sessions={sessions}
+                index={index}
+                total={sizes.length}
+                sessionPrice={editor.sessionPrice}
+                isBusy={isSending}
+                onMove={(direction) => editor.move(sessions, direction)}
+                onRemove={() => editor.remove(sessions)}
+              />
+            ))}
+          </ol>
+        </SortableList>
       )}
       <AddPackRow
         translate={translate}
