@@ -37,6 +37,8 @@ const LONGEST_CLUB_NAME =
 
 const VIEWER_ID = "00000000-0000-4000-8000-000000000001";
 
+const ACCOUNT = { fullName: "Camilo Gomez", email: "camilo@seadragons.club" };
+
 function renderShell(
   locale: Locale = "en",
   brand: ClubBrand = BRAND,
@@ -48,6 +50,7 @@ function renderShell(
       locale={locale}
       access={{ role, membershipCurrent }}
       viewerId={VIEWER_ID}
+      account={ACCOUNT}
       brand={brand}
       failedPayment={null}
     >
@@ -58,7 +61,9 @@ function renderShell(
 
 async function openAccountMenu(name = "My account"): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole("button", { name }));
-  return screen.getByRole("region", { name });
+  return screen.getByRole("region", {
+    name: name === "Mi cuenta" ? "Cuenta" : "Account",
+  });
 }
 
 describe("la marca en la cabecera", () => {
@@ -296,24 +301,20 @@ describe("app shell", () => {
     const menu = await openAccountMenu("Mi cuenta");
 
     expect(
-      within(menu).getByRole("button", { name: /cambiar a english/i }),
+      within(menu).getByRole("radio", { name: "English" }),
     ).toBeInTheDocument();
   });
 
-  it("pone el interruptor de idioma justo después del del tema", async () => {
+  it("pone el idioma justo después de la apariencia", async () => {
     usePathname.mockReturnValue("/dashboard");
     renderShell();
 
     const menu = await openAccountMenu();
 
-    const themeToggle = within(menu).getByRole("button", { name: /theme/i });
-    const languageToggle = within(menu).getByRole("button", {
-      name: /español/i,
-    });
-    const buttons = within(menu).getAllByRole("button");
-    expect(buttons.indexOf(languageToggle)).toBe(
-      buttons.indexOf(themeToggle) + 1,
-    );
+    const groups = within(menu).getAllByRole("radiogroup");
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toHaveAccessibleName("Appearance");
+    expect(groups[1]).toHaveAccessibleName("Language");
   });
 
   // E17 RF-5: la cáscara pasa el idioma a las dos navegaciones, que son hojas
@@ -325,6 +326,7 @@ describe("app shell", () => {
         locale="es"
         access={{ role: "Player", membershipCurrent: true }}
         viewerId={VIEWER_ID}
+        account={ACCOUNT}
         brand={BRAND}
         failedPayment={null}
       >
@@ -349,6 +351,7 @@ describe("app shell", () => {
         locale="en"
         access={{ role: "Player", membershipCurrent: true }}
         viewerId={VIEWER_ID}
+        account={ACCOUNT}
         brand={BRAND}
         failedPayment={null}
       >
@@ -373,6 +376,7 @@ describe("app shell", () => {
         locale="en"
         access={{ role: "Admin", membershipCurrent: true }}
         viewerId={VIEWER_ID}
+        account={ACCOUNT}
         brand={BRAND}
         failedPayment={null}
       >
@@ -395,6 +399,7 @@ describe("app shell", () => {
         locale="en"
         access={{ role: "Player", membershipCurrent: true }}
         viewerId={VIEWER_ID}
+        account={ACCOUNT}
         brand={BRAND}
         failedPayment={null}
       >
@@ -510,6 +515,7 @@ function renderShellWithFailedPayment(
       locale={locale}
       access={{ role: "Player", membershipCurrent: false }}
       viewerId={VIEWER_ID}
+      account={ACCOUNT}
       brand={BRAND}
       failedPayment={failedPayment}
     >

@@ -288,6 +288,11 @@ export const englishMessages = {
   "accountMenu.language": "Language",
   "accountMenu.back": "Back",
   "accountMenu.clubSettings": "Club settings",
+  "accountMenu.title": "Account",
+  "accountMenu.youAreHere": "You're here",
+  "accountMenu.themeLight": "Light",
+  "accountMenu.themeDark": "Dark",
+  "accountMenu.themeSystem": "System",
   "account.metaTitle": "Profile · {club}",
   "account.metaDescription":
     "Your details, your role in the club and your groups, plus a request to become a Coach or join the Committee.",

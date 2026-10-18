@@ -629,15 +629,18 @@ button.notification-item-content:hover {
   border-radius: 50%;
 }
 
-/* El menú de la cuenta (#287) se abre como la lista de avisos: en el móvil
-   una pantalla entera con su flecha para volver, en escritorio un desplegable
-   (ver la media query de abajo). */
+/* El menú de la cuenta (#287, rehecho en #716 con el handoff de E26) se abre
+   como la lista de avisos: en el móvil la pantalla Cuenta (#2a) con su flecha
+   para volver, en escritorio un desplegable (ver la media query de abajo). */
 .account-menu {
   position: fixed;
   inset: 0;
   z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   overflow-y: auto;
-  padding: var(--space-4);
+  padding: 0 var(--space-4) var(--space-6);
   color: var(--color-text);
   background: var(--color-background);
 }
@@ -645,15 +648,18 @@ button.notification-item-content:hover {
 .account-menu-header {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  gap: var(--space-1);
+  min-height: 56px;
+  margin: 0 calc(-1 * var(--space-4));
+  padding: 0 var(--space-2);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .account-menu-header h2 {
   flex: 1;
   margin: 0;
-  font-family: var(--font-family-heading);
-  font-size: 20px;
+  font-size: 17px;
+  font-weight: 600;
 }
 
 .account-menu-header h2:focus {
@@ -666,48 +672,103 @@ button.notification-item-content:hover {
   justify-content: center;
   min-width: var(--touch-target-min);
   min-height: var(--touch-target-min);
-  font-size: 18px;
-  color: var(--color-text);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.account-menu-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-}
-
-.account-menu-list > li + li {
-  border-top: 1px solid var(--color-border);
-}
-
-/* Mi perfil y Cerrar sesión: la fila entera es el control. */
-.account-menu-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: var(--touch-target-min);
-  padding: var(--space-2) var(--space-4);
-  font-family: inherit;
-  font-size: 15px;
-  color: var(--color-text);
-  text-align: left;
-  text-decoration: none;
+  font-size: 22px;
+  color: var(--color-accent-text);
   background: transparent;
   border: none;
   border-radius: var(--radius);
   cursor: pointer;
 }
 
-.account-menu-item:hover:not(:disabled) {
-  color: var(--color-accent-text);
+.account-menu-back:hover {
+  background: var(--color-hover);
+}
+
+.account-menu-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.account-menu-avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-segment-selected);
+  border-radius: 50%;
+}
+
+.account-menu-identity-text {
+  min-width: 0;
+}
+
+.account-menu-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.account-menu-meta {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* Mi perfil y la configuración del club: en el móvil una tarjeta con filas
+   de 54 px y su flecha, como la lista de la configuración (#718). */
+.account-menu-list {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.account-menu-list > li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.account-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 54px;
+  padding: 0 var(--space-4);
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--color-text);
+  text-align: left;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+/* Dentro de la tarjeta, que recorta lo que sale de ella. */
+.account-menu-item:focus-visible {
+  outline-offset: -2px;
+}
+
+.account-menu-item > svg {
+  flex: none;
+  font-size: 20px;
+  color: var(--color-text-secondary);
+}
+
+.account-menu-item:hover:not(:disabled),
+.account-menu-item[aria-current="page"] {
+  background: var(--color-hover);
 }
 
 .account-menu-item:disabled {
@@ -715,23 +776,108 @@ button.notification-item-content:hover {
   opacity: 0.6;
 }
 
-/* Apariencia e Idioma: el nombre de la preferencia y su interruptor, el mismo
-   que antes vivía suelto en la cabecera. */
-.account-menu-setting {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-  font-size: 15px;
+.account-menu-item-label {
+  flex: 1;
 }
 
-/* Aquí los interruptores van sobre el panel y no sobre el fondo oscuro de la
-   barra lateral, así que toman los colores del tema. */
-.account-menu .theme-toggle,
-.account-menu .language-toggle {
+/* Va sobre el fondo resaltado de la fila actual, donde el secundario no
+   llega a 4.5:1 en el tema claro. */
+.account-menu-here {
+  font-size: 12px;
   color: var(--color-text);
-  border-color: var(--color-border);
+}
+
+.account-menu-caret {
+  display: flex;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+}
+
+/* Apariencia e Idioma (#716): una etiqueta en mayúsculas y su control
+   segmentado. El radio queda encima de su segmento, transparente, como en la
+   categoría de las noticias: el clic y el foco son suyos, y lo que se ve es
+   la etiqueta. */
+.segmented-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.segmented-choice-label {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+}
+
+.segmented-choice-options {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.segmented-choice-option {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* El radio sobresale del segmento de 42 px hasta el borde del marco: lo que
+   se toca llega a la medida táctil aunque lo pintado no. */
+.segmented-choice-option input {
+  position: absolute;
+  inset: -4px 0;
+  width: 100%;
+  height: calc(100% + 8px);
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.segmented-choice-option span {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 var(--space-2);
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  border-radius: var(--radius);
+}
+
+.segmented-choice-option input:hover + span {
+  color: var(--color-text);
+}
+
+.segmented-choice-option input:checked + span {
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-segment-selected);
+}
+
+.segmented-choice-option input:focus-visible + span {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+/* Cerrar sesión, en rojo: en el móvil un botón de 50 px con borde. */
+.account-menu-signout {
+  margin-top: var(--space-2);
+}
+
+.account-menu-signout .account-menu-item {
+  justify-content: center;
+  min-height: 50px;
+  font-weight: 600;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  border-radius: 12px;
 }
 
 @media (min-width: 768px) {
@@ -758,23 +904,42 @@ button.notification-item-content:hover {
     box-shadow: var(--shadow);
   }
 
-  /* El menú sólo tiene cuatro filas cortas: no necesita el ancho de la
-     lista de avisos. */
+  /* El desplegable del handoff (#1a): 300 px, marco de 12 y 6 px por dentro.
+     Es más alto que la lista de avisos, así que su tope es la ventana. */
   .account-menu {
-    width: 280px;
+    gap: 0;
+    width: 300px;
+    max-height: calc(100vh - 80px);
+    padding: 6px;
+    border-radius: 12px;
   }
 
-  .notification-panel-header,
-  .account-menu-header {
+  .notification-panel-header {
     margin: 0;
     padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
     border-bottom: 1px solid var(--color-border);
   }
 
-  .notification-panel-header h2,
-  .account-menu-header h2 {
+  .notification-panel-header h2 {
     font-family: inherit;
     font-size: 15px;
+  }
+
+  /* En escritorio el desplegable empieza por la identidad, sin título. El
+     encabezado sigue ahí para el lector de pantalla y para recibir el foco
+     al abrir; son las declaraciones de `.visually-hidden`, que no se puede
+     aplicar sólo en un ancho. */
+  .account-menu-header {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   /* En escritorio se cierra pulsando fuera o con Escape: la flecha es del
@@ -784,10 +949,87 @@ button.notification-item-content:hover {
     display: none;
   }
 
-  /* El desplegable ya tiene su marco: la lista no dibuja otro dentro. */
+  .account-menu-identity {
+    gap: var(--space-3);
+    padding: 10px 10px 12px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .account-menu-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 13px;
+  }
+
+  .account-menu-name {
+    font-size: 14.5px;
+  }
+
+  .account-menu-meta {
+    font-size: 12.5px;
+  }
+
+  /* El desplegable ya tiene su marco: la lista no dibuja otro dentro, y sus
+     filas son las compactas del escritorio, sin flecha. */
   .account-menu-list {
+    overflow: visible;
+    background: transparent;
     border: none;
     border-radius: 0;
+  }
+
+  .account-menu-list > li + li {
+    border-top: none;
+  }
+
+  .account-menu-item {
+    min-height: 38px;
+    padding: 0 10px;
+    font-size: 14px;
+    border-radius: var(--radius);
+  }
+
+  .account-menu-item > svg {
+    font-size: 18px;
+  }
+
+  .account-menu-caret {
+    display: none;
+  }
+
+  .account-menu .segmented-choice {
+    gap: 6px;
+    padding: 10px 10px 4px;
+  }
+
+  .account-menu-list + .segmented-choice {
+    margin-top: 6px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .segmented-choice-option input {
+    inset: 0;
+    height: 100%;
+  }
+
+  .segmented-choice-option span {
+    min-height: 34px;
+    font-size: 13.5px;
+  }
+
+  .account-menu-signout {
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .account-menu-signout .account-menu-item {
+    justify-content: flex-start;
+    min-height: 38px;
+    font-weight: 400;
+    border: none;
+    border-radius: var(--radius);
   }
 
   .notification-panel-alert,

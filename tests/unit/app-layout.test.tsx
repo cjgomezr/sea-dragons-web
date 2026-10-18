@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { COMPLETE_REGISTRATION_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
@@ -51,10 +52,28 @@ vi.mock("@/lib/club/supabase-club-brand", () => ({
   readClubBrand: async () => ({ name: "Hobart Orcas", initials: "HO" }),
 }));
 
+/** La fila de miembro de quien mira: la cáscara pone su nombre y su correo
+ * en el menú de la cuenta (#716). */
+const OWN_MEMBER_ROW = {
+  from: () => ({
+    select: () => ({
+      eq: () => ({
+        maybeSingle: async () => ({
+          data: { full_name: "Camilo Gomez", email: "camilo@seadragons.club" },
+          error: null,
+        }),
+      }),
+    }),
+  }),
+};
+
 const { default: AppLayout } = await import("@/app/(app)/layout");
 
 function givenSession(state: SessionState): void {
-  createSessionClient.mockReturnValue({ kind: "ready", client: {} });
+  createSessionClient.mockReturnValue({
+    kind: "ready",
+    client: OWN_MEMBER_ROW,
+  });
   readSessionState.mockResolvedValue(state);
 }
 
@@ -86,6 +105,20 @@ describe("disposición de la aplicación", () => {
     await renderAppLayout();
 
     expect(screen.getByText("Hobart Orcas")).toBeInTheDocument();
+  });
+
+  // #716: el menú de la cuenta enseña arriba quién tiene la sesión.
+  it("pone el nombre, el rol y el correo de quien mira en el menú de la cuenta", async () => {
+    givenSession({ kind: "active", role: "Admin", membershipCurrent: true });
+
+    await renderAppLayout();
+    await userEvent.click(screen.getByRole("button", { name: "My account" }));
+
+    const menu = screen.getByRole("region", { name: "Account" });
+    expect(within(menu).getByText("Camilo Gomez")).toBeInTheDocument();
+    expect(
+      within(menu).getByText("Admin · camilo@seadragons.club"),
+    ).toBeInTheDocument();
   });
 
   it("dibuja la navegación de un Player sin Equipos, Evaluaciones ni Administración", async () => {

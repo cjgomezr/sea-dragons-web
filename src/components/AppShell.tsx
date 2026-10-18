@@ -7,6 +7,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { MobileSearch } from "@/components/search/MobileSearch";
 import { SidebarNav } from "@/components/SidebarNav";
+import type { MemberIdentity } from "@/lib/auth/caller-identity";
 import { CLUB_SETTINGS_PATH, SEARCH_API_PATH } from "@/lib/auth/routes";
 import {
   type ActiveAccess,
@@ -20,6 +21,7 @@ export function AppShell({
   locale,
   access,
   viewerId,
+  account,
   brand,
   failedPayment,
   children,
@@ -31,6 +33,8 @@ export function AppShell({
   /** Quien tiene la sesión, leído en el servidor: la búsqueda lo lleva a su
    * perfil cuando se encuentra a sí mismo (#427). */
   viewerId: string;
+  /** El nombre y el correo de quien mira, para el menú de la cuenta (#716). */
+  account: MemberIdentity;
   /** La que leyó el servidor de la base (#292). */
   brand: ClubBrand;
   /** El cobro fallido de quien mira, decidido en el servidor (#474); nulo
@@ -70,6 +74,7 @@ export function AppShell({
                 menú no ofrece lo que la frontera no dejaría abrir. */}
             <AccountMenu
               locale={locale}
+              account={{ ...account, role: access.role }}
               canConfigureClub={isAllowedForAccess(CLUB_SETTINGS_PATH, access)}
             />
           </div>
