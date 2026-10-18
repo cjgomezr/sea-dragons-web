@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClubSettingsScreen } from "@/components/club/ClubSettingsScreen";
@@ -507,7 +507,11 @@ describe("salir con un borrador", () => {
     await userEvent.click(saveChangesButton());
     await screen.findByText("Saved");
 
-    expect(dispatchBeforeUnload().defaultPrevented).toBe(false);
+    // La sección avisa a la pantalla en un efecto: bajo carga llega un
+    // pintado después del aviso de guardado.
+    await waitFor(() =>
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(false),
+    );
   });
 
   it("pregunta al seguir un enlace de la app, y cancelar deja todo como estaba", async () => {
