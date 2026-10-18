@@ -35,6 +35,7 @@ const CAMILO: AccountIdentity = {
   fullName: "Camilo Gomez",
   email: "camilo@seadragons.club",
   role: "Admin",
+  photoUrl: null,
 };
 
 function renderMenu(
@@ -44,6 +45,7 @@ function renderMenu(
   return render(
     <AccountMenu
       locale={locale}
+      trigger="icon"
       canConfigureClub={canConfigureClub}
       account={CAMILO}
     />,
@@ -110,10 +112,28 @@ describe("menú de la cuenta", () => {
     expect(within(menu).getByText("CG")).toBeInTheDocument();
   });
 
+  it("con foto, la pone arriba en vez de las iniciales (#717)", async () => {
+    const photoUrl = "https://storage.example.test/member-photos/camilo.jpg";
+    render(
+      <AccountMenu
+        locale="en"
+        trigger="icon"
+        canConfigureClub={false}
+        account={{ ...CAMILO, photoUrl }}
+      />,
+    );
+
+    const menu = await openMenu();
+
+    expect(menu.querySelector("img")).toHaveAttribute("src", photoUrl);
+    expect(within(menu).queryByText("CG")).toBeNull();
+  });
+
   it("nombra el rol en español con la aplicación en español", async () => {
     render(
       <AccountMenu
         locale="es"
+        trigger="icon"
         canConfigureClub={false}
         account={{ ...CAMILO, role: "Player" }}
       />,
@@ -245,7 +265,12 @@ describe("menú de la cuenta", () => {
     render(
       <>
         <p>Contenido de la pantalla</p>
-        <AccountMenu locale="en" canConfigureClub={false} account={CAMILO} />
+        <AccountMenu
+          locale="en"
+          trigger="icon"
+          canConfigureClub={false}
+          account={CAMILO}
+        />
       </>,
     );
     await openMenu();
@@ -260,7 +285,12 @@ describe("menú de la cuenta", () => {
     render(
       <>
         <input aria-label="Buscar" />
-        <AccountMenu locale="en" canConfigureClub={false} account={CAMILO} />
+        <AccountMenu
+          locale="en"
+          trigger="icon"
+          canConfigureClub={false}
+          account={CAMILO}
+        />
       </>,
     );
     await openMenu();
@@ -285,7 +315,12 @@ describe("menú de la cuenta", () => {
   it("se cierra cuando el foco sale de él y el foco vuelve al botón de la cuenta", async () => {
     render(
       <>
-        <AccountMenu locale="en" canConfigureClub={false} account={CAMILO} />
+        <AccountMenu
+          locale="en"
+          trigger="icon"
+          canConfigureClub={false}
+          account={CAMILO}
+        />
         <button type="button">Control de debajo</button>
       </>,
     );
@@ -520,7 +555,12 @@ describe("Idioma dentro del menú", () => {
     await openMenu();
 
     rerender(
-      <AccountMenu locale="es" canConfigureClub={false} account={CAMILO} />,
+      <AccountMenu
+        locale="es"
+        trigger="icon"
+        canConfigureClub={false}
+        account={CAMILO}
+      />,
     );
 
     const menu = screen.getByRole("region", { name: "Cuenta" });

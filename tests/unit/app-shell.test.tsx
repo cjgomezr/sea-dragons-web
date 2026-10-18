@@ -37,7 +37,11 @@ const LONGEST_CLUB_NAME =
 
 const VIEWER_ID = "00000000-0000-4000-8000-000000000001";
 
-const ACCOUNT = { fullName: "Camilo Gomez", email: "camilo@seadragons.club" };
+const ACCOUNT = {
+  fullName: "Camilo Gomez",
+  email: "camilo@seadragons.club",
+  photoUrl: null,
+};
 
 function renderShell(
   locale: Locale = "en",
@@ -58,6 +62,24 @@ function renderShell(
     </AppShell>,
   );
 }
+
+/** El corte de `useIsPhone` y de la hoja de estilos. */
+const PHONE_QUERY = "(width < 768px)";
+
+/** jsdom no tiene pantalla: el `matchMedia` de `vitest.setup.ts` nunca casa,
+ * así que por defecto la cáscara se pinta como en escritorio. */
+const desktopMatchMedia = window.matchMedia;
+
+function emulatePhone(): void {
+  window.matchMedia = (query: string) => ({
+    ...desktopMatchMedia(query),
+    matches: query === PHONE_QUERY,
+  });
+}
+
+afterEach(() => {
+  window.matchMedia = desktopMatchMedia;
+});
 
 async function openAccountMenu(name = "My account"): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole("button", { name }));
@@ -180,8 +202,9 @@ describe("app shell", () => {
   // #287: tema, idioma, Mi perfil y cerrar sesión viven en el menú de la
   // cuenta, así que la cabecera sólo lleva el nombre y dos controles.
   // #427: la lupa del móvil se suma junto a la campana.
-  it("la cabecera lleva sólo el nombre, la lupa, la campana y la cuenta", () => {
+  it("en el móvil la cabecera lleva sólo el nombre, la lupa, la campana y la cuenta", () => {
     usePathname.mockReturnValue("/calendario");
+    emulatePhone();
     renderShell();
 
     const sidebar = screen.getByRole("complementary");
@@ -412,6 +435,124 @@ describe("app shell", () => {
   });
 });
 
+// #717, RF-10 del PRD de E26: en escritorio la campana y la cuenta suben a la
+// barra de arriba, y la barra lateral se queda con la marca.
+function topbarOf(): HTMLElement {
+  const topbar = document.querySelector<HTMLElement>(".app-topbar");
+  if (topbar === null) {
+    throw new Error("la cáscara no pintó la barra de arriba");
+  }
+  return topbar;
+}
+
+const PHOTO_URL = "https://storage.example.test/member-photos/camilo-thumb.jpg";
+
+describe("la cabecera de escritorio (#717)", () => {
+  it("pone la campana y la cuenta en la barra de arriba, después del buscador", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+
+    const controls = within(topbarOf()).getAllByRole("button");
+    expect(
+      controls.map((control) => control.getAttribute("aria-label")),
+    ).toEqual([expect.stringMatching(/^Notifications/), "My account"]);
+    expect(
+      screen
+        .getByRole("search")
+        .compareDocumentPosition(controls[0] as HTMLElement),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("deja la barra lateral sólo con la marca y la navegación", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+
+    const sidebar = screen.getByRole("complementary");
+    expect(within(sidebar).queryAllByRole("button")).toHaveLength(0);
+    expect(within(sidebar).getByText("Hobart Orcas")).toBeInTheDocument();
+  });
+
+  it("el buscador sigue siendo el único cuadro de búsqueda de la barra", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+
+    const searchBar = screen.getByRole("search");
+    expect(topbarOf()).toContainElement(searchBar);
+    expect(within(searchBar).queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("el botón de la cuenta lleva las iniciales de quien mira", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+
+    const account = screen.getByRole("button", { name: "My account" });
+    expect(account).toHaveTextContent("CG");
+    expect(account).toHaveClass("account-avatar-button");
+  });
+
+  it("con foto, el botón de la cuenta la enseña en vez de las iniciales", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(
+      <AppShell
+        locale="en"
+        access={{ role: "Player", membershipCurrent: true }}
+        viewerId={VIEWER_ID}
+        account={{ ...ACCOUNT, photoUrl: PHOTO_URL }}
+        brand={BRAND}
+        failedPayment={null}
+      >
+        <p>Contenido de la sección</p>
+      </AppShell>,
+    );
+
+    const account = screen.getByRole("button", { name: "My account" });
+    expect(account.querySelector("img")).toHaveAttribute("src", PHOTO_URL);
+    expect(account).not.toHaveTextContent("CG");
+  });
+
+  it("el botón de la cuenta dice que el menú está abierto", async () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+    const account = screen.getByRole("button", { name: "My account" });
+
+    await userEvent.click(account);
+
+    expect(account).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("sin acceso a la búsqueda la barra de arriba sigue llevando la campana y la cuenta", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell("en", BRAND, "Player", false);
+
+    expect(
+      within(topbarOf()).getByRole("button", { name: "My account" }),
+    ).toBeInTheDocument();
+    expect(
+      within(topbarOf()).getByRole("button", { name: /^Notifications/ }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("la cabecera del móvil (#717)", () => {
+  it("deja la barra de arriba sin botones", () => {
+    usePathname.mockReturnValue("/dashboard");
+    emulatePhone();
+    renderShell();
+
+    expect(within(topbarOf()).queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("el botón de la cuenta sigue siendo el icono, sin iniciales", () => {
+    usePathname.mockReturnValue("/dashboard");
+    emulatePhone();
+    renderShell();
+
+    const account = screen.getByRole("button", { name: "My account" });
+    expect(account).not.toHaveTextContent("CG");
+    expect(account).toHaveClass("app-header-icon");
+  });
+});
+
 // #427, RF-8 del PRD de E14: la búsqueda global.
 describe("la búsqueda en la cáscara", () => {
   it("pone el cuadro de búsqueda en la barra de arriba del contenido", () => {
@@ -429,6 +570,7 @@ describe("la búsqueda en la cáscara", () => {
 
   it("pone la lupa del móvil justo antes de la campana", () => {
     usePathname.mockReturnValue("/dashboard");
+    emulatePhone();
     renderShell("es");
 
     const magnifier = screen.getByRole("button", { name: "Buscar" });
@@ -441,6 +583,7 @@ describe("la búsqueda en la cáscara", () => {
 
   it("la lupa abre la búsqueda a pantalla completa con el foco en el cuadro", async () => {
     usePathname.mockReturnValue("/dashboard");
+    emulatePhone();
     renderShell();
     const magnifier = screen.getByRole("button", { name: "Search" });
 
@@ -453,6 +596,7 @@ describe("la búsqueda en la cáscara", () => {
 
   it("Cerrar cierra la búsqueda y devuelve el foco a la lupa", async () => {
     usePathname.mockReturnValue("/dashboard");
+    emulatePhone();
     renderShell();
     const magnifier = screen.getByRole("button", { name: "Search" });
     await userEvent.click(magnifier);
@@ -465,6 +609,7 @@ describe("la búsqueda en la cáscara", () => {
 
   it("Escape en la pantalla entera la cierra y devuelve el foco a la lupa", async () => {
     usePathname.mockReturnValue("/dashboard");
+    emulatePhone();
     renderShell();
     const magnifier = screen.getByRole("button", { name: "Search" });
     await userEvent.click(magnifier);

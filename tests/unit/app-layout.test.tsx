@@ -16,15 +16,24 @@ class RedirectSignal extends Error {
   }
 }
 
-const { createSessionClient, readSessionState, failedPaymentGateway } =
-  vi.hoisted(() => ({
-    createSessionClient: vi.fn(),
-    readSessionState: vi.fn(),
-    failedPaymentGateway: {
-      findStanding: vi.fn(),
-      findLastFailedInvoiceAt: vi.fn(),
-    },
-  }));
+const {
+  createSessionClient,
+  readSessionState,
+  failedPaymentGateway,
+  photoGateways,
+} = vi.hoisted(() => ({
+  createSessionClient: vi.fn(),
+  readSessionState: vi.fn(),
+  failedPaymentGateway: {
+    findStanding: vi.fn(),
+    findLastFailedInvoiceAt: vi.fn(),
+  },
+  // #717: el botón de la cuenta lleva la foto de quien mira.
+  photoGateways: {
+    members: { findPhotoOwner: vi.fn() },
+    signing: { signPhotoUrl: vi.fn() },
+  },
+}));
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({ get: () => undefined, getAll: () => [] }),
@@ -47,6 +56,12 @@ vi.mock("@/lib/auth/session-reader", () => ({
 }));
 vi.mock("@/lib/membership/supabase-failed-payment-gateway", () => ({
   createFailedPaymentAlertGateway: () => failedPaymentGateway,
+}));
+vi.mock("@/lib/members/supabase-profile-photo-gateways", () => ({
+  createSupabaseProfilePhotoGateways: () => ({
+    kind: "ready",
+    gateways: photoGateways,
+  }),
 }));
 vi.mock("@/lib/club/supabase-club-brand", () => ({
   readClubBrand: async () => ({ name: "Hobart Orcas", initials: "HO" }),
@@ -85,6 +100,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   failedPaymentGateway.findStanding.mockResolvedValue(null);
   failedPaymentGateway.findLastFailedInvoiceAt.mockResolvedValue(null);
+  photoGateways.members.findPhotoOwner.mockResolvedValue({
+    status: "active",
+    photoPath: null,
+  });
 });
 
 function givenMembershipStatus(status: string): void {
@@ -119,6 +138,35 @@ describe("disposición de la aplicación", () => {
     expect(
       within(menu).getByText("Admin · camilo@seadragons.club"),
     ).toBeInTheDocument();
+  });
+
+  it("pone la foto firmada de quien mira en el botón de la cuenta (#717)", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
+    const signedUrl = "https://storage.example.test/signed/camilo-thumb.jpg";
+    photoGateways.members.findPhotoOwner.mockResolvedValue({
+      status: "active",
+      photoPath: "club/camilo-thumb.jpg",
+    });
+    photoGateways.signing.signPhotoUrl.mockResolvedValue(signedUrl);
+
+    await renderAppLayout();
+
+    const account = screen.getByRole("button", { name: "My account" });
+    expect(account.querySelector("img")).toHaveAttribute("src", signedUrl);
+    expect(photoGateways.signing.signPhotoUrl).toHaveBeenCalledWith(
+      "club/camilo-thumb.jpg",
+    );
+  });
+
+  it("sin foto, el botón de la cuenta lleva las iniciales (#717)", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
+
+    await renderAppLayout();
+
+    expect(
+      screen.getByRole("button", { name: "My account" }),
+    ).toHaveTextContent("CG");
+    expect(photoGateways.signing.signPhotoUrl).not.toHaveBeenCalled();
   });
 
   it("dibuja la navegación de un Player sin Equipos, Evaluaciones ni Administración", async () => {

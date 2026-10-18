@@ -34,12 +34,23 @@ import { isSectionActive } from "@/lib/navigation";
  */
 
 /** Lo que el menú pone arriba: el nombre y el correo de su fila de miembro,
- * con el rol que ya decide la navegación. */
-export type AccountIdentity = MemberIdentity & { readonly role: Role };
+ * con el rol que ya decide la navegación y la foto firmada, o null para las
+ * iniciales. */
+export type AccountIdentity = MemberIdentity & {
+  readonly role: Role;
+  readonly photoUrl: string | null;
+};
+
+/** Cómo se dibuja el botón que abre el menú: el icono de la cabecera del
+ * móvil, o el círculo con la cara o las iniciales de la barra de arriba de
+ * escritorio (#717). */
+export type AccountMenuTrigger = "icon" | "avatar";
 
 /** `MemberAvatar` pide una medida; la que manda es la del CSS, 40 px en
  * escritorio y 52 en el móvil. */
 const AVATAR_SIZE = 52;
+/** El círculo del botón en la barra de arriba (#717). */
+const TRIGGER_AVATAR_SIZE = 38;
 
 /** Lo que avisa al menú de que otra pantalla quiere volver a él: la lista
  * de la configuración del club en el móvil (#718) vuelve "a la cuenta", y la
@@ -71,7 +82,7 @@ function AccountIdentityRow({
     <div className="account-menu-identity">
       <MemberAvatar
         fullName={account.fullName}
-        photoUrl={null}
+        photoUrl={account.photoUrl}
         size={AVATAR_SIZE}
         className="account-menu-avatar"
       />
@@ -187,13 +198,35 @@ function AccountMenuPanel({
   );
 }
 
+function TriggerFace({
+  trigger,
+  account,
+}: {
+  readonly trigger: AccountMenuTrigger;
+  readonly account: AccountIdentity;
+}): React.JSX.Element {
+  if (trigger === "icon") {
+    return <AccountIcon />;
+  }
+  return (
+    <MemberAvatar
+      fullName={account.fullName}
+      photoUrl={account.photoUrl}
+      size={TRIGGER_AVATAR_SIZE}
+      className="account-avatar-face"
+    />
+  );
+}
+
 export function AccountMenu({
   locale,
   account,
+  trigger,
   canConfigureClub,
 }: {
   locale: Locale;
   account: AccountIdentity;
+  trigger: AccountMenuTrigger;
   /** Si quien lo abre es Admin: sólo entonces ofrece la configuración del
    * club. Lo decide el servidor con la regla de la frontera. */
   canConfigureClub: boolean;
@@ -250,14 +283,16 @@ export function AccountMenu({
       <button
         ref={buttonRef}
         type="button"
-        className="app-header-icon"
+        className={
+          trigger === "icon" ? "app-header-icon" : "account-avatar-button"
+        }
         aria-label={label}
         title={label}
         aria-expanded={isOpen}
         aria-controls={menuId}
         onClick={() => setIsOpen((wasOpen) => !wasOpen)}
       >
-        <AccountIcon />
+        <TriggerFace trigger={trigger} account={account} />
       </button>
       {isOpen ? (
         <AccountMenuPanel
