@@ -359,11 +359,14 @@ export function ClubPositionsSection({
     order: ManagedPositions,
   ): Promise<void> {
     setDroppedOrder(order);
-    await reorder(
-      position,
-      order.map(({ id }) => id),
-    );
-    setDroppedOrder(null);
+    try {
+      await reorder(
+        position,
+        order.map(({ id }) => id),
+      );
+    } finally {
+      setDroppedOrder(null);
+    }
   }
 
   function archiveAction(

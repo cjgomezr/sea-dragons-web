@@ -10014,7 +10014,9 @@ async function holdWithFingerOver(
 
 /** Deja la última fila de la lista a medio arrastrar sobre la primera: la
  * captura sale con la línea de destino arriba (#725). */
-function holdLastRowOverFirst(section: (page: Page) => Locator) {
+function holdLastRowOverFirst(
+  section: (page: Page) => Locator,
+): (page: Page) => Promise<void> {
   return async (page: Page): Promise<void> => {
     const rows = section(page).getByRole("list").first().getByRole("listitem");
     const handle = rows.last().getByRole("button", { name: /^Reorder / });
@@ -11336,15 +11338,40 @@ test.describe("arrastrar posiciones (#725)", () => {
       await expect.poll(() => sentOrders).toEqual([SWEEPER_FIRST_ORDER]);
     });
 
-    test("un toque corto en el asa no arrastra", async ({ page }) => {
+    test("mover el dedo antes de 150 ms no arrastra", async ({ page }) => {
       const sentOrders = await openSixPositions(page);
       const handle = positionRows(page)
         .nth(5)
         .getByRole("button", { name: /^Reorder Sweeper/ });
 
-      await handle.tap();
+      const from = await centreOf(handle);
+      const to = await centreOf(positionRows(page).first());
+      const cdp = await page.context().newCDPSession(page);
 
+      // Sin esperar los 150 ms: el dedo pasa de la tolerancia antes y el
+      // gesto no es un arrastre. Sin el retraso, esto reordenaría.
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [from],
+      });
+      for (let step = 1; step <= DRAG_STEP_COUNT; step += 1) {
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [
+            {
+              x: from.x,
+              y: from.y + ((to.y - from.y) * step) / DRAG_STEP_COUNT,
+            },
+          ],
+        });
+      }
       await expect(page.locator(".sortable-row-lifted")).toHaveCount(0);
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+      await cdp.detach();
+
       expect(sentOrders).toEqual([]);
     });
   });

@@ -1922,7 +1922,7 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.positions.handle.label":
     "Reordenar {name}, puesto {rank} de {total}",
   "clubSettings.reorder.hint":
-    "Arrástrala o usa las flechas arriba y abajo para moverla.",
+    "Arrastra o usa las flechas arriba y abajo para mover.",
   "clubSettings.positions.languageCode.en": "EN",
   "clubSettings.positions.languageCode.es": "ES",
   "clubSettings.positions.name.placeholder.en": "Inglés",
