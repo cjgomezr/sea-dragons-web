@@ -130,9 +130,9 @@ function accentPicker(): HTMLElement {
   return screen.getByLabelText(/^Pick the accent colour/);
 }
 
-/** La muestra con su texto encima: es decorativa, así que no tiene rol. */
+/** La vista previa de la pestaña General (#720), con el acento en línea. */
 function accentPreview(): HTMLElement {
-  return screen.getByText("Sample text");
+  return screen.getByRole("figure", { name: "Preview" });
 }
 
 async function typeAccent(code: string): Promise<void> {
@@ -173,11 +173,9 @@ describe("pantalla de configuración: carga", () => {
     expect(screen.getByLabelText("Club name")).toHaveValue(
       "Harbour Hammerheads",
     );
-    expect(screen.getByLabelText("Initials")).toHaveValue("HH");
+    expect(screen.getByLabelText("Initials · optional")).toHaveValue("HH");
     expect(accentField()).toHaveValue("#1C6EA4");
-    expect(
-      screen.getByText("No logo yet: the initials are shown instead."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("No logo yet")).toBeInTheDocument();
   });
 
   it("dice que hay un logo cuando el club lo tiene", async () => {
@@ -190,7 +188,7 @@ describe("pantalla de configuración: carga", () => {
 
     await renderScreen();
 
-    expect(screen.getByText("The club has a logo.")).toBeInTheDocument();
+    expect(screen.getByText("Logo in use")).toBeInTheDocument();
   });
 
   it("deja vacías las iniciales que no se guardaron", async () => {
@@ -198,7 +196,7 @@ describe("pantalla de configuración: carga", () => {
 
     await renderScreen();
 
-    expect(screen.getByLabelText("Initials")).toHaveValue("");
+    expect(screen.getByLabelText("Initials · optional")).toHaveValue("");
   });
 
   it("avisa si no pudo cargar y deja volver a intentarlo", async () => {
@@ -288,7 +286,7 @@ describe("pantalla de configuración: guardar", () => {
     stubApi();
     await renderScreen();
 
-    await userEvent.clear(screen.getByLabelText("Initials"));
+    await userEvent.clear(screen.getByLabelText("Initials · optional"));
     await userEvent.click(saveButton());
 
     await screen.findByText("Saved");
@@ -363,13 +361,13 @@ describe("pantalla de configuración: errores", () => {
     stubApi();
     await renderScreen();
 
-    await userEvent.type(screen.getByLabelText("Initials"), "QQ");
+    await userEvent.type(screen.getByLabelText("Initials · optional"), "QQ");
 
     expect(saveButton()).toBeDisabled();
 
-    expect(screen.getByLabelText("Initials")).toHaveAccessibleDescription(
-      /^Initials can have at most 3 characters\./,
-    );
+    expect(
+      screen.getByLabelText("Initials · optional"),
+    ).toHaveAccessibleDescription(/^Initials can have at most 3 characters\./);
     expect(patches).toEqual([]);
   });
 
@@ -478,7 +476,6 @@ describe("pantalla de configuración: errores", () => {
 
 /** Morado: acepta el blanco encima y se lee como enlace sobre el panel. */
 const PURPLE = "#7b3fa0";
-const PURPLE_RGB = "rgb(123, 63, 160)";
 
 /** El amarillo del prototipo: rellena bien, pero como enlace se oscurece. */
 const YELLOW = "#ffc94a";
@@ -486,8 +483,7 @@ const YELLOW = "#ffc94a";
 /** Un gris medio: ni el blanco ni el texto oscuro llegan a AA encima. */
 const UNREADABLE_GREY = "#777777";
 
-const INVALID_ACCENT_TEXT =
-  /^The accent colour must be a hex code such as #1C6EA4\./;
+const INVALID_ACCENT_TEXT = /^Use a code like #33A1E0\./;
 const NO_READABLE_TEXT = /^No text colour reaches the minimum contrast/;
 
 describe("elegir el color", () => {
@@ -518,8 +514,8 @@ describe("elegir el color", () => {
     await typeAccent(PURPLE);
 
     expect(accentPreview()).toHaveStyle({
-      backgroundColor: PURPLE_RGB,
-      color: "rgb(255, 255, 255)",
+      "--club-preview-accent-light": PURPLE,
+      "--club-preview-on-accent-light": "#ffffff",
     });
     expect(patches).toEqual([]);
   });
@@ -531,10 +527,12 @@ describe("elegir el color", () => {
     fireEvent.input(accentPicker(), { target: { value: PURPLE } });
 
     expect(accentField()).toHaveValue("#7B3FA0");
-    expect(accentPreview()).toHaveStyle({ backgroundColor: PURPLE_RGB });
+    expect(accentPreview()).toHaveStyle({
+      "--club-preview-accent-light": PURPLE,
+    });
   });
 
-  it("pinta el enlace de ejemplo con la variante oscurecida de un acento claro", async () => {
+  it("pinta el enlace de la vista previa con la variante oscurecida de un acento claro", async () => {
     stubApi();
     await renderScreen();
 
@@ -544,7 +542,7 @@ describe("elegir el color", () => {
     if (evaluation.kind !== "accepted") {
       throw new Error("El amarillo del prototipo debería valer.");
     }
-    expect(screen.getByText("Sample link")).toHaveStyle({
+    expect(accentPreview()).toHaveStyle({
       "--club-accent-link-light": evaluation.palette.light.accentText,
       "--club-accent-link-dark": evaluation.palette.dark.accentText,
     });
@@ -627,9 +625,9 @@ describe("elegir el color", () => {
     await renderScreen();
 
     accentField().focus();
-    await user.tab({ shift: true });
-    expect(accentPicker()).toHaveFocus();
     await user.tab();
+    expect(accentPicker()).toHaveFocus();
+    await user.tab({ shift: true });
     await user.clear(accentField());
     await user.type(accentField(), PURPLE);
     saveButton().focus();
@@ -715,7 +713,7 @@ describe("guardado del color", () => {
 
     expect(accentField()).toHaveValue("#1C6EA4");
     expect(accentPreview()).toHaveStyle({
-      backgroundColor: "rgb(28, 110, 164)",
+      "--club-preview-accent-light": "#1c6ea4",
     });
     expect(patches).toEqual([]);
   });

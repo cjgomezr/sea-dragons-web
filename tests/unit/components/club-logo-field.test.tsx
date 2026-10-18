@@ -127,12 +127,8 @@ describe("el logo en la configuración del club", () => {
       "src",
       LOGO_URL,
     );
-    expect(
-      screen.getByRole("button", { name: "Change logo" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Remove logo" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Replace" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
   });
 
   it("sin logo ofrece subirlo y no ofrece quitarlo", async () => {
@@ -140,11 +136,9 @@ describe("el logo en la configuración del club", () => {
 
     await renderScreen();
 
+    expect(screen.getByRole("button", { name: "Upload" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Upload logo" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Remove logo" }),
+      screen.queryByRole("button", { name: "Remove" }),
     ).not.toBeInTheDocument();
   });
 
@@ -221,7 +215,7 @@ describe("el logo en la configuración del club", () => {
     stubApi({ settings: { ...STORED, logoUrl: LOGO_URL } });
     await renderScreen();
 
-    await userEvent.click(screen.getByRole("button", { name: "Remove logo" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(
       await screen.findByText("Logo removed: the initials are back."),
@@ -241,7 +235,7 @@ describe("el logo en la configuración del club", () => {
     });
     await renderScreen();
 
-    await userEvent.click(screen.getByRole("button", { name: "Remove logo" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Only an Admin can change the club settings.",

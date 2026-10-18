@@ -1,73 +1,69 @@
 "use client";
 
+import { useId } from "react";
 import {
-  evaluateAccentColor,
   isHexColor,
   normalizeAccentInput,
+  SUGGESTED_ACCENT_COLORS,
 } from "@/lib/club/accent-color";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
- * El color de acento en la configuración del club (#346, RF-3 del PRD de
- * E18a). Se elige con el selector del navegador o escribiendo el código, que
- * es lo que hará quien lo copie de una guía de marca. La muestra sigue a lo
- * elegido antes de guardar, con el mismo cálculo que hace el servidor
- * (`evaluateAccentColor`), para que la vista previa no mienta. A diferencia
- * del logo, el color viaja con el botón del formulario.
+ * El color de acento en la configuración del club (#346, rehecho en #720
+ * con el handoff de E26). Se elige de un toque entre cinco sugeridos, con el
+ * selector del navegador o escribiendo el código, que es lo que hará quien lo
+ * copie de una guía de marca. La vista previa de al lado sigue a lo elegido
+ * antes de guardar. A diferencia del logo, el color viaja con el borrador.
  */
 
 export const ACCENT_FIELD_ID = "club-acento";
-const ACCENT_HINT_ID = "club-acento-ayuda";
 const ACCENT_ISSUE_ID = "club-acento-aviso";
 
-type LinkColorProperties = React.CSSProperties &
-  Readonly<Record<`--club-accent-link-${"light" | "dark"}`, string>>;
-
-/** Lo que enseña la muestra: lo escrito si ya es un color, y si no, el
- * guardado. El selector del navegador sólo admite `#rrggbb` en minúsculas. */
-function previewColorOf(typed: string, savedColor: string): string {
+/** El selector del navegador sólo admite `#rrggbb` en minúsculas: lo
+ * escrito si ya es un color, y si no, el guardado. */
+function pickerColorOf(typed: string, savedColor: string): string {
   const code = normalizeAccentInput(typed);
   return isHexColor(code) ? code : savedColor.toLowerCase();
 }
 
-function AccentPreview({
+/** Radios nativos: las flechas del teclado pasan de uno a otro y lo eligen.
+ * El color no es la única pista: cada uno se nombra con su código. */
+function SuggestedColours({
   translate,
-  color,
+  typedCode,
+  isDisabled,
+  onChoose,
 }: {
   translate: Translator;
-  color: string;
+  typedCode: string;
+  isDisabled: boolean;
+  onChoose: (color: string) => void;
 }): React.JSX.Element {
-  const evaluation = evaluateAccentColor(color);
-  // Un color sobre el que nada se lee no lleva texto de ejemplo: el aviso de
-  // al lado, al guardar, explica por qué.
-  if (evaluation.kind === "rejected") {
-    return (
-      <div className="club-accent-preview" aria-hidden="true">
-        <span
-          className="club-accent-preview-swatch"
-          style={{ backgroundColor: color }}
-        />
-      </div>
-    );
-  }
-  const { light, dark } = evaluation.palette;
-  // Un solo enlace no se lee sobre los dos temas: la hoja elige la variante.
-  const linkColors: LinkColorProperties = {
-    "--club-accent-link-light": light.accentText,
-    "--club-accent-link-dark": dark.accentText,
-  };
-  // El valor ya está en el campo; la muestra es sólo para la vista.
+  const groupName = useId();
   return (
-    <div className="club-accent-preview" aria-hidden="true">
-      <span
-        className="club-accent-preview-swatch"
-        style={{ backgroundColor: light.accent, color: light.onAccent }}
-      >
-        {translate("clubSettings.accent.previewText")}
-      </span>
-      <span className="club-accent-preview-link" style={linkColors}>
-        {translate("clubSettings.accent.previewLink")}
-      </span>
+    <div
+      role="radiogroup"
+      aria-label={translate("clubSettings.accent.suggested")}
+      className="club-accent-suggested"
+    >
+      {SUGGESTED_ACCENT_COLORS.map((color) => (
+        <label key={color} className="club-accent-swatch">
+          <input
+            type="radio"
+            name={groupName}
+            value={color}
+            checked={typedCode === color.toLowerCase()}
+            disabled={isDisabled}
+            onChange={() => onChoose(color)}
+          />
+          <span
+            className="club-accent-swatch-color"
+            style={{ backgroundColor: color }}
+            aria-hidden="true"
+          />
+          <span className="visually-hidden">{color}</span>
+        </label>
+      ))}
     </div>
   );
 }
@@ -88,24 +84,20 @@ export function ClubAccentField({
   isDisabled: boolean;
   onChange: (typedColor: string) => void;
 }): React.JSX.Element {
-  const previewColor = previewColorOf(typedColor, savedColor);
-  const describedBy = [
-    ...(issueText === null ? [] : [ACCENT_ISSUE_ID]),
-    ACCENT_HINT_ID,
-  ].join(" ");
+  const pickerColor = pickerColorOf(typedColor, savedColor);
   return (
     <div className="auth-field club-accent-field">
+      <label htmlFor={ACCENT_FIELD_ID}>
+        {translate("clubSettings.accent.label")}
+      </label>
       <div className="club-accent-controls">
-        <input
-          type="color"
-          className="club-accent-picker"
-          value={previewColor}
-          aria-label={translate("clubSettings.accent.picker", {
-            color: previewColor.toUpperCase(),
-          })}
-          disabled={isDisabled}
-          onChange={(event) => onChange(event.target.value.toUpperCase())}
+        <SuggestedColours
+          translate={translate}
+          typedCode={normalizeAccentInput(typedColor)}
+          isDisabled={isDisabled}
+          onChoose={onChange}
         />
+        <span className="club-accent-divider" aria-hidden="true" />
         <input
           id={ACCENT_FIELD_ID}
           type="text"
@@ -114,21 +106,26 @@ export function ClubAccentField({
           autoComplete="off"
           spellCheck={false}
           aria-invalid={issueText !== null}
-          aria-describedby={describedBy}
+          aria-describedby={issueText === null ? undefined : ACCENT_ISSUE_ID}
           disabled={isDisabled}
           onChange={(event) => onChange(event.target.value)}
         />
-        <AccentPreview translate={translate} color={previewColor} />
+        <input
+          type="color"
+          className="club-accent-picker"
+          value={pickerColor}
+          aria-label={translate("clubSettings.accent.picker", {
+            color: pickerColor.toUpperCase(),
+          })}
+          disabled={isDisabled}
+          onChange={(event) => onChange(event.target.value.toUpperCase())}
+        />
       </div>
-      {/* Primero el aviso y luego la ayuda, como en los campos del nombre. */}
       {issueText === null ? null : (
         <p className="auth-field-error" id={ACCENT_ISSUE_ID} role="alert">
           {issueText}
         </p>
       )}
-      <p className="auth-hint" id={ACCENT_HINT_ID}>
-        {translate("clubSettings.accent.hint")}
-      </p>
     </div>
   );
 }

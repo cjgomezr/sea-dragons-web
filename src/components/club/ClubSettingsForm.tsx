@@ -2,12 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { TextField } from "@/components/directory/record-fields";
+import { useIsPhone } from "@/components/use-is-phone";
 import { normalizeAccentInput } from "@/lib/club/accent-color";
 import { deriveInitials } from "@/lib/club/club-brand";
 import {
-  CLUB_INITIALS_MAX_LENGTH,
-  CLUB_NAME_MAX_LENGTH,
   type ClubIdentity,
   type ClubIdentityField,
   type ClubSettings,
@@ -24,7 +22,10 @@ import {
   readIssueCode,
   saveClubSettings,
 } from "./club-settings-client";
-import { ACCENT_FIELD_ID, ClubAccentField } from "./ClubAccentField";
+import { accentPreviewStyleOf } from "./accent-preview-style";
+import { ClubAccentField } from "./ClubAccentField";
+import { ClubGeneralPreview } from "./ClubGeneralPreview";
+import { ClubIdentityFields, IDENTITY_HEADING_ID } from "./ClubIdentityFields";
 import { ClubLogoField } from "./ClubLogoField";
 import { SavedNotice, UnsavedChangesBar } from "./ClubUnsavedChangesBar";
 import {
@@ -38,7 +39,10 @@ import {
  * El formulario de la configuración del club (#296). Sigue a la ficha del
  * miembro (`MemberRecordForm`): da un cambio por hecho sólo cuando el servidor
  * lo confirma, y entonces enseña lo que el servidor guardó. Se guarda con la
- * barra de cambios sin guardar (#719), que sólo sale con un borrador.
+ * barra de cambios sin guardar (#719), que sólo sale con un borrador. Desde
+ * #720 es la pestaña General del handoff de E26: IDENTIDAD y MARCA a la
+ * izquierda y la vista previa a la derecha; en el móvil, el logo arriba y la
+ * vista previa debajo.
  *
  * Cada guardado lleva lo que el Admin tenía delante. Si otro Admin guardó
  * entretanto, el servidor responde 409 y la pantalla ofrece cargar lo último
@@ -53,11 +57,6 @@ type Draft = {
   readonly initials: string;
   readonly accentColor: string;
 };
-
-const NAME_ID = "club-nombre";
-const NAME_HINT_ID = "club-nombre-ayuda";
-const INITIALS_ID = "club-iniciales";
-const INITIALS_HINT_ID = "club-iniciales-ayuda";
 
 const FIELD_OF_ISSUE: Readonly<
   Record<ClubSettingsIssueCode, ClubIdentityField>
@@ -140,56 +139,45 @@ function SaveFailure({
   );
 }
 
-/** El acento se elige aquí (#346) y viaja con el botón del formulario; el
- * logo se guarda en el acto con sus propios botones (#295). */
-function BrandSummary({
+/** Las iniciales que se ven sin logo: las escritas o, si no hay, las que
+ * la aplicación saca del nombre. */
+function shownInitialsOf(draft: Draft): string {
+  return draft.initials.trim() === ""
+    ? deriveInitials(draft.name)
+    : draft.initials;
+}
+
+type AccentControl = {
+  readonly typedColor: string;
+  readonly issueText: string | null;
+  readonly isDisabled: boolean;
+  readonly onChange: (typedColor: string) => void;
+};
+
+/** MARCA: el acento viaja con el borrador (#346); el logo, cuando va aquí, se
+ * guarda en el acto con sus propios botones (#295). */
+function BrandSection({
   translate,
-  settings,
+  savedColor,
   accent,
-  onLogoChanged,
+  logo,
 }: {
   translate: Translator;
-  settings: ClubSettings;
-  accent: {
-    readonly typedColor: string;
-    readonly issueText: string | null;
-    readonly isDisabled: boolean;
-    readonly onChange: (typedColor: string) => void;
-  };
-  onLogoChanged: (logoUrl: string | null) => void;
+  savedColor: string;
+  accent: AccentControl;
+  logo: React.ReactNode;
 }): React.JSX.Element {
-  const initials = settings.initials ?? deriveInitials(settings.name);
   return (
     <section className="auth-fields" aria-labelledby="club-marca">
-      <h2 id="club-marca">{translate("clubSettings.brand.title")}</h2>
-      <dl className="club-settings-brand">
-        <div className="club-settings-brand-row">
-          <dt>
-            <label htmlFor={ACCENT_FIELD_ID}>
-              {translate("clubSettings.accent.label")}
-            </label>
-          </dt>
-          <dd>
-            <ClubAccentField
-              translate={translate}
-              savedColor={settings.accentColor}
-              {...accent}
-            />
-          </dd>
-        </div>
-        <div className="club-settings-brand-row">
-          <dt>{translate("clubSettings.logo.label")}</dt>
-          <dd>
-            <ClubLogoField
-              translate={translate}
-              clubName={settings.name}
-              initials={initials}
-              logoUrl={settings.logoUrl}
-              onLogoChanged={onLogoChanged}
-            />
-          </dd>
-        </div>
-      </dl>
+      <h2 id="club-marca" className="club-general-heading">
+        {translate("clubSettings.brand.title")}
+      </h2>
+      <ClubAccentField
+        translate={translate}
+        savedColor={savedColor}
+        {...accent}
+      />
+      {logo}
     </section>
   );
 }
@@ -250,6 +238,7 @@ export function ClubSettingsForm({
     onHasDraftChange,
   );
   const { draft, status } = identity;
+  const isPhone = useIsPhone();
   // El borrador se valida mientras se escribe: Guardar cambios se desactiva
   // y el error sale junto a su campo.
   const localIssues = findClubSettingsIssues({
@@ -267,6 +256,21 @@ export function ClubSettingsForm({
   const canSave = localIssues.length === 0;
   const update = (change: Partial<Draft>): void =>
     identity.change((current) => ({ ...current, ...change }));
+  const shownInitials = shownInitialsOf(draft);
+  const accentStyle = accentPreviewStyleOf(
+    draft.accentColor,
+    settings.accentColor,
+  );
+  const logo = (
+    <ClubLogoField
+      translate={translate}
+      clubName={settings.name}
+      initials={shownInitials}
+      logoUrl={settings.logoUrl}
+      accentStyle={accentStyle}
+      onLogoChanged={setLogoUrl}
+    />
+  );
 
   return (
     <form
@@ -274,62 +278,53 @@ export function ClubSettingsForm({
       onSubmit={(event) => event.preventDefault()}
       noValidate
     >
-      {/* Mientras se guarda no se edita: lo que se escribiera ahora lo
-          pisaría lo que devuelva el servidor. */}
-      <fieldset className="member-record-fields" disabled={isSending}>
-        <section className="auth-fields" aria-labelledby="club-identidad">
-          <h2 id="club-identidad" tabIndex={-1}>
-            {translate("clubSettings.identity.title")}
-          </h2>
-          <TextField
-            id={NAME_ID}
-            label={translate("clubSettings.name.label")}
-            type="text"
-            value={draft.name}
-            issueText={issueTextFor("name")}
-            hintIds={[NAME_HINT_ID]}
-            onChange={(name) => update({ name })}
+      <div className="club-general">
+        <div className="club-general-editor">
+          {isPhone ? logo : null}
+          {/* Mientras se guarda no se edita: lo que se escribiera ahora lo
+              pisaría lo que devuelva el servidor. */}
+          <fieldset className="member-record-fields" disabled={isSending}>
+            <ClubIdentityFields
+              translate={translate}
+              name={draft.name}
+              initials={draft.initials}
+              automaticInitials={deriveInitials(draft.name)}
+              issueTextFor={issueTextFor}
+              onChange={update}
+            />
+          </fieldset>
+          <BrandSection
+            translate={translate}
+            savedColor={settings.accentColor}
+            accent={{
+              typedColor: draft.accentColor,
+              issueText: issueTextFor("accentColor"),
+              isDisabled: isSending,
+              onChange: (accentColor) => update({ accentColor }),
+            }}
+            logo={isPhone ? null : logo}
           />
-          <p className="auth-hint" id={NAME_HINT_ID}>
-            {translate("clubSettings.name.hint", { max: CLUB_NAME_MAX_LENGTH })}
-          </p>
-          <TextField
-            id={INITIALS_ID}
-            label={translate("clubSettings.initials.label")}
-            type="text"
-            value={draft.initials}
-            issueText={issueTextFor("initials")}
-            hintIds={[INITIALS_HINT_ID]}
-            onChange={(initials) => update({ initials })}
+          <SaveFailure
+            translate={translate}
+            status={status}
+            onReloadRequested={onReloadRequested}
           />
-          <p className="auth-hint" id={INITIALS_HINT_ID}>
-            {translate("clubSettings.initials.hint", {
-              max: CLUB_INITIALS_MAX_LENGTH,
-            })}
-          </p>
-        </section>
-      </fieldset>
-      <BrandSummary
-        translate={translate}
-        settings={settings}
-        accent={{
-          typedColor: draft.accentColor,
-          issueText: issueTextFor("accentColor"),
-          isDisabled: isSending,
-          onChange: (accentColor) => update({ accentColor }),
-        }}
-        onLogoChanged={setLogoUrl}
-      />
-      <SaveFailure
-        translate={translate}
-        status={status}
-        onReloadRequested={onReloadRequested}
-      />
+        </div>
+        <ClubGeneralPreview
+          translate={translate}
+          club={{
+            name: draft.name,
+            initials: shownInitials,
+            logoUrl: settings.logoUrl,
+          }}
+          accentStyle={accentStyle}
+        />
+      </div>
       {identity.hasDraft ? (
         <UnsavedChangesBar
           translate={translate}
           section="general"
-          headingId="club-identidad"
+          headingId={IDENTITY_HEADING_ID}
           canSave={canSave}
           isSaving={isSending}
           onDiscard={identity.discard}
