@@ -278,7 +278,7 @@ export function ClubSettingsForm({
           pisaría lo que devuelva el servidor. */}
       <fieldset className="member-record-fields" disabled={isSending}>
         <section className="auth-fields" aria-labelledby="club-identidad">
-          <h2 id="club-identidad">
+          <h2 id="club-identidad" tabIndex={-1}>
             {translate("clubSettings.identity.title")}
           </h2>
           <TextField
@@ -329,6 +329,7 @@ export function ClubSettingsForm({
         <UnsavedChangesBar
           translate={translate}
           section="general"
+          headingId="club-identidad"
           canSave={canSave}
           isSaving={isSending}
           onDiscard={identity.discard}

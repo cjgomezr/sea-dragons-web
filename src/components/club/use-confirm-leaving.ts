@@ -52,6 +52,8 @@ export function useConfirmLeaving(hasDraft: boolean, question: string): void {
     }
     const warnBeforeUnload = (event: BeforeUnloadEvent): void => {
       event.preventDefault();
+      // Los navegadores que aún no miran `preventDefault` piden esto.
+      event.returnValue = "";
     };
     const confirmLeavingLink = (event: MouseEvent): void => {
       if (!isLeavingThroughAppLink(event) || window.confirm(question)) {

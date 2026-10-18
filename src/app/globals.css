@@ -5577,9 +5577,11 @@ a.auth-brand-header:focus-visible {
   margin-right: var(--space-1);
 }
 
-/* Fija abajo, sobre la barra de pestañas del móvil. La página deja debajo
-   de la sección un hueco de su alto para que no tape lo último. */
-.club-settings:has(.club-unsaved-bar) {
+/* Fija abajo, sobre la barra de pestañas del móvil (que va en el 10). La
+   página deja debajo de la sección un hueco de su alto para que no tape lo
+   último; una barra de otra pestaña, oculta, no lo pide. */
+.club-settings:has(.club-settings-panel:not([hidden]) .club-unsaved-bar),
+.club-settings > .auth-fields:has(.club-unsaved-bar) {
   padding-bottom: calc(var(--space-12) + var(--space-8));
 }
 

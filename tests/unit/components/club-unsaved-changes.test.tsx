@@ -263,6 +263,20 @@ describe("guardar desde la barra", () => {
     expect(sentBodies).toMatchObject([{ name: "Bay Barracudas" }]);
   });
 
+  it("lleva el foco al título de la sección al guardar", async () => {
+    stubApi();
+    await renderScreen();
+    await typeName("Bay Barracudas");
+
+    await userEvent.click(saveChangesButton());
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Name and initials" }),
+      ).toHaveFocus(),
+    );
+  });
+
   it("quita el aviso de guardado a los 2,5 s", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     stubApi();
@@ -373,6 +387,28 @@ describe("descartar", () => {
     expect(queryBar("Unsaved changes to the club details")).toBeNull();
   });
 
+  it("lleva el foco al título de la sección, no a la página", async () => {
+    stubApi();
+    await renderScreen();
+    await openPacksWithOneRemoved();
+
+    await userEvent.click(discardButton());
+
+    expect(
+      screen.getByRole("heading", { name: "Session packs" }),
+    ).toHaveFocus();
+  });
+
+  it("no mueve el foco al deshacer el cambio a mano", async () => {
+    stubApi();
+    await renderScreen();
+    await typeName("Bay Barracudas");
+
+    await typeName(STORED.name);
+
+    expect(screen.getByLabelText("Club name")).toHaveFocus();
+  });
+
   it("devuelve el pack quitado", async () => {
     stubApi();
     await renderScreen();
@@ -464,11 +500,14 @@ describe("salir con un borrador", () => {
   }
 
   /** Un enlace de la app fuera de la pantalla, como los de la barra
-   * lateral. */
-  function renderWithAppLink(): HTMLElement {
+   * lateral. Su `onClick` hace de `Link` de Next.js, que navega aunque el
+   * clic ya llegue con `defaultPrevented`. */
+  function renderWithAppLink(followLink: () => void = () => undefined) {
     render(
       <>
-        <a href="/dashboard">Dashboard</a>
+        <a href="/dashboard" onClick={followLink}>
+          Dashboard
+        </a>
         <ClubSettingsScreen locale="en" canManageClub club={CLUB} />
       </>,
     );
@@ -517,7 +556,8 @@ describe("salir con un borrador", () => {
   it("pregunta al seguir un enlace de la app, y cancelar deja todo como estaba", async () => {
     stubApi();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    const link = renderWithAppLink();
+    const followLink = vi.fn();
+    const link = renderWithAppLink(followLink);
     await screen.findByLabelText("Club name");
     await typeName("Bay Barracudas");
 
@@ -525,17 +565,21 @@ describe("salir con un borrador", () => {
 
     expect(confirm).toHaveBeenCalledWith("Leave without saving?");
     expect(click.defaultPrevented).toBe(true);
+    expect(followLink).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Club name")).toHaveValue("Bay Barracudas");
   });
 
   it("deja seguir el enlace si se acepta", async () => {
     stubApi();
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    const link = renderWithAppLink();
+    const followLink = vi.fn();
+    const link = renderWithAppLink(followLink);
     await screen.findByLabelText("Club name");
     await typeName("Bay Barracudas");
 
-    expect(clickLink(link).defaultPrevented).toBe(false);
+    clickLink(link);
+
+    expect(followLink).toHaveBeenCalledOnce();
   });
 
   it("no pregunta al seguir un enlace sin borrador", async () => {

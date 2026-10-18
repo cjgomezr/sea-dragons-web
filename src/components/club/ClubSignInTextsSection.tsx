@@ -231,6 +231,7 @@ function SignInTextsForm({
         <UnsavedChangesBar
           translate={translate}
           section="sign-in"
+          headingId="club-textos-entrada"
           canSave={localIssues.length === 0}
           isSaving={isSending}
           onDiscard={texts.discard}
@@ -262,7 +263,7 @@ export function ClubSignInTextsSection({
 
   return (
     <section className="auth-fields" aria-labelledby="club-textos-entrada">
-      <h2 id="club-textos-entrada">
+      <h2 id="club-textos-entrada" tabIndex={-1}>
         {translate("clubSettings.signInTexts.title")}
       </h2>
       <p className="app-lead">{translate("clubSettings.signInTexts.lead")}</p>

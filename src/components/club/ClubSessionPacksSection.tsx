@@ -511,6 +511,7 @@ function SessionPacksEditorView({
         <UnsavedChangesBar
           translate={translate}
           section="packs"
+          headingId="club-packs-sesiones"
           canSave={listIssue === null}
           isSaving={isSending}
           onDiscard={editor.discard}
@@ -537,7 +538,7 @@ export function ClubSessionPacksSection({
 
   return (
     <section className="auth-fields" aria-labelledby="club-packs-sesiones">
-      <h2 id="club-packs-sesiones">
+      <h2 id="club-packs-sesiones" tabIndex={-1}>
         {translate("clubSettings.sessionPacks.title")}
       </h2>
       <p className="auth-hint">{translate("clubSettings.sessionPacks.lead")}</p>
