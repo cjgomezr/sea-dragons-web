@@ -64,3 +64,15 @@ export function subscribeToSystemScheme(onChange: () => void): () => void {
   query.addEventListener("change", onChange);
   return () => query.removeEventListener("change", onChange);
 }
+
+// Under `system` the painted theme also moves when the operating system does.
+export function subscribeToThemeChanges(onChange: () => void): () => void {
+  window.addEventListener(THEME_CHANGE_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  const unsubscribeFromSystem = subscribeToSystemScheme(onChange);
+  return () => {
+    window.removeEventListener(THEME_CHANGE_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+    unsubscribeFromSystem();
+  };
+}

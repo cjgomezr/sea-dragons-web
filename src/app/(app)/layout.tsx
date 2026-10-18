@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
+import { readCallerIdentity } from "@/lib/auth/caller-identity";
 import { readCallerAccess, readCallerId } from "@/lib/auth/caller-role";
 import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
@@ -12,18 +13,21 @@ import { readCallerFailedPayment } from "@/lib/membership/caller-failed-payment"
 export default async function AppLayout({
   children,
 }: Readonly<{ children: ReactNode }>): Promise<React.JSX.Element> {
-  const [locale, access, viewerId, brand, failedPayment] = await Promise.all([
-    readRequestLocale(),
-    readCallerAccess(),
-    readCallerId(),
-    readClubBrand(),
-    readCallerFailedPayment(),
-  ]);
+  const [locale, access, viewerId, account, brand, failedPayment] =
+    await Promise.all([
+      readRequestLocale(),
+      readCallerAccess(),
+      readCallerId(),
+      readCallerIdentity(),
+      readClubBrand(),
+      readCallerFailedPayment(),
+    ]);
   return (
     <AppShell
       locale={locale}
       access={access}
       viewerId={viewerId}
+      account={account}
       brand={brand}
       failedPayment={failedPayment}
     >

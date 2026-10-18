@@ -162,8 +162,11 @@ const HIDE_DEV_OVERLAY_CSS = "nextjs-portal { display: none !important; }";
 const ACCOUNT_BUTTON_NAME = /^(My account|Mi cuenta)$/;
 const BACK_BUTTON_NAME = /^(Back|Volver)$/;
 
+/** El botón dice "Mi cuenta"; la pantalla que abre se titula "Cuenta" (#716). */
+const ACCOUNT_MENU_NAME = /^(Account|Cuenta)$/;
+
 function accountMenu(page: Page): Locator {
-  return page.getByRole("region", { name: ACCOUNT_BUTTON_NAME });
+  return page.getByRole("region", { name: ACCOUNT_MENU_NAME });
 }
 
 async function openAccountMenu(page: Page): Promise<Locator> {
@@ -188,19 +191,17 @@ async function closeAccountMenu(page: Page): Promise<void> {
 }
 
 /** Fuera de la aplicación el interruptor está a la vista; dentro, en el menú
- * de la cuenta, que se cierra después para que la captura no lo lleve. */
+ * de la cuenta (desde #716 un radio de Apariencia), que se cierra después
+ * para que la captura no lo lleve. */
 async function chooseDarkTheme(page: Page): Promise<void> {
-  const darkThemeToggle = page.getByRole("button", {
-    name: /tema oscuro|dark theme/i,
-  });
   const isInsideApp =
     (await page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }).count()) > 0;
   if (!isInsideApp) {
-    await darkThemeToggle.click();
+    await page.getByRole("button", { name: /tema oscuro|dark theme/i }).click();
     return;
   }
-  await openAccountMenu(page);
-  await darkThemeToggle.click();
+  const menu = await openAccountMenu(page);
+  await menu.getByRole("radio", { name: /^(Dark|Oscuro)$/ }).click();
   await closeAccountMenu(page);
 }
 
@@ -359,12 +360,9 @@ async function togglesCornerClip(page: Page): Promise<Clip> {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-/** `revealToggles` los pone a la vista donde no lo están: dentro de la
- * aplicación viven en el menú de la cuenta (#287). */
-function describeTogglesCorner(
-  pg: Screen,
-  revealToggles?: (page: Page) => Promise<void>,
-): void {
+/** Sólo en la cabecera de autenticación: dentro de la aplicación el tema y
+ * el idioma son controles del menú de la cuenta (#716), con sus capturas. */
+function describeTogglesCorner(pg: Screen): void {
   for (const vp of viewports) {
     test.describe(`interruptores-${pg.name} @ ${vp.name}`, () => {
       test.use({ viewport: { width: vp.width, height: vp.height } });
@@ -372,7 +370,6 @@ function describeTogglesCorner(
       for (const theme of themes) {
         test(`matches approved baseline (${theme})`, async ({ page }) => {
           await goToWithTheme(page, pg.path, theme);
-          await revealToggles?.(page);
           const clip = await togglesCornerClip(page);
           const name = `interruptores-${pg.name}-${vp.name}-${theme}.png`;
           await createMissingLocalBaseline(name, () =>
@@ -826,11 +823,6 @@ test.describe("dentro de la aplicación", () => {
   // test agotaba la cuarentena de intentos de Supabase Auth a mitad de la
   // corrida, y ese límite es el que el ticket dice que no se reimplementa.
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
-
-  describeTogglesCorner({ name: "panel", path: "/dashboard" }, async (page) => {
-    await openAccountMenu(page);
-    await page.mouse.move(0, 0);
-  });
 
   const DESKTOP = { width: 1440, height: 900 } as const;
   const MOBILE = { width: 375, height: 812 } as const;
@@ -9292,12 +9284,11 @@ test.describe("menú de la cuenta", () => {
 
     const menu = await openAccountMenu(page);
 
-    await expect(menu.getByRole("listitem")).toHaveText([
-      /My profile/,
-      /Appearance/,
-      /Language/,
-      /Sign out/,
-    ]);
+    // El grupo de radios no lleva su nombre dentro: va en la etiqueta de
+    // encima, que es lo que se compara.
+    await expect(
+      menu.locator("a, .segmented-choice-label, .account-menu-signout button"),
+    ).toHaveText([/My profile/, /Appearance/, /Language/, /Sign out/]);
   });
 
   test("en escritorio es un desplegable que se cierra con Escape y devuelve el foco", async ({
@@ -9390,9 +9381,11 @@ test.describe("menú de la cuenta", () => {
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto(`${APP_URL}/dashboard`);
     const menu = await openAccountMenu(page);
+    // Cada grupo de radios es una sola parada del tabulador.
     const controlsInMenu =
       (await menu.getByRole("button").count()) +
-      (await menu.getByRole("link").count());
+      (await menu.getByRole("link").count()) +
+      (await menu.getByRole("radiogroup").count());
 
     // Una pulsación más que controles tiene el menú: la última lo recorre
     // entero y sale. En ningún momento puede quedar el menú abierto con el
@@ -9425,16 +9418,14 @@ test.describe("menú de la cuenta", () => {
     await expect(html).toHaveAttribute("data-theme", "light");
     const menu = await openAccountMenu(page);
 
-    await menu.getByRole("button", { name: /dark theme/i }).click();
+    await menu.getByRole("radio", { name: "Dark" }).click();
 
     await expect(html).toHaveAttribute("data-theme", "dark");
     await expect(accountMenu(page)).toBeVisible();
     await page.reload();
     await expect(html).toHaveAttribute("data-theme", "dark");
     const reopened = await openAccountMenu(page);
-    await expect(
-      reopened.getByRole("button", { name: /light theme/i }),
-    ).toBeVisible();
+    await expect(reopened.getByRole("radio", { name: "Dark" })).toBeChecked();
   });
 
   test("el idioma cambia toda la aplicación, el propio menú incluido, y se conserva al recargar", async ({
@@ -9443,7 +9434,7 @@ test.describe("menú de la cuenta", () => {
     await page.goto(`${APP_URL}/dashboard`);
     const menu = await openAccountMenu(page);
 
-    await menu.getByRole("button", { name: /switch to español/i }).click();
+    await menu.getByRole("radio", { name: "Español" }).click();
 
     await expect(page.locator("html")).toHaveAttribute("lang", "es");
     await expect(accountMenu(page)).toBeVisible();
@@ -9454,8 +9445,8 @@ test.describe("menú de la cuenta", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "es");
     const reopened = await openAccountMenu(page);
     await expect(
-      reopened.getByRole("button", { name: /cambiar a english/i }),
-    ).toBeVisible();
+      reopened.getByRole("radio", { name: "Español" }),
+    ).toBeChecked();
   });
 });
 /* ---------------------------------------------------------------------------
@@ -10126,15 +10117,143 @@ for (const state of CLUB_SETTINGS_STATES) {
 }
 
 /* ---------------------------------------------------------------------------
+   El menú de la cuenta rehecho (#716, RF-9 del PRD de E26), abierto sobre
+   la configuración del club, donde marca "Estás aquí". Mockups:
+   docs/design/design_handoff_club_settings/screenshots/05-desktop-account-menu.png
+   (escritorio) y 06-mobile-account.png (la pantalla Cuenta del móvil).
+   --------------------------------------------------------------------------- */
+
+const CLUB_COMMITTEE_STORAGE_STATE = roleRequestStorageStatePath(
+  "committee-de-configuracion",
+);
+
+/** El Committee y no el Admin: el Admin sembrado lleva en el nombre el id de
+ * la corrida, y el nombre sale arriba del menú. El Committee también ve la
+ * configuración del club (#469), abierta en Packs, que es lo único suyo. */
+const ACCOUNT_MENU_ON_CLUB: ClubSettingsState = {
+  name: "cuenta-menu",
+  tab: "packs",
+};
+
+/** El nombre de la captura: el móvil es la pantalla Cuenta, y el resto el
+ * desplegable, a 768 y a 1440. */
+function accountMenuSnapshotName(vp: (typeof viewports)[number]): string {
+  return vp.name === "mobile"
+    ? "cuenta-menu-movil"
+    : `cuenta-menu-escritorio-${vp.name}`;
+}
+
+async function openAccountMenuOnClub(
+  page: Page,
+  theme?: (typeof themes)[number],
+): Promise<Locator> {
+  await goToClubSettings(page, ACCOUNT_MENU_ON_CLUB, theme);
+  const menu = await openAccountMenu(page);
+  await page.mouse.move(0, 0);
+  return menu;
+}
+
+test.describe("menú de la cuenta sobre la configuración del club (#716)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: CLUB_COMMITTEE_STORAGE_STATE });
+
+  for (const vp of viewports) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await openAccountMenuOnClub(page, theme);
+          const snapshot = `${accountMenuSnapshotName(vp)}-${theme}.png`;
+          await createMissingLocalBaseline(snapshot, () =>
+            page.screenshot(SCREENSHOT_OPTIONS),
+          );
+          await expect(page).toHaveScreenshot(snapshot, {
+            ...SCREENSHOT_OPTIONS,
+            maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          });
+        });
+
+        test(`has no accessibility violations (axe-core, ${theme})`, async ({
+          page,
+        }) => {
+          await openAccountMenuOnClub(page, theme);
+
+          await expectNoAxeViolations(page);
+        });
+      }
+
+      test("marca la configuración del club como la pantalla actual", async ({
+        page,
+      }) => {
+        const menu = await openAccountMenuOnClub(page);
+
+        await expect(
+          menu.getByRole("link", { name: /^Club settings/ }),
+        ).toHaveAttribute("aria-current", "page");
+        await expect(menu.getByText("You're here")).toBeVisible();
+      });
+    });
+  }
+
+  test.describe("@ mobile: objetivos táctiles", () => {
+    test.use({ viewport: { width: 375, height: 812 } });
+
+    test("cada control del menú mide al menos 44 px", async ({ page }) => {
+      const menu = await openAccountMenuOnClub(page);
+      const controls = menu.locator("a, button, input");
+      const TOUCH_TARGET_MIN_PX = 44;
+
+      for (const control of await controls.all()) {
+        const box = await control.boundingBox();
+        const name = await control.evaluate(
+          (element) => element.textContent ?? element.getAttribute("value"),
+        );
+        expect(box, `${name} no tiene caja`).not.toBeNull();
+        expect(box!.height, `${name} es bajo`).toBeGreaterThanOrEqual(
+          TOUCH_TARGET_MIN_PX,
+        );
+        expect(box!.width, `${name} es estrecho`).toBeGreaterThanOrEqual(
+          TOUCH_TARGET_MIN_PX,
+        );
+      }
+    });
+  });
+
+  // Con Sistema elegido el menú marca Sistema, no el tema que pinta.
+  for (const scheme of themes) {
+    test(`con Sistema elegido sigue al sistema: matches approved baseline (${scheme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.emulateMedia({ colorScheme: scheme });
+      const menu = await openAccountMenuOnClub(page);
+      await menu.getByRole("radio", { name: "System" }).click();
+      await page.mouse.move(0, 0);
+
+      await expect(page.locator("html")).toHaveAttribute("data-theme", scheme);
+      await expect(menu.getByRole("radio", { name: "System" })).toBeChecked();
+      const snapshot = `cuenta-menu-sistema-${scheme}.png`;
+      await createMissingLocalBaseline(snapshot, () =>
+        page.screenshot(SCREENSHOT_OPTIONS),
+      );
+      await expect(page).toHaveScreenshot(snapshot, {
+        ...SCREENSHOT_OPTIONS,
+        maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+      });
+      await expectNoAxeViolations(page);
+    });
+  }
+});
+
+/* ---------------------------------------------------------------------------
    Las secciones de la configuración (#718, RF-1 del PRD de E26): la barra de
    pestañas en escritorio (docs/design/design_handoff_club_settings,
    01-desktop-positions.png), la lista y la pantalla de una sección en el
    móvil (07-mobile-settings-list.png) y el Committee, que sólo ve Packs.
    --------------------------------------------------------------------------- */
 
-const CLUB_COMMITTEE_STORAGE_STATE = roleRequestStorageStatePath(
-  "committee-de-configuracion",
-);
 const CLUB_SECTIONS_MOBILE = viewports.filter((vp) => vp.name === "mobile");
 const CLUB_SECTIONS_WIDE = viewports.filter((vp) => vp.name !== "mobile");
 const CLUB_SECTIONS_COMMITTEE = viewports.filter((vp) => vp.name !== "tablet");

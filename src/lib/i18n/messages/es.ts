@@ -284,6 +284,11 @@ export const spanishMessages: MessageCatalog = {
   "accountMenu.language": "Idioma",
   "accountMenu.back": "Volver",
   "accountMenu.clubSettings": "Configuración del club",
+  "accountMenu.title": "Cuenta",
+  "accountMenu.youAreHere": "Estás aquí",
+  "accountMenu.themeLight": "Claro",
+  "accountMenu.themeDark": "Oscuro",
+  "accountMenu.themeSystem": "Sistema",
   "account.metaTitle": "Perfil · {club}",
   "account.metaDescription":
     "Tus datos, tu rol en el club y tus grupos, y la solicitud para ser Coach o entrar al Comité.",
