@@ -56,7 +56,12 @@ describe("loadAgenda", () => {
   it("manda los tipos pedidos en la consulta", async () => {
     const requestedUrls = serveEmptyAgenda();
 
-    await loadAgenda("upcoming", "cursor-1", ["training", "social"]);
+    await loadAgenda({
+      period: "upcoming",
+      cursor: "cursor-1",
+      eventTypes: ["training", "social"],
+      from: null,
+    });
 
     expect(typesParamOf(requestedUrls[0])).toBe("training,social");
   });
@@ -64,9 +69,29 @@ describe("loadAgenda", () => {
   it("no manda tipos cuando no se pide ninguno", async () => {
     const requestedUrls = serveEmptyAgenda();
 
-    await loadAgenda("past", null, []);
+    await loadAgenda({
+      period: "past",
+      cursor: null,
+      eventTypes: [],
+      from: null,
+    });
 
     expect(typesParamOf(requestedUrls[0])).toBeNull();
+  });
+
+  it("manda la fecha del salto de los pasados con su cursor", async () => {
+    const requestedUrls = serveEmptyAgenda();
+
+    await loadAgenda({
+      period: "past",
+      cursor: "cursor-2",
+      eventTypes: [],
+      from: "2026-05-20",
+    });
+
+    expect(requestedUrls[0]).toContain(
+      "?period=past&from=2026-05-20&cursor=cursor-2",
+    );
   });
 });
 
