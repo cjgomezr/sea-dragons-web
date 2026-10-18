@@ -16,7 +16,8 @@ import { CLUB_SETTINGS_SECTION_ICONS } from "./club-settings-section-icons";
  *
  * Las flechas dan la vuelta al llegar a un extremo, e Inicio y Fin van a la
  * primera y a la última: el patrón de pestañas de WAI-ARIA, que activa la
- * pestaña al enfocarla.
+ * pestaña al enfocarla. Una pestaña con borrador lleva el punto de aviso
+ * (#719), y para el lector de pantalla, "Sin guardar".
  */
 
 const LAST_INDEX = CLUB_SETTINGS_SECTIONS.length - 1;
@@ -68,11 +69,13 @@ export function ClubSettingsTabs({
   translate,
   idPrefix,
   activeSection,
+  draftSections,
   onSelect,
 }: {
   readonly translate: Translator;
   readonly idPrefix: string;
   readonly activeSection: ClubSettingsSection;
+  readonly draftSections: ReadonlySet<ClubSettingsSection>;
   readonly onSelect: (section: ClubSettingsSection) => void;
 }): React.JSX.Element {
   const tabRefs = useRef<
@@ -115,6 +118,14 @@ export function ClubSettingsTabs({
           >
             <Icon glyph={CLUB_SETTINGS_SECTION_ICONS[section]} />
             {translate(`clubSettings.sections.${section}`)}
+            {draftSections.has(section) ? (
+              <>
+                <span className="club-draft-dot" aria-hidden="true" />{" "}
+                <span className="visually-hidden">
+                  {translate("clubSettings.draft.marker")}
+                </span>
+              </>
+            ) : null}
           </button>
         );
       })}

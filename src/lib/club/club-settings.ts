@@ -152,6 +152,21 @@ function normalizeIdentity(identity: ClubIdentity): ClubIdentity {
   };
 }
 
+/** Si un borrador de la identidad guardaría lo mismo que `stored` (#719):
+ * se comparan como los guarda la base. */
+export function isSameClubIdentity(
+  draft: ClubIdentity,
+  stored: ClubIdentity,
+): boolean {
+  const a = normalizeIdentity(draft);
+  const b = normalizeIdentity(stored);
+  return (
+    a.name === b.name &&
+    a.initials === b.initials &&
+    a.accentColor === b.accentColor
+  );
+}
+
 /**
  * El contraste sólo se exige a un acento que cambia. Uno ya guardado que no
  * llegue a AA (escrito a mano en la base, o de antes de un cambio de paleta)

@@ -895,7 +895,8 @@ describe("¿Vas? en el panel", () => {
     ).toEqual([{ response }]);
   });
 
-  it("la píldora de la fila cambia al responder en el panel", async () => {
+  // Desde #731 la fila de escritorio responde con sus propios botones.
+  it("los botones de la fila marcan lo que se responde en el panel", async () => {
     stubApi([TRIVIA_NIGHT]);
     renderAgenda();
     const panel = await findPanel(TRIVIA_NIGHT.title);
@@ -903,8 +904,16 @@ describe("¿Vas? en el panel", () => {
     await userEvent.click(within(panel).getByRole("button", { name: "Maybe" }));
 
     const row = rowButton(TRIVIA_NIGHT.title).closest("li");
+    if (row === null) {
+      throw new Error("La fila no es un elemento de la lista.");
+    }
+    const rowGroup = within(row).getByRole("group", {
+      name: `Are you going to ${TRIVIA_NIGHT.title}?`,
+    });
     await waitFor(() =>
-      expect(row?.querySelector(".agenda-answer-maybe")).not.toBeNull(),
+      expect(
+        within(rowGroup).getByRole("button", { name: "Maybe" }),
+      ).toHaveAttribute("aria-pressed", "true"),
     );
   });
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import {
   findSessionPackIssue,
+  isSamePackList,
   MAX_PACK_SESSIONS,
   MIN_PACK_SESSIONS,
   priceSessionPack,
@@ -19,11 +20,19 @@ import {
   type SessionPacksDraft,
   saveSessionPacks,
 } from "./club-session-packs-client";
+import { SavedNotice, UnsavedChangesBar } from "./ClubUnsavedChangesBar";
+import {
+  type ClubDraft,
+  type ClubDraftStatus,
+  type DraftSaveOutcome,
+  useClubDraft,
+} from "./use-club-draft";
 
 /**
  * Los packs de sesiones que el club ofrece a sus Casual (#469, RF-4 del PRD
  * de E13). El Admin o el Committee añade, quita y ordena en un borrador, y lo
- * guarda entero con su botón: la API cambia la lista de una vez.
+ * guarda entero con la barra de cambios sin guardar (#719): la API cambia la
+ * lista de una vez.
  *
  * El precio de cada pack es el de una sesión Casual en Stripe por su tamaño.
  * Lo calcula la pantalla con el precio que trae el endpoint, así que un pack
@@ -32,12 +41,10 @@ import {
 
 type Direction = "up" | "down";
 
-type Status =
+type LoadState =
   | { readonly kind: "loading" }
-  | { readonly kind: "editing" }
-  | { readonly kind: "sending" }
-  | { readonly kind: "invalid"; readonly code: SessionPackIssueCode }
-  | ({ readonly phase: "load" | "save" } & ApiRequestFailure);
+  | { readonly kind: "loaded" }
+  | ApiRequestFailure;
 
 type PackControl = Direction | "remove";
 
@@ -48,9 +55,9 @@ type FocusTarget = string;
 const NEW_PACK_FIELD_ID = "club-packs-nuevo";
 const NEW_PACK_ISSUE_ID = `${NEW_PACK_FIELD_ID}-aviso`;
 const NEW_PACK_HINT_ID = `${NEW_PACK_FIELD_ID}-ayuda`;
-const EMPTY_PACKS: SessionPacksDraft = {
-  sizes: [],
-  sessionPrice: { amountCents: null, reason: "not_configured" },
+const NO_SESSION_PRICE: ClubPrice = {
+  amountCents: null,
+  reason: "not_configured",
 };
 
 function packName(translate: Translator, sessions: number): string {
@@ -102,23 +109,26 @@ function focusAfterMove(
 }
 
 type SessionPacksEditor = {
-  readonly packs: SessionPacksDraft;
-  readonly status: Status;
+  readonly sizes: readonly number[];
+  readonly sessionPrice: ClubPrice;
+  readonly load: LoadState;
+  readonly status: ClubDraftStatus;
+  readonly hasDraft: boolean;
+  readonly isSavedNoticeShowing: boolean;
   readonly notice: string | null;
   readonly addIssue: SessionPackIssueCode | null;
   readonly focusTarget: FocusTarget | null;
   readonly move: (sessions: number, direction: Direction) => void;
   readonly remove: (sessions: number) => void;
   readonly add: (sessions: number) => boolean;
-  readonly submit: () => Promise<void>;
+  readonly discard: () => void;
+  readonly save: () => Promise<void>;
 };
 
-/** Lee lo guardado una vez, al montar. Los setters de React no cambian, así
- * que el efecto no se repite. */
-function useInitialLoad(
-  setPacks: (packs: SessionPacksDraft) => void,
-  setStatus: (status: Status) => void,
-): void {
+/** Lee lo guardado una vez, al montar. `keep` no cambia, así que el efecto
+ * no se repite. */
+function useInitialLoad(keep: (packs: SessionPacksDraft) => void): LoadState {
+  const [load, setLoad] = useState<LoadState>({ kind: "loading" });
   useEffect(() => {
     let isCurrent = true;
     void loadSessionPacks().then((outcome) => {
@@ -126,53 +136,91 @@ function useInitialLoad(
         return;
       }
       if (outcome.kind === "failed") {
-        setStatus({ ...outcome, phase: "load" });
+        setLoad(outcome);
         return;
       }
-      setPacks(outcome.packs);
-      setStatus({ kind: "editing" });
+      keep(outcome.packs);
+      setLoad({ kind: "loaded" });
     });
     return () => {
       isCurrent = false;
     };
-  }, [setPacks, setStatus]);
+  }, [keep]);
+  return load;
 }
 
-function useSessionPacksEditor(translate: Translator): SessionPacksEditor {
-  const [packs, setPacks] = useState<SessionPacksDraft>(EMPTY_PACKS);
-  const [status, setStatus] = useState<Status>({ kind: "loading" });
+/** La lista de packs como borrador, con el precio de una sesión que trae
+ * cada respuesta del servidor. */
+function usePacksDraft(onHasDraftChange: (hasDraft: boolean) => void): {
+  readonly packs: ClubDraft<readonly number[]>;
+  readonly sessionPrice: ClubPrice;
+  readonly load: LoadState;
+} {
+  const [sessionPrice, setSessionPrice] = useState(NO_SESSION_PRICE);
+
+  async function send(
+    sizes: readonly number[],
+  ): Promise<DraftSaveOutcome<readonly number[]>> {
+    const result = await saveSessionPacks(sizes);
+    if (result.kind === "failed") {
+      return result;
+    }
+    setSessionPrice(result.packs.sessionPrice);
+    return { kind: "saved", value: result.packs.sizes };
+  }
+
+  const packs = useClubDraft<readonly number[]>({
+    initial: [],
+    isSame: isSamePackList,
+    send,
+    onHasDraftChange,
+  });
+  const { replaceSaved } = packs;
+  const keepLoaded = useCallback(
+    (loaded: SessionPacksDraft): void => {
+      setSessionPrice(loaded.sessionPrice);
+      replaceSaved(loaded.sizes);
+    },
+    [replaceSaved],
+  );
+  const load = useInitialLoad(keepLoaded);
+  return { packs, sessionPrice, load };
+}
+
+function useSessionPacksEditor(
+  translate: Translator,
+  onHasDraftChange: (hasDraft: boolean) => void,
+): SessionPacksEditor {
+  const { packs, sessionPrice, load } = usePacksDraft(onHasDraftChange);
   const [notice, setNotice] = useState<string | null>(null);
   const [addIssue, setAddIssue] = useState<SessionPackIssueCode | null>(null);
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
-  // Un doble clic llega antes de que el estado desactive el botón.
-  const isSendingRef = useRef(false);
-  useInitialLoad(setPacks, setStatus);
+  const sizes = packs.draft;
 
-  function change(sizes: readonly number[], announcement: string): void {
-    setPacks((current) => ({ ...current, sizes }));
+  function change(next: readonly number[], announcement: string): void {
+    packs.change(() => next);
     setNotice(announcement);
-    setStatus({ kind: "editing" });
   }
 
   function move(sessions: number, direction: Direction): void {
-    const sizes = swapWithNeighbour(packs.sizes, sessions, direction);
-    const newIndex = sizes.indexOf(sessions);
+    const moved = swapWithNeighbour(sizes, sessions, direction);
+    const newIndex = moved.indexOf(sessions);
     change(
-      sizes,
+      moved,
       translate("clubSettings.sessionPacks.moved", {
         pack: packName(translate, sessions),
         rank: newIndex + 1,
-        total: sizes.length,
+        total: moved.length,
       }),
     );
-    setFocusTarget(focusAfterMove(sessions, newIndex, sizes.length, direction));
+    setFocusTarget(focusAfterMove(sessions, newIndex, moved.length, direction));
   }
 
   function remove(sessions: number): void {
-    const index = packs.sizes.indexOf(sessions);
-    const sizes = packs.sizes.filter((size) => size !== sessions);
+    const index = sizes.indexOf(sessions);
+    const left = sizes.filter((size) => size !== sessions);
     change(
-      sizes,
+      left,
       translate("clubSettings.sessionPacks.removed", {
         pack: packName(translate, sessions),
       }),
@@ -180,20 +228,20 @@ function useSessionPacksEditor(translate: Translator): SessionPacksEditor {
     // El botón pulsado desaparece: el foco pasa al pack que ocupa su sitio,
     // o al anterior si era el último, o al campo de añadir si no queda
     // ninguno.
-    const next = sizes[Math.min(index, sizes.length - 1)];
+    const next = left[Math.min(index, left.length - 1)];
     setFocusTarget(
       next === undefined ? NEW_PACK_FIELD_ID : focusKey(next, "remove"),
     );
   }
 
   function add(sessions: number): boolean {
-    const issue = findSessionPackIssue([...packs.sizes, sessions]);
+    const issue = findSessionPackIssue([...sizes, sessions]);
     setAddIssue(issue);
     if (issue !== null) {
       return false;
     }
     change(
-      [...packs.sizes, sessions],
+      [...sizes, sessions],
       translate("clubSettings.sessionPacks.added", {
         pack: packName(translate, sessions),
       }),
@@ -201,39 +249,31 @@ function useSessionPacksEditor(translate: Translator): SessionPacksEditor {
     return true;
   }
 
-  async function submit(): Promise<void> {
-    if (isSendingRef.current) {
-      return;
-    }
-    const issue = findSessionPackIssue(packs.sizes);
-    if (issue !== null) {
-      setStatus({ kind: "invalid", code: issue });
-      return;
-    }
-    isSendingRef.current = true;
-    setStatus({ kind: "sending" });
+  function discard(): void {
+    packs.discard();
     setNotice(null);
-    const result = await saveSessionPacks(packs.sizes);
-    isSendingRef.current = false;
-    if (result.kind === "failed") {
-      setStatus({ ...result, phase: "save" });
-      return;
-    }
-    setPacks(result.packs);
-    setStatus({ kind: "editing" });
-    setNotice(translate("clubSettings.sessionPacks.saved"));
+  }
+
+  async function save(): Promise<void> {
+    setNotice(null);
+    await packs.save();
   }
 
   return {
-    packs,
-    status,
+    sizes,
+    sessionPrice,
+    load,
+    status: packs.status,
+    hasDraft: packs.hasDraft,
+    isSavedNoticeShowing: packs.isSavedNoticeShowing,
     notice,
     addIssue,
     focusTarget,
     move,
     remove,
     add,
-    submit,
+    discard,
+    save,
   };
 }
 
@@ -377,21 +417,25 @@ function AddPackForm({
   );
 }
 
+/** Lo que impide guardar: una lista inválida (sin ningún pack) o el error
+ * del último guardado. */
 function SaveError({
   translate,
+  listIssue,
   status,
 }: {
   translate: Translator;
-  status: Status;
+  listIssue: SessionPackIssueCode | null;
+  status: ClubDraftStatus;
 }): React.JSX.Element | null {
-  if (status.kind === "invalid") {
+  if (listIssue !== null) {
     return (
       <p className="auth-error" role="alert">
-        {describeSessionPackIssue(translate, status.code)}
+        {describeSessionPackIssue(translate, listIssue)}
       </p>
     );
   }
-  if (status.kind !== "failed" || status.phase !== "save") {
+  if (status.kind !== "failed") {
     return null;
   }
   return (
@@ -423,24 +467,25 @@ function SessionPacksEditorView({
   translate: Translator;
   editor: SessionPacksEditor;
 }): React.JSX.Element {
-  const { packs, status, notice, addIssue } = editor;
+  const { sizes, status, notice, addIssue } = editor;
   const editorRef = useRef<HTMLDivElement>(null);
   useFocusTarget(editorRef, editor.focusTarget);
   const isSending = status.kind === "sending";
+  const listIssue = editor.hasDraft ? findSessionPackIssue(sizes) : null;
   return (
     <div className="club-session-packs" ref={editorRef}>
       <ol
         className="groups-items"
         aria-label={translate("clubSettings.sessionPacks.title")}
       >
-        {packs.sizes.map((sessions, index) => (
+        {sizes.map((sessions, index) => (
           <PackItem
             key={sessions}
             translate={translate}
             sessions={sessions}
             index={index}
-            total={packs.sizes.length}
-            sessionPrice={packs.sessionPrice}
+            total={sizes.length}
+            sessionPrice={editor.sessionPrice}
             isBusy={isSending}
             onMove={(direction) => editor.move(sessions, direction)}
             onRemove={() => editor.remove(sessions)}
@@ -461,51 +506,55 @@ function SessionPacksEditorView({
           {notice}
         </p>
       )}
-      <SaveError translate={translate} status={status} />
-      <button
-        type="button"
-        className="auth-submit"
-        disabled={isSending}
-        onClick={() => void editor.submit()}
-      >
-        {translate(
-          isSending
-            ? "clubSettings.sessionPacks.saving"
-            : "clubSettings.sessionPacks.save",
-        )}
-      </button>
+      <SaveError translate={translate} listIssue={listIssue} status={status} />
+      {editor.hasDraft ? (
+        <UnsavedChangesBar
+          translate={translate}
+          section="packs"
+          headingId="club-packs-sesiones"
+          canSave={listIssue === null}
+          isSaving={isSending}
+          onDiscard={editor.discard}
+          onSave={() => void editor.save()}
+        />
+      ) : null}
+      <SavedNotice
+        translate={translate}
+        isShowing={editor.isSavedNoticeShowing}
+      />
     </div>
   );
 }
 
 export function ClubSessionPacksSection({
   translate,
+  onHasDraftChange,
 }: {
   translate: Translator;
+  onHasDraftChange: (hasDraft: boolean) => void;
 }): React.JSX.Element {
-  const editor = useSessionPacksEditor(translate);
-  const { status } = editor;
-  const hasLoadFailed = status.kind === "failed" && status.phase === "load";
+  const editor = useSessionPacksEditor(translate, onHasDraftChange);
+  const { load } = editor;
 
   return (
     <section className="auth-fields" aria-labelledby="club-packs-sesiones">
-      <h2 id="club-packs-sesiones">
+      <h2 id="club-packs-sesiones" tabIndex={-1}>
         {translate("clubSettings.sessionPacks.title")}
       </h2>
       <p className="auth-hint">{translate("clubSettings.sessionPacks.lead")}</p>
-      {status.kind === "loading" ? (
+      {load.kind === "loading" ? (
         <p className="admin-empty">
           {translate("clubSettings.sessionPacks.loading")}
         </p>
       ) : null}
-      {hasLoadFailed ? (
+      {load.kind === "failed" ? (
         <p className="auth-error" role="alert">
-          {describeSessionPacksFailure(translate, status)}
+          {describeSessionPacksFailure(translate, load)}
         </p>
       ) : null}
-      {status.kind === "loading" || hasLoadFailed ? null : (
+      {load.kind === "loaded" ? (
         <SessionPacksEditorView translate={translate} editor={editor} />
-      )}
+      ) : null}
     </section>
   );
 }

@@ -83,6 +83,12 @@
   /* La marca en la barra lateral, con el logo junto al nombre (#352). */
   --sidebar-logo-max-width: calc(var(--space-8) * 2.5);
   --sidebar-brand-name-min-width: 120px;
+  --sidebar-width: 240px;
+  /* La barra de pestañas del móvil: su borde, su relleno, el icono de 20px y
+     una línea de 12px. Lo fijo encima la usa para no quedar debajo (#719). */
+  --tabbar-height: calc(
+    1px + 2 * var(--space-2) + 20px + var(--space-1) + 12px * 1.2
+  );
 
   --font-family-body:
     Archivo, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
@@ -1309,7 +1315,7 @@ button.notification-item-content:hover {
   }
 
   .app-sidebar {
-    width: 240px;
+    width: var(--sidebar-width);
     flex-shrink: 0;
     padding: var(--space-4);
     border-bottom: none;
@@ -5788,6 +5794,185 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text-secondary);
 }
 
+/* Los cambios sin guardar (#719, 02-desktop-packs-unsaved.png y
+   10-mobile-packs-unsaved.png del handoff de E26). El punto de 7 px marca la
+   pestaña, la fila del móvil y la barra. */
+.club-draft-dot {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  vertical-align: middle;
+  background: var(--color-warning);
+  border-radius: 50%;
+}
+
+/* "● Sin guardar" junto al título de la fila. El amarillo de aviso no se lee
+   sobre el panel claro: el texto lo mezcla con el del cuerpo. */
+.club-settings-list-draft {
+  font-size: 13px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-warning) 50%, var(--color-text));
+}
+
+.club-settings-list-draft .club-draft-dot {
+  margin-right: var(--space-1);
+}
+
+/* Fija abajo, sobre la barra de pestañas del móvil (que va en el 10). La
+   página deja debajo de la sección un hueco de su alto para que no tape lo
+   último; una barra de otra pestaña, oculta, no lo pide. */
+.club-settings:has(.club-settings-panel:not([hidden]) .club-unsaved-bar),
+.club-settings > .auth-fields:has(.club-unsaved-bar) {
+  padding-bottom: calc(var(--space-12) + var(--space-8));
+}
+
+.club-unsaved-bar {
+  position: fixed;
+  right: 0;
+  bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+  left: 0;
+  z-index: 9;
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-panel);
+  border-top: 1px solid
+    color-mix(in srgb, var(--color-warning) 40%, transparent);
+  box-shadow: var(--shadow);
+}
+
+/* En el móvil la barra son sus dos botones; la frase queda para el lector
+   de pantalla. */
+.club-unsaved-bar > .club-draft-dot,
+.club-unsaved-bar-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.club-unsaved-bar-actions {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: var(--space-2);
+}
+
+.club-unsaved-bar-discard,
+.club-unsaved-bar .club-unsaved-bar-save {
+  min-height: var(--space-12);
+  padding: 0 var(--space-4);
+  font-size: 15px;
+}
+
+.club-unsaved-bar-discard {
+  font-family: inherit;
+  font-weight: 700;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.club-unsaved-bar-discard:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.club-unsaved-bar-discard:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.club-unsaved-bar button:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+/* "✓ Guardado", abajo a la derecha unos segundos. */
+.club-saved-notice {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(
+    var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-4)
+  );
+  z-index: 9;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.club-saved-notice svg {
+  color: var(--color-success);
+}
+
+/* En escritorio, a lo ancho del contenido, al lado de la barra lateral, con
+   la frase y los botones en su tamaño. */
+@media (min-width: 768px) {
+  .club-unsaved-bar {
+    right: var(--space-4);
+    bottom: var(--space-4);
+    left: calc(var(--sidebar-width) + var(--space-4));
+    max-width: 1040px;
+    box-sizing: border-box;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid color-mix(in srgb, var(--color-warning) 40%, transparent);
+    border-radius: 12px;
+  }
+
+  .club-unsaved-bar > .club-draft-dot,
+  .club-unsaved-bar-text {
+    position: static;
+    width: 7px;
+    height: 7px;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  .club-unsaved-bar-text {
+    flex: 1;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    font-size: 14px;
+  }
+
+  .club-unsaved-bar-actions {
+    display: flex;
+    flex: none;
+  }
+
+  .club-unsaved-bar-discard,
+  .club-unsaved-bar .club-unsaved-bar-save {
+    min-height: var(--touch-target-min);
+    font-size: 14px;
+  }
+
+  .club-unsaved-bar-discard {
+    border-color: transparent;
+  }
+
+  .club-saved-notice {
+    bottom: var(--space-4);
+  }
+}
+
 /* Las posiciones del club (#300): las activas en su orden, el alta y las
    archivadas, cada grupo con su título. Cada posición es una tarjeta como
    las de Grupos, con sus acciones debajo del nombre. */
@@ -10001,6 +10186,40 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text);
   background: color-mix(in srgb, var(--color-danger) 24%, var(--color-panel));
   border-color: var(--color-danger);
+}
+
+/* Voy, Quizás y No puedo en la fila de escritorio (#731): tres botones de
+   icono, por encima del ::after que hace pulsable la fila, como el enlace del
+   lugar. El elegido toma el tinte de su respuesta, como en el panel. El fallo
+   va en su propia línea bajo la fila, del cuerpo al borde derecho: en la
+   columna de los botones le quitaba el sitio al título. */
+.agenda-row-rsvp {
+  position: relative;
+  z-index: 1;
+}
+
+.agenda-rsvp.agenda-rsvp-compact {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.agenda-rsvp-compact .agenda-rsvp-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.agenda-row-rsvp-error {
+  grid-column: 4 / -1;
+  justify-self: end;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1) var(--space-2);
+  font-size: 12px;
 }
 
 /* Hasta siete avatares de 30px montados unos sobre otros. */

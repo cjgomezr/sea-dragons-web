@@ -1,10 +1,11 @@
 "use client";
 
 import { CaretLeft } from "@phosphor-icons/react/dist/ssr/CaretLeft";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { useIsPhone } from "@/components/use-is-phone";
 import {
+  type ClubDraftSection,
   CLUB_SETTINGS_SECTIONS,
   type ClubSettingsSection,
 } from "@/lib/club/club-settings-sections";
@@ -26,6 +27,7 @@ import {
 } from "./ClubSettingsTabs";
 import { ClubSignInTextsSection } from "./ClubSignInTextsSection";
 import { useClubSettingsSection } from "./use-club-settings-section";
+import { useConfirmLeaving } from "./use-confirm-leaving";
 
 /**
  * La configuración del club (#296, RF-6 del PRD de E18a), que se abre desde
@@ -35,6 +37,9 @@ import { useClubSettingsSection } from "./use-club-settings-section";
  * sesiones (#469, FR-080), que es lo único que la matriz le deja cambiar,
  * sin pestañas ni lista (D8).
  *
+ * General, Inicio de sesión y Packs juntan un borrador (#719, D10 y D11):
+ * su pestaña o su fila lo marca, y salir de la página con él pregunta.
+ *
  * La frontera ya mandó al panel a quien no es ninguno de los dos; si alguien
  * deja de serlo con la pantalla abierta, el 403 del endpoint lo dice aquí. Es
  * de cliente porque lee y guarda por la API v1, la misma que usará la
@@ -43,12 +48,52 @@ import { useClubSettingsSection } from "./use-club-settings-section";
 
 type ScreenState = { readonly kind: "loading" } | ClubSettingsRead;
 
+type DraftReporters = Readonly<
+  Record<ClubDraftSection, (hasDraft: boolean) => void>
+>;
+
+/** Las secciones con borrador, y con qué avisa cada una. Los avisos no
+ * cambian entre pintados: cada sección los usa en un efecto. */
+function useDraftSections(): readonly [
+  ReadonlySet<ClubSettingsSection>,
+  DraftReporters,
+] {
+  const [sections, setSections] = useState<ReadonlySet<ClubSettingsSection>>(
+    () => new Set(),
+  );
+  const reporters = useMemo(() => {
+    const reportFor =
+      (section: ClubDraftSection) =>
+      (hasDraft: boolean): void =>
+        setSections((current) => {
+          if (current.has(section) === hasDraft) {
+            return current;
+          }
+          const next = new Set(current);
+          if (hasDraft) {
+            next.add(section);
+          } else {
+            next.delete(section);
+          }
+          return next;
+        });
+    return {
+      general: reportFor("general"),
+      "sign-in": reportFor("sign-in"),
+      packs: reportFor("packs"),
+    };
+  }, []);
+  return [sections, reporters];
+}
+
 /** General: la identidad del club. Carga lo suyo y enseña su propio error,
  * sin tocar las demás secciones. */
 function GeneralSection({
   translate,
+  onHasDraftChange,
 }: {
   translate: Translator;
+  onHasDraftChange: (hasDraft: boolean) => void;
 }): React.JSX.Element {
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
@@ -93,6 +138,7 @@ function GeneralSection({
           translate={translate}
           settings={state.settings}
           onReloadRequested={reload}
+          onHasDraftChange={onHasDraftChange}
         />
       );
   }
@@ -102,21 +148,38 @@ function SectionContent({
   section,
   locale,
   translate,
+  reporters,
 }: {
   section: ClubSettingsSection;
   locale: Locale;
   translate: Translator;
+  reporters: DraftReporters;
 }): React.JSX.Element {
   switch (section) {
     case "general":
-      return <GeneralSection translate={translate} />;
+      return (
+        <GeneralSection
+          translate={translate}
+          onHasDraftChange={reporters.general}
+        />
+      );
     case "sign-in":
-      return <ClubSignInTextsSection translate={translate} />;
+      return (
+        <ClubSignInTextsSection
+          translate={translate}
+          onHasDraftChange={reporters["sign-in"]}
+        />
+      );
     case "positions":
       // Cada cambio de las posiciones se guarda en el acto (#300).
       return <ClubPositionsSection locale={locale} translate={translate} />;
     case "packs":
-      return <ClubSessionPacksSection translate={translate} />;
+      return (
+        <ClubSessionPacksSection
+          translate={translate}
+          onHasDraftChange={reporters.packs}
+        />
+      );
   }
 }
 
@@ -207,10 +270,14 @@ function AdminClubSettings({
   locale,
   translate,
   club,
+  draftSections,
+  reporters,
 }: {
   locale: Locale;
   translate: Translator;
   club: ClubIdentity;
+  draftSections: ReadonlySet<ClubSettingsSection>;
+  reporters: DraftReporters;
 }): React.JSX.Element {
   const idPrefix = useId();
   const isPhone = useIsPhone();
@@ -232,6 +299,7 @@ function AdminClubSettings({
         <ClubSettingsList
           translate={translate}
           club={club}
+          draftSections={draftSections}
           shouldFocusTitle={hasNavigated}
           onOpen={navigate}
         />
@@ -249,6 +317,7 @@ function AdminClubSettings({
             translate={translate}
             idPrefix={idPrefix}
             activeSection={active}
+            draftSections={draftSections}
             onSelect={select}
           />
         </>
@@ -266,6 +335,7 @@ function AdminClubSettings({
               section={section}
               locale={locale}
               translate={translate}
+              reporters={reporters}
             />
           ) : null}
         </div>
@@ -286,10 +356,21 @@ export function ClubSettingsScreen({
   club: ClubIdentity;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
+  const [draftSections, reporters] = useDraftSections();
+  useConfirmLeaving(
+    draftSections.size > 0,
+    translate("clubSettings.draft.leaveQuestion"),
+  );
   return (
     <div className="club-settings">
       {canManageClub ? (
-        <AdminClubSettings locale={locale} translate={translate} club={club} />
+        <AdminClubSettings
+          locale={locale}
+          translate={translate}
+          club={club}
+          draftSections={draftSections}
+          reporters={reporters}
+        />
       ) : (
         <>
           {/* Al Committee le basta la entradilla de la sección de los packs:
@@ -299,7 +380,10 @@ export function ClubSettingsScreen({
               {translate("clubSettings.title")}
             </h1>
           </header>
-          <ClubSessionPacksSection translate={translate} />
+          <ClubSessionPacksSection
+            translate={translate}
+            onHasDraftChange={reporters.packs}
+          />
         </>
       )}
     </div>

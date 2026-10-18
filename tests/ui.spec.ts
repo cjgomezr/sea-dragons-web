@@ -9472,14 +9472,20 @@ const STUBBED_CLUB_SETTINGS = {
   logoUrl: null,
 } as const;
 
-const ENGLISH_SAVE_SETTINGS = "Save settings";
-const SPANISH_SAVE_SETTINGS = "Guardar la configuración";
+/** Guardar cambios, en la barra de cambios sin guardar (#719). */
+const ENGLISH_SAVE_SETTINGS = "Save changes";
+const SPANISH_SAVE_SETTINGS = "Guardar cambios";
+
+/** Un nombre distinto del guardado: sin un cambio no hay barra con la que
+ * guardar (#719). */
+const EDITED_CLUB_NAME = "Victoria Seadragons Underwater Rugby";
 
 type ClubSettingsSave =
   | "rejects_as_conflict"
   | "rejects_accent_contrast"
   | "hangs"
-  | "drops_connection";
+  | "drops_connection"
+  | "accepts";
 
 /** Lo que el servidor fingido responde a cada guardado que rechaza. */
 const REJECTED_CLUB_SETTINGS_SAVES = {
@@ -9521,6 +9527,16 @@ async function stubClubSettings(
         await route.abort("internetdisconnected");
         return;
       }
+      if (save === "accepts") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            data: { ...STUBBED_CLUB_SETTINGS, name: EDITED_CLUB_NAME },
+          }),
+        });
+        return;
+      }
       if (
         save === "rejects_as_conflict" ||
         save === "rejects_accent_contrast"
@@ -9541,13 +9557,13 @@ function clubNameField(page: Page): Locator {
   return page.getByLabel(/^(Club name|Nombre del club)$/);
 }
 
-/** Borra el nombre y guarda: la pantalla lo rechaza junto al campo sin
- * mandar nada. */
+/** Borra el nombre: la pantalla lo rechaza junto al campo y la barra no deja
+ * guardar (#719). */
 function submitEmptyName(saveLabel: string, issueText: RegExp) {
   return async (page: Page): Promise<void> => {
     await clubNameField(page).fill("");
-    await page.getByRole("button", { name: saveLabel }).click();
     await expect(page.getByText(issueText)).toBeVisible();
+    await expect(page.getByRole("button", { name: saveLabel })).toBeDisabled();
   };
 }
 
@@ -9581,12 +9597,44 @@ function chooseAccentAndSave(saveLabel: string, outcome: RegExp) {
   };
 }
 
-/** Guarda y espera a lo que conteste el servidor fingido. */
+/** Cambia el nombre, guarda y espera a lo que conteste el servidor fingido. */
 function submitAndExpect(saveLabel: string, outcome: RegExp) {
   return async (page: Page): Promise<void> => {
+    await clubNameField(page).fill(EDITED_CLUB_NAME);
     await page.getByRole("button", { name: saveLabel }).click();
     await expect(page.getByText(outcome)).toBeVisible();
   };
+}
+
+/** Quita el pack de 50 sesiones del borrador: sale la barra (#719). */
+async function removeLargestSessionPack(page: Page): Promise<void> {
+  await sessionPacksSection(page)
+    .getByRole("button", { name: "Remove the 50 sessions pack" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: ENGLISH_SAVE_SETTINGS }),
+  ).toBeEnabled();
+}
+
+/** Guarda un cambio y espera a "✓ Guardado" (#719). */
+async function saveAndExpectSavedNotice(page: Page): Promise<void> {
+  await clubNameField(page).fill(EDITED_CLUB_NAME);
+  await page.getByRole("button", { name: ENGLISH_SAVE_SETTINGS }).click();
+  await expect(page.getByRole("status").getByText("Saved")).toBeVisible();
+}
+
+/** Cuánto adelanta pauseClock el reloj. Entre leer la hora y pausarlo el
+ * reloj sigue andando, y en CI cargado pasa más de 1 ms: pausar en el pasado
+ * falla ("Cannot fast-forward to the past"). Queda muy por debajo de los
+ * 2,5 s de "✓ Guardado". */
+const CLOCK_PAUSE_MARGIN_MS = 200;
+
+/** Para el reloj que instaló la visita: "✓ Guardado" se va a los 2,5 s, a
+ * veces antes de la captura. Sólo para la captura: axe también necesita los
+ * temporizadores. */
+async function pauseClock(page: Page): Promise<void> {
+  const now = await page.evaluate(() => Date.now());
+  await page.clock.pauseAt(now + CLOCK_PAUSE_MARGIN_MS);
 }
 
 /* Las posiciones del club (#300) viven en la misma pantalla. También se sirven
@@ -9811,8 +9859,8 @@ function sessionPacksSection(page: Page): Locator {
   });
 }
 
-/** Un lema de 141 caracteres: la pantalla lo rechaza junto al campo sin
- * mandar nada. */
+/** Un lema de 141 caracteres: la pantalla lo rechaza junto al campo y la
+ * barra no deja guardar (#719). */
 function writeTooLongTagline(labels: {
   readonly field: string;
   readonly submit: string;
@@ -9821,8 +9869,10 @@ function writeTooLongTagline(labels: {
   return async (page: Page): Promise<void> => {
     const section = signInTextsSection(page);
     await section.getByLabel(labels.field).fill("a".repeat(141));
-    await section.getByRole("button", { name: labels.submit }).click();
     await expect(section.getByText(labels.issue)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: labels.submit }),
+    ).toBeDisabled();
   };
 }
 
@@ -9879,6 +9929,12 @@ type ClubSettingsState = {
   /** La sección que abre (#718). Sin ella, General: en el móvil hace falta
    * nombrarla, porque sin `tab` sale la lista. */
   readonly tab?: ClubSettingsSection;
+  /** Sin ellos, los tres. */
+  readonly viewports?: readonly (typeof viewports)[number][];
+  /** Lo último antes de la captura, que no hace falta para axe. Lo fijo
+   * abajo pide `fitViewportToPage`: si la página no cabe, la captura entera
+   * lo deja a media página. */
+  readonly beforeCapture?: (page: Page) => Promise<void>;
 };
 
 /** Los estados de una sección, abiertos en su pestaña (#718). */
@@ -9959,6 +10015,25 @@ const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
       /Another Admin changed the settings/,
     ),
   },
+  // La barra de cambios sin guardar (#719, 02-desktop-packs-unsaved.png y
+  // 10-mobile-packs-unsaved.png del handoff de E26).
+  {
+    name: "club-cambios-sin-guardar",
+    tab: "packs",
+    prepare: removeLargestSessionPack,
+    beforeCapture: fitViewportToPage,
+  },
+  {
+    name: "club-guardado",
+    save: "accepts",
+    viewports: viewports.filter((vp) => vp.name === "desktop"),
+    beforeVisit: (page) => page.clock.install(),
+    prepare: saveAndExpectSavedNotice,
+    beforeCapture: async (page) => {
+      await pauseClock(page);
+      await fitViewportToPage(page);
+    },
+  },
 ];
 
 /** El título de cada sección que carga por su lado (#469). General no
@@ -10029,7 +10104,7 @@ for (const state of CLUB_SETTINGS_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of state.viewports ?? viewports) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -10037,6 +10112,7 @@ for (const state of CLUB_SETTINGS_STATES) {
           for (const theme of themes) {
             test(`matches approved baseline (${theme})`, async ({ page }) => {
               await goToClubSettings(page, state, theme);
+              await state.beforeCapture?.(page);
               const snapshot = `${state.name}-${vp.name}-${theme}.png`;
               await createMissingLocalBaseline(snapshot, () =>
                 page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
@@ -10510,7 +10586,7 @@ const CLUB_SIGN_IN_TEXTS_STATES = inClubSection("sign-in", [
     name: "club-textos-entrada-demasiado-largo",
     prepare: writeTooLongTagline({
       field: "Tagline in Spanish",
-      submit: "Save sign-in texts",
+      submit: ENGLISH_SAVE_SETTINGS,
       issue: /The tagline can have at most 140 characters/,
     }),
   },
@@ -10519,7 +10595,7 @@ const CLUB_SIGN_IN_TEXTS_STATES = inClubSection("sign-in", [
     beforeVisit: chooseSpanish,
     prepare: writeTooLongTagline({
       field: "Lema en español",
-      submit: "Guardar los textos",
+      submit: SPANISH_SAVE_SETTINGS,
       issue: /El lema puede tener como mucho 140 caracteres/,
     }),
   },
@@ -15865,6 +15941,115 @@ for (const state of AGENDA_REDESIGN_STATES) {
       });
     }
   });
+}
+
+// Voy, Quizás y No puedo en la fila de escritorio (#731): responder desde la
+// fila sin elegirla. Toda respuesta recibe el 422 de evento empezado, así que
+// el aviso sale bajo los botones de la fila. El móvil no tiene esos botones:
+// sólo 768 y 1440.
+async function showRowRsvpError(page: Page): Promise<void> {
+  await waitForRedesignedAgenda(page);
+  const row = agendaRow(page, AGENDA_REDESIGN_EVENTS[2].title);
+  await row
+    .getByRole("group")
+    .getByRole("button", { name: /^(Can't go|No puedo)$/ })
+    .click();
+  await expect(row.getByRole("alert")).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+const ROW_RSVP_ERROR_STATE: CalendarState = {
+  name: "calendario-fila-rsvp-error",
+  events: AGENDA_REDESIGN_EVENTS,
+  beforeVisit: fixAgendaClock,
+  ready: showRowRsvpError,
+};
+
+test.describe(ROW_RSVP_ERROR_STATE.name, () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const vp of AGENDA_REDESIGN_VIEWPORTS) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToCalendar(page, ROW_RSVP_ERROR_STATE, theme);
+          const snapshot = `${ROW_RSVP_ERROR_STATE.name}-${vp.name}-${theme}.png`;
+          await createMissingLocalBaseline(snapshot, () =>
+            page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+          );
+          await expect(page).toHaveScreenshot(snapshot, {
+            ...SCREENSHOT_OPTIONS,
+            fullPage: true,
+            maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          });
+        });
+
+        test(`has no accessibility violations (axe-core, ${theme})`, async ({
+          page,
+        }) => {
+          await goToCalendar(page, ROW_RSVP_ERROR_STATE, theme);
+          await expectNoAxeViolations(page);
+        });
+      }
+    });
+  }
+
+  test("has no horizontal scroll at 768px", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 812 });
+    await goToCalendar(page, ROW_RSVP_ERROR_STATE);
+    expect(await hasHorizontalScroll(page)).toBe(false);
+  });
+});
+
+// Un título tres veces más largo de lo normal a 768 (#731): se corta con
+// puntos suspensivos antes de empujar los botones fuera de la fila.
+const LONG_TITLE_EVENT = {
+  ...AGENDA_REDESIGN_EVENTS[2],
+  title:
+    "Inter-club scrimmage and skills clinic with the Geelong Krakens and the Ballarat Barracudas",
+} as const;
+
+test.describe("calendario-fila-rsvp-titulo-largo", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("corta el título y deja los botones a la vista a 768px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 768, height: 812 });
+    await goToCalendar(page, {
+      name: "calendario-fila-rsvp-titulo-largo",
+      events: [AGENDA_REDESIGN_EVENTS[0], LONG_TITLE_EVENT],
+      beforeVisit: fixAgendaClock,
+      ready: waitForAgendaRowsOf(LONG_TITLE_EVENT.title),
+    });
+
+    expect(await hasHorizontalScroll(page)).toBe(false);
+    const row = agendaRow(page, LONG_TITLE_EVENT.title);
+    const title = row.locator(".agenda-title-text");
+    expect(
+      await title.evaluate(
+        (element) => element.scrollWidth > element.clientWidth,
+      ),
+    ).toBe(true);
+    const cantGoButton = row
+      .getByRole("group")
+      .getByRole("button", { name: /^(Can't go|No puedo)$/ });
+    await expect(cantGoButton).toBeInViewport({ ratio: 1 });
+  });
+});
+
+function waitForAgendaRowsOf(title: string): (page: Page) => Promise<void> {
+  return async (page) => {
+    await expect(
+      page.getByRole("heading", { level: 3, name: title }),
+    ).toBeVisible();
+  };
 }
 
 // El mapa de la tarjeta del lugar (#658, RF-15 y D3 del PRD de E24; la zona
