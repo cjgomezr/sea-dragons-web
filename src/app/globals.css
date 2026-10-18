@@ -6095,20 +6095,6 @@ a.auth-brand-header:focus-visible {
   overflow-wrap: anywhere;
 }
 
-/* La función de la posición (#404): la etiqueta, el desplegable y su botón en
-   una fila que se parte en dos a 375px antes que desbordar. */
-.club-positions-coverage {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.club-positions-coverage label {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-}
-
 .club-positions-form {
   display: flex;
   flex-direction: column;
@@ -6145,6 +6131,327 @@ a.auth-brand-header:focus-visible {
   margin: 0;
   padding: 0;
   border: none;
+}
+
+/* La tabla de posiciones (#723, RF-5 del PRD de E26; docs/design/
+   design_handoff_club_settings, "01-desktop-positions"). Una sola caja con
+   borde: la cabecera, una fila por activa y la de añadir al final, todas con
+   las mismas columnas. El formulario de cada fila no tiene caja propia
+   (`display: contents`), así que sus campos y botones caen en las columnas
+   de la fila. Las clases de siempre (`club-positions-name`, `-names`, `-form`,
+   `-fields`) las comparten los packs y las evaluaciones: aquí se acotan. */
+.club-settings-panel:has(> .club-positions) {
+  max-width: 820px;
+}
+
+.club-positions {
+  position: relative;
+}
+
+.club-positions-lead {
+  max-width: 540px;
+}
+
+/* Por debajo de 768px, hasta que llegue la versión del móvil, la tabla se
+   desplaza dentro de su caja y la página no. Sin la contención, su ancho
+   mínimo ensanchaba la sección entera. A 768px la columna mide unos 496px y
+   la tabla cabe. */
+.club-positions-table-scroll {
+  overflow-x: auto;
+  contain: inline-size;
+}
+
+.club-positions-table {
+  min-width: 480px;
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.club-positions-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.club-positions-row {
+  display: grid;
+  grid-template-columns: 36px 28px 1fr 170px 84px;
+  column-gap: var(--space-2);
+  align-items: center;
+  min-height: 46px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.club-positions-table-head {
+  min-height: 0;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  background: var(--color-editor-bar);
+}
+
+.club-positions .club-positions-form {
+  display: contents;
+}
+
+.club-positions-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+}
+
+.club-positions .club-positions-rank {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.club-positions .club-positions-names {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+}
+
+.club-positions .club-positions-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.club-positions .club-positions-note {
+  font-size: 12.5px;
+}
+
+/* El aviso sobre --color-panel en claro no llega al contraste con el ámbar
+   puro: se oscurece hacia el color del texto, que en oscuro lo aclara. */
+.club-positions .club-positions-note-missing {
+  color: color-mix(in srgb, var(--color-warning) 50%, var(--color-text));
+}
+
+.club-positions-handle,
+.club-positions-icon-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 18px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.club-positions-handle {
+  width: 30px;
+  height: 30px;
+}
+
+.club-positions-icon-button {
+  width: 32px;
+  height: 32px;
+}
+
+.club-positions-handle:hover,
+.club-positions-icon-button:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.club-positions-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.club-positions-icon-button-primary {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.club-positions-icon-button-primary:hover:not(:disabled) {
+  color: var(--color-on-accent);
+  background: var(--color-accent-hover);
+}
+
+.club-positions-actions {
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.club-positions-select,
+.club-positions-input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 var(--space-2);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.club-positions-select {
+  font-weight: 600;
+}
+
+.club-positions-input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+/* Los dos nombres, uno al lado del otro; el aviso de cada uno debajo. */
+.club-positions-names-cell {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+/* Donde la columna del nombre no da para dos campos de 120px (la tableta),
+   el español baja debajo del inglés. */
+.club-positions .club-positions-fields {
+  flex-flow: row wrap;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.club-positions-name-field {
+  display: flex;
+  flex: 1 1 120px;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.club-positions-name-field .auth-field-error {
+  font-size: 12.5px;
+}
+
+.club-positions .club-positions-names-cell .auth-error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+}
+
+.club-positions-add-row {
+  background: var(--color-editor-bar);
+  border-bottom: none;
+}
+
+.club-positions-add-icon {
+  justify-content: center;
+  font-size: 18px;
+  color: var(--color-text-secondary);
+}
+
+.club-positions-add-hint {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.club-positions-add-button.auth-submit {
+  min-height: 32px;
+  padding: 0 var(--space-4);
+  font-size: 14px;
+}
+
+.club-positions-empty {
+  margin: 0;
+  padding: var(--space-4) 12px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.club-positions-archived {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.club-positions-archived-toggle {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  align-self: flex-start;
+  gap: 0 var(--space-2);
+  padding: var(--space-1) 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.club-positions-archived-caret {
+  align-self: center;
+  transition: transform 0.15s ease;
+}
+
+.club-positions-archived-toggle[aria-expanded="true"]
+  .club-positions-archived-caret {
+  transform: rotate(90deg);
+}
+
+.club-positions-archived-count {
+  font-weight: 700;
+}
+
+.club-positions-archived-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.club-positions-archived-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 7px 12px;
+}
+
+.club-positions-archived-row + .club-positions-archived-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.club-positions-archived-row .admin-secondary {
+  min-height: 32px;
+  padding: 0 var(--space-4);
+  font-size: 14px;
+}
+
+/* El aviso corto de guardado, arriba a la derecha de la pestaña. */
+.club-positions-notice {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .club-settings-brand {

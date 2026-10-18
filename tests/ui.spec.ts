@@ -9884,7 +9884,8 @@ function writeTooLongTagline(labels: {
 }
 
 /** Da de alta una posición cuyo nombre en español ya usa otra: el servidor
- * fingido la rechaza y el aviso sale junto a ese campo. */
+ * fingido la rechaza y el aviso sale junto a ese campo. Añadir está
+ * desactivado sin nombre, así que se escribe antes de pulsarlo (#723). */
 function addPositionWithTakenName(labels: {
   readonly english: string;
   readonly spanish: string;
@@ -9895,9 +9896,31 @@ function addPositionWithTakenName(labels: {
     const section = positionsSection(page);
     await section.getByLabel(labels.english).fill("Centre");
     await section.getByLabel(labels.spanish).fill("Defensa");
-    await section.getByRole("button", { name: labels.submit }).click();
+    await section
+      .getByRole("button", { name: labels.submit, exact: true })
+      .click();
     await expect(section.getByText(labels.issue)).toBeVisible();
   };
+}
+
+/** Abre el renombrado de una posición en su fila de la tabla (#723). */
+function openPositionRename(renameLabel: string) {
+  return async (page: Page): Promise<void> => {
+    const section = positionsSection(page);
+    await section.getByRole("button", { name: renameLabel }).click();
+    await expect(
+      section.getByRole("form", { name: renameLabel }),
+    ).toBeVisible();
+  };
+}
+
+/** Despliega las archivadas, que salen plegadas bajo la tabla (#723). */
+async function openArchivedPositions(page: Page): Promise<void> {
+  const section = positionsSection(page);
+  await section
+    .getByRole("button", { name: /^(Archived|Archivadas) · / })
+    .click();
+  await expect(section.getByRole("list").last()).toBeVisible();
 }
 
 type ClubSettingsState = {
@@ -10637,13 +10660,24 @@ const CLUB_POSITIONS_STATES = inClubSection("positions", [
   { name: "club-posiciones" },
   { name: "club-posiciones-es", beforeVisit: chooseSpanish },
   {
+    name: "club-posiciones-renombrando",
+    prepare: openPositionRename("Rename Defender"),
+  },
+  {
+    name: "club-posiciones-renombrando-es",
+    beforeVisit: chooseSpanish,
+    prepare: openPositionRename("Renombrar Defensa"),
+  },
+  {
     name: "club-posiciones-archivadas",
     positions: STUBBED_POSITIONS_WITH_ARCHIVED,
+    prepare: openArchivedPositions,
   },
   {
     name: "club-posiciones-archivadas-es",
     positions: STUBBED_POSITIONS_WITH_ARCHIVED,
     beforeVisit: chooseSpanish,
+    prepare: openArchivedPositions,
   },
   {
     name: "club-posiciones-nombre-repetido",
@@ -10651,7 +10685,7 @@ const CLUB_POSITIONS_STATES = inClubSection("positions", [
     prepare: addPositionWithTakenName({
       english: "Name in English",
       spanish: "Name in Spanish",
-      submit: "Add position",
+      submit: "Add",
       issue: /Another position already has this name/,
     }),
   },
@@ -10662,7 +10696,7 @@ const CLUB_POSITIONS_STATES = inClubSection("positions", [
     prepare: addPositionWithTakenName({
       english: "Nombre en inglés",
       spanish: "Nombre en español",
-      submit: "Añadir posición",
+      submit: "Añadir",
       issue: /Otra posición ya se llama así/,
     }),
   },
