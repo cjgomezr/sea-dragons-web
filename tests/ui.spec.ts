@@ -11227,6 +11227,9 @@ function positionRows(page: Page): Locator {
   return positionsSection(page).getByRole("list").first().getByRole("listitem");
 }
 
+/** Una ventana en la que la lista de seis no cabe entera. */
+const SHORT_WINDOW_HEIGHT_PX = 480;
+
 /** La sexta: el id que le da `SIX_STUBBED_POSITIONS`. */
 const SWEEPER_ID = "90000000-0000-4000-8000-000000000012";
 
@@ -11277,6 +11280,35 @@ test.describe("arrastrar posiciones (#725)", () => {
         }),
       ).toBeFocused();
       expect(sentOrders).toEqual([SWEEPER_FIRST_ORDER]);
+    });
+  });
+
+  test.describe("con el ratón en una ventana baja", () => {
+    test.use({
+      viewport: { width: viewports[2].width, height: SHORT_WINDOW_HEIGHT_PX },
+    });
+
+    test("arrastrar cerca del borde de abajo hace scroll solo", async ({
+      page,
+    }) => {
+      await openSixPositions(page);
+      const handle = positionRows(page)
+        .first()
+        .getByRole("button", { name: /^Reorder Goalkeeper/ });
+      await handle.scrollIntoViewIfNeeded();
+      const scrollBefore = await page.evaluate(() => window.scrollY);
+      const from = await centreOf(handle);
+
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move(from.x, SHORT_WINDOW_HEIGHT_PX - 2, {
+        steps: DRAG_STEP_COUNT,
+      });
+
+      await expect
+        .poll(() => page.evaluate(() => window.scrollY))
+        .toBeGreaterThan(scrollBefore);
+      await page.mouse.up();
     });
   });
 
