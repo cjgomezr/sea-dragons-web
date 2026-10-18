@@ -6548,6 +6548,11 @@ a.auth-brand-header:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+.club-sign-in-counter-over {
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
 .club-sign-in-editor textarea {
   padding: var(--space-3);
   resize: vertical;

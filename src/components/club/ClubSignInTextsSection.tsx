@@ -147,7 +147,14 @@ function SignInTextInput({
         <label htmlFor={id}>
           {translate(`clubSettings.signInTexts.${field.kind}`)}
         </label>
-        <span className="club-sign-in-counter" id={counterId}>
+        <span
+          className={
+            isInvalid
+              ? "club-sign-in-counter club-sign-in-counter-over"
+              : "club-sign-in-counter"
+          }
+          id={counterId}
+        >
           {translate("clubSettings.signInTexts.counter", {
             count: countCharacters(value),
             max: signInTextMaxLength(field.kind),
