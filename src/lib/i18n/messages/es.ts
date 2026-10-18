@@ -1174,6 +1174,7 @@ export const spanishMessages: MessageCatalog = {
   "calendar.answer.missingHint": "Aún no has respondido.",
   "calendar.rsvp.label": "¿Vas?",
   "calendar.rsvp.groupLabel": "Tu respuesta a {title}",
+  "calendar.rsvp.rowGroupLabel": "¿Vas a {title}?",
   "calendar.rsvp.yes": "Sí",
   "calendar.rsvp.maybe": "Quizás",
   "calendar.rsvp.no": "No",

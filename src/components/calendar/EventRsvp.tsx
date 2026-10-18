@@ -16,7 +16,8 @@ import type { Translator } from "@/lib/i18n/translator";
  * el grupo anuncia por qué con la frase que lleva a Pagos.
  *
  * En el panel del evento (#648) son Voy, Quizás y No puedo, y el elegido
- * toma el color de su respuesta.
+ * toma el color de su respuesta. En la fila de la agenda de escritorio (#731)
+ * son los mismos, sólo con su icono: el nombre lo oye el lector de pantalla.
  */
 
 type RsvpChoice = {
@@ -26,8 +27,15 @@ type RsvpChoice = {
   readonly Glyph: PhosphorGlyph | null;
 };
 
-/** La fila del inicio dice Sí, Quizás y No; el panel del evento (#648), Voy,
- * Quizás y No puedo con su icono, como la píldora de la agenda. */
+const ANSWER_CHOICES: readonly RsvpChoice[] = [
+  { response: "yes", label: "calendar.answer.yes", Glyph: Check },
+  { response: "maybe", label: "calendar.answer.maybe", Glyph: Question },
+  { response: "no", label: "calendar.answer.no", Glyph: X },
+];
+
+/** La fila del inicio dice Sí, Quizás y No; el panel del evento (#648) y la
+ * fila de la agenda (#731), Voy, Quizás y No puedo con su icono, como la
+ * píldora de la agenda. */
 const RSVP_CHOICES: Readonly<Record<EventRsvpVariant, readonly RsvpChoice[]>> =
   {
     row: [
@@ -35,19 +43,24 @@ const RSVP_CHOICES: Readonly<Record<EventRsvpVariant, readonly RsvpChoice[]>> =
       { response: "maybe", label: "calendar.rsvp.maybe", Glyph: null },
       { response: "no", label: "calendar.rsvp.no", Glyph: null },
     ],
-    panel: [
-      { response: "yes", label: "calendar.answer.yes", Glyph: Check },
-      { response: "maybe", label: "calendar.answer.maybe", Glyph: Question },
-      { response: "no", label: "calendar.answer.no", Glyph: X },
-    ],
+    panel: ANSWER_CHOICES,
+    compact: ANSWER_CHOICES,
   };
 
+/** La fila compacta no lleva encabezado: su grupo ya pregunta "¿Vas a…?". */
 const RSVP_HEADINGS = {
   row: "calendar.rsvp.label",
   panel: "calendar.panel.rsvpHeading",
+  compact: null,
+} as const satisfies Record<EventRsvpVariant, string | null>;
+
+const GROUP_LABELS = {
+  row: "calendar.rsvp.groupLabel",
+  panel: "calendar.rsvp.groupLabel",
+  compact: "calendar.rsvp.rowGroupLabel",
 } as const satisfies Record<EventRsvpVariant, string>;
 
-export type EventRsvpVariant = "row" | "panel";
+export type EventRsvpVariant = "row" | "panel" | "compact";
 
 function choiceClassName(
   variant: EventRsvpVariant,
@@ -55,10 +68,40 @@ function choiceClassName(
   isPending: boolean,
 ): string {
   const classes =
-    variant === "panel"
-      ? ["agenda-rsvp-choice", `agenda-rsvp-choice-${response}`]
-      : ["agenda-rsvp-choice"];
+    variant === "row"
+      ? ["agenda-rsvp-choice"]
+      : ["agenda-rsvp-choice", `agenda-rsvp-choice-${response}`];
   return (isPending ? [...classes, "is-pending"] : classes).join(" ");
+}
+
+function ChoiceContent({
+  translate,
+  choice,
+  variant,
+}: {
+  readonly translate: Translator;
+  readonly choice: RsvpChoice;
+  readonly variant: EventRsvpVariant;
+}): React.JSX.Element {
+  const { label, Glyph } = choice;
+  const glyph =
+    Glyph === null ? null : (
+      <Glyph aria-hidden="true" focusable="false" size={16} />
+    );
+  if (variant === "compact") {
+    return (
+      <>
+        {glyph}
+        <span className="visually-hidden">{translate(label)}</span>
+      </>
+    );
+  }
+  return (
+    <>
+      {glyph}
+      {translate(label)}
+    </>
+  );
 }
 
 export function EventRsvp({
@@ -82,34 +125,38 @@ export function EventRsvp({
   readonly variant?: EventRsvpVariant;
 }): React.JSX.Element {
   const isDisabled = disabledReasonId !== null;
+  const heading = RSVP_HEADINGS[variant];
   return (
     <div
       className={`agenda-rsvp agenda-rsvp-${variant}`}
       role="group"
-      aria-label={translate("calendar.rsvp.groupLabel", { title })}
+      aria-label={translate(GROUP_LABELS[variant], { title })}
       aria-busy={pendingResponse !== null}
       aria-describedby={disabledReasonId ?? undefined}
     >
-      <span className="agenda-rsvp-label" aria-hidden="true">
-        {translate(RSVP_HEADINGS[variant])}
-      </span>
-      {RSVP_CHOICES[variant].map(({ response, label, Glyph }) => (
+      {heading === null ? null : (
+        <span className="agenda-rsvp-label" aria-hidden="true">
+          {translate(heading)}
+        </span>
+      )}
+      {RSVP_CHOICES[variant].map((choice) => (
         <button
-          key={response}
+          key={choice.response}
           type="button"
           className={choiceClassName(
             variant,
-            response,
-            pendingResponse === response,
+            choice.response,
+            pendingResponse === choice.response,
           )}
-          aria-pressed={savedResponse === response}
+          aria-pressed={savedResponse === choice.response}
           disabled={isDisabled}
-          onClick={() => onRespond(response)}
+          onClick={() => onRespond(choice.response)}
         >
-          {Glyph === null ? null : (
-            <Glyph aria-hidden="true" focusable="false" size={16} />
-          )}
-          {translate(label)}
+          <ChoiceContent
+            translate={translate}
+            choice={choice}
+            variant={variant}
+          />
         </button>
       ))}
     </div>

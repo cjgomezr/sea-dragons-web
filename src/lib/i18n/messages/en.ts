@@ -1173,6 +1173,7 @@ export const englishMessages = {
   "calendar.answer.missingHint": "You haven't answered yet.",
   "calendar.rsvp.label": "RSVP",
   "calendar.rsvp.groupLabel": "RSVP: {title}",
+  "calendar.rsvp.rowGroupLabel": "Are you going to {title}?",
   "calendar.rsvp.yes": "Yes",
   "calendar.rsvp.maybe": "Maybe",
   "calendar.rsvp.no": "No",
