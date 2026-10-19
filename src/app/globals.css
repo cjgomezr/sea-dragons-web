@@ -15659,7 +15659,7 @@ a.agenda-take-attendance {
   color: var(--color-text-secondary);
 }
 
-/* En el móvil los dos botones reparten el ancho, y "Cambios sin guardar"
+/* En el móvil los dos botones reparten el ancho, y "Sin guardar"
    parte la línea en vez de empujar la pantalla hacia un lado. */
 .team-actions {
   display: flex;
@@ -16079,6 +16079,12 @@ a.agenda-take-attendance {
 
   .team-confirm .groups-question {
     flex: 1 1 20rem;
+  }
+
+  .team-confirm .groups-actions button {
+    min-height: 36px;
+    padding: 0 var(--space-4);
+    font-size: 14px;
   }
 
   .team-columns,
