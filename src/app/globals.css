@@ -16288,8 +16288,10 @@ a.dashboard-tile:hover {
   font-size: 14px;
 }
 
+/* El secundario sobre el tinte de aviso se quedaba en 4,26:1 en oscuro: va
+   en el texto suave, que pasa AA en los dos temas. */
 .contact-reminder-strip .contact-reminder-text p:not(:first-child) {
-  color: var(--color-text-secondary);
+  color: var(--color-text-soft);
 }
 
 .contact-reminder-strip .contact-reminder-text a {
