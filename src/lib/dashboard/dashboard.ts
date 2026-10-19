@@ -368,7 +368,9 @@ function toNextTrainingTile(events: readonly AgendaEvent[]): NextTrainingTile {
 
 /** La primera página de próximos y la de pasados: 50 eventos sobran para
  * encontrar tres, un entrenamiento y la semana, y los pasados recientes son
- * donde está un evento de varios días que sigue en curso (D4). */
+ * donde está un evento de varios días que sigue en curso (D4). Uno que
+ * empezó antes de los 50 pasados más recientes no se ve: para este club no
+ * pasa. */
 async function readAgendaWindow(
   gateways: DashboardGateways,
   request: DashboardRequest,
