@@ -17106,6 +17106,17 @@ p.dashboard-next-up-line {
   color: var(--color-accent-text);
 }
 
+/* Sobre el fondo de seleccionado el texto de acento no llega a AA en ninguno
+   de los dos temas: el día marcado lleva el texto del tinte del acento, y hoy
+   sigue distinguiéndose por el color. */
+.dashboard-week-day[aria-pressed="true"] .dashboard-week-weekday {
+  color: var(--color-text-soft);
+}
+
+.dashboard-week-day[aria-pressed="true"] .dashboard-week-weekday.is-today {
+  color: var(--color-accent-soft-text);
+}
+
 .dashboard-week-weekday-short {
   display: none;
 }
