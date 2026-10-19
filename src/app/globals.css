@@ -15975,12 +15975,6 @@ a.agenda-take-attendance {
   gap: var(--space-3) var(--space-4);
 }
 
-.dashboard-new-training {
-  display: none;
-  align-items: center;
-  text-decoration: none;
-}
-
 .dashboard-tile-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -16187,10 +16181,6 @@ a.dashboard-tile:hover {
 }
 
 @media (min-width: 768px) {
-  .dashboard-new-training {
-    display: inline-flex;
-  }
-
   .dashboard-training-card {
     display: none;
   }
@@ -16225,5 +16215,481 @@ a.dashboard-tile:hover {
   .dashboard-panels {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     align-items: start;
+  }
+}
+
+/* La cabecera, los avisos y la tarjeta "Próximo" del inicio (#747, RF-3 y
+   RF-8 del PRD de E27; docs/design/design_handoff_dashboard, #1a y #2a). El
+   día va en mono encima del saludo. "+ Evento" se queda en un "+" de 44px en
+   el móvil; su nombre lo sigue diciendo entero. */
+.dashboard-eyebrow {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.dashboard-header h1 {
+  font-size: 24px;
+}
+
+.dashboard-new-event {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: var(--touch-target-min);
+  text-decoration: none;
+}
+
+.dashboard-header .dashboard-new-event {
+  padding: 0;
+}
+
+.dashboard-header .dashboard-new-event-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* El aviso del contacto en el inicio es una franja con el tinte de aviso al
+   12%: el icono del teléfono, la frase, "Añadir contacto" y cerrar. */
+.contact-reminder-strip {
+  align-items: center;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--color-panel));
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
+  border-left-width: 1px;
+  border-radius: 10px;
+}
+
+.contact-reminder-icon {
+  flex: none;
+  color: var(--color-warning);
+}
+
+.contact-reminder-strip .contact-reminder-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-2);
+  row-gap: 0;
+}
+
+.contact-reminder-strip .contact-reminder-title {
+  font-size: 14px;
+}
+
+.contact-reminder-strip .contact-reminder-text p:not(:first-child) {
+  color: var(--color-text-secondary);
+}
+
+.contact-reminder-strip .contact-reminder-text a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  margin-left: auto;
+  text-decoration: none;
+}
+
+.contact-reminder-strip .contact-reminder-dismiss {
+  margin-top: 0;
+}
+
+/* El aviso de la membresía (D8): el tinte de peligro al 14% con el borde al
+   50%. En el móvil "Renovar membresía" va a todo el ancho. */
+.dashboard-membership-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-panel));
+  border: 1px solid color-mix(in srgb, var(--color-danger) 50%, transparent);
+  border-radius: 12px;
+}
+
+.dashboard-membership-notice-icon {
+  flex: none;
+  color: var(--color-danger);
+}
+
+.dashboard-membership-notice-text {
+  display: grid;
+  flex: 1 1 0;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.dashboard-membership-notice-text p {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: break-word;
+}
+
+.dashboard-membership-notice .dashboard-membership-notice-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dashboard-membership-notice .auth-submit {
+  display: inline-flex;
+  flex: 1 1 100%;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  text-decoration: none;
+}
+
+/* La tarjeta: en el móvil, la imagen de 130px encima; desde 768px, la
+   imagen en una columna de 280px. La barra de 4px del color del tipo va bajo
+   la imagen, como en el panel del calendario. */
+.dashboard-next-up {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-next-up-cover {
+  position: relative;
+  height: 130px;
+  border-bottom: 4px solid var(--color-accent);
+}
+
+.dashboard-next-up-competition .dashboard-next-up-cover {
+  border-bottom-color: var(--color-warning);
+}
+
+.dashboard-next-up-social .dashboard-next-up-cover {
+  border-bottom-color: var(--color-success);
+}
+
+.dashboard-next-up-meeting .dashboard-next-up-cover {
+  border-bottom-color: var(--color-type-meeting);
+}
+
+.dashboard-next-up-cover > .event-cover-fallback,
+.dashboard-next-up-cover > .event-cover-image {
+  width: 100%;
+  height: 100%;
+}
+
+.dashboard-next-up-cover .event-cover-image {
+  display: block;
+  object-fit: cover;
+}
+
+/* El icono de 84px no cabe holgado en los 130px del móvil. */
+.dashboard-next-up-cover .event-cover-fallback svg {
+  width: 56px;
+  height: 56px;
+}
+
+.dashboard-next-up-pill {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  margin: 0;
+  padding: 2px var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  background: var(--color-background);
+  border-radius: 999px;
+}
+
+.dashboard-next-up-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+}
+
+.dashboard-next-up-title {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-next-up-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  font-size: 14px;
+}
+
+.dashboard-next-up-line > svg {
+  flex: none;
+  color: var(--color-accent-text);
+}
+
+.dashboard-next-up-line > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-next-up-directions {
+  display: inline-flex;
+  flex: 1 1 100%;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--touch-target-min);
+  font-weight: 700;
+  color: var(--color-accent-text);
+  text-decoration: none;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.dashboard-next-up-directions:hover {
+  border-color: var(--color-accent);
+}
+
+/* Voy, Quizás y No puedo: en el móvil de 56px con el icono encima; el
+   elegido toma su color al 22% con el borde al 60%. "¿Vas?" no se pinta: el
+   grupo ya lo dice. */
+.dashboard-next-up-rsvp {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dashboard-next-up .agenda-rsvp-panel .agenda-rsvp-label {
+  display: none;
+}
+
+.dashboard-next-up .agenda-rsvp-panel .agenda-rsvp-choice {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 56px;
+  border-radius: 10px;
+}
+
+.dashboard-next-up .agenda-rsvp-choice-yes[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-success) 22%, var(--color-panel));
+  border-color: color-mix(in srgb, var(--color-success) 60%, transparent);
+}
+
+.dashboard-next-up .agenda-rsvp-choice-maybe[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-warning) 22%, var(--color-panel));
+  border-color: color-mix(in srgb, var(--color-warning) 60%, transparent);
+}
+
+.dashboard-next-up .agenda-rsvp-choice-no[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-danger) 22%, var(--color-panel));
+  border-color: color-mix(in srgb, var(--color-danger) 60%, transparent);
+}
+
+.dashboard-next-up-counts {
+  margin: 0;
+  font-size: 13px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+/* Las filas de debajo de la hora: el candado del socio restringido, la
+   franja del equipo y el reparto sin publicar. Su enlace va al final, en el
+   acento, y mide 44px de alto. */
+.dashboard-next-up-locked,
+.dashboard-next-up-draft,
+.dashboard-next-up-team {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+.dashboard-next-up-locked p,
+.dashboard-next-up-draft p,
+.dashboard-next-up-team p {
+  margin: 0;
+}
+
+.dashboard-next-up-locked p,
+.dashboard-next-up-draft p,
+.dashboard-next-up-team-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.dashboard-next-up-locked {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+}
+
+.dashboard-next-up-locked > svg {
+  flex: none;
+  color: var(--color-text-secondary);
+}
+
+.dashboard-next-up-draft {
+  background: var(--color-background);
+  border: 1px dashed var(--color-border-dashed);
+}
+
+.dashboard-next-up-draft-icon {
+  flex: none;
+  color: var(--color-warning);
+}
+
+.dashboard-next-up-row-link,
+.dashboard-next-up-team-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-2);
+  font-weight: 700;
+  color: var(--color-accent-text);
+  text-decoration: none;
+}
+
+.dashboard-next-up-row-link:hover,
+.dashboard-next-up-team-link:hover {
+  text-decoration: underline;
+}
+
+/* La franja del equipo, teñida con su color: al 26% sobre el fondo y el
+   borde al 60%. "Alineaciones" cubre la franja entera con su ::after. */
+.dashboard-next-up-team {
+  position: relative;
+  min-height: 52px;
+  background: color-mix(
+    in srgb,
+    var(--team-color) 26%,
+    var(--color-background)
+  );
+  border: 1px solid color-mix(in srgb, var(--team-color) 60%, transparent);
+}
+
+.dashboard-next-up-team-swatch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--color-text);
+  background: var(--team-color);
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+}
+
+.dashboard-next-up-eyebrow {
+  font-family: var(--font-family-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.dashboard-next-up-team-line strong {
+  font-weight: 700;
+}
+
+.dashboard-next-up-team-link::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  border-radius: inherit;
+}
+
+.dashboard-next-up-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+}
+
+.dashboard-next-up-empty p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+@media (min-width: 768px) {
+  .dashboard-header h1 {
+    font-size: 28px;
+  }
+
+  .dashboard-header .dashboard-new-event {
+    padding: 0 var(--space-4);
+  }
+
+  .dashboard-header .dashboard-new-event-text {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+  }
+
+  .dashboard-membership-notice .auth-submit {
+    flex: none;
+    min-height: var(--touch-target-min);
+  }
+
+  .dashboard-next-up {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  .dashboard-next-up-cover {
+    height: auto;
+    min-height: 220px;
+  }
+
+  .dashboard-next-up-cover .event-cover-fallback svg {
+    width: 84px;
+    height: 84px;
+  }
+
+  .dashboard-next-up-empty {
+    grid-column: 1 / -1;
+  }
+
+  .dashboard-next-up-title {
+    font-size: 22px;
+  }
+
+  .dashboard-next-up-directions {
+    flex: none;
+    padding: 0 var(--space-1);
+    background: none;
+    border: 0;
+  }
+
+  .dashboard-next-up .agenda-rsvp-panel .agenda-rsvp-choice {
+    flex-direction: row;
+    gap: var(--space-1);
+    min-height: var(--touch-target-min);
+  }
+
+  .dashboard-next-up-counts {
+    text-align: start;
   }
 }
