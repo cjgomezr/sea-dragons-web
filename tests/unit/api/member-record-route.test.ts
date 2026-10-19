@@ -37,6 +37,7 @@ const MEMBER_ATTENDANCE: MemberAttendance = {
   sessions: 3,
 };
 const REGISTERED_AT = "2024-03-06T01:00:00.000Z";
+const MEMBER_EMAIL = "paula@example.com";
 const ADULT_BIRTH = "1990-05-10";
 /** 14 años el día del registro. */
 const MINOR_BIRTH = "2010-01-01";
@@ -104,6 +105,11 @@ function memberRecordGateways(
               photoPath: memberPhotoPath,
               membershipStatus: "active",
               membershipWaiver: null,
+              membershipPlan: "Student",
+              email: MEMBER_EMAIL,
+              country: "NZ",
+              experienceLevel: "Beginner",
+              positionId: null,
               ...contact,
             }
           : null,
@@ -142,6 +148,7 @@ function memberRecordGateways(
       findMemberAttendance: async (_clubId, userIds) =>
         new Map(userIds.map((userId) => [userId, MEMBER_ATTENDANCE])),
     },
+    positions: { findClubPositions: async () => [] },
     photos: {
       signPhotoUrl: async () => {
         if (isPhotoSigningDown) {
@@ -276,9 +283,14 @@ describe("PATCH /api/v1/members/{id}/record", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       data: {
+        view: "admin",
         userId: MEMBER_ID,
         fullName: "Paula Player",
         role: "Player",
+        positionName: null,
+        experienceLevel: "Beginner",
+        country: "NZ",
+        email: MEMBER_EMAIL,
         joinedOn: JOINED_ON,
         accountStatus: "active",
         aufNumber: "AUF-2026-0042",
@@ -287,6 +299,7 @@ describe("PATCH /api/v1/members/{id}/record", () => {
         dateOfBirth: ADULT_BIRTH,
         registeredAt: REGISTERED_AT,
         hasGuardianConsent: false,
+        membershipPlan: "Student",
         membershipStatus: "active",
         membershipWaiver: null,
         phone: null,
@@ -461,14 +474,52 @@ describe("GET /api/v1/members/{id}/record", () => {
     });
   });
 
-  it.each(["Coach", "Committee", "Player"] as const)(
-    "responde 403 a un %s",
+  it("responde 403 a un Player", async () => {
+    givenRole("Player");
+
+    const response = await getRecord();
+
+    expect(response.status).toBe(403);
+  });
+
+  it("responde a un Committee con su vista, con el correo y el teléfono", async () => {
+    givenRole("Committee");
+
+    const response = await getRecord();
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { data: Record<string, unknown> };
+    expect(body.data).toMatchObject({
+      view: "committee",
+      email: MEMBER_EMAIL,
+      phone: null,
+      membershipPlan: "Student",
+    });
+    expect(body.data).not.toHaveProperty("aufNumber");
+    expect(body.data).not.toHaveProperty("dateOfBirth");
+  });
+
+  it("responde a un Coach con su vista, sin el correo ni el teléfono", async () => {
+    givenRole("Coach");
+
+    const response = await getRecord();
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { data: Record<string, unknown> };
+    expect(body.data).toMatchObject({ view: "coach", emergencyContact: null });
+    expect(body.data).not.toHaveProperty("email");
+    expect(body.data).not.toHaveProperty("phone");
+    expect(body.data).not.toHaveProperty("aufNumber");
+  });
+
+  it.each(["Admin", "Committee", "Coach"] as const)(
+    "responde 404 a un %s que pide un miembro de otro club",
     async (role) => {
       givenRole(role);
 
-      const response = await getRecord();
+      const response = await getRecord(UNKNOWN_MEMBER_ID);
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(404);
     },
   );
 
@@ -513,18 +564,15 @@ describe("la foto en la ficha", () => {
     logged.mockRestore();
   });
 
-  it.each(["Coach", "Committee", "Player"] as const)(
-    "sigue respondiendo 403 a un %s aunque el miembro tenga foto",
-    async (role) => {
-      memberPhotoPath = PHOTO_PATH;
-      givenRole(role);
+  it("sigue respondiendo 403 a un Player aunque el miembro tenga foto", async () => {
+    memberPhotoPath = PHOTO_PATH;
+    givenRole("Player");
 
-      const response = await getRecord();
+    const response = await getRecord();
 
-      expect(response.status).toBe(403);
-      await expect(response.text()).resolves.not.toContain(SIGNED_PHOTO_URL);
-    },
-  );
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.not.toContain(SIGNED_PHOTO_URL);
+  });
 });
 
 describe("endpoint de la ficha: fecha de nacimiento", () => {

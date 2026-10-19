@@ -21,6 +21,8 @@ import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
 import {
   AUF_NUMBER_MAX_LENGTH,
   MemberAufChangedError,
+  MemberRecordForbiddenError,
+  MemberRecordNotFoundError,
   MemberRecordValidationError,
   readMemberRecord,
   updateMemberRecord,
@@ -665,6 +667,172 @@ describeRls("verificar el AUF contra seadragons-dev", () => {
         });
 
         expect(saved.isAufVerified).toBe(true);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+});
+
+/** Lo que cada vista trae, y nada más (#770, D1, D3 y D4 del PRD de E30). */
+const SHARED_RECORD_FIELDS = [
+  "attendance",
+  "country",
+  "emergencyContact",
+  "experienceLevel",
+  "fullName",
+  "groups",
+  "membershipPlan",
+  "membershipStatus",
+  "photoUrl",
+  "positionName",
+  "role",
+  "userId",
+  "view",
+];
+
+/** La posición Forward que trae todo club nuevo. */
+async function findForwardId(
+  serviceClient: ServiceRoleClient,
+  clubId: string,
+): Promise<string> {
+  const { data, error } = await serviceClient.client
+    .from("club_position_names")
+    .select("position_id")
+    .eq("club_id", clubId)
+    .eq("locale", "en")
+    .eq("name", "Forward")
+    .single();
+  if (error) {
+    throw new Error(`No se pudo leer Forward: ${error.message}`);
+  }
+  return data.position_id as string;
+}
+
+async function fillHeaderFields(
+  serviceClient: ServiceRoleClient,
+  clubId: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await serviceClient.client
+    .from(MEMBERS_TABLE)
+    .update({
+      country: "AU",
+      experience_level: "Intermediate",
+      position_id: await findForwardId(serviceClient, clubId),
+      phone: "0412 345 678",
+      gender: "female",
+    })
+    .eq("user_id", userId);
+  if (error) {
+    throw new Error(`No se pudo completar la ficha: ${error.message}`);
+  }
+}
+
+type RoleScenario = {
+  readonly serviceClient: ServiceRoleClient;
+  readonly clubId: string;
+  readonly callers: Readonly<Record<Role, string>>;
+  readonly paulaId: string;
+};
+
+async function withEveryRole(run: (scenario: RoleScenario) => Promise<void>) {
+  const serviceClient = createServiceRoleTestClient(process.env);
+  await withClub(serviceClient, (clubId) =>
+    withMembers(
+      serviceClient,
+      clubId,
+      [
+        { fullName: "Ana Admin", role: "Admin" },
+        { fullName: "Carla Committee", role: "Committee" },
+        { fullName: "Coco Coach", role: "Coach" },
+        { fullName: "Paula Ficha", role: "Player" },
+      ],
+      ([admin, committee, coach, paula]) =>
+        run({
+          serviceClient,
+          clubId,
+          callers: {
+            Admin: admin!.id,
+            Committee: committee!.id,
+            Coach: coach!.id,
+            Player: paula!.id,
+          },
+          paulaId: paula!.id,
+        }),
+    ),
+  );
+}
+
+describeRls("la ficha por rol contra seadragons-dev (#770)", () => {
+  it(
+    "cada rol recibe sólo su vista, y el género no sale a nadie",
+    async () => {
+      await withEveryRole(
+        async ({ serviceClient, clubId, callers, paulaId }) => {
+          await fillHeaderFields(serviceClient, clubId, paulaId);
+          const gateways = createMemberRecordGateways(serviceClient.client);
+          const readAs = (role: Role) =>
+            readMemberRecord(gateways, {
+              callerId: callers[role],
+              userId: paulaId,
+              todayInClub: TODAY_IN_CLUB,
+            });
+
+          const admin = await readAs("Admin");
+          const committee = await readAs("Committee");
+          const coach = await readAs("Coach");
+
+          expect(admin).toMatchObject({
+            view: "admin",
+            country: "AU",
+            experienceLevel: "Intermediate",
+            positionName: { en: "Forward" },
+            phone: "0412 345 678",
+            joinedOn: JOINED_ON,
+          });
+          expect(admin).not.toHaveProperty("gender");
+          expect(Object.keys(committee).sort()).toEqual(
+            [...SHARED_RECORD_FIELDS, "email", "phone"].sort(),
+          );
+          expect(committee).toMatchObject({
+            view: "committee",
+            phone: "0412 345 678",
+          });
+          expect(Object.keys(coach).sort()).toEqual(
+            [...SHARED_RECORD_FIELDS].sort(),
+          );
+          await expect(readAs("Player")).rejects.toBeInstanceOf(
+            MemberRecordForbiddenError,
+          );
+        },
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "un socio de otro club no existe para ningún rol",
+    async () => {
+      await withEveryRole(async ({ serviceClient, callers }) => {
+        await withClub(serviceClient, (otherClubId) =>
+          withMembers(
+            serviceClient,
+            otherClubId,
+            [{ fullName: "Otra Socia", role: "Player" }],
+            async ([outsider]) => {
+              const gateways = createMemberRecordGateways(serviceClient.client);
+              for (const role of ["Admin", "Committee", "Coach"] as const) {
+                await expect(
+                  readMemberRecord(gateways, {
+                    callerId: callers[role],
+                    userId: outsider!.id,
+                    todayInClub: TODAY_IN_CLUB,
+                  }),
+                ).rejects.toBeInstanceOf(MemberRecordNotFoundError);
+              }
+            },
+          ),
+        );
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,

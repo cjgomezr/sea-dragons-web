@@ -41,6 +41,11 @@ import {
   MEMBER_RECORD_API_PATH,
   MEMBER_RECORD_PATH,
   MEMBER_ROLE_API_PATH,
+  MEMBER_AUF_VERIFICATION_API_PATH,
+  MEMBER_INVITATION_API_PATH,
+  MEMBER_STATUS_API_PATH,
+  MEMBERSHIP_WAIVER_API_PATH,
+  NEW_MEMBER_PATH,
   NEWS_API_PATH,
   NEWS_PATH,
   NEWS_EDIT_PATH,
@@ -665,48 +670,149 @@ const MEMBER_ID = "b1b1b1b1-0000-4000-8000-00000000000b";
 const MEMBER_RECORD_API = MEMBER_RECORD_API_PATH.replace("[id]", MEMBER_ID);
 const MEMBER_RECORD_PAGE = MEMBER_RECORD_PATH.replace("[id]", MEMBER_ID);
 
-describe("frontera de la ficha reservada al Admin (#242)", () => {
-  it.each(["Coach", "Committee", "Player"] as const)(
-    "niega a un %s el endpoint de la ficha",
+/** Lo que el Admin hace desde la ficha y que sigue siendo sólo suyo (#770). */
+const MEMBER_RECORD_WRITES = [
+  MEMBER_AUF_VERIFICATION_API_PATH,
+  MEMBER_ROLE_API_PATH,
+  MEMBER_STATUS_API_PATH,
+  MEMBERSHIP_WAIVER_API_PATH,
+  MEMBER_INVITATION_API_PATH,
+].map((path) => path.replace("[id]", MEMBER_ID));
+
+describe("frontera de la ficha de un socio (#242, #770)", () => {
+  it.each(["Admin", "Committee", "Coach"] as const)(
+    "deja a un %s leer el endpoint de la ficha",
     (role) => {
       expect(
         decideSessionBoundary({
           pathname: MEMBER_RECORD_API,
+          method: "GET",
           ...activeAs(role),
         }),
-      ).toEqual({ kind: "missingCapability" });
+      ).toEqual(ALLOW);
     },
   );
 
-  it.each(["Coach", "Committee", "Player"] as const)(
-    "manda al panel a un %s que abre la ficha a mano",
+  it.each(["Admin", "Committee", "Coach"] as const)(
+    "deja a un %s abrir la ficha desde el directorio",
     (role) => {
       expect(
         decideSessionBoundary({
           pathname: MEMBER_RECORD_PAGE,
+          method: "GET",
+          ...activeAs(role),
+        }),
+      ).toEqual(ALLOW);
+    },
+  );
+
+  it("niega a un Player el endpoint de la ficha", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: MEMBER_RECORD_API,
+        method: "GET",
+        ...activeAs("Player"),
+      }),
+    ).toEqual({ kind: "missingCapability" });
+  });
+
+  it("manda al panel a un Player que abre la ficha a mano", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: MEMBER_RECORD_PAGE,
+        method: "GET",
+        ...activeAs("Player"),
+      }),
+    ).toEqual(TO_DASHBOARD);
+  });
+
+  it.each(
+    (["Committee", "Coach"] as const).flatMap((role) =>
+      ["PATCH", "POST", "PUT", "DELETE"].map(
+        (method) => [role, method] as const,
+      ),
+    ),
+  )("niega a un %s escribir la ficha con %s", (role, method) => {
+    expect(
+      decideSessionBoundary({
+        pathname: MEMBER_RECORD_API,
+        method,
+        ...activeAs(role),
+      }),
+    ).toEqual({ kind: "missingCapability" });
+  });
+
+  it.each(
+    (["Committee", "Coach"] as const).flatMap((role) =>
+      MEMBER_RECORD_WRITES.flatMap((pathname) =>
+        ["GET", "POST", "DELETE"].map(
+          (method) => [role, pathname, method] as const,
+        ),
+      ),
+    ),
+  )("niega a un %s %s con %s", (role, pathname, method) => {
+    expect(
+      decideSessionBoundary({ pathname, method, ...activeAs(role) }),
+    ).toEqual({ kind: "missingCapability" });
+  });
+
+  it.each(["Committee", "Coach"] as const)(
+    "no abre a un %s el alta de un socio, que casa con la ficha",
+    (role) => {
+      expect(
+        decideSessionBoundary({
+          pathname: NEW_MEMBER_PATH,
+          method: "GET",
           ...activeAs(role),
         }),
       ).toEqual(TO_DASHBOARD);
     },
   );
 
-  it.each([MEMBER_RECORD_API, MEMBER_RECORD_PAGE])(
-    "deja pasar a un Admin a %s",
-    (pathname) => {
-      expect(decideSessionBoundary({ pathname, ...activeAs("Admin") })).toEqual(
-        ALLOW,
-      );
+  it.each(["Committee", "Coach"] as const)(
+    "no abre a un %s lo que cuelga de la ficha con un GET",
+    (role) => {
+      expect(
+        decideSessionBoundary({
+          pathname: `${MEMBER_RECORD_API}/otra-cosa`,
+          method: "GET",
+          ...activeAs(role),
+        }),
+      ).toEqual({ kind: "missingCapability" });
     },
   );
 
-  it.each(["Coach", "Committee", "Player"] as const)(
-    "sigue dejando a un %s ver el directorio",
+  it.each(["Committee", "Coach"] as const)(
+    "no abre a un %s la lista de socios, de la que cuelga la ficha",
     (role) => {
       expect(
-        decideSessionBoundary({ pathname: "/directorio", ...activeAs(role) }),
+        decideSessionBoundary({
+          pathname: MEMBERS_API_PATH,
+          method: "GET",
+          ...activeAs(role),
+        }),
+      ).toEqual({ kind: "missingCapability" });
+    },
+  );
+
+  it.each([MEMBER_RECORD_API, MEMBER_RECORD_PAGE])(
+    "deja escribir a un Admin en %s",
+    (pathname) => {
+      expect(
+        decideSessionBoundary({
+          pathname,
+          method: "PATCH",
+          ...activeAs("Admin"),
+        }),
       ).toEqual(ALLOW);
     },
   );
+
+  it.each(ROLES)("sigue dejando a un %s ver el directorio", (role) => {
+    expect(
+      decideSessionBoundary({ pathname: "/directorio", ...activeAs(role) }),
+    ).toEqual(ALLOW);
+  });
 });
 
 /** Una publicación cualquiera, en el segmento dinámico del detalle (#327). */

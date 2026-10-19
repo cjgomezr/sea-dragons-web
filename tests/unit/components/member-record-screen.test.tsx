@@ -25,9 +25,15 @@ const GROUPS_PATH = "/api/v1/groups";
 const EVALUATION_PATH = `/api/v1/evaluations/${MEMBER_ID}`;
 
 const RECORD: MemberRecord = {
+  view: "admin",
   userId: MEMBER_ID,
   fullName: "Paula Player",
   role: "Player",
+  positionName: { en: "Goalkeeper", es: "Portero" },
+  experienceLevel: "Intermediate",
+  country: "AU",
+  email: "paula@example.com",
+  membershipPlan: "Full",
   joinedOn: "2024-03-06",
   accountStatus: "active",
   aufNumber: "AUF-1",

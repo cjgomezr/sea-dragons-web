@@ -41,7 +41,7 @@ type Row = Record<string, unknown>;
 
 /** Una columna con `check` que trae algo fuera del catálogo es un esquema que
  * cambió sin que este archivo se enterara: se falla en vez de servirla. */
-function readOptionalCatalogValue<T>(
+export function readOptionalCatalogValue<T>(
   row: Row,
   column: string,
   parse: (value: unknown) => T | null,

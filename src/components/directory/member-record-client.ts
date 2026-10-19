@@ -6,6 +6,7 @@ import {
   requestApi,
 } from "@/lib/api/request-api";
 import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
+import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
 import { ROLES } from "@/lib/auth/roles";
 import { describeAuthIssue } from "@/lib/auth/issue-messages";
 import {
@@ -40,6 +41,8 @@ import {
   memberAttendanceSchema,
   membershipStatusSchema,
 } from "./directory-client";
+import { EXPERIENCE_LEVELS } from "@/lib/members/profile-fields";
+import { namedPositionSchema } from "@/components/club/positions-client";
 import { membershipWaiverSchema } from "./membership-waiver-client";
 
 /**
@@ -54,9 +57,17 @@ import { membershipWaiverSchema } from "./membership-waiver-client";
  */
 
 const recordSchema = z.object({
+  // La pantalla es la del Admin; la vista del Committee y la del Coach las
+  // pinta otro ticket de E30 (#776).
+  view: z.literal("admin"),
   userId: z.uuid(),
   fullName: z.string(),
   role: z.enum(ROLES),
+  positionName: namedPositionSchema.shape.names.nullable(),
+  experienceLevel: z.enum(EXPERIENCE_LEVELS).nullable(),
+  country: z.string().nullable(),
+  email: z.string(),
+  membershipPlan: z.enum(MEMBERSHIP_TYPES).nullable(),
   joinedOn: z.string(),
   accountStatus: z.enum(ACCOUNT_STATUSES),
   aufNumber: z.string().nullable(),

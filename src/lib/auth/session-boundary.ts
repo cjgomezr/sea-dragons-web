@@ -9,7 +9,9 @@ import {
   PUBLIC_API_PATHS,
   PUBLIC_BROWSER_ASSET_PATHS,
   PUBLIC_PAGE_PATHS,
+  READABLE_ROUTES,
   RESTRICTED_ROUTES,
+  type RestrictedRoute,
   SIGN_IN_PATH,
 } from "./routes";
 import { type Role, hasCapability } from "./roles";
@@ -66,8 +68,16 @@ export type ActiveAccess = {
 
 export type SessionBoundaryRequest = {
   readonly pathname: string;
+  /** El método HTTP. Sin él la petición cuenta como una lectura, que es lo
+   * que pregunta quien sólo quiere saber si una pantalla se abre. El proxy lo
+   * pasa siempre: de él depende `READABLE_ROUTES` (#770). */
+  readonly method?: string;
   readonly session: SessionState;
 };
+
+/** Los métodos que sólo leen. */
+const READ_METHODS: readonly string[] = ["GET", "HEAD"];
+const DEFAULT_METHOD = "GET";
 
 /** Un segmento declarado entre corchetes, como la carpeta `[id]` de una ruta
  * de Next. */
@@ -145,15 +155,55 @@ function decideForIncompleteAccount(pathname: string): SessionBoundaryOutcome {
     : { kind: "redirect", to: COMPLETE_REGISTRATION_PATH };
 }
 
+/** La misma ruta, no algo que cuelgue de ella. */
+function isSamePath(pathname: string, declaredPath: string): boolean {
+  return (
+    pathname.split("/").length === declaredPath.split("/").length &&
+    isPathWithin(pathname, declaredPath)
+  );
+}
+
+/** Las reglas que pide la petición: las de `RESTRICTED_ROUTES` bajo las que
+ * cae, salvo en la lectura de una ruta de `READABLE_ROUTES`, que cambia las
+ * que la contienen por la suya (#770). */
+function rulesFor(
+  pathname: string,
+  method: string,
+): readonly RestrictedRoute[] {
+  const rules = RESTRICTED_ROUTES.filter((route) =>
+    isPathWithin(pathname, route.path),
+  );
+  const readable = READ_METHODS.includes(method)
+    ? READABLE_ROUTES.find((route) => isSamePath(pathname, route.path))
+    : undefined;
+  if (readable === undefined) {
+    return rules;
+  }
+  return [
+    ...rules.filter((route) => !isPathWithin(readable.path, route.path)),
+    readable,
+  ];
+}
+
+function isRequestAllowedForRole(
+  pathname: string,
+  method: string,
+  role: Role,
+): boolean {
+  return rulesFor(pathname, method).every((route) =>
+    hasCapability(role, route.capability),
+  );
+}
+
 /** Si el rol cumple cada capacidad que exigen las rutas restringidas bajo las
- * que cae la petición. Sin ninguna, la ruta es de cualquier cuenta activa.
+ * que cae la lectura de la ruta. Sin ninguna, la ruta es de cualquier cuenta
+ * activa.
  *
  * La navegación (#213) pregunta aquí qué ofrecer, para que esconder y cerrar
- * salgan de la misma matriz y no de dos listas que puedan desincronizarse. */
+ * salgan de la misma matriz y no de dos listas que puedan desincronizarse.
+ * Pregunta por lecturas: un enlace abre una pantalla. */
 export function isAllowedForRole(pathname: string, role: Role): boolean {
-  return RESTRICTED_ROUTES.filter((route) =>
-    isPathWithin(pathname, route.path),
-  ).every((route) => hasCapability(role, route.capability));
+  return isRequestAllowedForRole(pathname, DEFAULT_METHOD, role);
 }
 
 /** Si la membresía deja alcanzar la ruta: al día, todo; sin estar al día,
@@ -195,13 +245,13 @@ export function isAllowedForAccess(
  * (AC-007). Una que pide estar al día lleva a Pagos, que es donde se arregla.
  * Un endpoint responde 403 y el handler no llega a ejecutarse. */
 function decideForActiveAccount(
-  pathname: string,
+  { pathname, method }: { readonly pathname: string; readonly method: string },
   access: ActiveAccess,
 ): SessionBoundaryOutcome {
   if (isPathWithin(pathname, COMPLETE_REGISTRATION_PATH)) {
     return { kind: "redirect", to: DASHBOARD_PATH };
   }
-  if (!isAllowedForRole(pathname, access.role)) {
+  if (!isRequestAllowedForRole(pathname, method, access.role)) {
     return isApiPath(pathname)
       ? { kind: "missingCapability" }
       : { kind: "redirect", to: DASHBOARD_PATH };
@@ -216,6 +266,7 @@ function decideForActiveAccount(
 
 export function decideSessionBoundary({
   pathname,
+  method = DEFAULT_METHOD,
   session,
 }: SessionBoundaryRequest): SessionBoundaryOutcome {
   if (isPublicPath(pathname)) {
@@ -229,6 +280,6 @@ export function decideSessionBoundary({
     case "incomplete":
       return decideForIncompleteAccount(pathname);
     case "active":
-      return decideForActiveAccount(pathname, session);
+      return decideForActiveAccount({ pathname, method }, session);
   }
 }

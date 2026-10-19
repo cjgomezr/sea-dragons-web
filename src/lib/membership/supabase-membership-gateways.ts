@@ -139,12 +139,13 @@ export function readEmbeddedMembershipStatus(
   return standing === null ? null : resolveStandingStatus(standing, now);
 }
 
-/** La membresía embebida con el motivo de la exención: lo que la ficha del
- * Admin enseña (#457). */
+/** La membresía embebida con el motivo de la exención (#457) y el plan
+ * (#770): lo que la ficha de un socio enseña. */
 export const MEMBERSHIP_SUMMARY_EMBED =
-  "memberships!memberships_member_same_club_fkey(status, stripe_subscription_id, trial_end, current_period_end, waived_until, waived_reason)";
+  "memberships!memberships_member_same_club_fkey(plan, status, stripe_subscription_id, trial_end, current_period_end, waived_until, waived_reason)";
 
 const summaryRowSchema = standingRowSchema.extend({
+  plan: z.enum(MEMBERSHIP_TYPES).nullable(),
   waived_reason: z.string().nullable(),
 });
 
@@ -152,10 +153,11 @@ const embeddedSummarySchema = z
   .union([summaryRowSchema, z.array(summaryRowSchema).max(1)])
   .nullish();
 
-/** El estado que cuenta hoy y la exención, si está exento hoy. */
+/** El estado que cuenta hoy, la exención si está exento hoy, y el plan. */
 export type MembershipSummary = {
   readonly status: MembershipStatus | null;
   readonly waiver: MembershipWaiverView | null;
+  readonly plan: MembershipPlan | null;
 };
 
 export function readEmbeddedMembershipSummary(
@@ -164,14 +166,15 @@ export function readEmbeddedMembershipSummary(
 ): MembershipSummary {
   const row = singleEmbeddedRow(embeddedSummarySchema.parse(embedded));
   if (row === null) {
-    return { status: null, waiver: null };
+    return { status: null, waiver: null, plan: null };
   }
   const status = resolveStandingStatus(toStanding(row), now);
   if (status !== "waived" || row.waived_reason === null) {
-    return { status, waiver: null };
+    return { status, waiver: null, plan: row.plan };
   }
   return {
     status,
+    plan: row.plan,
     waiver: {
       reason: row.waived_reason,
       until: toNullableIso(toDate(row.waived_until)),

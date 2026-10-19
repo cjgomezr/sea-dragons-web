@@ -105,10 +105,11 @@ export const MEMBER_ROLES_API_PATH = `${MEMBERS_API_PATH}/roles`;
 /** El directorio del club (#239). Lo alcanza cualquier cuenta activa. */
 export const DIRECTORY_PATH = "/directorio";
 
-/** La ficha reservada al Admin de un socio (#242, RF-4 del PRD de E5): su
- * AUF y sus grupos. `[id]` es el `user_id` del socio. Cuelga de
- * `MEMBERS_API_PATH`, y se declara igual por el mismo motivo que el cambio de
- * rol. */
+/** La ficha de un socio (#242, RF-4 del PRD de E5): su AUF y sus grupos.
+ * `[id]` es el `user_id` del socio. Cuelga de `MEMBERS_API_PATH`, y se
+ * declara igual por el mismo motivo que el cambio de rol. Desde #770 la leen
+ * también el Committee y el Coach (`READABLE_ROUTES`); escribirla sigue siendo
+ * del Admin. */
 export const MEMBER_RECORD_API_PATH = `${MEMBERS_API_PATH}/[id]/record`;
 
 /** Verificar el AUF que propuso un miembro (#274, RF-12 del PRD de E5).
@@ -135,7 +136,8 @@ export const MEMBERSHIP_WAIVER_API_PATH = `${MEMBERS_API_PATH}/[id]/membership-w
 
 /** La pantalla de esa ficha, abierta desde el directorio. El directorio lo
  * alcanza cualquier cuenta activa, pero lo que cuelga de él con un id es del
- * Admin: quien no lo es y la pide a mano vuelve al panel, como con Equipos. */
+ * personal que abre fichas (#770): un Player que la pide a mano vuelve al
+ * panel, como con Equipos. */
 export const MEMBER_RECORD_PATH = `${DIRECTORY_PATH}/[id]`;
 
 /** La ficha de un miembro concreto. */
@@ -750,6 +752,29 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: LEVY_PAYERS_API_PATH, capability: "viewLevyPayers" },
   { path: LEVY_SALES_API_PATH, capability: "viewLevyPayers" },
   { path: LEVY_BUYERS_API_PATH, capability: "viewLevyPayers" },
+];
+
+/** Una ruta cuya lectura alcanzan más roles que su escritura. */
+export type ReadableRoute = {
+  readonly path: string;
+  readonly capability: Capability;
+};
+
+/**
+ * Las rutas que se leen con otra capacidad que la que piden para escribirse
+ * (#770, D1, D3 y D11 del PRD de E30). Una lectura (GET o HEAD) de justo esa
+ * ruta pide su capacidad en lugar de la de las rutas de `RESTRICTED_ROUTES`
+ * que la contienen, como `MEMBERS_API_PATH` contiene la ficha. Las demás
+ * reglas que casen siguen valiendo: `/directorio/nuevo` casa con la pantalla
+ * de la ficha, pero `NEW_MEMBER_PATH` lo sigue reservando al Admin.
+ *
+ * Sólo la ruta misma, no lo que cuelga de ella: la verificación del AUF cuelga
+ * de la ficha y no se abre por leerla. Y sólo la lectura: un PATCH sigue
+ * pidiendo las reglas de `RESTRICTED_ROUTES`.
+ */
+export const READABLE_ROUTES: readonly ReadableRoute[] = [
+  { path: MEMBER_RECORD_API_PATH, capability: "viewMemberRecords" },
+  { path: MEMBER_RECORD_PATH, capability: "viewMemberRecords" },
 ];
 
 /** Una ruta de socio, que sólo alcanza quien tiene la membresía al día. */

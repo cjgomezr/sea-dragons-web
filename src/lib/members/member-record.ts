@@ -13,7 +13,15 @@ import {
   requiresGuardianConsent,
 } from "@/lib/auth/account-activation";
 import type { AccountStatus } from "@/lib/auth/account-status";
-import type { MembershipStatus } from "@/lib/membership/membership";
+import {
+  type ClubPositionsGateway,
+  type PositionNames,
+  findClubPosition,
+} from "@/lib/club/club-positions";
+import type {
+  MembershipPlan,
+  MembershipStatus,
+} from "@/lib/membership/membership";
 import type { MembershipWaiverView } from "@/lib/membership/membership-view";
 import {
   isRealCalendarDate,
@@ -28,6 +36,7 @@ import {
 } from "@/lib/groups/group-members";
 import { GroupNotFoundError, type GroupsGateways } from "@/lib/groups/groups";
 import { type MemberGroup, listMemberGroups } from "@/lib/groups/member-groups";
+import type { ExperienceLevel } from "./profile-fields";
 import {
   CONTACT_ISSUE_CODES,
   type ContactField,
@@ -63,6 +72,11 @@ import {
  * Desde #499 el Admin también corrige el teléfono y el contacto de emergencia
  * del miembro, por ejemplo si se los pasaron por mensaje. Valen las reglas
  * del perfil propio (`profile-contact.ts`) y queda en la bitácora.
+ *
+ * Desde #770 (D1, D3, D4 y D11 del PRD de E30) el Committee y el Coach la
+ * leen, cada uno con su vista: sin el AUF, la fecha de nacimiento ni el alta,
+ * y el Coach además sin el correo ni el teléfono (D5 de E19). El género no
+ * sale a nadie: ni se lee. Escribir sigue siendo sólo del Admin.
  */
 
 /** El mismo tope que el `check` de `members.auf_number` en
@@ -107,22 +121,77 @@ export type StoredMemberRecord = ProfileContact & {
   /** La ruta de su foto en Storage (#245), o null si no tiene. */
   readonly photoPath: string | null;
   /** El estado de su membresía tal como cuenta hoy (#453), o `null` si no
-   * tiene. La ficha ya es sólo del Admin. */
+   * tiene. */
   readonly membershipStatus: MembershipStatus | null;
   /** El motivo y el fin de su exención, sólo si está exento hoy (#457). */
   readonly membershipWaiver: MembershipWaiverView | null;
+  /** Su plan, o `null` si todavía no eligió ninguno (#770). */
+  readonly membershipPlan: MembershipPlan | null;
+  /** El correo de su cuenta (#770). */
+  readonly email: string;
+  /** Lo que la cabecera pinta como "posición · experiencia · país" (#770). */
+  readonly country: string | null;
+  readonly experienceLevel: ExperienceLevel | null;
+  /** Una posición del catálogo del club (#299), o null sin posición. */
+  readonly positionId: string | null;
 };
 
-/** La ficha tal como la sirve la API. La ruta de la foto se queda en el
- * servidor: sale la dirección firmada, que caduca (#354). */
-export type MemberRecord = Omit<StoredMemberRecord, "photoPath"> & {
+/** Lo que tienen todas las vistas de la ficha. La ruta de la foto se queda en
+ * el servidor: sale la dirección firmada, que caduca (#354). */
+type SharedMemberRecordFields = {
+  readonly userId: string;
+  readonly fullName: string;
   /** Null sin foto, y también si Storage no la firmó: la pantalla pone las
    * iniciales. */
   readonly photoUrl: string | null;
-  readonly isAufExpired: boolean;
+  readonly role: Role;
+  /** Los nombres de su posición en cada idioma: la pantalla elige el suyo,
+   * como en el directorio (#299). Null sin posición. */
+  readonly positionName: PositionNames | null;
+  readonly experienceLevel: ExperienceLevel | null;
+  readonly country: string | null;
+  readonly emergencyContact: ProfileContact["emergencyContact"];
+  readonly membershipPlan: MembershipPlan | null;
+  readonly membershipStatus: MembershipStatus | null;
   readonly groups: readonly MemberGroup[];
   /** Su porcentaje y su total de asistencia, o sin datos (#394, FR-022). */
   readonly attendance: MemberAttendance;
+};
+
+/** La ficha que lee el Admin: todo lo que se guarda de ella. Es también lo
+ * que responden sus escrituras. */
+export type MemberRecord = { readonly view: "admin" } & Omit<
+  StoredMemberRecord,
+  "photoPath" | "positionId"
+> &
+  SharedMemberRecordFields & {
+    readonly isAufExpired: boolean;
+  };
+
+/** La que lee un Committee (D1 del PRD de E30): con el contacto. */
+export type CommitteeMemberRecord = {
+  readonly view: "committee";
+} & SharedMemberRecordFields &
+  Pick<StoredMemberRecord, "email" | "phone">;
+
+/** La que lee un Coach (D3): la del Committee sin el correo ni el teléfono. */
+export type CoachMemberRecord = {
+  readonly view: "coach";
+} & SharedMemberRecordFields;
+
+/** La ficha según quién la lee (#770). */
+export type MemberRecordReading =
+  MemberRecord | CommitteeMemberRecord | CoachMemberRecord;
+
+export type MemberRecordView = MemberRecordReading["view"];
+
+/** Qué vista lee cada rol; null es que no la abre. Es la fila
+ * `viewMemberRecords` de la matriz, con la vista de cada uno. */
+const RECORD_VIEW_BY_ROLE: Readonly<Record<Role, MemberRecordView | null>> = {
+  Admin: "admin",
+  Committee: "committee",
+  Coach: "coach",
+  Player: null,
 };
 
 /** El AUF que el Admin escribió en la ficha. Un número vacío o en null es
@@ -241,6 +310,7 @@ export type MemberRecordGateways = Pick<
     ): Promise<ContactUpdateResult>;
   };
   readonly groups: Pick<GroupsGateways["groups"], "findClubGroups">;
+  readonly positions: ClubPositionsGateway;
   readonly photos: {
     /** Null si Storage no firmó esa ruta; lanza si la llamada falla. */
     signPhotoUrl(photoPath: string): Promise<string | null>;
@@ -251,7 +321,7 @@ export type MemberRecordGateways = Pick<
 
 export class MemberRecordForbiddenError extends Error {
   constructor() {
-    super("Sólo un Admin puede ver y editar la ficha reservada de un socio.");
+    super("Tu rol no te deja ver o editar la ficha de este socio.");
     this.name = "MemberRecordForbiddenError";
   }
 }
@@ -461,6 +531,20 @@ async function signRecordPhoto(
   }
 }
 
+async function findPositionName(
+  gateways: Pick<MemberRecordGateways, "positions">,
+  clubId: string,
+  positionId: string | null,
+): Promise<PositionNames | null> {
+  if (positionId === null) {
+    return null;
+  }
+  const positions = await gateways.positions.findClubPositions(clubId, [
+    positionId,
+  ]);
+  return findClubPosition(positions, positionId).names;
+}
+
 async function composeRecord(
   gateways: MemberRecordGateways,
   scope: MemberScope,
@@ -474,14 +558,58 @@ async function composeRecord(
     ),
     gateways.attendance.findMemberAttendance(scope.clubId, [scope.userId]),
   ]);
-  const { photoPath, ...fields } = record;
+  const { photoPath, positionId, ...fields } = record;
+  const [photoUrl, positionName] = await Promise.all([
+    signRecordPhoto(gateways, photoPath),
+    findPositionName(gateways, scope.clubId, positionId),
+  ]);
   return {
+    view: "admin",
     ...fields,
-    photoUrl: await signRecordPhoto(gateways, photoPath),
+    photoUrl,
+    positionName,
     isAufExpired: isAufExpired(record.aufExpiry, todayInClub),
     groups,
     attendance: attendanceOf(attendance, scope.userId),
   };
+}
+
+/** Campo a campo, para que a quien no es Admin no le llegue nada que no se
+ * nombre aquí. */
+function sharedFieldsOf(record: MemberRecord): SharedMemberRecordFields {
+  return {
+    userId: record.userId,
+    fullName: record.fullName,
+    photoUrl: record.photoUrl,
+    role: record.role,
+    positionName: record.positionName,
+    experienceLevel: record.experienceLevel,
+    country: record.country,
+    emergencyContact: record.emergencyContact,
+    membershipPlan: record.membershipPlan,
+    membershipStatus: record.membershipStatus,
+    groups: record.groups,
+    attendance: record.attendance,
+  };
+}
+
+function projectRecord(
+  record: MemberRecord,
+  view: MemberRecordView,
+): MemberRecordReading {
+  switch (view) {
+    case "admin":
+      return record;
+    case "committee":
+      return {
+        view,
+        ...sharedFieldsOf(record),
+        email: record.email,
+        phone: record.phone,
+      };
+    case "coach":
+      return { view, ...sharedFieldsOf(record) };
+  }
 }
 
 type MemberRecordRequest = {
@@ -492,16 +620,34 @@ type MemberRecordRequest = {
   readonly todayInClub: string;
 };
 
+/** Quien llama, con su club y la vista que lee, si abre fichas. */
+async function findRecordReader(
+  gateways: Pick<MemberRecordGateways, "members">,
+  callerId: string,
+): Promise<{ readonly clubId: string; readonly view: MemberRecordView }> {
+  const caller = await gateways.members.findRoleRequestMember(callerId);
+  if (caller === null) {
+    throw new MemberNotFoundError(callerId);
+  }
+  const view = RECORD_VIEW_BY_ROLE[caller.role];
+  if (view === null) {
+    throw new MemberRecordForbiddenError();
+  }
+  return { clubId: caller.clubId, view };
+}
+
+/** La ficha en la vista del rol de quien llama (#770). */
 export async function readMemberRecord(
   gateways: MemberRecordGateways,
   request: MemberRecordRequest,
-): Promise<MemberRecord> {
-  const caller = await findAdministrator(gateways, request.callerId);
-  return composeRecord(
+): Promise<MemberRecordReading> {
+  const reader = await findRecordReader(gateways, request.callerId);
+  const record = await composeRecord(
     gateways,
-    { clubId: caller.clubId, userId: request.userId },
+    { clubId: reader.clubId, userId: request.userId },
     request.todayInClub,
   );
+  return projectRecord(record, reader.view);
 }
 
 /** Un id que no es de un grupo del club se rechaza antes de escribir nada:
