@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
+import type { AttendanceStatus } from "@/lib/attendance/attendance-status";
 import { type DashboardSource, readDashboard } from "@/lib/dashboard/dashboard";
 import { createDashboardGateways } from "@/lib/dashboard/supabase-dashboard-gateways";
 import { markNewsSeen } from "@/lib/news/news-seen";
@@ -373,6 +374,7 @@ describeRls("el dashboard en Supabase", () => {
             training: expect.objectContaining({ id: home.trainingId }),
           },
           contactReminder: { kind: "reminder", reminder: "both" },
+          me: { attendance: null },
           nextUp: expect.objectContaining({ id: home.trainingId }),
           week: {
             kind: "week",
@@ -474,6 +476,232 @@ describeRls("el dashboard en Supabase", () => {
           expect(result.nextUp).toMatchObject({
             id: home.trainingId,
             myTeam: null,
+          });
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+});
+/** El día del club de hace `days` días; negativo, en el futuro. */
+function clubDaysAgo(days: number): string {
+  return clubCalendarDate(new Date(Date.now() - days * DAY_MS));
+}
+
+type PastTraining = {
+  readonly daysAgo: number;
+  /** La fila de Pía en la hoja, o null si nadie la guardó. */
+  readonly sheet: AttendanceStatus | null;
+  readonly isCancelled?: boolean;
+};
+
+/** Entrenamientos a las 7:00 de días ya pasados, para todo el club. Las
+ * filas de las hojas se van con los eventos en cascada. */
+function withPastTrainings<T>(
+  home: Home,
+  clubId: string,
+  trainings: readonly PastTraining[],
+  run: (eventIds: readonly string[]) => Promise<T>,
+): Promise<T> {
+  return withSeededRows(
+    home.serviceClient,
+    "events",
+    trainings.map((training) => ({
+      club_id: clubId,
+      title: `Hace ${training.daysAgo} días`,
+      event_type: "training",
+      starts_on: clubDaysAgo(training.daysAgo),
+      start_time: "07:00",
+      location: "MSAC",
+      audience: "all",
+      author_id: home.player.id,
+      status: training.isCancelled === true ? "cancelled" : "scheduled",
+      cancelled_at:
+        training.isCancelled === true ? new Date().toISOString() : null,
+    })),
+    async (rows) => {
+      const eventIds = rows.map((row) => String(row.id));
+      const records = trainings.flatMap((training, index) =>
+        training.sheet === null
+          ? []
+          : [
+              {
+                event_id: eventIds[index],
+                user_id: home.player.id,
+                club_id: clubId,
+                status: training.sheet,
+              },
+            ],
+      );
+      if (records.length > 0) {
+        await succeed(
+          "guardar las hojas",
+          home.serviceClient.client.from("attendance_records").insert(records),
+        );
+      }
+      return run(eventIds);
+    },
+  );
+}
+
+async function updateRow(
+  home: Home,
+  table: "members" | "clubs",
+  changes: Record<string, unknown>,
+  match: { readonly column: string; readonly value: string },
+): Promise<void> {
+  await succeed(
+    `cambiar ${table}`,
+    home.serviceClient.client
+      .from(table)
+      .update(changes)
+      .eq(match.column, match.value),
+  );
+}
+
+async function ownSeasonAttendance(home: Home): Promise<unknown> {
+  const result = await readDashboard(
+    createDashboardGateways(home.serviceClient.client),
+    { callerId: home.player.id, now: new Date() },
+  );
+  return result.me.attendance;
+}
+
+describeRls("la columna del inicio en Supabase (#746)", () => {
+  it(
+    "cuenta la temporada desde la fecha guardada, sin fecha o con fecha futura desde el 1 de enero, y da las últimas sesiones",
+    async () => {
+      await withHome(async (home) => {
+        const clubId = await clubIdOf(home);
+        const member = { column: "user_id", value: home.player.id };
+        const club = { column: "id", value: clubId };
+        await updateRow(
+          home,
+          "members",
+          { joined_on: clubDaysAgo(90) },
+          member,
+        );
+        const trainings: readonly PastTraining[] = [
+          { daysAgo: 60, sheet: "present" },
+          { daysAgo: 20, sheet: "absent" },
+          { daysAgo: 10, sheet: "late" },
+          { daysAgo: 5, sheet: null },
+        ];
+        await withPastTrainings(home, clubId, trainings, async (ids) => {
+          const last10 = [
+            { eventId: ids[0], startsOn: clubDaysAgo(60), status: "present" },
+            { eventId: ids[1], startsOn: clubDaysAgo(20), status: "absent" },
+            { eventId: ids[2], startsOn: clubDaysAgo(10), status: "late" },
+          ];
+
+          await updateRow(
+            home,
+            "clubs",
+            { season_starts_on: clubDaysAgo(30) },
+            club,
+          );
+          await expect(ownSeasonAttendance(home)).resolves.toEqual({
+            percent: 50,
+            attended: 1,
+            sessions: 2,
+            last10,
+          });
+
+          const firstOfJanuary = `${clubDaysAgo(0).slice(0, 4)}-01-01`;
+          const sinceJanuary = last10.filter(
+            ({ startsOn }) => startsOn >= firstOfJanuary,
+          );
+          for (const seasonStartsOn of [null, clubDaysAgo(-10)]) {
+            await updateRow(
+              home,
+              "clubs",
+              { season_starts_on: seasonStartsOn },
+              club,
+            );
+            await expect(ownSeasonAttendance(home)).resolves.toMatchObject({
+              sessions: sinceJanuary.length,
+              last10,
+            });
+          }
+
+          await updateRow(
+            home,
+            "members",
+            { joined_on: clubDaysAgo(15) },
+            member,
+          );
+          await updateRow(
+            home,
+            "clubs",
+            { season_starts_on: clubDaysAgo(30) },
+            club,
+          );
+          await expect(ownSeasonAttendance(home)).resolves.toEqual({
+            percent: 100,
+            attended: 1,
+            sessions: 1,
+            last10: [last10[2]],
+          });
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "da a un Admin la asistencia por tomar, quién no respondió y los números del club",
+    async () => {
+      await withHome(async (home) => {
+        const clubId = await clubIdOf(home);
+        await updateRow(
+          home,
+          "members",
+          { role: "Admin" },
+          { column: "user_id", value: home.player.id },
+        );
+        const trainings: readonly PastTraining[] = [
+          { daysAgo: 40, sheet: null },
+          { daysAgo: 3, sheet: null },
+          { daysAgo: 2, sheet: null, isCancelled: true },
+          { daysAgo: 1, sheet: "present" },
+        ];
+        await withPastTrainings(home, clubId, trainings, async (ids) => {
+          const reported: DashboardSource[] = [];
+          const result = await readDashboard(
+            {
+              ...createDashboardGateways(home.serviceClient.client),
+              failures: {
+                report: (source: DashboardSource) => {
+                  reported.push(source);
+                },
+              },
+            },
+            { callerId: home.player.id, now: new Date() },
+          );
+
+          expect(reported).toEqual([]);
+          expect(result).toMatchObject({
+            kind: "member",
+            column: "management",
+            todos: [
+              {
+                kind: "attendance_missing",
+                eventId: ids[1],
+                title: "Hace 3 días",
+                startsOn: clubDaysAgo(3),
+              },
+              {
+                kind: "no_reply",
+                eventId: home.trainingId,
+                title: "Entrenamiento del inicio",
+                count: 1,
+              },
+            ],
+            club: {
+              attendance: { percent: 100, previousPercent: null },
+              members: { active: 1, joinedThisMonth: 1 },
+              unreadNews: { count: 1, announcements: 1 },
+            },
           });
         });
       });

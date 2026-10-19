@@ -7,6 +7,7 @@ import {
   positionSchema,
   publishedTeamSchema,
 } from "@/components/calendar/event-team-client";
+import { ATTENDANCE_STATUSES } from "@/lib/attendance/attendance-status";
 import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
 import {
   type ApiRequestFailure,
@@ -198,9 +199,69 @@ const contactReminderSchema = z.discriminatedUnion("kind", [
   unavailableSchema,
 ]);
 
-const memberDashboardSchema = z.object({
+/** "Mi asistencia" de la temporada (#746, D13). */
+const meSchema = z.object({
+  attendance: z.union([
+    z.object({
+      percent: percentSchema,
+      attended: countSchema,
+      sessions: countSchema,
+      last10: z.array(
+        z.object({
+          eventId: z.string(),
+          startsOn: z.iso.date(),
+          status: z.enum(ATTENDANCE_STATUSES),
+        }),
+      ),
+    }),
+    z.null(),
+    unavailableSchema,
+  ]),
+});
+
+const todoSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("role_requests"), count: countSchema }),
+  z.object({
+    kind: z.literal("attendance_missing"),
+    eventId: z.string(),
+    title: z.string(),
+    startsOn: z.iso.date(),
+  }),
+  z.object({
+    kind: z.literal("teams_unpublished"),
+    eventId: z.string(),
+    title: z.string(),
+  }),
+  z.object({
+    kind: z.literal("no_reply"),
+    eventId: z.string(),
+    title: z.string(),
+    count: countSchema,
+  }),
+]);
+
+const clubNumbersSchema = z.object({
+  attendance: z.union([
+    z.object({
+      percent: percentSchema.nullable(),
+      previousPercent: percentSchema.nullable(),
+    }),
+    unavailableSchema,
+  ]),
+  members: z.union([
+    z.object({ active: countSchema, joinedThisMonth: countSchema }),
+    unavailableSchema,
+  ]),
+  unreadNews: z.union([
+    z.object({ count: countSchema, announcements: countSchema }),
+    unavailableSchema,
+  ]),
+});
+
+const memberDashboardBaseSchema = z.object({
   kind: z.literal("member"),
   viewer: viewerSchema,
+  me: meSchema,
   tiles: z.object({
     attendance: attendanceTileSchema,
     members: membersTileSchema,
@@ -215,10 +276,21 @@ const memberDashboardSchema = z.object({
   membership: activeMembershipSchema,
 });
 
+/** La columna de gestión sólo llega a Admin, Coach y Committee (D3). */
+const memberDashboardSchema = z.discriminatedUnion("column", [
+  memberDashboardBaseSchema.extend({ column: z.literal("player") }),
+  memberDashboardBaseSchema.extend({
+    column: z.literal("management"),
+    todos: z.union([z.array(todoSchema), unavailableSchema]),
+    club: clubNumbersSchema,
+  }),
+]);
+
 /** El de quien no tiene la membresía al día (#453). */
 const restrictedDashboardSchema = z.object({
   kind: z.literal("restricted"),
   viewer: viewerSchema,
+  me: meSchema,
   block: membershipBlockSchema,
   nextTraining: nextTrainingTileSchema,
   contactReminder: contactReminderSchema,

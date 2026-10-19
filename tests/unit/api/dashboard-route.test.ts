@@ -121,6 +121,19 @@ function dashboardGateways(): DashboardGateways {
       },
       positions: { findClubPositions: async () => [] },
     },
+    seasonAttendance: {
+      findSeasonStartsOn: async () => null,
+      findMemberSessions: async () => [],
+    },
+    administration: {
+      members: { ...members, findClubMembers: async () => [] },
+      requests: { findPendingRequests: async () => [] },
+    },
+    attendanceSessions: {
+      members,
+      sessions: { findRecentTrainings: async () => [] },
+    },
+    unanswered: { countUnanswered: async () => 0 },
     failures: { report: () => undefined },
   };
 }
@@ -214,7 +227,9 @@ describe("GET /api/v1/dashboard", () => {
     await expect(response.json()).resolves.toEqual({
       data: {
         kind: "member",
+        column: "player",
         viewer: { firstName: "Alba" },
+        me: { attendance: null },
         tiles: {
           attendance: {
             kind: "own_attendance",
@@ -245,6 +260,32 @@ describe("GET /api/v1/dashboard", () => {
     const body = await response.json();
     expect(body.data.tiles.attendance).toEqual({ kind: "unavailable" });
     expect(body.data.latestNews).toEqual({ kind: "news", posts: [] });
+  });
+
+  it("sirve los pendientes y los números del club a un Admin (#746)", async () => {
+    givenSession({ kind: "active", role: "Admin", membershipCurrent: true });
+    role = "Admin";
+
+    const response = await getDashboard();
+
+    const body = await response.json();
+    expect(body.data.column).toBe("management");
+    expect(body.data.todos).toEqual([]);
+    expect(body.data.club).toEqual({
+      attendance: { percent: 86, previousPercent: 86 },
+      members: { active: 1, joinedThisMonth: 1 },
+      unreadNews: { count: 0, announcements: 0 },
+    });
+  });
+
+  it("no le manda pendientes ni números del club a un Player (#746)", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
+
+    const response = await getDashboard();
+
+    const body = await response.json();
+    expect(body.data).not.toHaveProperty("todos");
+    expect(body.data).not.toHaveProperty("club");
   });
 
   it("responde 401 sin sesión", async () => {
@@ -293,6 +334,7 @@ describe("GET /api/v1/dashboard sin la membresía al día (#453)", () => {
       data: {
         kind: "restricted",
         viewer: { firstName: "Alba" },
+        me: { attendance: null },
         block: "past_due",
         nextTraining: { kind: "none" },
         contactReminder: { kind: "reminder", reminder: "both" },
