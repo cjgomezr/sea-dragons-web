@@ -1,3 +1,4 @@
+import type { DndContextProps } from "@dnd-kit/core";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -5,6 +6,24 @@ import { ClubSessionPacksSection } from "@/components/club/ClubSessionPacksSecti
 import { CLUB_SESSION_PACKS_API_PATH } from "@/lib/auth/routes";
 import type { ClubPrice } from "@/lib/membership/stripe-prices";
 import { createTranslator } from "@/lib/i18n/translator";
+import {
+  announcementsOf,
+  type CapturedDndContext,
+  dropOn,
+} from "../helpers/dnd-kit-drag";
+
+const dndContext = vi.hoisted((): CapturedDndContext => ({ props: null }));
+
+vi.mock("@dnd-kit/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@dnd-kit/core")>();
+  return {
+    ...actual,
+    DndContext: (props: DndContextProps) => {
+      dndContext.props = props;
+      return <actual.DndContext {...props} />;
+    },
+  };
+});
 
 /**
  * La sección "Packs de sesiones" de `/club` (#469, RF-4 del PRD de E13; la
@@ -20,7 +39,7 @@ const SESSION_PRICE: ClubPrice = { amountCents: 1990, currency: "AUD" };
 type Stub = {
   readonly sessionPrice?: ClubPrice;
   readonly load?: () => Response;
-  readonly save?: (sessions: readonly number[]) => Response;
+  readonly save?: (sessions: readonly number[]) => Response | Promise<Response>;
 };
 
 const savedLists: (readonly number[])[] = [];
@@ -373,6 +392,86 @@ describe("mover con el teclado", () => {
 
     expect(listedPacks()).toEqual(["5 sessions", "10 sessions"]);
     expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  });
+});
+
+describe("arrastrar por el asa", () => {
+  it("soltar en otro puesto sólo cambia el borrador y saca la barra", async () => {
+    stubApi({ load: () => catalog([5, 10, 20]) });
+    await renderSection();
+
+    dropOn(dndContext, 20, 5);
+
+    expect(listedPacks()).toEqual(["20 sessions", "5 sessions", "10 sessions"]);
+    expect(saveButton()).toBeEnabled();
+    expect(savedLists).toEqual([]);
+    expect(
+      screen.getByText("20 sessions is now number 1 of 3."),
+    ).toHaveAttribute("role", "status");
+    expect(handle(20, 1, 3)).toHaveFocus();
+  });
+
+  it("soltar en el mismo puesto no cambia nada", async () => {
+    stubApi();
+    await renderSection();
+
+    dropOn(dndContext, 10, 10);
+
+    expect(listedPacks()).toEqual(["5 sessions", "10 sessions"]);
+    expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  });
+
+  it("soltar fuera de la lista no cambia nada", async () => {
+    stubApi();
+    await renderSection();
+
+    dropOn(dndContext, 10, null);
+
+    expect(listedPacks()).toEqual(["5 sessions", "10 sessions"]);
+    expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  });
+
+  it("mientras se guarda no deja arrastrar", async () => {
+    stubApi({ save: () => new Promise<Response>(() => {}) });
+    await renderSection();
+    handle(5, 1, 2).focus();
+    await userEvent.keyboard("{ArrowDown}");
+    await save();
+
+    dropOn(dndContext, 5, 10);
+
+    expect(listedPacks()).toEqual(["10 sessions", "5 sessions"]);
+  });
+
+  it("en español anuncia el arrastre en español", async () => {
+    stubApi({ load: () => catalog([5, 10, 20]) });
+    await renderSection("es");
+
+    const announce = announcementsOf(dndContext);
+
+    expect(announce.start(20)).toBe(
+      "Has cogido el pack de 20 sesiones, puesto 3 de 3.",
+    );
+    expect(announce.over(20, 5)).toBe(
+      "Llevas el pack de 20 sesiones sobre el puesto 1 de 3.",
+    );
+    expect(announce.end(20, 5)).toBe(
+      "Has soltado el pack de 20 sesiones en el puesto 1 de 3.",
+    );
+  });
+
+  it("en inglés anuncia el arrastre en inglés", async () => {
+    stubApi({ load: () => catalog([5, 10, 20]) });
+    await renderSection();
+
+    const announce = announcementsOf(dndContext);
+
+    expect(announce.start(20)).toBe(
+      "Picked up the 20 sessions pack, position 3 of 3.",
+    );
+    expect(announce.end(20, 5)).toBe(
+      "Dropped the 20 sessions pack at position 1 of 3.",
+    );
   });
 });
 

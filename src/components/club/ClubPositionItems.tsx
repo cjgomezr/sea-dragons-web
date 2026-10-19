@@ -8,14 +8,15 @@ import { PencilSimple } from "@phosphor-icons/react/dist/ssr/PencilSimple";
 import { type ClubPosition, positionName } from "@/lib/club/club-positions";
 import { type Locale, otherLocale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
+import { type SortableRowBinding, useSortableRow } from "./SortableRows";
 
 /**
  * Las filas de la tabla de posiciones (#723, RF-5 del PRD de E26). Una activa
  * tiene su asa, su número, sus nombres, su función (#404) y sus acciones; una
  * archivada, sólo su nombre y Reactivar.
  *
- * El asa reordena con ↑ y ↓. Arrastrar llega en otro ticket. Las archivadas
- * van plegadas debajo de la tabla.
+ * El asa reordena con ↑ y ↓, o arrastrándola con ratón o dedo (#725). Las
+ * archivadas van plegadas debajo de la tabla.
  */
 
 export type Direction = "up" | "down";
@@ -123,6 +124,8 @@ export function ReorderHandle({
   rank,
   total,
   hintId,
+  setHandleNode,
+  handleListeners,
   onMove,
 }: {
   translate: Translator;
@@ -131,6 +134,8 @@ export function ReorderHandle({
   rank: number;
   total: number;
   hintId: string;
+  setHandleNode: SortableRowBinding["setHandleNode"];
+  handleListeners: SortableRowBinding["handleListeners"];
   onMove: (direction: Direction) => void;
 }): React.JSX.Element {
   function handleKey(event: React.KeyboardEvent): void {
@@ -149,6 +154,7 @@ export function ReorderHandle({
   return (
     <div className="club-positions-cell">
       <button
+        ref={setHandleNode}
         type="button"
         className="club-positions-handle"
         data-focus-key={handleFocusKey(positionId)}
@@ -158,6 +164,7 @@ export function ReorderHandle({
           total,
         })}
         aria-describedby={hintId}
+        {...handleListeners}
         onKeyDown={handleKey}
       >
         <DotsSixVertical aria-hidden="true" />
@@ -240,8 +247,14 @@ export function ActivePositionRow({
   onArchive: () => void;
 }): React.JSX.Element {
   const name = positionName(position.names, locale);
+  const { setRowNode, rowClassName, rowStyle, setHandleNode, handleListeners } =
+    useSortableRow(position.id);
   return (
-    <li className="club-positions-row">
+    <li
+      ref={setRowNode}
+      className={`club-positions-row ${rowClassName}`.trimEnd()}
+      style={rowStyle}
+    >
       <ReorderHandle
         translate={translate}
         positionId={position.id}
@@ -249,6 +262,8 @@ export function ActivePositionRow({
         rank={rank}
         total={total}
         hintId={handleHintId}
+        setHandleNode={setHandleNode}
+        handleListeners={handleListeners}
         onMove={onMove}
       />
       <span className="club-positions-cell club-positions-rank">{rank}</span>

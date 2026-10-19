@@ -1874,6 +1874,18 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.sessionPacks.lead.noPrice":
     "Paquetes que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual × sesiones.",
   "clubSettings.sessionPacks.loading": "Cargando los packs de sesiones…",
+  "clubSettings.reorder.pickedUp":
+    "Has cogido {item}, puesto {rank} de {total}.",
+  "clubSettings.reorder.over":
+    "Llevas {item} sobre el puesto {rank} de {total}.",
+  "clubSettings.reorder.outside": "Llevas {item} fuera de la lista.",
+  "clubSettings.reorder.dropped":
+    "Has soltado {item} en el puesto {rank} de {total}.",
+  "clubSettings.reorder.droppedInPlace":
+    "Has soltado {item} en su puesto, el {rank} de {total}.",
+  "clubSettings.reorder.cancelled":
+    "Movimiento cancelado: {item} sigue en el puesto {rank} de {total}.",
+  "clubSettings.sessionPacks.dragItem": "el pack de {pack}",
   "clubSettings.sessionPacks.pack": {
     one: "{count} sesión",
     other: "{count} sesiones",
@@ -1912,8 +1924,8 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.positions.column.coverage": "Rol en el reparto",
   "clubSettings.positions.handle.label":
     "Reordenar {name}, puesto {rank} de {total}",
-  "clubSettings.positions.handle.hint":
-    "Usa las flechas arriba y abajo para moverla.",
+  "clubSettings.reorder.hint":
+    "Arrastra o usa las flechas arriba y abajo para mover.",
   "clubSettings.positions.languageCode.en": "EN",
   "clubSettings.positions.languageCode.es": "ES",
   "clubSettings.positions.name.placeholder.en": "Inglés",

@@ -28,6 +28,7 @@ import {
   ReorderHandle,
 } from "./ClubPositionItems";
 import { describeCoverage } from "./PositionCoverageControl";
+import { useSortableRow } from "./SortableRows";
 import {
   type PositionFormOutcome,
   PositionNamesForm,
@@ -84,8 +85,14 @@ export function PhonePositionRow({
   const detailId = useId();
   const name = positionName(position.names, locale);
   const missing = missingNameLocale(position, locale);
+  const { setRowNode, rowClassName, rowStyle, setHandleNode, handleListeners } =
+    useSortableRow(position.id);
   return (
-    <li className="club-positions-phone-row">
+    <li
+      ref={setRowNode}
+      className={`club-positions-phone-row ${rowClassName}`.trimEnd()}
+      style={rowStyle}
+    >
       <ReorderHandle
         translate={translate}
         positionId={position.id}
@@ -93,6 +100,8 @@ export function PhonePositionRow({
         rank={rank}
         total={total}
         hintId={handleHintId}
+        setHandleNode={setHandleNode}
+        handleListeners={handleListeners}
         onMove={onMove}
       />
       <button
