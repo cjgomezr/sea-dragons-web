@@ -318,6 +318,23 @@ describe("los eventos del día marcado", () => {
   });
 });
 
+describe("una respuesta negativa", () => {
+  it("dice No puedo y no ofrece Responder", () => {
+    const declined = weekEvent({
+      id: "eeeeeeee-0000-4000-8000-00000000000e",
+      title: "Gym session",
+      myResponse: "no",
+    });
+    renderWeek({ week: { kind: "week", events: [declined] } });
+
+    const row = within(eventList()).getByRole("link");
+    expect(row.querySelector(".dashboard-week-response-no")).toHaveTextContent(
+      "Can't go",
+    );
+    expect(row).not.toHaveTextContent("RSVP");
+  });
+});
+
 describe("un socio restringido", () => {
   it("no ve Responder", () => {
     renderWeek({ nextUpStartsOn: "2026-10-17", isRestricted: true });

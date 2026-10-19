@@ -281,7 +281,9 @@ function WeekDays({
 }): React.JSX.Element {
   const [chosenDate, setChosenDate] = useState<string | null>(null);
   const days = spreadWeekByDay(events, today);
-  const selectedDate = chosenDate ?? pickDefaultWeekDay(days, nextUpStartsOn);
+  const chosenDay = days.find((day) => day.date === chosenDate);
+  const selectedDate =
+    chosenDay?.date ?? pickDefaultWeekDay(days, nextUpStartsOn);
   const selectedDay = days.find((day) => day.date === selectedDate);
   return (
     <>
