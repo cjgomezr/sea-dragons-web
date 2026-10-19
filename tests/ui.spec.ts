@@ -22232,7 +22232,7 @@ test.describe("el inicio en el navegador", () => {
     const saturday = week.getByRole("button", { name: /October 3/ });
 
     await expect(saturday.locator(".dashboard-week-weekday")).toHaveText(
-      "Sat",
+      "SAT",
       {
         useInnerText: true,
       },
