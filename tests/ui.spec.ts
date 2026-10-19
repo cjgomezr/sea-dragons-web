@@ -21692,6 +21692,41 @@ function dashboardEvent(overrides: {
   };
 }
 
+// El próximo evento de la tarjeta "Próximo" (#747): un entrenamiento con
+// hora de fin y lugar con coordenadas, como el del handoff de E27.
+const DASHBOARD_NEXT_UP = {
+  kind: "event",
+  id: DASHBOARD_TRAINING.id,
+  title: "Saturday scrimmage",
+  eventType: "training",
+  startsOn: "2026-10-03",
+  endsOn: null,
+  startTime: "09:00",
+  endTime: "11:00",
+  location: "Princes Park · Field 2",
+  place: {
+    name: "Princes Park",
+    address: "Princes Park Dr, Carlton North VIC 3054",
+    lat: -37.7826,
+    lng: 144.9611,
+  },
+  coverUrl: null,
+  audience: { kind: "club" },
+  goingCount: 14,
+  maybeCount: 3,
+  myResponse: "yes",
+  myTeam: null,
+} as const;
+
+const DASHBOARD_MY_TEAM = {
+  name: "Team Kelp",
+  color: "#1C6EA4",
+  position: {
+    id: "d0d0d0d0-0000-4000-8000-0000000000d7",
+    names: { en: "Full back", es: "Defensa" },
+  },
+} as const;
+
 const DASHBOARD_UPCOMING = [
   dashboardEvent({
     id: DASHBOARD_TRAINING.id,
@@ -21775,7 +21810,7 @@ const ADMIN_DASHBOARD = {
   upcomingEvents: { kind: "events", events: DASHBOARD_UPCOMING },
   latestNews: { kind: "news", posts: DASHBOARD_LATEST_NEWS },
   contactReminder: { kind: "reminder", reminder: "none" },
-  nextUp: { kind: "none" },
+  nextUp: { ...DASHBOARD_NEXT_UP, teamsStatus: "none" },
   week: { kind: "week", events: [] },
   membership: { status: "active", plan: "Full", renewsOn: null },
 };
@@ -21790,6 +21825,24 @@ const PLAYER_DASHBOARD = {
       attendance: { kind: "rate", percent: 90, sessions: 10 },
     },
   },
+  nextUp: DASHBOARD_NEXT_UP,
+};
+
+// La tarjeta "Próximo" (#747) de quien juega en el reparto publicado, la del
+// Admin con el reparto sin publicar y la de quien no tiene nada próximo.
+const MY_TEAM_DASHBOARD = {
+  ...PLAYER_DASHBOARD,
+  nextUp: { ...DASHBOARD_NEXT_UP, myTeam: DASHBOARD_MY_TEAM },
+};
+
+const UNPUBLISHED_TEAMS_DASHBOARD = {
+  ...ADMIN_DASHBOARD,
+  nextUp: { ...DASHBOARD_NEXT_UP, teamsStatus: "draft" },
+};
+
+const NOTHING_NEXT_DASHBOARD = {
+  ...PLAYER_DASHBOARD,
+  nextUp: { kind: "none" },
 };
 
 // Un club recién creado: lo que el PRD describe en sus casos borde.
@@ -21813,20 +21866,25 @@ const EMPTY_DASHBOARD = {
 };
 
 // El inicio reducido de quien no tiene la membresía al día (#453): el aviso
-// con el motivo y el próximo entrenamiento, sin RSVP ni teselas de club.
+// de la membresía vencida con su fecha y la tarjeta "Próximo" con la fila del
+// candado en lugar del RSVP (#747).
 const RESTRICTED_DASHBOARD = {
   kind: "restricted",
   viewer: { firstName: "Liam" },
   me: { attendance: null },
-  block: "pending",
+  block: "cancelled",
   nextTraining: {
     kind: "training",
     training: { ...DASHBOARD_TRAINING, myResponse: null },
   },
   contactReminder: { kind: "reminder", reminder: "none" },
-  nextUp: { kind: "none" },
+  nextUp: { ...DASHBOARD_NEXT_UP, myResponse: null },
   week: { kind: "week", events: [] },
-  membership: { status: "restricted", block: "pending", endedOn: null },
+  membership: {
+    status: "restricted",
+    block: "cancelled",
+    endedOn: "2026-09-15",
+  },
   latestNews: { kind: "news", posts: [] },
 };
 
@@ -21890,6 +21948,21 @@ const DASHBOARD_STATES: readonly DashboardScreenState[] = [
   ...dashboardStates(
     "inicio-aviso-telefono",
     PHONE_REMINDER_DASHBOARD,
+    E2E_STORAGE_STATE_PATH,
+  ),
+  ...dashboardStates(
+    "inicio-proximo-equipo",
+    MY_TEAM_DASHBOARD,
+    E2E_STORAGE_STATE_PATH,
+  ),
+  ...dashboardStates(
+    "inicio-proximo-sin-publicar",
+    UNPUBLISHED_TEAMS_DASHBOARD,
+    ADMIN_STORAGE_STATE,
+  ),
+  ...dashboardStates(
+    "inicio-proximo-vacio",
+    NOTHING_NEXT_DASHBOARD,
     E2E_STORAGE_STATE_PATH,
   ),
   ...dashboardStates(
@@ -21973,107 +22046,124 @@ test.describe("el inicio en el navegador", () => {
   quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
-  function tileList(page: Page): Locator {
-    return page
-      .getByRole("region", { name: "Club at a glance" })
-      .getByRole("listitem");
+  function nextUpCard(page: Page): Locator {
+    return page.getByRole("region", { name: "Next up" });
   }
 
-  /** Las teselas que se ven, con su caja. Una escondida no cuenta. */
-  function visibleTileBoxes(
-    page: Page,
-  ): Promise<{ top: number; left: number; right: number }[]> {
-    return tileList(page).evaluateAll((tiles) =>
-      tiles
-        .filter((tile) => tile.getClientRects().length > 0)
-        .map((tile) => {
-          const { top, left, right } = tile.getBoundingClientRect();
-          return {
-            top: Math.round(top),
-            left: Math.round(left),
-            right: Math.round(right),
-          };
-        }),
-    );
+  /** La caja de un elemento que se ve, o un fallo que dice cuál faltaba. */
+  async function boxOf(
+    locator: Locator,
+  ): Promise<{ x: number; y: number; width: number; height: number }> {
+    const box = await locator.boundingBox();
+    if (box === null) {
+      throw new Error(`${locator.toString()} no se ve.`);
+    }
+    return box;
   }
 
-  test("a 375px sin entrenamiento a la vista las teselas van en dos filas de dos", async ({
+  test("a 375px la imagen va arriba con 130px, Cómo llegar a todo el ancho y los botones de 56px con el icono encima", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await goToDashboard(page, { dashboard: EMPTY_DASHBOARD });
+    await goToDashboard(page, { dashboard: PLAYER_DASHBOARD });
+    const card = nextUpCard(page);
 
-    const boxes = await visibleTileBoxes(page);
-
-    expect(boxes).toHaveLength(4);
-    const [first, second, third, fourth] = boxes;
-    expect(second?.top).toBe(first?.top);
-    expect(fourth?.top).toBe(third?.top);
-    expect(third?.top).toBeGreaterThan(first?.top ?? 0);
-    expect(third?.left).toBe(first?.left);
-  });
-
-  test("a 375px la tarjeta ocupa el sitio de la tesela del entrenamiento y la última va a todo el ancho", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
-
-    const boxes = await visibleTileBoxes(page);
-
-    // Tres teselas: la del entrenamiento la sustituye la tarjeta, que es
-    // donde está el RSVP, para no contar el mismo entrenamiento dos veces.
-    expect(boxes).toHaveLength(3);
-    const [first, second, third] = boxes;
-    expect(second?.top).toBe(first?.top);
-    expect(third?.top).toBeGreaterThan(first?.top ?? 0);
-    expect(third?.left).toBe(first?.left);
-    expect(third?.right).toBe(second?.right);
-    await expect(
-      page.getByRole("region", { name: "Next training" }),
-    ).toBeVisible();
-  });
-
-  test("en el móvil la tarjeta lleva el RSVP y no hay Nuevo entrenamiento", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
-
-    const card = page.getByRole("region", { name: "Next training" });
-    await expect(
-      card.getByRole("group", { name: `RSVP: ${DASHBOARD_TRAINING.title}` }),
-    ).toBeVisible();
-    await expect(card.getByRole("button", { name: "Yes" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
+    const [cover, title, directions, body, going] = await Promise.all([
+      boxOf(card.locator(".dashboard-next-up-cover")),
+      boxOf(card.getByRole("heading", { name: DASHBOARD_NEXT_UP.title })),
+      boxOf(card.getByRole("link", { name: /^Directions/ })),
+      boxOf(card.locator(".dashboard-next-up-body")),
+      boxOf(card.getByRole("button", { name: "Going" })),
+    ]);
+    const icon = await boxOf(
+      card.getByRole("button", { name: "Going" }).locator("svg"),
     );
-    await expect(page.getByRole("link", { name: "New training" })).toBeHidden();
+
+    expect(Math.round(cover.height)).toBe(130);
+    expect(title.y).toBeGreaterThan(cover.y + cover.height);
+    expect(Math.round(directions.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(directions.width)).toBe(Math.round(body.width - 2 * 16));
+    expect(Math.round(going.height)).toBe(56);
+    // Con el icono encima del texto, el icono queda centrado en el botón; al
+    // lado del texto quedaría desplazado a la izquierda.
+    expect(Math.round(icon.x + icon.width / 2)).toBe(
+      Math.round(going.x + going.width / 2),
+    );
   });
 
-  test("en escritorio no hay botones de RSVP y sí Nuevo entrenamiento", async ({
+  test("a 375px la franja del equipo mide al menos 52px", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: MY_TEAM_DASHBOARD });
+
+    const strip = nextUpCard(page).locator(".dashboard-next-up-team");
+
+    expect((await boxOf(strip)).height).toBeGreaterThanOrEqual(52);
+  });
+
+  test("en escritorio la tarjeta lleva la imagen en una columna de 280px a la izquierda", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToDashboard(page, { dashboard: PLAYER_DASHBOARD });
+    const card = nextUpCard(page);
+
+    const [cover, body] = await Promise.all([
+      boxOf(card.locator(".dashboard-next-up-cover")),
+      boxOf(card.locator(".dashboard-next-up-body")),
+    ]);
+
+    expect(Math.round(cover.width)).toBe(280);
+    expect(body.x).toBeGreaterThanOrEqual(cover.x + cover.width);
+    expect(Math.round(body.y)).toBe(Math.round(cover.y));
+  });
+
+  test("Voy guarda la respuesta y la marca", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.route(
+      (url) =>
+        url.pathname ===
+        `${CALENDAR_AGENDA_ENDPOINT}/${DASHBOARD_NEXT_UP.id}/rsvp`,
+      (route) =>
+        route.fulfill(
+          jsonBody({
+            eventId: DASHBOARD_NEXT_UP.id,
+            response: "maybe",
+            respondedAt: HOME_NOW.toISOString(),
+          }),
+        ),
+    );
+    await goToDashboard(page, { dashboard: PLAYER_DASHBOARD });
+    const maybe = nextUpCard(page).getByRole("button", { name: "Maybe" });
+
+    await maybe.click();
+
+    await expect(maybe).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("+ Evento abre el calendario con el formulario y entrenamiento elegido", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
 
-    await expect(page.getByRole("button", { name: "Yes" })).toBeHidden();
-    await expect(
-      page.getByRole("link", { name: "New training" }),
-    ).toBeVisible();
-  });
-
-  test("Nuevo entrenamiento abre el calendario con el formulario y entrenamiento elegido", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
-
-    await page.getByRole("link", { name: "New training" }).click();
+    await page.getByRole("link", { name: "New event" }).click();
 
     await expect(page).toHaveURL(/\/calendario\?nuevo=training$/);
     const dialog = page.getByRole("dialog", { name: "New event" });
     await expect(dialog.getByRole("radio", { name: "Training" })).toBeChecked();
+  });
+
+  test("en el móvil + Evento es un botón de 44px con su nombre entero", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
+
+    const newEvent = page.getByRole("link", { name: "New event" });
+    const box = await boxOf(newEvent);
+
+    expect(Math.round(box.width)).toBe(44);
+    expect(Math.round(box.height)).toBe(44);
   });
 
   test("con la red caída lo dice y vuelve a pedir al reintentar", async ({
@@ -22111,7 +22201,7 @@ test.describe("el aviso del contacto en el inicio (#498)", () => {
   quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
-  test("a 375px no empuja el RSVP del entrenamiento fuera de la primera pantalla", async ({
+  test("a 375px no empuja el RSVP de la tarjeta Próximo fuera de la primera pantalla", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
@@ -22123,8 +22213,8 @@ test.describe("el aviso del contacto en el inicio (#498)", () => {
       }),
     ).toBeVisible();
     const rsvp = page
-      .getByRole("region", { name: "Next training" })
-      .getByRole("group", { name: `RSVP: ${DASHBOARD_TRAINING.title}` });
+      .getByRole("region", { name: "Next up" })
+      .getByRole("group", { name: `RSVP: ${DASHBOARD_NEXT_UP.title}` });
     const [rsvpBox, tabBarBox] = await Promise.all([
       rsvp.boundingBox(),
       page.getByRole("navigation", { name: "Sections" }).boundingBox(),
@@ -22155,30 +22245,24 @@ test.describe("el aviso del contacto en el inicio (#498)", () => {
   test("el enlace lleva a la sección Contacto del perfil", async ({ page }) => {
     await goToDashboard(page, { dashboard: CONTACT_REMINDER_DASHBOARD });
 
-    await page
-      .getByRole("link", { name: "Complete it in Contact, on your profile" })
-      .click();
+    await page.getByRole("link", { name: "Add contact" }).click();
 
     await expect(page).toHaveURL(/\/cuenta#perfil-contacto$/);
     await expect(page.getByRole("heading", { name: "Contact" })).toBeVisible();
   });
 });
 
-type RealNextTraining =
+type RealNextUp =
   | {
-      readonly kind: "training";
-      readonly training: {
-        readonly id: string;
-        readonly title: string;
-        readonly startsOn: string;
-        readonly myResponse: "yes" | "maybe" | "no" | null;
-      };
+      readonly kind: "event";
+      readonly id: string;
+      readonly title: string;
+      readonly myResponse: "yes" | "maybe" | "no" | null;
     }
   | { readonly kind: "none" | "unavailable" };
 
-const RSVP_BUTTON_NAMES = { yes: "Yes", maybe: "Maybe", no: "No" } as const;
-
-/** En el panel del calendario los botones dicen la respuesta entera (#648). */
+/** En la tarjeta "Próximo" (#747) y en el panel del calendario (#648) los
+ * botones dicen la respuesta entera. */
 const PANEL_RSVP_BUTTON_NAMES = {
   yes: "Going",
   maybe: "Maybe",
@@ -22199,28 +22283,26 @@ test.describe("el RSVP del inicio con los datos de verdad", () => {
     );
     await page.goto(`${APP_URL}${HOME_SCREEN_PATH}`);
     const body = (await (await dashboardRead).json()) as {
-      readonly data: {
-        readonly tiles: { readonly nextTraining: RealNextTraining };
-      };
+      readonly data: { readonly nextUp: RealNextUp };
     };
-    const { nextTraining } = body.data.tiles;
+    const { nextUp } = body.data;
     test.skip(
-      nextTraining.kind !== "training",
-      "seadragons-dev no tiene ningún entrenamiento a la vista del socio de prueba",
+      nextUp.kind !== "event",
+      "seadragons-dev no tiene ningún evento a la vista del socio de prueba",
     );
-    if (nextTraining.kind !== "training") {
+    if (nextUp.kind !== "event") {
       return;
     }
-    const { training } = nextTraining;
+    const training = nextUp;
     const answer = training.myResponse === "maybe" ? "no" : "maybe";
-    const card = page.getByRole("region", { name: "Next training" });
+    const card = page.getByRole("region", { name: "Next up" });
 
     try {
       await card
-        .getByRole("button", { name: RSVP_BUTTON_NAMES[answer] })
+        .getByRole("button", { name: PANEL_RSVP_BUTTON_NAMES[answer] })
         .click();
       await expect(
-        card.getByRole("button", { name: RSVP_BUTTON_NAMES[answer] }),
+        card.getByRole("button", { name: PANEL_RSVP_BUTTON_NAMES[answer] }),
       ).toHaveAttribute("aria-pressed", "true");
 
       await page.goto(`${APP_URL}${CALENDAR_SCREEN_PATH}`);

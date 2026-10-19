@@ -74,3 +74,23 @@ export function timeUntil(start: ClubMoment, now: ClubMoment): TimeUntil {
   }
   return { kind: "days", days: calendarDaysBetween(now.date, start.date) };
 }
+
+/** Lo que dice la píldora de la tarjeta "Próximo" (#747, RF-3 del PRD de
+ * E27): "hoy", "mañana" o "en N días". */
+export type NextUpDistance =
+  | { readonly kind: "today" }
+  | { readonly kind: "tomorrow" }
+  | { readonly kind: "days"; readonly days: number };
+
+/** Los días de calendario del club de `today` a `startsOn`. Un evento que ya
+ * empezó y sigue en curso (D4) es de hoy. */
+export function nextUpDistance(
+  startsOn: string,
+  today: string,
+): NextUpDistance {
+  const days = calendarDaysBetween(today, startsOn);
+  if (days <= 0) {
+    return { kind: "today" };
+  }
+  return days === 1 ? { kind: "tomorrow" } : { kind: "days", days };
+}

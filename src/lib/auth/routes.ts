@@ -455,6 +455,10 @@ export const ATTENDANCE_SESSION_QUERY_PARAM = "sesion";
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
+/** El evento que abre Equipos al llegar desde "Abrir equipos" del inicio
+ * (#747). */
+export const TEAMS_EVENT_QUERY_PARAM = "evento";
+
 /** Las evaluaciones. Un Player no las ve, ni las propias (FR-055). */
 export const EVALUATIONS_PATH = "/evaluaciones";
 

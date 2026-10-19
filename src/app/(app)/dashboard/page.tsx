@@ -8,15 +8,10 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
 // navegación. Lo alcanza cualquier cuenta activa: qué ve cada rol lo decide
 // `GET /api/v1/dashboard` (#424), de donde lee la pantalla.
 
-/** RF-4 reserva "Nuevo entrenamiento" a Admin y Coach, pero un Coach no
- * crea eventos (ASS-006 del SRD, la matriz de la sección 4): el botón lo
- * llevaría a un calendario sin formulario. Queda quien está en los dos
- * conjuntos, el Admin. */
-function canCreateTrainingsFromHome(role: Role): boolean {
-  return (
-    hasCapability(role, "createEvents") &&
-    hasCapability(role, "buildTeamsAndTrackAttendance")
-  );
+/** "+ Evento" sale a quien puede crear eventos (D12 del PRD de E27, #747):
+ * Admin y Committee. Crear lo vuelve a comprobar el endpoint (#307). */
+function canCreateEventsFromHome(role: Role): boolean {
+  return hasCapability(role, "createEvents");
 }
 
 export default async function DashboardPage(): Promise<React.JSX.Element> {
@@ -29,7 +24,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
     <DashboardScreen
       locale={locale}
       userId={userId}
-      canCreateTrainings={canCreateTrainingsFromHome(role)}
+      canCreateEvents={canCreateEventsFromHome(role)}
     />
   );
 }

@@ -490,6 +490,13 @@ export function formatSessionDay(locale: Locale, isoDate: string): string {
     : `${weekday}, ${dayNumber} ${month}`;
 }
 
+/** Un día de la cabecera y de la tarjeta "Próximo" del inicio (#747), en el
+ * mismo orden en los dos idiomas: "Fri 2 Oct", "vie 2 oct". */
+export function formatDashboardDay(locale: Locale, isoDate: string): string {
+  const { weekday, day, month } = formatCalendarDayParts(locale, isoDate);
+  return `${weekday} ${Number(day)} ${month}`;
+}
+
 const RELATIVE_TIME_FORMATTERS = formattersByLocale(
   (displayLocale) =>
     new Intl.RelativeTimeFormat(displayLocale, { numeric: "auto" }),

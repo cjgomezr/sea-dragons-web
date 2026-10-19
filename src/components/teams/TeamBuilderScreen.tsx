@@ -16,7 +16,8 @@ import { TeamBuilderPanel } from "./TeamBuilderPanel";
 /**
  * La pantalla de Equipos (#402, RF-9 del PRD de E10): donde Admin y Coach
  * arman los dos equipos de un entrenamiento o una competición. Abre el
- * evento armable más cercano y deja elegir otro.
+ * evento armable más cercano y deja elegir otro. Desde el inicio (#747) llega
+ * con el evento pedido, que abre si está entre los armables.
  *
  * Es de cliente porque se mueve sin recargar y los totales cambian al
  * momento (AC-018). Lee y guarda sólo por la API v1 (#401), la misma que
@@ -96,12 +97,15 @@ function EventsFallback({
 
 export function TeamBuilderScreen({
   locale,
+  initialEventId = null,
 }: {
   readonly locale: Locale;
+  /** El evento que pide `?evento=`, o null para el más cercano. */
+  readonly initialEventId?: string | null;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const events = useBuildableEvents();
-  const [chosenId, setChosenId] = useState<string | null>(null);
+  const [chosenId, setChosenId] = useState<string | null>(initialEventId);
   const list = events.state.kind === "ready" ? events.state.events : [];
   const opened =
     list.find((event) => event.id === chosenId) ?? list.at(0) ?? null;

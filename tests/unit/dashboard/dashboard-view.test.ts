@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   type GreetingPeriod,
+  type NextUpDistance,
   type TimeUntil,
   greetingPeriodAt,
+  nextUpDistance,
   timeUntil,
 } from "@/lib/dashboard/dashboard-view";
 
@@ -70,5 +72,29 @@ describe("el tiempo hasta el entrenamiento", () => {
     expect(
       timeUntil({ date: "2026-10-03", time: "09:00" }, endOfMonth),
     ).toEqual<TimeUntil>({ kind: "days", days: 4 });
+  });
+});
+
+describe("la distancia hasta el próximo evento (#747)", () => {
+  it.each<[string, NextUpDistance]>([
+    ["2026-09-30", { kind: "today" }],
+    ["2026-10-01", { kind: "tomorrow" }],
+    ["2026-10-02", { kind: "days", days: 2 }],
+    ["2026-10-12", { kind: "days", days: 12 }],
+  ])("del 30 de septiembre al %s es %o", (startsOn, distance) => {
+    expect(nextUpDistance(startsOn, "2026-09-30")).toEqual(distance);
+  });
+
+  it("un evento que empezó ayer y sigue en curso es de hoy", () => {
+    expect(nextUpDistance("2026-09-29", "2026-09-30")).toEqual({
+      kind: "today",
+    });
+  });
+
+  it("cuenta días de calendario aunque cruce el cambio de horario", () => {
+    expect(nextUpDistance("2026-10-05", "2026-10-03")).toEqual({
+      kind: "days",
+      days: 2,
+    });
   });
 });

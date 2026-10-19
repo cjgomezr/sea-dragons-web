@@ -241,7 +241,6 @@ export const englishMessages = {
   "dashboard.greeting.morning": "Good morning, {name}",
   "dashboard.greeting.afternoon": "Good afternoon, {name}",
   "dashboard.greeting.evening": "Good evening, {name}",
-  "dashboard.newTraining": "New training",
   "dashboard.loading": "Loading…",
   "dashboard.retry": "Try again",
   "dashboard.error.unexpected": "We couldn't load the dashboard. Try again.",
@@ -279,6 +278,33 @@ export const englishMessages = {
   "dashboard.news.title": "Latest news",
   "dashboard.news.all": "All",
   "dashboard.news.empty": "No news yet.",
+  // La cabecera, los avisos y la tarjeta "Próximo" (#747, RF-3 y RF-8 del
+  // PRD de E27).
+  "dashboard.eyebrow.dated": "{date} · {section}",
+  "dashboard.newEvent": "Event",
+  "dashboard.newEvent.label": "New event",
+  "dashboard.nextUp.label": "Next up",
+  "dashboard.nextUp.today": "Next up · Today",
+  "dashboard.nextUp.tomorrow": "Next up · Tomorrow",
+  "dashboard.nextUp.inDays": "Next up · In {count} days",
+  "dashboard.nextUp.when": "{day} · {hours}",
+  "dashboard.nextUp.none": "Nothing coming up.",
+  "dashboard.nextUp.unavailable": "We couldn't load the next event.",
+  "dashboard.nextUp.locked": "RSVP is for current members.",
+  "dashboard.nextUp.renew": "Renew",
+  "dashboard.nextUp.bib": "{color} bib",
+  "dashboard.nextUp.lineups": "Lineups",
+  // La frase va en tres trozos para poner en negrita el del medio; el último
+  // lleva su espacio delante porque en español no lo hay.
+  "dashboard.nextUp.draft.start": "Teams are saved but",
+  "dashboard.nextUp.draft.emphasis": "not published",
+  "dashboard.nextUp.draft.end": " yet.",
+  "dashboard.nextUp.openTeams": "Open teams",
+  "dashboard.membership.expiredOn": "Your membership expired on {date}",
+  "dashboard.membership.expired": "Your membership expired",
+  "dashboard.membership.body":
+    "You can still see what's on. Renew to RSVP and be picked for teams.",
+  "dashboard.membership.renew": "Renew membership",
   "signOut.label": "Sign out",
   // Mi cuenta (#209). Los roles se escriben como en el SRD en inglés.
   "account.link": "My account",
@@ -389,6 +415,7 @@ export const englishMessages = {
   "contactReminder.phone.why": "So the club can reach you if it needs to.",
   "contactReminder.link": "Complete it in Contact, on your profile",
   "contactReminder.dismissPhone": "Dismiss phone reminder",
+  "contactReminder.add": "Add contact",
   // El teléfono y el contacto de emergencia del perfil propio (#496).
   "account.profile.contact.title": "Contact",
   "account.profile.contact.phone": "Your phone (optional)",

@@ -1,12 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import {
-  CALENDAR_NEW_EVENT_QUERY_PARAM,
-  CALENDAR_PATH,
-} from "@/lib/auth/routes";
-import { MembershipNotice } from "@/components/MembershipNotice";
 import { ContactReminderNotice } from "@/components/account/ContactReminderNotice";
 import type {
   Dashboard,
@@ -14,6 +8,7 @@ import type {
   RestrictedDashboard,
 } from "@/lib/dashboard/dashboard";
 import { greetingPeriodAt } from "@/lib/dashboard/dashboard-view";
+import { formatDashboardDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import { type ClubMoment, clubMoment } from "@/lib/time/club-calendar";
@@ -22,15 +17,16 @@ import {
   describeDashboardFailure,
   loadDashboard,
 } from "./dashboard-client";
+import { DashboardMembershipNotice } from "./DashboardMembershipNotice";
 import { LatestNewsPanel, UpcomingPanel } from "./DashboardLists";
-import { DashboardTiles } from "./DashboardTiles";
-import { NextTrainingCard, ReadOnlyTrainingCard } from "./NextTrainingCard";
+import { NewEventLink } from "./NewEventLink";
+import { NextUpCard } from "./NextUpCard";
 
 /**
- * La pantalla de inicio (#426, RF-1 a RF-4 del PRD de E14): el saludo, las
- * cuatro teselas, los próximos eventos y las últimas noticias de
- * docs/mockups/dashboard-light.png, y en el móvil la tarjeta del próximo
- * entrenamiento con el RSVP de docs/mockups/mobile-home-light.png.
+ * La pantalla de inicio (#426, RF-1 a RF-4 del PRD de E14), que E27 rehace
+ * por partes. De arriba abajo: la cabecera con el día y el saludo, los avisos
+ * y la tarjeta "Próximo" con el RSVP y el equipo (#747, RF-3 y RF-8 del PRD
+ * de E27); debajo, de momento, los próximos eventos y las últimas noticias.
  *
  * Es de cliente porque responde al RSVP sin recargar y porque la hora del
  * saludo y de "hace N" es la del momento en que se pintó. Lo lee todo de
@@ -39,18 +35,12 @@ import { NextTrainingCard, ReadOnlyTrainingCard } from "./NextTrainingCard";
  * pintar lo que ya llegó, sin pedirlo otra vez.
  *
  * A quien no tiene la membresía al día el endpoint le sirve el inicio
- * reducido (#453): el saludo, el aviso que lleva a Pagos y el próximo
- * entrenamiento sin RSVP.
- *
- * Los dos inicios llevan el aviso de los datos de contacto que faltan (#498)
- * detrás de la tarjeta del entrenamiento, para que en el móvil no empuje el
- * RSVP fuera de la primera pantalla. Se pide al montar, así que al volver del
- * perfil con el contacto guardado el aviso ya no está.
+ * reducido (#453): la cabecera, el aviso que lleva a Pagos y la tarjeta
+ * "Próximo" sin RSVP. El aviso del contacto que falta (#498) sólo sale en el
+ * inicio de un socio al día, para no competir con el de la membresía. Se pide
+ * al montar, así que al volver del perfil con el contacto guardado el aviso
+ * ya no está.
  */
-
-const NEW_TRAINING_HREF = `${CALENDAR_PATH}?${new URLSearchParams({
-  [CALENDAR_NEW_EVENT_QUERY_PARAM]: "training",
-}).toString()}`;
 
 type DashboardState =
   | { readonly kind: "loading" }
@@ -73,32 +63,29 @@ function DashboardHeader({
   translate,
   firstName,
   now,
-  canCreateTrainings,
+  canCreateEvents,
 }: {
   readonly translate: Translator;
   readonly firstName: string;
   readonly now: ClubMoment;
-  readonly canCreateTrainings: boolean;
+  readonly canCreateEvents: boolean;
 }): React.JSX.Element {
   return (
     <header className="dashboard-header">
       <div>
-        <p className="agenda-eyebrow">{translate("dashboard.eyebrow")}</p>
+        <p className="dashboard-eyebrow">
+          {translate("dashboard.eyebrow.dated", {
+            date: formatDashboardDay(translate.locale, now.date),
+            section: translate("dashboard.eyebrow"),
+          })}
+        </p>
         <h1>
           {translate(GREETING_KEYS[greetingPeriodAt(now)], {
             name: firstName,
           })}
         </h1>
       </div>
-      {canCreateTrainings ? (
-        <Link
-          href={NEW_TRAINING_HREF}
-          className="auth-submit dashboard-new-training"
-        >
-          <span aria-hidden="true">+ </span>
-          {translate("dashboard.newTraining")}
-        </Link>
-      ) : null}
+      {canCreateEvents ? <NewEventLink translate={translate} /> : null}
     </header>
   );
 }
@@ -129,7 +116,8 @@ type ContentProps<Shown extends Dashboard> = {
   readonly userId: string;
   readonly dashboard: Shown;
   readonly loadedAt: Date;
-  readonly canCreateTrainings: boolean;
+  readonly canCreateEvents: boolean;
+  readonly onRetry: () => void;
 };
 
 /** Sin poder leer el contacto no se avisa: el resto del inicio sigue. */
@@ -138,7 +126,7 @@ function DashboardContactReminder({
   userId,
   dashboard,
 }: Pick<
-  ContentProps<Dashboard>,
+  ContentProps<MemberDashboard>,
   "translate" | "userId" | "dashboard"
 >): React.JSX.Element | null {
   const { contactReminder } = dashboard;
@@ -147,38 +135,36 @@ function DashboardContactReminder({
       locale={translate.locale}
       userId={userId}
       reminder={contactReminder.reminder}
+      variant="strip"
     />
   );
 }
 
 function RestrictedContent({
   translate,
-  userId,
   dashboard,
   loadedAt,
-  canCreateTrainings,
+  canCreateEvents,
+  onRetry,
 }: ContentProps<RestrictedDashboard>): React.JSX.Element {
+  const now = clubMoment(loadedAt);
   return (
     <>
       <DashboardHeader
         translate={translate}
         firstName={dashboard.viewer.firstName}
-        now={clubMoment(loadedAt)}
-        canCreateTrainings={canCreateTrainings}
+        now={now}
+        canCreateEvents={canCreateEvents}
       />
-      <MembershipNotice
+      <DashboardMembershipNotice
         translate={translate}
-        block={dashboard.block}
-        linksToPayments
+        membership={dashboard.membership}
       />
-      <ReadOnlyTrainingCard
+      <NextUpCard
         translate={translate}
-        nextTraining={dashboard.nextTraining}
-      />
-      <DashboardContactReminder
-        translate={translate}
-        userId={userId}
-        dashboard={dashboard}
+        nextUp={dashboard.nextUp}
+        viewer={{ isRestricted: true, canCreateEvents, today: now.date }}
+        onRetry={onRetry}
       />
     </>
   );
@@ -189,30 +175,28 @@ function MemberContent({
   userId,
   dashboard,
   loadedAt,
-  canCreateTrainings,
+  canCreateEvents,
+  onRetry,
 }: ContentProps<MemberDashboard>): React.JSX.Element {
   const now = clubMoment(loadedAt);
-  const { nextTraining } = dashboard.tiles;
   return (
     <>
       <DashboardHeader
         translate={translate}
         firstName={dashboard.viewer.firstName}
         now={now}
-        canCreateTrainings={canCreateTrainings}
+        canCreateEvents={canCreateEvents}
       />
-      <DashboardTiles translate={translate} tiles={dashboard.tiles} now={now} />
-      {nextTraining.kind === "training" ? (
-        <NextTrainingCard
-          key={nextTraining.training.id}
-          translate={translate}
-          training={nextTraining.training}
-        />
-      ) : null}
       <DashboardContactReminder
         translate={translate}
         userId={userId}
         dashboard={dashboard}
+      />
+      <NextUpCard
+        translate={translate}
+        nextUp={dashboard.nextUp}
+        viewer={{ isRestricted: false, canCreateEvents, today: now.date }}
+        onRetry={onRetry}
       />
       <div className="dashboard-panels">
         <UpcomingPanel
@@ -232,14 +216,14 @@ function MemberContent({
 export function DashboardScreen({
   locale,
   userId,
-  canCreateTrainings,
+  canCreateEvents,
 }: {
   readonly locale: Locale;
   /** Quien mira: el cierre del aviso del teléfono es de su cuenta (#498). */
   readonly userId: string;
-  /** Si se pinta "Nuevo entrenamiento". Sólo decide el botón: crear lo
+  /** Si se pinta "+ Evento". Sólo decide el botón: crear lo
    * vuelve a comprobar el endpoint (#307). */
-  readonly canCreateTrainings: boolean;
+  readonly canCreateEvents: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [state, setState] = useState<DashboardState>({ kind: "loading" });
@@ -293,7 +277,8 @@ export function DashboardScreen({
           userId={userId}
           dashboard={state.dashboard}
           loadedAt={state.loadedAt}
-          canCreateTrainings={canCreateTrainings}
+          canCreateEvents={canCreateEvents}
+          onRetry={retry}
         />
       ) : null}
       {state.kind === "ready" && state.dashboard.kind === "restricted" ? (
@@ -302,7 +287,8 @@ export function DashboardScreen({
           userId={userId}
           dashboard={state.dashboard}
           loadedAt={state.loadedAt}
-          canCreateTrainings={canCreateTrainings}
+          canCreateEvents={canCreateEvents}
+          onRetry={retry}
         />
       ) : null}
     </div>

@@ -176,19 +176,23 @@ describe("panel principal", () => {
     );
   }
 
-  it("ofrece Nuevo entrenamiento al Admin cuando llega el dashboard", async () => {
-    callerRole.current = "Admin";
-    stubLoadedDashboard();
+  it.each<Role>(["Admin", "Committee"])(
+    "ofrece + Evento a un %s, que puede crear eventos, cuando llega el dashboard",
+    async (role) => {
+      callerRole.current = role;
+      stubLoadedDashboard();
 
-    await renderIn("en", HomePage);
+      await renderIn("en", HomePage);
 
-    expect(
-      await screen.findByRole("link", { name: "New training" }),
-    ).toBeInTheDocument();
-  });
+      // Sin nada próximo, la tarjeta "Próximo" también lo ofrece (#747).
+      expect(
+        await screen.findAllByRole("link", { name: "New event" }),
+      ).toHaveLength(2);
+    },
+  );
 
-  it.each<Role>(["Coach", "Committee", "Player"])(
-    "no ofrece Nuevo entrenamiento a un %s ni con el dashboard cargado",
+  it.each<Role>(["Coach", "Player"])(
+    "no ofrece + Evento a un %s ni con el dashboard cargado",
     async (role) => {
       callerRole.current = role;
       stubLoadedDashboard();
@@ -199,7 +203,7 @@ describe("panel principal", () => {
       // esperar al saludo, que llega con la misma respuesta que la cabecera.
       await screen.findByRole("heading", { level: 1, name: /Alba/ });
       expect(
-        screen.queryByRole("link", { name: "New training" }),
+        screen.queryByRole("link", { name: "New event" }),
       ).not.toBeInTheDocument();
     },
   );
