@@ -20334,8 +20334,27 @@ async function markLateAndSave(
 type AttendanceState = AttendanceReads & {
   readonly name: string;
   readonly isSpanish?: boolean;
+  /** Sin ellos, se fotografía en todos. */
+  readonly viewports?: readonly (typeof viewports)[number][];
   readonly ready: (page: Page) => Promise<void>;
 };
+
+const ATTENDANCE_ROW_UNSAVED = /^(Not saved yet|Sin guardar todavía)$/;
+
+/** Cambia a dos socios sin guardar: los dos llevan el punto (#764). */
+async function markTwoUnsaved(page: Page): Promise<void> {
+  await waitForAttendanceSheet(page);
+  for (const fullName of [FIRST_ATTENDEE, "Ruby Tan"]) {
+    await attendanceRow(page, fullName)
+      .getByRole("button", { name: ATTENDANCE_LATE })
+      .click();
+  }
+  await expect(page.getByTitle(ATTENDANCE_ROW_UNSAVED)).toHaveCount(2);
+  await page.mouse.move(0, 0);
+}
+
+/** La fila compacta es de escritorio (#764); el móvil es otro ticket. */
+const ATTENDANCE_DESKTOP_VIEWPORTS = viewports.filter((vp) => vp.width >= 768);
 
 function withSpanish(state: AttendanceState): readonly AttendanceState[] {
   return [state, { ...state, name: `${state.name}-es`, isSpanish: true }];
@@ -20364,6 +20383,13 @@ const ATTENDANCE_STATES: readonly AttendanceState[] = [
     members: ATTENDANCE_MEMBERS,
     ready: (page) => markLateAndSave(page, "status"),
   }),
+  {
+    name: "asistencia-sin-guardar",
+    sessions: ATTENDANCE_SESSIONS,
+    members: ATTENDANCE_MEMBERS,
+    viewports: ATTENDANCE_DESKTOP_VIEWPORTS,
+    ready: markTwoUnsaved,
+  },
   ...withSpanish({
     name: "asistencia-error",
     sessions: ATTENDANCE_SESSIONS,
@@ -20422,7 +20448,7 @@ for (const state of ATTENDANCE_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of state.viewports ?? viewports) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -20559,6 +20585,57 @@ test.describe("asistencia en el navegador", () => {
 
     await opened;
     await waitForAttendanceSheet(page);
+  });
+
+  for (const theme of themes) {
+    test(`el estado elegido y el punto pasan axe en ${theme} (#764)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await stubAttendance(page, ATTENDANCE_SHEET_STATE);
+      await goToWithTheme(page, ATTENDANCE_SCREEN_PATH, theme);
+      await markTwoUnsaved(page);
+
+      await expectNoAxeViolations(page);
+    });
+  }
+
+  test("a 1440px la fila es una línea de al menos 44px con el segmento de 26px (#764)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+    const row = attendanceRow(page, LONG_NAMED_ATTENDEE);
+
+    const rowBox = await row.boundingBox();
+    const buttonHeights = await row
+      .getByRole("group")
+      .getByRole("button")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getBoundingClientRect().height),
+      );
+
+    expect(rowBox?.height).toBeGreaterThanOrEqual(
+      ATTENDANCE_MIN_TOUCH_TARGET_PX,
+    );
+    expect(rowBox?.height).toBeLessThan(2 * ATTENDANCE_MIN_TOUCH_TARGET_PX);
+    expect(buttonHeights).toHaveLength(3);
+    for (const height of buttonHeights) {
+      expect(height).toBeCloseTo(26, 0);
+    }
+  });
+
+  test("el punto de sin guardar sale al marcar y se va al volver (#764)", async ({
+    page,
+  }) => {
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+    const row = attendanceRow(page, FIRST_ATTENDEE);
+
+    await row.getByRole("button", { name: "Late" }).click();
+    await expect(row.getByTitle("Not saved yet")).toBeVisible();
+    await row.getByRole("button", { name: "Present" }).click();
+
+    await expect(row.getByTitle("Not saved yet")).toHaveCount(0);
   });
 
   test("a 375px cada botón de la fila mide al menos 44px de alto", async ({

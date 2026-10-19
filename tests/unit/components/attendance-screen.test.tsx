@@ -969,3 +969,136 @@ describe("guardar tras reintentar", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
+
+describe("la fila compacta (#764)", () => {
+  it("al Admin el enlace del nombre lleva el icono de abrir, sin nombrarlo", async () => {
+    stubClub([POOL_TRAINING], [ADMIN_POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    const link = recordLink(MATEO.fullName);
+    expect(link).toHaveAccessibleName("Open Mateo Restrepo's record");
+    expect(link.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("al Coach el nombre es texto sin icono", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    const name = within(await findRow(MATEO.fullName)).getByText(
+      MATEO.fullName,
+    );
+    expect(name.querySelector("svg")).toBeNull();
+  });
+
+  it("cada estado del segmento lleva su icono sin cambiar su nombre", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    const mateo = await findRow(MATEO.fullName);
+    for (const status of ["Present", "Late", "Absent"]) {
+      expect(choice(mateo, status).querySelector("svg")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
+    }
+  });
+
+  it("cada estado del segmento lleva su texto en una etiqueta aparte, que la tableta esconde a la vista", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    const mateo = await findRow(MATEO.fullName);
+    for (const status of ["Present", "Late", "Absent"]) {
+      expect(
+        choice(mateo, status).querySelector(".attendance-choice-label"),
+      ).toHaveTextContent(status);
+    }
+  });
+
+  it("una hoja recién abierta no lleva ningún punto de sin guardar", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(screen.queryByTitle("Not saved yet")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not saved yet")).not.toBeInTheDocument();
+  });
+
+  it("al cambiar a un socio su fila lleva el punto y lo anuncia", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+
+    await userEvent.click(choice(mateo, "Late"));
+
+    expect(within(mateo).getByTitle("Not saved yet")).toBeInTheDocument();
+    expect(within(mateo).getByText("Not saved yet")).toBeInTheDocument();
+    expect(
+      within(await findRow(RUBY.fullName)).queryByTitle("Not saved yet"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("el punto desaparece cuando el socio vuelve a su estado guardado", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+    await userEvent.click(choice(mateo, "Late"));
+
+    await userEvent.click(choice(mateo, "Present"));
+
+    expect(within(mateo).queryByTitle("Not saved yet")).not.toBeInTheDocument();
+  });
+
+  it("el punto desaparece al guardar", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+    await userEvent.click(choice(mateo, "Late"));
+
+    await userEvent.click(saveButton());
+
+    await waitFor(() =>
+      expect(
+        within(mateo).queryByTitle("Not saved yet"),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("si guardar falla, el punto se queda", async () => {
+    stubApi(({ method, path }) => {
+      if (path === SESSIONS_PATH) {
+        return jsonResponse(200, { data: { sessions: [POOL_TRAINING] } });
+      }
+      if (method === "PUT") {
+        throw new TypeError("Failed to fetch");
+      }
+      return jsonResponse(200, { data: POOL_SHEET });
+    });
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+    await userEvent.click(choice(mateo, "Late"));
+
+    await userEvent.click(saveButton());
+
+    await screen.findByRole("alert");
+    expect(within(mateo).getByTitle("Not saved yet")).toBeInTheDocument();
+  });
+
+  it("en español el punto dice Sin guardar todavía", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+
+    await userEvent.click(choice(mateo, "Tarde"));
+
+    expect(within(mateo).getByTitle("Sin guardar todavía")).toHaveTextContent(
+      "Sin guardar todavía",
+    );
+  });
+});

@@ -3,8 +3,9 @@ import type {
   IconWeight,
 } from "@phosphor-icons/react/dist/lib/types";
 
-/** Los dos pesos que usa el handoff del directorio (#547). */
-type GlyphWeight = Extract<IconWeight, "regular" | "fill">;
+/** Los dos pesos del handoff del directorio (#547) y el grueso de los
+ * estados de la asistencia (#764). */
+type GlyphWeight = Extract<IconWeight, "regular" | "fill" | "bold">;
 
 /** Un icono de Phosphor, siempre decorativo: el nombre accesible lo lleva el
  * control que lo contiene. Mide `1em` y pinta con `currentColor`, así que el
