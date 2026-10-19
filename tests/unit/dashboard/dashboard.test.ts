@@ -1272,6 +1272,8 @@ describe("mi equipo en el próximo evento (#745)", () => {
       coverage: null,
       ratings: null,
       membershipCurrent: true,
+      accountStatus: "active",
+      photoPath: null,
     };
   }
 

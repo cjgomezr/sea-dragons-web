@@ -15,8 +15,10 @@ import type { Destination, RosterPlayer } from "./team-draft";
  * Asistencia, y cada uno dice además a quién mueve y a dónde.
  */
 
-/** En píxeles, como `.team-avatar`. */
-const AVATAR_SIZE = 32;
+/** En píxeles, como `.team-avatar` y `.team-avatar-ringed`: en un equipo el
+ * avatar crece para el anillo de su color (#757); en el banco no lo lleva. */
+const BENCH_AVATAR_SIZE = 32;
+const TEAM_AVATAR_SIZE = 34;
 
 /** El tipo que viaja en el arrastre: el `userId` del jugador. */
 export const PLAYER_DRAG_TYPE = "text/plain";
@@ -110,12 +112,22 @@ export function TeamPlayerRow({
         event.dataTransfer.effectAllowed = "move";
       }}
     >
-      <MemberAvatar
-        fullName={player.fullName}
-        photoUrl={null}
-        size={AVATAR_SIZE}
-        className="team-avatar"
-      />
+      {team === null ? (
+        <MemberAvatar
+          fullName={player.fullName}
+          photoUrl={player.photoUrl}
+          size={BENCH_AVATAR_SIZE}
+          className="team-avatar"
+        />
+      ) : (
+        <MemberAvatar
+          fullName={player.fullName}
+          photoUrl={player.photoUrl}
+          size={TEAM_AVATAR_SIZE}
+          className="team-avatar team-avatar-ringed"
+          style={{ borderColor: teams[team].color }}
+        />
+      )}
       <div className="team-player-text">
         <span className="team-player-name">{player.fullName}</span>
         <span className="team-player-hints">

@@ -1,4 +1,5 @@
 import type { AuditLogInsertRow } from "@/lib/audit/audit-log";
+import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
 import type { ClubPosition } from "@/lib/club/club-positions";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
@@ -60,6 +61,10 @@ export type FakePlayer = {
   readonly ratings?: readonly number[];
   /** Si su membresía está al día (#453); sin decirlo, lo está. */
   readonly membershipCurrent?: boolean;
+  /** Sin foto si falta. */
+  readonly photoPath?: string;
+  /** Activo si falta. */
+  readonly accountStatus?: AccountStatus;
 };
 
 export type FakeTeamsClubOptions = {
@@ -75,6 +80,8 @@ export type FakeTeamsClubOptions = {
   readonly failingNotifications?: boolean;
   /** Escribir en la bitácora falla siempre. */
   readonly failingAudit?: boolean;
+  /** Firmar las fotos falla siempre. */
+  readonly failingPhotos?: boolean;
 };
 
 export type SentNotice = {
@@ -90,7 +97,14 @@ export type FakeTeamsClub = {
   readonly saves: NewTeamSplit[];
   readonly notices: SentNotice[];
   readonly auditRows: AuditLogInsertRow[];
+  /** Las rutas que se mandaron a firmar, en cada llamada. */
+  readonly signedPaths: (readonly string[])[];
 };
+
+/** La dirección que el doble firma para una ruta. */
+export function signedPhotoUrl(photoPath: string): string {
+  return `https://storage.test/signed/${photoPath}`;
+}
 
 export function playerId(index: number): string {
   return `4e4e4e4e-0000-4000-8000-${String(index).padStart(12, "0")}`;
@@ -185,6 +199,8 @@ export function fakeTeamsClub(
           coverage: player.coverage ?? null,
           ratings: player.ratings ?? null,
           membershipCurrent: player.membershipCurrent ?? true,
+          accountStatus: player.accountStatus ?? "active",
+          photoPath: player.photoPath ?? null,
         })),
     findSplit: async () => split,
     saveSplit: async (newSplit) => {
@@ -216,10 +232,21 @@ export function fakeTeamsClub(
   const positions = {
     findClubPositions: async () => options.positions ?? SEEDED_POSITIONS,
   };
+  const signedPaths: (readonly string[])[] = [];
+  const photos: TeamBuilderGateways["photos"] = {
+    signPhotoUrls: async (photoPaths) => {
+      if (options.failingPhotos) {
+        throw new Error("Storage no responde.");
+      }
+      signedPaths.push(photoPaths);
+      return new Map(photoPaths.map((path) => [path, signedPhotoUrl(path)]));
+    },
+  };
   const gateways: TeamBuilderGateways = {
     members,
     teams,
     positions,
+    photos,
     notifications: fakeNotifications(
       notices,
       options.failingNotifications ?? false,
@@ -250,5 +277,6 @@ export function fakeTeamsClub(
     saves,
     notices,
     auditRows,
+    signedPaths,
   };
 }

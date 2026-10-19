@@ -62,6 +62,7 @@ function entry(
     coverage: null,
     rating: 7,
     isUnrated: false,
+    photoUrl: null,
     ...changes,
   };
 }
@@ -445,6 +446,81 @@ describe("la escuadra", () => {
     expect(await screen.findByRole("region", { name: "Available" })).toBe(
       region("Available"),
     );
+  });
+});
+
+describe("las fotos (#757)", () => {
+  const MATEO_PHOTO = `https://storage.test/member-photos/${MATEO.userId}/thumb.webp?token=t`;
+  const DANIELA_PHOTO = `https://storage.test/member-photos/${DANIELA.userId}/thumb.webp?token=t`;
+  const WITH_PHOTOS = builderFor(SCRIMMAGE, {
+    available: [
+      { ...DANIELA, photoUrl: DANIELA_PHOTO },
+      ETHAN,
+      { ...MATEO, photoUrl: MATEO_PHOTO },
+    ],
+    split: {
+      mode: "manual",
+      publishedAt: null,
+      assignments: [assigned({ ...MATEO, photoUrl: MATEO_PHOTO }, "a")],
+    },
+  });
+
+  it("enseña la foto del jugador en su fila", async () => {
+    stubClub({ builders: [WITH_PHOTOS] });
+
+    await openScreen();
+
+    expect(
+      within(playerRow(region("Available"), DANIELA.fullName)).getByRole(
+        "presentation",
+      ),
+    ).toHaveAttribute("src", DANIELA_PHOTO);
+  });
+
+  it("enseña las iniciales del jugador sin foto", async () => {
+    stubClub({ builders: [WITH_PHOTOS] });
+
+    await openScreen();
+
+    const row = playerRow(region("Available"), ETHAN.fullName);
+    expect(within(row).queryByRole("presentation")).not.toBeInTheDocument();
+    expect(within(row).getByText("EB")).toBeInTheDocument();
+  });
+
+  it("pone en un equipo el avatar de 34 px con el anillo del color del equipo", async () => {
+    stubClub({ builders: [WITH_PHOTOS] });
+
+    await openScreen();
+
+    const photo = within(
+      playerRow(region("Team Kelp"), MATEO.fullName),
+    ).getByRole("presentation");
+    expect(photo).toHaveAttribute("width", "34");
+    expect(photo).toHaveStyle({
+      borderColor: DEFAULT_TEAM_LABELS.a.color,
+    });
+  });
+
+  it("pone el anillo del equipo también en las iniciales", async () => {
+    stubClub({ builders: [DRAFTED] });
+
+    await openScreen();
+
+    expect(
+      within(playerRow(region("Team Tide"), ETHAN.fullName)).getByText("EB"),
+    ).toHaveStyle({ borderColor: DEFAULT_TEAM_LABELS.b.color });
+  });
+
+  it("pone en el banco el avatar de 32 px sin anillo", async () => {
+    stubClub({ builders: [WITH_PHOTOS] });
+
+    await openScreen();
+
+    const photo = within(
+      playerRow(region("Available"), DANIELA.fullName),
+    ).getByRole("presentation");
+    expect(photo).toHaveAttribute("width", "32");
+    expect(photo.style.borderColor).toBe("");
   });
 });
 
