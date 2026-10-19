@@ -146,13 +146,18 @@ fi
 
 # 4. Visual regression + accessibility (only if playwright config exists)
 #
-# Sólo si la rama tocó algo que pueda mover una captura: la misma lista que
-# filtra visual-baselines.yml. Cada corrida siembra socios de prueba en
-# seadragons-dev, y el gate corre tras cada turno de cada worker (#415). El PR
-# corre Playwright igual en CI.
+# Por defecto no corre aquí. La suite entera tarda unos 44 minutos y el hook
+# se corta a los 10 (`timeout` del Stop en .claude/settings.json): nunca
+# llegaba a decir nada y cada turno de un ticket de UI perdía 10 minutos. La
+# corre CI en cada PR (visual-baselines.yml) y el merge la exige en verde.
+# Con FABRICA_LOCAL_PLAYWRIGHT=1 sí corre, y sólo si la rama tocó algo que
+# pueda mover una captura: la misma lista que filtra visual-baselines.yml.
+# Cada corrida siembra socios de prueba en seadragons-dev (#415).
 VISUAL_PATHS_CHECK="$(dirname "$0")/../../scripts/branch-touches-visual-paths.sh"
 if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
-  if ! bash "$VISUAL_PATHS_CHECK"; then
+  if [ "${FABRICA_LOCAL_PLAYWRIGHT:-}" != "1" ]; then
+    echo "Playwright no corre en el gate: lo corre CI en el PR. Para correrlo aquí: FABRICA_LOCAL_PLAYWRIGHT=1."
+  elif ! bash "$VISUAL_PATHS_CHECK"; then
     echo "Playwright no corre: la rama no toca ninguna ruta de .github/visual-paths.txt (lo corre CI en el PR)."
   elif ! E2E_OUT=$(npx playwright test 2>&1); then
     fail "❌ Playwright (visual/a11y) failed. Fix before finishing:

@@ -127,6 +127,7 @@ describe("el Stop gate y Playwright", () => {
 
   async function runGateOnBranchTouching(
     file: string,
+    options: { readonly localPlaywright?: boolean } = {},
   ): Promise<{ readonly calls: string; readonly output: string }> {
     const { workDir, originDir } = await createBranchTouching(file);
     const { binDir, logFile } = await installCommandRecorder();
@@ -137,6 +138,7 @@ describe("el Stop gate y Playwright", () => {
       env: {
         ...process.env,
         FACTORY_GATE: undefined,
+        FABRICA_LOCAL_PLAYWRIGHT: options.localPlaywright ? "1" : undefined,
         // CI corre esta suite con la variable puesta: sin quitarla, el test
         // no sabría si la puso el gate o venía de fuera.
         RUN_INTEGRATION_TESTS: undefined,
@@ -149,9 +151,11 @@ describe("el Stop gate y Playwright", () => {
   }
 
   it(
-    "no corre Playwright cuando la rama sólo toca docs/",
+    "con FABRICA_LOCAL_PLAYWRIGHT=1 no corre Playwright cuando la rama sólo toca docs/",
     async () => {
-      const { calls } = await runGateOnBranchTouching("docs/nota.md");
+      const { calls } = await runGateOnBranchTouching("docs/nota.md", {
+        localPlaywright: true,
+      });
 
       expect(calls).not.toContain("playwright test");
     },
@@ -159,10 +163,13 @@ describe("el Stop gate y Playwright", () => {
   );
 
   it(
-    "no corre Playwright cuando la rama sólo toca supabase/migrations/",
+    "con FABRICA_LOCAL_PLAYWRIGHT=1 no corre Playwright cuando la rama sólo toca supabase/migrations/",
     async () => {
       const { calls } = await runGateOnBranchTouching(
         "supabase/migrations/0099_algo.sql",
+        {
+          localPlaywright: true,
+        },
       );
 
       expect(calls).not.toContain("playwright test");
@@ -185,9 +192,11 @@ describe("el Stop gate y Playwright", () => {
   );
 
   it(
-    "corre Playwright cuando la rama toca src/",
+    "con FABRICA_LOCAL_PLAYWRIGHT=1 corre Playwright cuando la rama toca src/",
     async () => {
-      const { calls } = await runGateOnBranchTouching("src/app/page.tsx");
+      const { calls } = await runGateOnBranchTouching("src/app/page.tsx", {
+        localPlaywright: true,
+      });
 
       expect(calls).toContain("playwright test");
     },
@@ -195,10 +204,13 @@ describe("el Stop gate y Playwright", () => {
   );
 
   it(
-    "corre Playwright cuando la rama toca el arranque de sesión de tests/support/",
+    "con FABRICA_LOCAL_PLAYWRIGHT=1 corre Playwright cuando la rama toca el arranque de sesión de tests/support/",
     async () => {
       const { calls } = await runGateOnBranchTouching(
         "tests/support/e2e-session.ts",
+        {
+          localPlaywright: true,
+        },
       );
 
       expect(calls).toContain("playwright test");
@@ -207,10 +219,13 @@ describe("el Stop gate y Playwright", () => {
   );
 
   it(
-    "no corre Playwright cuando la rama sólo toca un test unitario",
+    "con FABRICA_LOCAL_PLAYWRIGHT=1 no corre Playwright cuando la rama sólo toca un test unitario",
     async () => {
       const { calls } = await runGateOnBranchTouching(
         "tests/unit/algo.test.ts",
+        {
+          localPlaywright: true,
+        },
       );
 
       expect(calls).not.toContain("playwright test");
@@ -219,13 +234,38 @@ describe("el Stop gate y Playwright", () => {
   );
 
   it(
-    "corre Playwright cuando la rama toca un spec dentro de una carpeta",
+    "con FABRICA_LOCAL_PLAYWRIGHT=1 corre Playwright cuando la rama toca un spec dentro de una carpeta",
     async () => {
       const { calls } = await runGateOnBranchTouching(
         "tests/flujo/algo.spec.ts",
+        {
+          localPlaywright: true,
+        },
       );
 
       expect(calls).toContain("playwright test");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no corre Playwright por defecto aunque la rama toque src/",
+    async () => {
+      const { calls } = await runGateOnBranchTouching("src/app/page.tsx");
+
+      expect(calls).not.toContain("playwright test");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "dice en una línea que Playwright lo corre CI y cómo correrlo aquí",
+    async () => {
+      const { output } = await runGateOnBranchTouching("src/app/page.tsx");
+
+      expect(output).toMatch(
+        /Playwright[^\n]*CI[^\n]*FABRICA_LOCAL_PLAYWRIGHT=1/,
+      );
     },
     REAL_PROCESS_TEST_TIMEOUT_MS,
   );
