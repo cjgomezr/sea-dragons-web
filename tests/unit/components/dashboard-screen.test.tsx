@@ -1206,3 +1206,89 @@ describe("el aviso del contacto (#498)", () => {
     expect(requests).toHaveLength(requestsBefore);
   });
 });
+
+describe("la columna del Player (#749)", () => {
+  const SEASON_ATTENDANCE = {
+    percent: 82,
+    attended: 18,
+    sessions: 22,
+    last10: [
+      { eventId: POOL_TRAINING.id, startsOn: "2026-09-26", status: "late" },
+    ],
+  } as const;
+
+  it("a un Player le pinta Mi asistencia y la membresía", async () => {
+    stubDashboard({
+      ...PLAYER_DASHBOARD,
+      me: { attendance: SEASON_ATTENDANCE },
+    });
+
+    await renderScreen();
+
+    const attendance = screen.getByRole("region", { name: "My attendance" });
+    expect(within(attendance).getByText("82%")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Membership" })).getByText(
+        "Membership active",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("a Admin, Coach o Committee no se la pinta", async () => {
+    stubDashboard({
+      ...ADMIN_DASHBOARD,
+      me: { attendance: SEASON_ATTENDANCE },
+    });
+
+    await renderScreen();
+
+    expect(
+      screen.queryByRole("region", { name: "My attendance" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Membership" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("a quien no tiene la membresía al día le dice su estado", async () => {
+    stubDashboard(restrictedBy("cancelled", "2026-09-30"));
+
+    await renderScreen();
+
+    const membership = screen.getByRole("region", { name: "Membership" });
+    expect(
+      within(membership).getByText("Membership expired"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "My attendance" })).getByText(
+        "No sessions yet this season.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("si no se pudo leer la asistencia, Reintentar vuelve a pedir el inicio", async () => {
+    let attempts = 0;
+    stubApi(() => {
+      attempts += 1;
+      return jsonResponse(200, {
+        data: {
+          ...PLAYER_DASHBOARD,
+          me: {
+            attendance:
+              attempts === 1 ? { kind: "unavailable" } : SEASON_ATTENDANCE,
+          },
+        },
+      });
+    });
+    await renderScreen();
+
+    await userEvent.click(
+      within(screen.getByRole("region", { name: "My attendance" })).getByRole(
+        "button",
+        { name: "Try again" },
+      ),
+    );
+
+    expect(await screen.findByText("82%")).toBeInTheDocument();
+  });
+});
