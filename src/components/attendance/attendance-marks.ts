@@ -52,16 +52,22 @@ export function isMarkUnsaved(
   return saved !== current;
 }
 
+function savedStatusOf(
+  marks: SheetMarks,
+  userId: string,
+): AttendanceStatus | undefined {
+  return marks.saved.find((candidate) => candidate.userId === userId)?.status;
+}
+
 export function hasUnsavedChanges(marks: SheetMarks): boolean {
-  return marks.current.some((mark, index) =>
-    isMarkUnsaved(marks.saved[index]?.status, mark.status),
+  return marks.current.some((mark) =>
+    isMarkUnsaved(savedStatusOf(marks, mark.userId), mark.status),
   );
 }
 
 /** Lleva el punto de "sin guardar" en su fila. */
 export function isMemberUnsaved(marks: SheetMarks, userId: string): boolean {
-  const saved = marks.saved.find((candidate) => candidate.userId === userId);
-  return isMarkUnsaved(saved?.status, statusOf(marks, userId));
+  return isMarkUnsaved(savedStatusOf(marks, userId), statusOf(marks, userId));
 }
 
 export function statusOf(marks: SheetMarks, userId: string): AttendanceStatus {

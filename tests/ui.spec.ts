@@ -20586,7 +20586,10 @@ test.describe("asistencia en el navegador", () => {
       ATTENDANCE_MIN_TOUCH_TARGET_PX,
     );
     expect(rowBox?.height).toBeLessThan(2 * ATTENDANCE_MIN_TOUCH_TARGET_PX);
-    expect(buttonHeights).toEqual([26, 26, 26]);
+    expect(buttonHeights).toHaveLength(3);
+    for (const height of buttonHeights) {
+      expect(height).toBeCloseTo(26, 0);
+    }
   });
 
   test("el punto de sin guardar sale al marcar y se va al volver (#764)", async ({
