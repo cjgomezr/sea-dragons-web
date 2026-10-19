@@ -8273,7 +8273,7 @@ test.describe("la ficha con una foto que no carga", () => {
     );
     await page.goto(`${APP_URL}${MEMBER_RECORD_SCREEN_PATH}`);
 
-    const header = page.locator(".member-record-identity");
+    const header = page.locator(".profile-hero-photo");
     await expect(header.locator("img")).toHaveCount(0);
     await expect(header.locator('[aria-hidden="true"]')).toHaveText(
       memberInitials(LONG_MEMBER_NAME),
