@@ -22093,20 +22093,13 @@ test.describe("la columna del Player en el navegador (#749)", () => {
   quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
-  async function topOf(locator: Locator): Promise<number> {
+  /** La esquina de un elemento que se ve, o un fallo que dice cuál faltaba. */
+  async function cornerOf(locator: Locator): Promise<{ x: number; y: number }> {
     const box = await locator.boundingBox();
     if (box === null) {
       throw new Error(`${locator.toString()} no se ve.`);
     }
-    return box.y;
-  }
-
-  async function leftOf(locator: Locator): Promise<number> {
-    const box = await locator.boundingBox();
-    if (box === null) {
-      throw new Error(`${locator.toString()} no se ve.`);
-    }
-    return box.x;
+    return { x: box.x, y: box.y };
   }
 
   test("en el móvil Mi asistencia y Membresía van lado a lado", async ({
@@ -22118,8 +22111,12 @@ test.describe("la columna del Player en el navegador (#749)", () => {
     const attendance = page.getByRole("region", { name: "My attendance" });
     const membership = page.getByRole("region", { name: "Membership" });
 
-    expect(await topOf(membership)).toBe(await topOf(attendance));
-    expect(await leftOf(membership)).toBeGreaterThan(await leftOf(attendance));
+    const [left, right] = await Promise.all([
+      cornerOf(attendance),
+      cornerOf(membership),
+    ]);
+    expect(right.y).toBe(left.y);
+    expect(right.x).toBeGreaterThan(left.x);
   });
 
   test("en escritorio la columna va a la derecha de Próximo", async ({
@@ -22131,8 +22128,12 @@ test.describe("la columna del Player en el navegador (#749)", () => {
     const nextUp = page.getByRole("region", { name: "Next up" });
     const attendance = page.getByRole("region", { name: "My attendance" });
 
-    expect(await topOf(attendance)).toBe(await topOf(nextUp));
-    expect(await leftOf(attendance)).toBeGreaterThan(await leftOf(nextUp));
+    const [card, column] = await Promise.all([
+      cornerOf(nextUp),
+      cornerOf(attendance),
+    ]);
+    expect(column.y).toBe(card.y);
+    expect(column.x).toBeGreaterThan(card.x);
   });
 });
 

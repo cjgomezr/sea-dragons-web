@@ -17357,9 +17357,7 @@ p.dashboard-attendance-empty {
   }
 
   .dashboard-attendance-header h2 {
-    font-size: 13px;
-    font-weight: 400;
-    color: var(--color-text-secondary);
+    font-size: 14.5px;
   }
 
   .dashboard-attendance-season,
