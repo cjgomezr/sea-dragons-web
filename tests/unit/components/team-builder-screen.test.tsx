@@ -487,6 +487,17 @@ describe("las fotos (#757)", () => {
     expect(within(row).getByText("EB")).toBeInTheDocument();
   });
 
+  it("cae a las iniciales si la foto no carga", async () => {
+    stubClub({ builders: [WITH_PHOTOS] });
+    await openScreen();
+    const row = playerRow(region("Available"), DANIELA.fullName);
+
+    fireEvent.error(within(row).getByRole("presentation"));
+
+    expect(within(row).queryByRole("presentation")).not.toBeInTheDocument();
+    expect(within(row).getByText("DV")).toBeInTheDocument();
+  });
+
   it("pone en un equipo el avatar de 34 px con el anillo del color del equipo", async () => {
     stubClub({ builders: [WITH_PHOTOS] });
 

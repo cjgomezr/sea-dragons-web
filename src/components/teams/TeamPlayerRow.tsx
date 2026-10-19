@@ -103,6 +103,7 @@ export function TeamPlayerRow({
   readonly teams: TeamLabels;
   readonly onMove: (destination: Destination) => void;
 }): React.JSX.Element {
+  const ringColor = team === null ? null : teams[team].color;
   return (
     <li
       className="team-player"
@@ -112,22 +113,15 @@ export function TeamPlayerRow({
         event.dataTransfer.effectAllowed = "move";
       }}
     >
-      {team === null ? (
-        <MemberAvatar
-          fullName={player.fullName}
-          photoUrl={player.photoUrl}
-          size={BENCH_AVATAR_SIZE}
-          className="team-avatar"
-        />
-      ) : (
-        <MemberAvatar
-          fullName={player.fullName}
-          photoUrl={player.photoUrl}
-          size={TEAM_AVATAR_SIZE}
-          className="team-avatar team-avatar-ringed"
-          style={{ borderColor: teams[team].color }}
-        />
-      )}
+      <MemberAvatar
+        fullName={player.fullName}
+        photoUrl={player.photoUrl}
+        size={ringColor === null ? BENCH_AVATAR_SIZE : TEAM_AVATAR_SIZE}
+        className={
+          ringColor === null ? "team-avatar" : "team-avatar team-avatar-ringed"
+        }
+        style={ringColor === null ? undefined : { borderColor: ringColor }}
+      />
       <div className="team-player-text">
         <span className="team-player-name">{player.fullName}</span>
         <span className="team-player-hints">
