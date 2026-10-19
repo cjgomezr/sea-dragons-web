@@ -27,6 +27,7 @@ import { ClubAccentField } from "./ClubAccentField";
 import { ClubGeneralPreview } from "./ClubGeneralPreview";
 import { ClubIdentityFields, IDENTITY_HEADING_ID } from "./ClubIdentityFields";
 import { ClubLogoField } from "./ClubLogoField";
+import { ClubSeasonField } from "./ClubSeasonField";
 import { SavedNotice, UnsavedChangesBar } from "./ClubUnsavedChangesBar";
 import {
   type ClubDraft,
@@ -42,7 +43,7 @@ import {
  * barra de cambios sin guardar (#719), que sólo sale con un borrador. Desde
  * #720 es la pestaña General del handoff de E26: IDENTIDAD y MARCA a la
  * izquierda y la vista previa a la derecha; en el móvil, el logo arriba y la
- * vista previa debajo.
+ * vista previa debajo. Desde #744, TEMPORADA va debajo de MARCA.
  *
  * Cada guardado lleva lo que el Admin tenía delante. Si otro Admin guardó
  * entretanto, el servidor responde 409 y la pantalla ofrece cargar lo último
@@ -50,12 +51,14 @@ import {
  * es lo que redibuja la cabecera con el nombre nuevo.
  */
 
-/** Lo que hay en los controles. Unas iniciales vacías se mandan como null, y
- * el acento se manda como lo guarda la base, escriba lo que escriba el Admin. */
+/** Lo que hay en los controles. Unas iniciales vacías y un inicio de
+ * temporada vacío se mandan como null, y el acento se manda como lo guarda
+ * la base, escriba lo que escriba el Admin. */
 type Draft = {
   readonly name: string;
   readonly initials: string;
   readonly accentColor: string;
+  readonly seasonStartsOn: string;
 };
 
 const FIELD_OF_ISSUE: Readonly<
@@ -66,6 +69,7 @@ const FIELD_OF_ISSUE: Readonly<
   initials_too_long: "initials",
   accent_color_invalid: "accentColor",
   accent_color_no_readable_text: "accentColor",
+  season_starts_on_invalid: "seasonStartsOn",
 };
 
 function toDraft(settings: ClubSettings): Draft {
@@ -73,6 +77,7 @@ function toDraft(settings: ClubSettings): Draft {
     name: settings.name,
     initials: settings.initials ?? "",
     accentColor: settings.accentColor.toUpperCase(),
+    seasonStartsOn: settings.seasonStartsOn ?? "",
   };
 }
 
@@ -81,6 +86,7 @@ function toIdentity(draft: Draft): ClubIdentity {
     name: draft.name,
     initials: draft.initials.trim() === "" ? null : draft.initials,
     accentColor: normalizeAccentInput(draft.accentColor),
+    seasonStartsOn: draft.seasonStartsOn === "" ? null : draft.seasonStartsOn,
   };
 }
 
@@ -89,6 +95,7 @@ function identityOf(settings: ClubSettings): ClubIdentity {
     name: settings.name,
     initials: settings.initials,
     accentColor: settings.accentColor,
+    seasonStartsOn: settings.seasonStartsOn,
   };
 }
 
@@ -304,6 +311,14 @@ export function ClubSettingsForm({
             }}
             logo={isPhone ? null : logo}
           />
+          <fieldset className="member-record-fields" disabled={isSending}>
+            <ClubSeasonField
+              translate={translate}
+              value={draft.seasonStartsOn}
+              issueText={issueTextFor("seasonStartsOn")}
+              onChange={(seasonStartsOn) => update({ seasonStartsOn })}
+            />
+          </fieldset>
           <SaveFailure
             translate={translate}
             status={status}

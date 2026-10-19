@@ -26,6 +26,7 @@ const SETTINGS: ClubSettings = {
   initials: "VS",
   accentColor: "#33a1e0",
   logoUrl: "https://logos.example.test/club.png",
+  seasonStartsOn: null,
 };
 
 function position(id: string, isArchived: boolean): ManagedPosition {

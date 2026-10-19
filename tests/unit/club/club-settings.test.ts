@@ -28,12 +28,14 @@ const STORED: ClubSettings = {
   initials: "HH",
   accentColor: "#1c6ea4",
   logoUrl: null,
+  seasonStartsOn: null,
 };
 
 const LOADED: ClubIdentity = {
   name: STORED.name,
   initials: STORED.initials,
   accentColor: STORED.accentColor,
+  seasonStartsOn: STORED.seasonStartsOn,
 };
 
 type FakeOptions = {
@@ -325,6 +327,68 @@ describe("configuración del club: acento", () => {
 
     expect(writes).toEqual([]);
   });
+});
+
+// #744 (RF-1 y D1 del PRD de E27)
+describe("configuración del club: inicio de temporada", () => {
+  it("guarda la fecha elegida y anota el campo, sin el valor", async () => {
+    const { gateways, writes, auditRows } = fake();
+
+    const settings = await updateClubSettings(gateways, {
+      callerId: ADMIN_ID,
+      submission: submit({ seasonStartsOn: "2026-03-02" }),
+    });
+
+    expect(writes[0]?.identity.seasonStartsOn).toBe("2026-03-02");
+    expect(settings.seasonStartsOn).toBe("2026-03-02");
+    expect(auditRows[0]?.metadata).toEqual({ fields: ["seasonStartsOn"] });
+  });
+
+  it("vacía la fecha guardada con null", async () => {
+    const stored = { ...LOADED, seasonStartsOn: "2026-03-02" };
+    const { gateways, writes } = fake();
+
+    await updateClubSettings(gateways, {
+      callerId: ADMIN_ID,
+      submission: submit({ seasonStartsOn: null }, stored),
+    });
+
+    expect(writes[0]?.identity.seasonStartsOn).toBeNull();
+  });
+
+  it("acepta una fecha futura, que cuenta desde el 1 de enero hasta que llegue", async () => {
+    const { gateways, writes } = fake();
+
+    await updateClubSettings(gateways, {
+      callerId: ADMIN_ID,
+      submission: submit({ seasonStartsOn: "2099-01-01" }),
+    });
+
+    expect(writes[0]?.identity.seasonStartsOn).toBe("2099-01-01");
+  });
+
+  it.each([
+    ["que no existe en el calendario", "2026-02-30"],
+    ["escrita al revés", "02-03-2026"],
+    ["con hora", "2026-03-02T00:00:00Z"],
+    ["vacía, que para no tenerla está el null", ""],
+  ])(
+    "rechaza una fecha %s junto a su campo, sin tocar la base",
+    async (_case, seasonStartsOn) => {
+      const { gateways, reads, writes } = fake();
+
+      const attempt = updateClubSettings(gateways, {
+        callerId: ADMIN_ID,
+        submission: submit({ seasonStartsOn }),
+      });
+
+      await expect(attempt).rejects.toMatchObject({
+        issues: [{ field: "seasonStartsOn", code: "season_starts_on_invalid" }],
+      });
+      expect(reads).toEqual([]);
+      expect(writes).toEqual([]);
+    },
+  );
 });
 
 describe("configuración del club: validación", () => {
