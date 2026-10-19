@@ -185,13 +185,14 @@ export type MemberRecordReading =
 
 export type MemberRecordView = MemberRecordReading["view"];
 
-/** Qué vista lee cada rol; null es que no la abre. Es la fila
- * `viewMemberRecords` de la matriz, con la vista de cada uno. */
-const RECORD_VIEW_BY_ROLE: Readonly<Record<Role, MemberRecordView | null>> = {
+/** Qué vista lee cada rol que abre fichas. Quién las abre lo dice la fila
+ * `viewMemberRecords` de la matriz; esto sólo elige la vista. */
+const RECORD_VIEW_BY_ROLE: Readonly<
+  Record<Exclude<Role, "Player">, MemberRecordView>
+> = {
   Admin: "admin",
   Committee: "committee",
   Coach: "coach",
-  Player: null,
 };
 
 /** El AUF que el Admin escribió en la ficha. Un número vacío o en null es
@@ -629,11 +630,13 @@ async function findRecordReader(
   if (caller === null) {
     throw new MemberNotFoundError(callerId);
   }
-  const view = RECORD_VIEW_BY_ROLE[caller.role];
-  if (view === null) {
+  if (
+    caller.role === "Player" ||
+    !hasCapability(caller.role, "viewMemberRecords")
+  ) {
     throw new MemberRecordForbiddenError();
   }
-  return { clubId: caller.clubId, view };
+  return { clubId: caller.clubId, view: RECORD_VIEW_BY_ROLE[caller.role] };
 }
 
 /** La ficha en la vista del rol de quien llama (#770). */
