@@ -270,6 +270,12 @@ export const CLUB_SESSION_PACKS_API_PATH = "/api/v1/club/session-packs";
  * no cuelga de la configuración del club, que es sólo del Admin. */
 export const CLUB_POSITIONS_API_PATH = "/api/v1/club/positions";
 
+/** El nombre y el color de los dos equipos del club (#755, D1 y D2 del PRD
+ * de E28). GET los lee y PATCH los cambia. Son de Admin y Coach, los mismos
+ * que arman equipos, así que no cuelga de la configuración del club, que es
+ * sólo del Admin. El handler lo vuelve a comprobar. */
+export const CLUB_TEAM_LABELS_API_PATH = "/api/v1/club/team-labels";
+
 /** La sección Noticias (#329). La alcanza cualquier cuenta activa: qué
  * publicaciones enseña lo decide el endpoint del feed. */
 export const NEWS_PATH = "/noticias";
@@ -749,6 +755,10 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: ATTENDANCE_API_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: ATTENDANCE_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: TEAMS_API_PATH, capability: "buildTeamsAndTrackAttendance" },
+  {
+    path: CLUB_TEAM_LABELS_API_PATH,
+    capability: "buildTeamsAndTrackAttendance",
+  },
   { path: LEVY_PAYERS_API_PATH, capability: "viewLevyPayers" },
   { path: LEVY_SALES_API_PATH, capability: "viewLevyPayers" },
   { path: LEVY_BUYERS_API_PATH, capability: "viewLevyPayers" },

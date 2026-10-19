@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { messageCatalogs } from "@/lib/i18n/message-catalogs";
-import { BIB_SWATCHES, nameTeamColor } from "@/lib/teams/team-color-name";
+import { TEAM_BIB_COLORS, nameTeamColor } from "@/lib/teams/team-color-name";
 
 /**
  * El color de un equipo dicho con palabras (#403): el lector de pantalla oye
@@ -78,8 +78,27 @@ describe("los doce colores del muestrario", () => {
   ] as const;
 
   it("son los doce del handoff, en su orden", () => {
-    expect(BIB_SWATCHES.map(({ hex, name }) => [hex, name])).toEqual(
+    expect(TEAM_BIB_COLORS.map(({ hex, name }) => [hex, name])).toEqual(
       EXPECTED_SWATCHES,
+    );
+  });
+
+  it.each([
+    ["#D64545", "light"],
+    ["#E07B2E", "dark"],
+    ["#C99A3E", "dark"],
+    ["#E8C547", "dark"],
+    ["#3E9B5F", "light"],
+    ["#2A9D9A", "light"],
+    ["#1C6EA4", "light"],
+    ["#2B3F7A", "light"],
+    ["#7A5BC4", "light"],
+    ["#D9669A", "light"],
+    ["#2B2F36", "light"],
+    ["#F2F4F6", "dark"],
+  ] as const)("pone sobre %s el texto %s, como el handoff", (hex, textTone) => {
+    expect(TEAM_BIB_COLORS.find((color) => color.hex === hex)?.textTone).toBe(
+      textTone,
     );
   });
 
@@ -103,7 +122,7 @@ describe("los doce colores del muestrario", () => {
   });
 
   it("cada color del muestrario tiene texto en los dos idiomas", () => {
-    const keys = BIB_SWATCHES.map(
+    const keys = TEAM_BIB_COLORS.map(
       ({ name }) => `calendar.teams.color.${name}` as const,
     );
 

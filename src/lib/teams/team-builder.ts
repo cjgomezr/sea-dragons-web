@@ -62,7 +62,9 @@ export {
 } from "./team-ids";
 
 /** D5: "Team Kelp" azul y "Team Tide" amarillo, los del mockup, con los
- * colores de acento y de aviso de `design-system.md`. */
+ * colores de acento y de aviso de `design-system.md`. Desde #755 los equipos
+ * son del club (`0077_club_team_labels.sql`) y éstos son sólo los que la
+ * migración pone por defecto; los tests los usan con ese sentido. */
 export const DEFAULT_TEAM_LABELS: TeamLabels = {
   a: { name: "Team Kelp", color: "#1C6EA4" },
   b: { name: "Team Tide", color: "#C99A3E" },
@@ -176,12 +178,24 @@ export type TeamSplitsGateway = {
   }): Promise<TeamSplitPublication>;
 };
 
+/** Los equipos del club (#755, D1 del PRD de E28): los que estrena un
+ * reparto nuevo. */
+export type ClubTeamLabelsGateway = {
+  findClubTeamLabels(clubId: string): Promise<TeamLabels>;
+  /** Los guarda y devuelve lo que quedó guardado. */
+  saveClubTeamLabels(change: {
+    readonly clubId: string;
+    readonly teams: TeamLabels;
+  }): Promise<TeamLabels>;
+};
+
 export type TeamBuilderGateways = {
   readonly members: Pick<
     RoleRequestGateways["members"],
     "findRoleRequestMember"
   >;
   readonly teams: TeamSplitsGateway;
+  readonly clubTeams: ClubTeamLabelsGateway;
   readonly positions: ClubPositionsGateway;
   readonly photos: {
     /** Las direcciones firmadas, por ruta. Una ruta que no se pudo firmar
@@ -223,7 +237,7 @@ export type BuilderSplit = {
 
 export type TeamBuilder = {
   readonly event: TeamBuilderEventSummary;
-  /** Los del reparto guardado, o los de por defecto si no hay. */
+  /** Los del reparto guardado, o los del club si no hay (D4 de E28). */
   readonly teams: TeamLabels;
   readonly available: readonly SquadEntry[];
   readonly maybe: readonly SquadEntry[];
@@ -637,7 +651,9 @@ export async function openTeamBuilder(
       startsOn: event.startsOn,
       startTime: event.startTime,
     },
-    teams: split?.teams ?? DEFAULT_TEAM_LABELS,
+    teams:
+      split?.teams ??
+      (await gateways.clubTeams.findClubTeamLabels(actor.clubId)),
     available: squad.available,
     maybe: squad.maybe,
     split: split === null ? null : toBuilderSplit(split, squad),
@@ -756,7 +772,7 @@ function entriesOf(
 
 /** El auto-balance en el servidor (RF-5): reparte los "Sí" con el algoritmo
  * de C2 y guarda el resultado en borrador con modo `auto`. Conserva los
- * nombres y colores del reparto que hubiera. */
+ * nombres y colores del reparto que hubiera; sin él, usa los del club. */
 export async function autoBalanceEventTeams(
   gateways: TeamBuilderGateways,
   request: {
@@ -778,7 +794,9 @@ export async function autoBalanceEventTeams(
     throw new TeamSquadEmptyError();
   }
   const balanced = autoBalanceTeams(squad.available.map(toSquadPlayer));
-  const teams = stored?.teams ?? DEFAULT_TEAM_LABELS;
+  const teams =
+    stored?.teams ??
+    (await gateways.clubTeams.findClubTeamLabels(actor.clubId));
   await writeSplit(gateways, {
     clubId: actor.clubId,
     eventId: event.id,

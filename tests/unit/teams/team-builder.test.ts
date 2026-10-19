@@ -80,6 +80,12 @@ function draftWith(assignments: readonly TeamAssignment[]): StoredTeamSplit {
   };
 }
 
+/** Los equipos que el club guardó (#755): ni Kelp ni Tide. */
+const CLUB_TEAMS = {
+  a: { name: "Orcas", color: "#D64545" },
+  b: { name: "Rayas", color: "#2B3F7A" },
+};
+
 const CLOSED_EVENTS = [
   ["team_event_not_buildable", { ...SCRIMMAGE, eventType: "meeting" as const }],
   ["team_event_not_buildable", { ...SCRIMMAGE, eventType: "social" as const }],
@@ -153,6 +159,22 @@ describe("la escuadra", () => {
     });
     expect(builder.teams).toEqual(DEFAULT_TEAM_LABELS);
     expect(builder.split).toBeNull();
+  });
+
+  it("da los equipos del club a un evento sin reparto", async () => {
+    const builder = await open({ players: [ANA], clubTeams: CLUB_TEAMS });
+
+    expect(builder.teams).toEqual(CLUB_TEAMS);
+  });
+
+  it("da a un reparto guardado sus equipos, no los del club", async () => {
+    const builder = await open({
+      players: [ANA],
+      clubTeams: CLUB_TEAMS,
+      split: draftWith([]),
+    });
+
+    expect(builder.teams).toEqual(DEFAULT_TEAM_LABELS);
   });
 
   it("deja armar una competición y un evento de hoy aunque ya empezó", async () => {
@@ -559,6 +581,15 @@ describe("balancear", () => {
     });
 
     await expect(balancing).resolves.toMatchObject({ teams });
+  });
+
+  it("reparte un evento sin reparto con los equipos del club", async () => {
+    const { club, balancing } = balance({ clubTeams: CLUB_TEAMS });
+
+    await expect(balancing).resolves.toMatchObject({ teams: CLUB_TEAMS });
+    expect(club.saves).toEqual([
+      expect.objectContaining({ teams: CLUB_TEAMS }),
+    ]);
   });
 
   it("responde que la escuadra está vacía sin guardar nada", async () => {

@@ -20,6 +20,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type { MyTeamGateways } from "./my-team";
 import {
   BUILDABLE_EVENT_TYPES,
+  type ClubTeamLabelsGateway,
   TEAM_IDS,
   TEAM_SPLIT_MODES,
   type NewTeamSplit,
@@ -29,6 +30,7 @@ import {
   type TeamBuilderEvent,
   type TeamBuilderEventSummary,
   type TeamBuilderGateways,
+  type TeamLabels,
   type TeamSplitPublication,
   type TeamSplitSaveOutcome,
   type TeamSplitsGateway,
@@ -48,6 +50,7 @@ import {
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
+const CLUBS_TABLE = "clubs";
 const EVENTS_TABLE = "events";
 const MEMBERS_TABLE = "members";
 const SPLITS_TABLE = "team_splits";
@@ -62,6 +65,9 @@ const PLAYER_COLUMNS = [
   "member_evaluations(member_evaluation_ratings(rating))",
   MEMBERSHIP_STANDING_EMBED,
 ].join(", ");
+
+const TEAM_LABEL_COLUMNS =
+  "team_a_name, team_a_color, team_b_name, team_b_color";
 
 const SPLIT_COLUMNS = [
   "team_a_name, team_a_color, team_b_name, team_b_color, mode, published_at",
@@ -115,15 +121,25 @@ const assignmentRowSchema = z.object({
   team: z.enum(TEAM_IDS),
 });
 
-const splitRowSchema = z.object({
+const teamLabelRowSchema = z.object({
   team_a_name: z.string(),
   team_a_color: z.string(),
   team_b_name: z.string(),
   team_b_color: z.string(),
+});
+
+const splitRowSchema = teamLabelRowSchema.extend({
   mode: z.enum(TEAM_SPLIT_MODES),
   published_at: z.string().nullable(),
   team_split_members: z.array(assignmentRowSchema),
 });
+
+function toTeamLabels(row: z.infer<typeof teamLabelRowSchema>): TeamLabels {
+  return {
+    a: { name: row.team_a_name, color: row.team_a_color },
+    b: { name: row.team_b_name, color: row.team_b_color },
+  };
+}
 
 const rejectionSchema = z.object({
   outcome: z.enum(["not_found", "not_buildable", "cancelled", "past", "empty"]),
@@ -313,10 +329,7 @@ async function findSplit(
   }
   const row = splitRowSchema.parse(data);
   return {
-    teams: {
-      a: { name: row.team_a_name, color: row.team_a_color },
-      b: { name: row.team_b_name, color: row.team_b_color },
-    },
+    teams: toTeamLabels(row),
     mode: row.mode,
     publishedAt: row.published_at === null ? null : new Date(row.published_at),
     assignments: toAssignments(row.team_split_members),
@@ -371,12 +384,58 @@ async function publishSplit(
   return {
     kind: "published",
     publishedAt: new Date(row.published_at),
-    teams: {
-      a: { name: row.team_a_name, color: row.team_a_color },
-      b: { name: row.team_b_name, color: row.team_b_color },
-    },
+    teams: toTeamLabels(row),
     previous: toAssignments(row.previous),
     current: toAssignments(row.current),
+  };
+}
+
+async function findClubTeamLabels(
+  serviceClient: SupabaseClient,
+  clubId: string,
+): Promise<TeamLabels> {
+  const { data, error } = await serviceClient
+    .from(CLUBS_TABLE)
+    .select(TEAM_LABEL_COLUMNS)
+    .eq("id", clubId)
+    .single();
+  if (error) {
+    throw new Error(
+      `No se pudieron leer los equipos del club ${clubId}: ${error.message}`,
+    );
+  }
+  return toTeamLabels(teamLabelRowSchema.parse(data));
+}
+
+async function saveClubTeamLabels(
+  serviceClient: SupabaseClient,
+  change: { readonly clubId: string; readonly teams: TeamLabels },
+): Promise<TeamLabels> {
+  const { data, error } = await serviceClient
+    .from(CLUBS_TABLE)
+    .update({
+      team_a_name: change.teams.a.name,
+      team_a_color: change.teams.a.color,
+      team_b_name: change.teams.b.name,
+      team_b_color: change.teams.b.color,
+    })
+    .eq("id", change.clubId)
+    .select(TEAM_LABEL_COLUMNS)
+    .single();
+  if (error) {
+    throw new Error(
+      `No se pudieron guardar los equipos del club ${change.clubId}: ${error.message}`,
+    );
+  }
+  return toTeamLabels(teamLabelRowSchema.parse(data));
+}
+
+function createClubTeamLabelsGateway(
+  serviceClient: SupabaseClient,
+): ClubTeamLabelsGateway {
+  return {
+    findClubTeamLabels: (clubId) => findClubTeamLabels(serviceClient, clubId),
+    saveClubTeamLabels: (change) => saveClubTeamLabels(serviceClient, change),
   };
 }
 
@@ -400,6 +459,7 @@ export function createTeamBuilderGateways(
   return {
     members: createRoleRequestGateways(serviceClient).members,
     teams: createTeamSplitsGateway(serviceClient),
+    clubTeams: createClubTeamLabelsGateway(serviceClient),
     positions: cachedClubPositions,
     photos: {
       signPhotoUrls: (photoPaths) =>
