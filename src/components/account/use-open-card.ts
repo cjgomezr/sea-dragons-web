@@ -24,7 +24,9 @@ export type OpenCardState<Card extends string> = {
   readonly savedCard: Card | null;
   readonly openCard: (request: CardRequest<Card>) => void;
   readonly closeCard: () => void;
-  readonly closeSavedCard: () => void;
+  /** Cierra la que guardó, si sigue abierta: mientras guardaba se pudo abrir
+   * otra, y esa no se toca. */
+  readonly closeSavedCard: (card: Card) => void;
   readonly reportChanges: (hasChanges: boolean) => void;
 };
 
@@ -42,6 +44,15 @@ export function useOpenCard<Card extends string>(
   const [open, setOpen] = useState<CardRequest<Card> | null>(null);
   const [savedCard, setSavedCard] = useState<Card | null>(null);
   const hasChangesRef = useRef(false);
+  // Un guardado vuelve con las funciones del pintado en que se pidió: la
+  // referencia dice qué tarjeta está abierta ahora.
+  const openCardRef = useRef<Card | null>(null);
+
+  function changeOpen(request: CardRequest<Card> | null): void {
+    hasChangesRef.current = false;
+    openCardRef.current = request === null ? null : request.card;
+    setOpen(request);
+  }
 
   function openCard(request: CardRequest<Card>): void {
     if (open !== null && open.card === request.card) {
@@ -55,20 +66,20 @@ export function useOpenCard<Card extends string>(
     ) {
       return;
     }
-    hasChangesRef.current = false;
     setSavedCard(null);
-    setOpen(request);
+    changeOpen(request);
   }
 
   function closeCard(): void {
-    hasChangesRef.current = false;
-    setOpen(null);
+    changeOpen(null);
   }
 
-  function closeSavedCard(): void {
-    const saved = open === null ? null : open.card;
-    closeCard();
-    setSavedCard(saved);
+  function closeSavedCard(card: Card): void {
+    if (openCardRef.current !== card) {
+      return;
+    }
+    changeOpen(null);
+    setSavedCard(card);
   }
 
   function reportChanges(hasChanges: boolean): void {

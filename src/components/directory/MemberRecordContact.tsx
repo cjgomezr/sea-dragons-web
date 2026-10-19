@@ -47,8 +47,8 @@ import { TextField } from "./record-fields";
  *
  * Guardar manda lo suyo con los grupos y la fecha de nacimiento tal como están
  * guardados, porque la API los pide siempre, y sin el AUF, que es no tocarlo.
- * Sin tocar, el contacto tampoco se manda: el socio puede haberlo cambiado
- * desde que se abrió la ficha, y mandar el de entonces lo pisaría.
+ * Sin tocar no se manda nada: el socio puede haberlo cambiado desde que se
+ * abrió la ficha, y mandar el de entonces lo pisaría.
  */
 
 const HEADING_ID = "ficha-contacto";
@@ -62,14 +62,8 @@ function recordContactDraftOf(record: MemberRecord): ContactDraft {
 
 function toRecordContactSubmission(
   record: MemberRecord,
-  draft: ContactDraft,
+  contact: ProfileContactSubmission,
 ): MemberRecordSubmission {
-  const contact: ProfileContactSubmission | null = isSameContactDraft(
-    draft,
-    recordContactDraftOf(record),
-  )
-    ? null
-    : toContactSubmission(draft, null);
   return {
     auf: null,
     groupIds: record.groups.map(({ id }) => id),
@@ -212,17 +206,23 @@ function RecordContactEditor({
   }
 
   function handleSubmit(): void {
-    const recordSubmission = toRecordContactSubmission(record, draft);
-    const localIssues =
-      recordSubmission.contact === null
-        ? []
-        : contactIssuesOf(recordSubmission.contact);
+    // Sin tocar no hay nada que mandar: guardar es cerrar, como Cancelar.
+    if (isSameContactDraft(draft, recordContactDraftOf(record))) {
+      onCancel();
+      return;
+    }
+    const contact = toContactSubmission(draft, null);
+    const localIssues = contactIssuesOf(contact);
     if (localIssues.length > 0) {
       setIssues(localIssues);
       return;
     }
     void submission.submit(
-      () => saveMemberRecord(record.userId, recordSubmission),
+      () =>
+        saveMemberRecord(
+          record.userId,
+          toRecordContactSubmission(record, contact),
+        ),
       (result) => onSaved(result.record),
     );
   }

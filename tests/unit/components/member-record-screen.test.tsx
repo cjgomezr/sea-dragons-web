@@ -1610,6 +1610,21 @@ describe("ficha en pantalla: contacto (#499, #772)", () => {
     ]);
   });
 
+  it("guardar sin tocar nada vuelve a lectura sin mandar nada", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+    const card = await openContact(user);
+
+    await user.click(saveContact(card));
+
+    expect(within(card).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(
+      within(card).getByRole("button", { name: "Edit Contact" }),
+    ).toHaveFocus();
+    expect(patches).toEqual([]);
+  });
+
   it("al guardar vuelve a lectura con lo nuevo y el foco en Editar", async () => {
     stubApi();
     const user = userEvent.setup();

@@ -261,11 +261,11 @@ export function ProfileForm({
     router.refresh();
   }
 
-  function handleCardSaved(saved: OwnProfile): void {
-    if (cards.open !== null && cards.open.card === "contact") {
+  function handleCardSaved(card: ProfileCard, saved: OwnProfile): void {
+    if (card === "contact") {
       setGuardian(null);
     }
-    cards.closeSavedCard();
+    cards.closeSavedCard(card);
     applySaved(saved);
   }
 
@@ -301,7 +301,7 @@ export function ProfileForm({
         onEdit={() =>
           cards.openCard({ card: "about", focusFieldId: FULL_NAME_ID })
         }
-        onSaved={handleCardSaved}
+        onSaved={(saved) => handleCardSaved("about", saved)}
         onCancel={cards.closeCard}
         onChanges={cards.reportChanges}
       />
@@ -314,7 +314,7 @@ export function ProfileForm({
         onEdit={() =>
           cards.openCard({ card: "contact", focusFieldId: PHONE_ID })
         }
-        onSaved={handleCardSaved}
+        onSaved={(saved) => handleCardSaved("contact", saved)}
         onCancel={cards.closeCard}
         onChanges={cards.reportChanges}
       />

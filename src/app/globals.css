@@ -2369,8 +2369,12 @@ a.auth-brand-header:focus-visible {
   cursor: pointer;
 }
 
-.profile-card-edit:hover {
-  background: var(--color-segment-selected);
+/* Sin fondo al pasar por encima: el azul del texto no llega a AA sobre el
+   tinte de la selección, y axe lo cazó. */
+.profile-card-edit:hover,
+.profile-card-cancel:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .profile-card-edit:focus-visible,
@@ -2572,10 +2576,6 @@ a.auth-brand-header:focus-visible {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-}
-
-.profile-card-cancel:hover:not(:disabled) {
-  background: var(--color-segment-selected);
 }
 
 .profile-card-form .profile-card-save {

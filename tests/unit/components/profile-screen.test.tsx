@@ -1515,6 +1515,33 @@ describe("perfil propio: una tarjeta abierta a la vez (#772)", () => {
     confirm.mockRestore();
   });
 
+  it("abrir otra mientras la primera guarda no la cierra al volver la respuesta", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    let answer: (response: Response) => void = () => undefined;
+    stubFetch(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    renderScreen();
+    const about = await openAbout(user);
+    await user.type(within(about).getByLabelText("Full name"), " Soto");
+    await user.click(saveIn(about));
+    const card = await openContact(user);
+    await user.type(within(card).getByLabelText(OWN_PHONE_LABEL), "0412");
+
+    answer(
+      jsonResponse(200, { data: { ...PROFILE, fullName: "Nerea Ruiz Soto" } }),
+    );
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(within(card).getByLabelText(OWN_PHONE_LABEL)).toHaveValue("0412");
+    expect(within(about).queryByRole("status")).not.toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
   it("escribir y deshacer lo escrito no cuenta como cambio", async () => {
     const confirm = vi.spyOn(window, "confirm");
     const user = userEvent.setup();
