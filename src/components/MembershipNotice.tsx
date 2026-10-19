@@ -4,7 +4,9 @@ import type { MessageKey } from "@/lib/i18n/message";
 import type { Translator } from "@/lib/i18n/translator";
 import type { MembershipBlock } from "@/lib/membership/membership";
 
-const BLOCK_REASON_KEYS = {
+/** El motivo de cada bloqueo: también es el título del aviso del inicio
+ * (#747, D8 del PRD de E27). */
+export const BLOCK_REASON_KEYS = {
   pending: "membership.block.pending",
   past_due: "membership.block.pastDue",
   cancelled: "membership.block.cancelled",

@@ -4,13 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
 import type {
   Dashboard,
+  DashboardNextUpEvent,
   MemberDashboard,
   NextTraining,
+  NextUp,
+  NextUpTeam,
   RestrictedDashboard,
 } from "@/lib/dashboard/dashboard";
 import type { AgendaEvent } from "@/lib/events/event-agenda";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
-import { formatClockTime, formatPercent } from "@/lib/i18n/format";
 import type { ContactReminder } from "@/lib/members/contact-reminder";
 
 /**
@@ -115,6 +117,39 @@ const LATEST_NEWS = [
   },
 ] as const;
 
+const NEXT_UP: DashboardNextUpEvent = {
+  kind: "event",
+  id: POOL_TRAINING.id,
+  title: "Saturday scrimmage",
+  eventType: "training",
+  startsOn: "2026-10-02",
+  endsOn: null,
+  startTime: "09:00",
+  endTime: "11:00",
+  location: "Princes Park · Field 2",
+  place: {
+    name: "Princes Park",
+    address: "Princes Park Dr, Carlton North VIC 3054",
+    lat: -37.7826,
+    lng: 144.9611,
+  },
+  coverUrl: null,
+  audience: { kind: "club" },
+  goingCount: 14,
+  maybeCount: 3,
+  myResponse: "yes",
+  myTeam: null,
+};
+
+const KELP_TEAM: NextUpTeam = {
+  name: "Team Kelp",
+  color: "#1C6EA4",
+  position: {
+    id: "12121212-0000-4000-8000-000000000012",
+    names: { en: "Full back", es: "Defensa" },
+  },
+};
+
 const ADMIN_DASHBOARD: MemberDashboard = {
   kind: "member",
   viewer: { firstName: "Alba" },
@@ -130,7 +165,7 @@ const ADMIN_DASHBOARD: MemberDashboard = {
   upcomingEvents: { kind: "events", events: UPCOMING },
   latestNews: { kind: "news", posts: LATEST_NEWS },
   contactReminder: { kind: "reminder", reminder: "none" },
-  nextUp: { kind: "none" },
+  nextUp: { ...NEXT_UP, teamsStatus: "none" },
   week: { kind: "week", events: [] },
   membership: { status: "active", plan: "Full", renewsOn: null },
 };
@@ -144,6 +179,7 @@ const PLAYER_DASHBOARD: MemberDashboard = {
       attendance: { kind: "rate", percent: 75, sessions: 6 },
     },
   },
+  nextUp: NEXT_UP,
 };
 
 const EMPTY_DASHBOARD: MemberDashboard = {
@@ -208,19 +244,6 @@ function savedResponse(eventId: string, response: RsvpResponse): Response {
   });
 }
 
-function detailResponse(myResponse: RsvpResponse): Response {
-  return jsonResponse(200, {
-    data: {
-      goingCount: 14,
-      maybeCount: 3,
-      myResponse,
-      notes: null,
-      going: [],
-      maybe: [],
-    },
-  });
-}
-
 function setClubTime(instant: string): void {
   vi.setSystemTime(new Date(instant));
 }
@@ -242,12 +265,8 @@ async function renderScreen(
   return view;
 }
 
-function tiles(): HTMLElement {
-  return screen.getByRole("region", { name: "Club at a glance" });
-}
-
-function trainingCard(): HTMLElement {
-  return screen.getByRole("region", { name: "Next training" });
+function nextUpCard(): HTMLElement {
+  return screen.getByRole("region", { name: "Next up" });
 }
 
 /** La fila `index` de una lista, o un fallo que dice cuántas había. */
@@ -259,11 +278,18 @@ function rowAt(rows: readonly HTMLElement[], index: number): HTMLElement {
   return row;
 }
 
-function rsvpButton(name: "Yes" | "Maybe" | "No"): HTMLElement {
-  const group = within(trainingCard()).getByRole("group", {
-    name: "RSVP: Pool Training",
+function rsvpButton(name: "Going" | "Maybe" | "Can't go"): HTMLElement {
+  const group = within(nextUpCard()).getByRole("group", {
+    name: `RSVP: ${NEXT_UP.title}`,
   });
   return within(group).getByRole("button", { name });
+}
+
+function withNextUp(
+  nextUp: NextUp,
+  dashboard: Dashboard = PLAYER_DASHBOARD,
+): Dashboard {
+  return { ...dashboard, nextUp };
 }
 
 beforeEach(() => {
@@ -308,142 +334,6 @@ describe("el saludo", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: text }),
     ).toBeInTheDocument();
-  });
-});
-
-describe("las teselas", () => {
-  it("pinta a un Admin las cuatro en el orden del mockup, cada una enlazando a su sección", async () => {
-    stubDashboard(ADMIN_DASHBOARD);
-
-    await renderScreen();
-
-    const links = within(tiles()).getAllByRole("link");
-    expect(
-      links.map((link) => [
-        link.getAttribute("aria-label"),
-        link.getAttribute("href"),
-      ]),
-    ).toEqual([
-      ["Attendance rate: 86%", "/asistencia"],
-      ["Active members: 48", "/directorio"],
-      ["Next training: 2 d", "/calendario"],
-      ["Unread news: 3", "/noticias"],
-    ]);
-  });
-
-  it("pone debajo de cada valor su detalle", async () => {
-    stubDashboard(ADMIN_DASHBOARD);
-
-    await renderScreen();
-
-    const region = tiles();
-    expect(within(region).getByText("last 30 days")).toBeInTheDocument();
-    expect(within(region).getByText("+3 this month")).toBeInTheDocument();
-    expect(within(region).getByText("Fri · MSAC")).toBeInTheDocument();
-    expect(within(region).getByText("1 announcement")).toBeInTheDocument();
-  });
-
-  it("enseña a un Player su asistencia, sin enlace a Asistencia", async () => {
-    stubDashboard(PLAYER_DASHBOARD);
-
-    await renderScreen();
-
-    const region = tiles();
-    expect(
-      within(region).getByRole("group", { name: "Your attendance: 75%" }),
-    ).toBeInTheDocument();
-    expect(within(region).getByText("6 sessions")).toBeInTheDocument();
-    expect(
-      within(region).queryByRole("link", { name: /attendance/i }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("dice sin datos, sin entrenamiento y al día cuando no hay nada que contar", async () => {
-    stubDashboard(EMPTY_DASHBOARD);
-
-    await renderScreen();
-
-    const region = tiles();
-    expect(
-      within(region).getByRole("link", { name: "Attendance rate: No data" }),
-    ).toBeInTheDocument();
-    expect(
-      within(region).getByRole("link", {
-        name: "Next training: No training scheduled",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(region).getByRole("link", { name: "Unread news: All caught up" }),
-    ).toBeInTheDocument();
-    expect(within(region).queryByText(/this month/)).not.toBeInTheDocument();
-    expect(within(region).queryByText(/announcement/)).not.toBeInTheDocument();
-  });
-
-  it("dice no disponible en la tesela que cayó y pinta las demás", async () => {
-    stubDashboard({
-      ...ADMIN_DASHBOARD,
-      tiles: { ...ADMIN_DASHBOARD.tiles, attendance: { kind: "unavailable" } },
-    });
-
-    await renderScreen();
-
-    const region = tiles();
-    expect(
-      within(region).getByRole("group", { name: "Attendance: Unavailable" }),
-    ).toBeInTheDocument();
-    expect(
-      within(region).getByRole("link", { name: "Active members: 48" }),
-    ).toBeInTheDocument();
-  });
-
-  it("dice hoy y la hora cuando el entrenamiento es hoy", async () => {
-    stubDashboard({
-      ...ADMIN_DASHBOARD,
-      tiles: {
-        ...ADMIN_DASHBOARD.tiles,
-        nextTraining: {
-          kind: "training",
-          training: { ...POOL_TRAINING, startsOn: "2026-09-30" },
-        },
-      },
-    });
-
-    await renderScreen();
-
-    expect(
-      within(tiles()).getByRole("link", {
-        name: `Next training: today ${formatClockTime("en", "19:00")}`,
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("cuenta horas cuando faltan menos de 24", async () => {
-    // 22:00 del 1 de octubre en Melbourne: el entrenamiento es mañana a las 19.
-    setClubTime("2026-10-01T12:00:00.000Z");
-    stubDashboard(ADMIN_DASHBOARD);
-
-    await renderScreen();
-
-    expect(
-      within(tiles()).getByRole("link", { name: "Next training: 21 h" }),
-    ).toBeInTheDocument();
-  });
-
-  it("se oye en español con el porcentaje del idioma", async () => {
-    stubDashboard(ADMIN_DASHBOARD);
-
-    await renderScreen({ locale: "es" });
-
-    const region = screen.getByRole("region", {
-      name: "El club de un vistazo",
-    });
-    expect(
-      within(region).getByRole("link", {
-        name: `Tasa de asistencia: ${formatPercent("es", 86)}`,
-      }),
-    ).toBeInTheDocument();
-    expect(within(region).getByText("+3 este mes")).toBeInTheDocument();
-    expect(within(region).getByText("1 anuncio")).toBeInTheDocument();
   });
 });
 
@@ -562,28 +452,257 @@ describe("próximos y noticias", () => {
   });
 });
 
-describe("el RSVP del móvil", () => {
-  it("marca la respuesta actual", async () => {
+describe("la cabecera (#747)", () => {
+  it("lleva el día del club y la sección encima del saludo", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
+
+    await renderScreen();
+
+    expect(screen.getByText("Wed 30 Sep · Dashboard")).toBeInTheDocument();
+  });
+
+  it("dice el día en español", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
+
+    await renderScreen({ locale: "es" });
+
+    expect(screen.getByText("mié 30 sep · Inicio")).toBeInTheDocument();
+  });
+
+  it("ofrece + Evento a quien puede crear eventos y abre el calendario con el formulario", async () => {
+    stubDashboard(ADMIN_DASHBOARD);
+
+    await renderScreen({ canCreateTrainings: true });
+
+    const newEvent = screen.getByRole("link", { name: "New event" });
+    expect(newEvent).toHaveAttribute("href", "/calendario?nuevo=training");
+    expect(newEvent).toHaveTextContent("Event");
+  });
+
+  it("no ofrece + Evento a quien no puede", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
+
+    await renderScreen({ canCreateTrainings: false });
+
+    expect(
+      screen.queryByRole("link", { name: "New event" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ya no pinta las teselas ni la tarjeta del entrenamiento", async () => {
     stubDashboard(ADMIN_DASHBOARD);
 
     await renderScreen();
 
-    expect(rsvpButton("Yes")).toHaveAttribute("aria-pressed", "true");
-    expect(rsvpButton("Maybe")).toHaveAttribute("aria-pressed", "false");
-    expect(rsvpButton("No")).toHaveAttribute("aria-pressed", "false");
+    expect(
+      screen.queryByRole("region", { name: "Club at a glance" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Next training" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("la tarjeta Próximo (#747)", () => {
+  it("sin portada pinta el fondo del tipo y la píldora de los días que faltan", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
+
+    const view = await renderScreen();
+
+    const card = nextUpCard();
+    expect(within(card).getByText("Next up · In 2 days")).toBeInTheDocument();
+    expect(
+      view.container.querySelector(".event-cover-fallback-training"),
+    ).not.toBeNull();
+    expect(within(card).queryByRole("img")).not.toBeInTheDocument();
   });
 
-  it("guarda la respuesta como en el calendario y la marca", async () => {
+  it("con portada la pinta como imagen decorativa", async () => {
+    const coverUrl = "https://example.com/cover.jpg";
+    stubDashboard(withNextUp({ ...NEXT_UP, coverUrl }));
+
+    const view = await renderScreen();
+
+    const cover = view.container.querySelector(".dashboard-next-up img");
+    expect(cover).toHaveAttribute("src", coverUrl);
+    expect(cover).toHaveAttribute("alt", "");
+  });
+
+  it.each([
+    ["2026-09-30", "Next up · Today"],
+    ["2026-10-01", "Next up · Tomorrow"],
+  ])("un evento del %s dice %s", async (startsOn, pill) => {
+    stubDashboard(withNextUp({ ...NEXT_UP, startsOn }));
+
+    await renderScreen();
+
+    expect(within(nextUpCard()).getByText(pill)).toBeInTheDocument();
+  });
+
+  it("dice la píldora en español", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
+
+    await renderScreen({ locale: "es" });
+
+    const card = screen.getByRole("region", { name: "Próximo" });
+    expect(within(card).getByText("Próximo · En 2 días")).toBeInTheDocument();
+  });
+
+  it("pinta el tipo, la audiencia, el título, cuándo con lo que dura y el lugar", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
+
+    await renderScreen();
+
+    const card = nextUpCard();
+    expect(within(card).getByText("Training")).toBeInTheDocument();
+    expect(within(card).getByText("The whole club")).toBeInTheDocument();
+    expect(
+      within(card).getByRole("heading", { level: 2, name: NEXT_UP.title }),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByText("Fri 2 Oct · 9:00 am – 11:00 am · 2 h"),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByText("Princes Park · Field 2"),
+    ).toBeInTheDocument();
+  });
+
+  it("sin hora de fin dice sólo el día y el inicio", async () => {
+    stubDashboard(withNextUp({ ...NEXT_UP, endTime: null }));
+
+    await renderScreen();
+
+    expect(
+      within(nextUpCard()).getByText("Fri 2 Oct · 9:00 am"),
+    ).toBeInTheDocument();
+  });
+
+  it("Cómo llegar abre el mapa del calendario en otra pestaña", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
+
+    await renderScreen();
+
+    const directions = within(nextUpCard()).getByRole("link", {
+      name: /^Directions/,
+    });
+    expect(directions).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/search/?api=1&query=-37.7826,144.9611",
+    );
+    expect(directions).toHaveAttribute("target", "_blank");
+  });
+
+  it("con la dirección pero sin coordenadas también ofrece Cómo llegar", async () => {
+    stubDashboard(
+      withNextUp({
+        ...NEXT_UP,
+        place: {
+          name: "Princes Park",
+          address: "Princes Park Dr",
+          lat: null,
+          lng: null,
+        },
+      }),
+    );
+
+    await renderScreen();
+
+    expect(
+      within(nextUpCard()).getByRole("link", { name: /^Directions/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("con el lugar en texto libre no ofrece Cómo llegar", async () => {
+    stubDashboard(withNextUp({ ...NEXT_UP, place: null }));
+
+    await renderScreen();
+
+    const card = nextUpCard();
+    expect(within(card).getByText(NEXT_UP.location)).toBeInTheDocument();
+    expect(
+      within(card).queryByRole("link", { name: /^Directions/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("sin nada próximo lo dice y ofrece + Evento a quien puede crearlo", async () => {
+    stubDashboard(withNextUp({ kind: "none" }, ADMIN_DASHBOARD));
+
+    await renderScreen({ canCreateTrainings: true });
+
+    const card = nextUpCard();
+    expect(within(card).getByText("Nothing coming up.")).toBeInTheDocument();
+    expect(
+      within(card).getByRole("link", { name: "New event" }),
+    ).toHaveAttribute("href", "/calendario?nuevo=training");
+  });
+
+  it("sin nada próximo no ofrece + Evento a quien no puede crearlo", async () => {
+    stubDashboard(withNextUp({ kind: "none" }));
+
+    await renderScreen();
+
+    expect(
+      within(nextUpCard()).queryByRole("link", { name: "New event" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("si no se pudo leer lo dice con Reintentar y pinta el resto", async () => {
+    let attempts = 0;
+    stubApi(() => {
+      attempts += 1;
+      return jsonResponse(200, {
+        data:
+          attempts === 1
+            ? withNextUp({ kind: "unavailable" })
+            : PLAYER_DASHBOARD,
+      });
+    });
+    await renderScreen();
+
+    const card = nextUpCard();
+    expect(
+      within(card).getByText("We couldn't load the next event."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Latest news" }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      within(card).getByRole("button", { name: "Try again" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { level: 2, name: NEXT_UP.title }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("el RSVP de la tarjeta Próximo (#747)", () => {
+  it("marca la respuesta guardada y cuenta los que van", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
+
+    await renderScreen();
+
+    expect(rsvpButton("Going")).toHaveAttribute("aria-pressed", "true");
+    expect(rsvpButton("Maybe")).toHaveAttribute("aria-pressed", "false");
+    expect(rsvpButton("Can't go")).toHaveAttribute("aria-pressed", "false");
+    expect(
+      within(nextUpCard()).getByText("14 going · 3 maybe"),
+    ).toBeInTheDocument();
+  });
+
+  it("guarda como en el calendario y pone al día la marca y los conteos al confirmar", async () => {
     stubApi(({ method, url, body }) => {
       if (method === "PUT") {
-        expect(url.pathname).toBe(rsvpPath(POOL_TRAINING.id));
+        expect(url.pathname).toBe(rsvpPath(NEXT_UP.id));
         expect(body).toEqual({ response: "maybe" });
-        return savedResponse(POOL_TRAINING.id, "maybe");
+        return savedResponse(NEXT_UP.id, "maybe");
       }
-      if (url.pathname === `/api/v1/events/${POOL_TRAINING.id}`) {
-        return detailResponse("maybe");
+      if (url.pathname === `/api/v1/events/${NEXT_UP.id}`) {
+        return jsonResponse(500, {
+          error: { code: "internal_error", message: "Falló." },
+        });
       }
-      return jsonResponse(200, { data: ADMIN_DASHBOARD });
+      return jsonResponse(200, { data: PLAYER_DASHBOARD });
     });
     await renderScreen();
 
@@ -592,67 +711,140 @@ describe("el RSVP del móvil", () => {
     await waitFor(() =>
       expect(rsvpButton("Maybe")).toHaveAttribute("aria-pressed", "true"),
     );
-    expect(rsvpButton("Yes")).toHaveAttribute("aria-pressed", "false");
+    expect(rsvpButton("Going")).toHaveAttribute("aria-pressed", "false");
+    expect(
+      within(nextUpCard()).getByText("13 going · 4 maybe"),
+    ).toBeInTheDocument();
   });
 
-  it("un doble toque manda una sola respuesta", async () => {
+  it("si guardar falla lo dice bajo los botones y deja la respuesta de antes", async () => {
+    stubApi(({ method }) => {
+      if (method === "PUT") {
+        throw new TypeError("Failed to fetch");
+      }
+      return jsonResponse(200, { data: PLAYER_DASHBOARD });
+    });
+    await renderScreen();
+
+    await userEvent.click(rsvpButton("Can't go"));
+
+    expect(await within(nextUpCard()).findByRole("alert")).toHaveTextContent(
+      "We couldn't save your answer. Check your connection and try again.",
+    );
+    expect(rsvpButton("Going")).toHaveAttribute("aria-pressed", "true");
+    expect(rsvpButton("Can't go")).toHaveAttribute("aria-pressed", "false");
+    expect(
+      within(nextUpCard()).getByText("14 going · 3 maybe"),
+    ).toBeInTheDocument();
+  });
+
+  it("un segundo toque mientras guarda no manda otra respuesta", async () => {
     let releaseSave: () => void = () => undefined;
     stubApi(async ({ method, url }) => {
       if (method === "PUT") {
         await new Promise<void>((resolve) => {
           releaseSave = resolve;
         });
-        return savedResponse(POOL_TRAINING.id, "no");
+        return savedResponse(NEXT_UP.id, "no");
       }
-      if (url.pathname === `/api/v1/events/${POOL_TRAINING.id}`) {
-        return detailResponse("no");
+      if (url.pathname === `/api/v1/events/${NEXT_UP.id}`) {
+        return jsonResponse(500, {
+          error: { code: "internal_error", message: "Falló." },
+        });
       }
-      return jsonResponse(200, { data: ADMIN_DASHBOARD });
+      return jsonResponse(200, { data: PLAYER_DASHBOARD });
     });
     await renderScreen();
 
-    await userEvent.click(rsvpButton("No"));
+    await userEvent.click(rsvpButton("Can't go"));
     await userEvent.click(rsvpButton("Maybe"));
     releaseSave();
 
     await waitFor(() =>
-      expect(rsvpButton("No")).toHaveAttribute("aria-pressed", "true"),
+      expect(rsvpButton("Can't go")).toHaveAttribute("aria-pressed", "true"),
     );
     expect(requests.filter((request) => request.method === "PUT")).toEqual([
-      { method: "PUT", path: rsvpPath(POOL_TRAINING.id) },
+      { method: "PUT", path: rsvpPath(NEXT_UP.id) },
     ]);
   });
+});
 
-  it("no hay tarjeta sin entrenamiento a la vista", async () => {
-    stubDashboard(EMPTY_DASHBOARD);
+describe("el equipo en la tarjeta Próximo (#747)", () => {
+  it("con el reparto publicado dice en qué equipo juega, su peto y su posición", async () => {
+    stubDashboard(withNextUp({ ...NEXT_UP, myTeam: KELP_TEAM }));
+
+    await renderScreen();
+
+    const card = nextUpCard();
+    expect(within(card).getByText("You're playing in")).toBeInTheDocument();
+    const strip = within(card).getByText("Team Kelp").closest("p");
+    expect(strip).toHaveTextContent("Team Kelp · blue bib · Full back");
+    expect(within(card).getByRole("link", { name: "Lineups" })).toHaveAttribute(
+      "href",
+      `/calendario?evento=${NEXT_UP.id}`,
+    );
+  });
+
+  it("sin posición no la dice", async () => {
+    stubDashboard(
+      withNextUp({ ...NEXT_UP, myTeam: { ...KELP_TEAM, position: null } }),
+    );
+
+    await renderScreen();
+
+    const strip = within(nextUpCard()).getByText("Team Kelp").closest("p");
+    expect(strip).toHaveTextContent(/^Team Kelp · blue bib$/);
+  });
+
+  it("dice el peto y la posición en español", async () => {
+    stubDashboard(withNextUp({ ...NEXT_UP, myTeam: KELP_TEAM }));
+
+    await renderScreen({ locale: "es" });
+
+    const card = screen.getByRole("region", { name: "Próximo" });
+    expect(within(card).getByText("Juegas en")).toBeInTheDocument();
+    const strip = within(card).getByText("Team Kelp").closest("p");
+    expect(strip).toHaveTextContent("Team Kelp · peto azul · Defensa");
+  });
+
+  it("sin equipo no hay franja", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
 
     await renderScreen();
 
     expect(
-      screen.queryByRole("region", { name: "Next training" }),
+      within(nextUpCard()).queryByText("You're playing in"),
     ).not.toBeInTheDocument();
   });
-});
 
-describe("nuevo entrenamiento", () => {
-  it("lo ve quien puede crear entrenamientos y abre el calendario con el formulario", async () => {
-    stubDashboard(ADMIN_DASHBOARD);
-
-    await renderScreen({ canCreateTrainings: true });
-
-    expect(screen.getByRole("link", { name: "New training" })).toHaveAttribute(
-      "href",
-      "/calendario?nuevo=training",
+  it("a Admin y Coach les avisa del reparto sin publicar y abre ese evento en Equipos", async () => {
+    stubDashboard(
+      withNextUp({ ...NEXT_UP, teamsStatus: "draft" }, ADMIN_DASHBOARD),
     );
+
+    await renderScreen();
+
+    const card = nextUpCard();
+    expect(
+      within(card)
+        .getByText(/^Teams are saved but/)
+        .closest("p"),
+    ).toHaveTextContent("Teams are saved but not published yet.");
+    expect(within(card).getByText("not published").tagName).toBe("STRONG");
+    expect(
+      within(card).getByRole("link", { name: "Open teams" }),
+    ).toHaveAttribute("href", `/equipos?evento=${NEXT_UP.id}`);
   });
 
-  it("no lo ve quien no puede", async () => {
-    stubDashboard(PLAYER_DASHBOARD);
+  it("con el reparto publicado o sin reparto no avisa", async () => {
+    stubDashboard(
+      withNextUp({ ...NEXT_UP, teamsStatus: "published" }, ADMIN_DASHBOARD),
+    );
 
-    await renderScreen({ canCreateTrainings: false });
+    await renderScreen();
 
     expect(
-      screen.queryByRole("link", { name: "New training" }),
+      within(nextUpCard()).queryByRole("link", { name: "Open teams" }),
     ).not.toBeInTheDocument();
   });
 });
@@ -717,73 +909,116 @@ const RESTRICTED_DASHBOARD: RestrictedDashboard = {
   block: "pending",
   nextTraining: { kind: "training", training: POOL_TRAINING },
   contactReminder: { kind: "reminder", reminder: "none" },
-  nextUp: { kind: "none" },
+  nextUp: NEXT_UP,
   week: { kind: "week", events: [] },
   membership: { status: "restricted", block: "pending", endedOn: null },
   latestNews: { kind: "news", posts: [] },
 };
 
-describe("el inicio de quien no tiene la membresía al día (#453)", () => {
-  it("saluda y avisa del motivo con el enlace a Pagos", async () => {
-    stubDashboard(RESTRICTED_DASHBOARD);
+function restrictedBy(
+  block: RestrictedDashboard["block"],
+  endedOn: string | null = null,
+): RestrictedDashboard {
+  return {
+    ...RESTRICTED_DASHBOARD,
+    block,
+    membership: { status: "restricted", block, endedOn },
+  };
+}
+
+describe("el inicio de quien no tiene la membresía al día (#453, #747)", () => {
+  it.each([
+    ["pending", "Your membership is pending: you haven't added a card yet."],
+    ["past_due", "Your last payment didn't go through."],
+  ] as const)(
+    "con %s avisa con el texto de hoy y Renovar membresía a Pagos",
+    async (block, title) => {
+      stubDashboard(restrictedBy(block));
+
+      await renderScreen();
+
+      const notice = screen.getByRole("note", { name: title });
+      expect(
+        within(notice).getByRole("link", { name: "Renew membership" }),
+      ).toHaveAttribute("href", "/pagos");
+    },
+  );
+
+  it("vencida dice la fecha en que venció", async () => {
+    stubDashboard(restrictedBy("cancelled", "2026-09-30"));
 
     await renderScreen();
 
     expect(
-      screen.getByText(
-        "Your membership is pending: you haven't added a card yet.",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Go to Payments" }),
-    ).toHaveAttribute("href", "/pagos");
-  });
-
-  it("enseña el próximo entrenamiento sin RSVP", async () => {
-    stubDashboard(RESTRICTED_DASHBOARD);
-
-    await renderScreen();
-
-    expect(
-      within(trainingCard()).getByText("Pool Training"),
-    ).toBeInTheDocument();
-    expect(
-      within(trainingCard()).queryByRole("button", { name: "Yes" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("no pinta teselas de club ni noticias", async () => {
-    stubDashboard(RESTRICTED_DASHBOARD);
-
-    await renderScreen();
-
-    expect(
-      screen.queryByRole("region", { name: "Club at a glance" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/Latest news/i)).not.toBeInTheDocument();
-  });
-
-  it("dice cuando no hay entrenamiento a la vista", async () => {
-    stubDashboard({ ...RESTRICTED_DASHBOARD, nextTraining: { kind: "none" } });
-
-    await renderScreen();
-
-    expect(
-      within(trainingCard()).getByText("No training scheduled"),
+      screen.getByRole("note", {
+        name: "Your membership expired on 30 September 2026",
+      }),
     ).toBeInTheDocument();
   });
 
-  it("avisa en español", async () => {
-    stubDashboard({ ...RESTRICTED_DASHBOARD, block: "cancelled" });
+  it("vencida sin fecha no la dice", async () => {
+    stubDashboard(restrictedBy("cancelled"));
+
+    await renderScreen();
+
+    expect(
+      screen.getByRole("note", { name: "Your membership expired" }),
+    ).toBeInTheDocument();
+  });
+
+  it("vencida lo dice en español", async () => {
+    stubDashboard(restrictedBy("cancelled", "2026-09-30"));
 
     await renderScreen({ locale: "es" });
 
+    const notice = screen.getByRole("note", {
+      name: /^Tu membresía venció el /,
+    });
     expect(
-      screen.getByText("Tu membresía está cancelada."),
+      within(notice).getByRole("link", { name: "Renovar membresía" }),
+    ).toHaveAttribute("href", "/pagos");
+  });
+
+  it("en la tarjeta cambia los botones por la fila con candado y Renovar", async () => {
+    stubDashboard(RESTRICTED_DASHBOARD);
+
+    await renderScreen();
+
+    const card = nextUpCard();
+    expect(
+      within(card).getByRole("heading", { level: 2, name: NEXT_UP.title }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Ir a Pagos" }),
+      within(card).getByText("RSVP is for current members."),
     ).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "Renew" })).toHaveAttribute(
+      "href",
+      "/pagos",
+    );
+    expect(within(card).queryByRole("group")).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("no avisa del contacto, para no competir con el de la membresía", async () => {
+    stubDashboard({
+      ...RESTRICTED_DASHBOARD,
+      contactReminder: { kind: "reminder", reminder: "emergency_contact" },
+    });
+
+    await renderScreen();
+
+    expect(screen.getAllByRole("note")).toHaveLength(1);
+    expect(
+      screen.queryByRole("note", { name: "Add your emergency contact" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("no pinta noticias", async () => {
+    stubDashboard(RESTRICTED_DASHBOARD);
+
+    await renderScreen();
+
+    expect(screen.queryByText(/Latest news/i)).not.toBeInTheDocument();
   });
 });
 
@@ -797,7 +1032,7 @@ function withReminder(
 const EMERGENCY_NOTE = "Add your emergency contact";
 const PHONE_NOTE = "Add your phone number";
 const BOTH_NOTE = "Add your phone number and emergency contact";
-const CONTACT_LINK = "Complete it in Contact, on your profile";
+const CONTACT_LINK = "Add contact";
 
 describe("el aviso del contacto (#498)", () => {
   it("sin contacto de emergencia explica para qué es, enlaza a Contacto y no se puede cerrar", async () => {
@@ -922,24 +1157,13 @@ describe("el aviso del contacto (#498)", () => {
   });
 
   it("no bloquea el RSVP ni el resto del inicio", async () => {
-    stubDashboard(withReminder("both"));
+    stubDashboard(withReminder("both", PLAYER_DASHBOARD));
 
     await renderScreen();
 
-    expect(rsvpButton("Yes")).toBeEnabled();
-    expect(tiles()).toBeInTheDocument();
-  });
-
-  it("también avisa en el inicio reducido, sin tapar el enlace a Pagos", async () => {
-    stubDashboard(withReminder("emergency_contact", RESTRICTED_DASHBOARD));
-
-    await renderScreen();
-
+    expect(rsvpButton("Going")).toBeEnabled();
     expect(
-      screen.getByRole("note", { name: EMERGENCY_NOTE }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Go to Payments" }),
+      screen.getByRole("region", { name: "Latest news" }),
     ).toBeInTheDocument();
   });
 
@@ -980,7 +1204,7 @@ describe("el aviso del contacto (#498)", () => {
     ).toBeInTheDocument();
     expect(
       within(note).getByRole("link", {
-        name: "Complétalo en Contacto, en tu perfil",
+        name: "Añadir contacto",
       }),
     ).toBeInTheDocument();
     expect(requests).toHaveLength(requestsBefore);

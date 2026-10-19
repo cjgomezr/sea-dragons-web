@@ -6,8 +6,8 @@ import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types
 import type { EventType } from "@/lib/events/event-creation";
 
 /** Los tamaños del handoff de E24: la miniatura de la fila, la imagen del
- * diálogo (#650) y la del panel. */
-export type EventCoverIconSize = 24 | 48 | 76;
+ * diálogo (#650), la del panel y la de la tarjeta "Próximo" (#747). */
+export type EventCoverIconSize = 24 | 48 | 76 | 84;
 
 const TYPE_GLYPHS: Readonly<Record<EventType, PhosphorGlyph>> = {
   training: Timer,

@@ -15,6 +15,7 @@ import {
   formatCompactClockRange,
   formatClubDay,
   formatClubMoment,
+  formatDashboardDay,
   formatWeekdayName,
   formatWeekdays,
   formatFileSize,
@@ -405,6 +406,16 @@ describe("días del panel del evento (#648)", () => {
 
   it("escribe el día y el mes en español", () => {
     expect(formatShortMonthDay("es", "2026-12-16")).toBe("16 dic");
+  });
+});
+
+describe("el día del inicio (#747)", () => {
+  it("escribe el día de la semana, el número y el mes en corto", () => {
+    expect(formatDashboardDay("en", "2026-10-02")).toBe("Fri 2 Oct");
+  });
+
+  it("escribe el día en español", () => {
+    expect(formatDashboardDay("es", "2026-09-30")).toBe("mié 30 sep");
   });
 });
 
