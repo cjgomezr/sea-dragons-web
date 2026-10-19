@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import type { Role } from "@/lib/auth/roles";
 import { listBuildableEvents } from "@/lib/teams/buildable-events";
+import {
+  changeClubTeamLabels,
+  readClubTeamLabels,
+} from "@/lib/teams/club-team-labels";
 import { openMyTeam } from "@/lib/teams/my-team";
 import {
   createMyTeamGateways,
@@ -425,6 +429,73 @@ describeRls("el team builder en Supabase", () => {
           "Beto Base",
           "Pía Portera",
         ]);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "arma con los equipos del club y cambiarlos no toca un reparto publicado (#755)",
+    async () => {
+      await withSquad(async (squad) => {
+        const gateways = createTeamBuilderGateways(squad.serviceClient.client);
+        const request = {
+          callerId: squad.coach.id,
+          eventId: squad.eventId,
+          now: new Date(),
+        };
+        const orcas = {
+          a: { name: "Orcas", color: "#D64545" },
+          b: { name: "Rayas", color: "#2B3F7A" },
+        };
+        const later = {
+          a: { name: "Pulpos", color: "#3E9B5F" },
+          b: { name: "Medusas", color: "#7A5BC4" },
+        };
+
+        await expect(
+          readClubTeamLabels(gateways, squad.coach.id),
+        ).resolves.toEqual(DEFAULT_TEAM_LABELS);
+        await expect(
+          changeClubTeamLabels(gateways, {
+            callerId: squad.coach.id,
+            teams: orcas,
+          }),
+        ).resolves.toEqual(orcas);
+        await expect(openTeamBuilder(gateways, request)).resolves.toMatchObject(
+          { teams: orcas, split: null },
+        );
+
+        const builder = await openTeamBuilder(gateways, request);
+        await saveTeamSplit(gateways, {
+          ...request,
+          teams: builder.teams,
+          assignments: [
+            { userId: squad.pia.id, team: "a" },
+            { userId: squad.maya.id, team: "b" },
+          ],
+        });
+        await publishTeamSplit(gateways, request);
+        await changeClubTeamLabels(gateways, {
+          callerId: squad.coach.id,
+          teams: later,
+        });
+
+        await expect(openTeamBuilder(gateways, request)).resolves.toMatchObject(
+          { teams: orcas },
+        );
+        await expect(
+          openMyTeam(createMyTeamGateways(squad.serviceClient.client), {
+            callerId: squad.pia.id,
+            eventId: squad.eventId,
+          }),
+        ).resolves.toMatchObject({
+          status: "published",
+          teams: {
+            a: { name: "Orcas", color: "#D64545" },
+            b: { name: "Rayas", color: "#2B3F7A" },
+          },
+        });
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,

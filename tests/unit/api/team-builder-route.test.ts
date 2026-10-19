@@ -205,6 +205,18 @@ const DRAFT: StoredTeamSplit = {
   assignments: [{ userId: ANA.userId, team: "a" }],
 };
 
+/** Los equipos que el club guardó (#755): ni Kelp ni Tide. */
+const CLUB_TEAMS = {
+  a: { name: "Orcas", color: "#D64545" },
+  b: { name: "Rayas", color: "#2B3F7A" },
+};
+
+/** Un reparto de antes del muestrario de E28: ningún color es de los doce. */
+const OLD_COLORS = {
+  a: { name: "Team Kelp", color: "#123456" },
+  b: { name: "Team Tide", color: "#ABCDEF" },
+};
+
 const BUILDER_CALLS = [
   ["GET", openBuilder],
   ["PUT", () => saveSplit(MANUAL_SPLIT)],
@@ -292,6 +304,18 @@ describe("GET /api/v1/teams/[eventId]", () => {
     },
   );
 
+  it("sirve los equipos del club a un evento sin reparto (#755)", async () => {
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
+    givenClub({ clubTeams: CLUB_TEAMS });
+
+    const response = await openBuilder();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { teams: CLUB_TEAMS, split: null },
+    });
+  });
+
   it("responde 404 con un id que no es uuid", async () => {
     givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
@@ -315,6 +339,18 @@ describe("GET /api/v1/teams/[eventId]", () => {
 });
 
 describe("PUT /api/v1/teams/[eventId]", () => {
+  it("acepta un color fuera del muestrario, como antes (D5 de E28)", async () => {
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
+    givenClub({ split: { ...DRAFT, teams: OLD_COLORS } });
+
+    const response = await saveSplit({ ...MANUAL_SPLIT, teams: OLD_COLORS });
+
+    expect(response.status).toBe(200);
+    expect(club.saves).toEqual([
+      expect.objectContaining({ teams: OLD_COLORS }),
+    ]);
+  });
+
   it("guarda el reparto en borrador y responde 200", async () => {
     givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 

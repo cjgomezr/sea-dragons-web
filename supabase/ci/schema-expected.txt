@@ -41,6 +41,10 @@ columna clubs.logo_path tipo=text null=YES default=-
 columna clubs.name tipo=text null=NO default=-
 columna clubs.season_starts_on tipo=date null=YES default=-
 columna clubs.slug tipo=text null=NO default=-
+columna clubs.team_a_color tipo=text null=NO default='#1C6EA4'::text
+columna clubs.team_a_name tipo=text null=NO default='Team Kelp'::text
+columna clubs.team_b_color tipo=text null=NO default='#C99A3E'::text
+columna clubs.team_b_name tipo=text null=NO default='Team Tide'::text
 columna confirmation_email_requests.club_id tipo=uuid null=NO default=-
 columna confirmation_email_requests.email_hash tipo=text null=NO default=-
 columna confirmation_email_requests.id tipo=uuid null=NO default=gen_random_uuid()
@@ -1116,6 +1120,11 @@ restriccion clubs.clubs_initials_length CHECK (((char_length(initials) >= 1) AND
 restriccion clubs.clubs_name_length CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 60)))
 restriccion clubs.clubs_pkey PRIMARY KEY (id)
 restriccion clubs.clubs_slug_key UNIQUE (slug)
+restriccion clubs.clubs_team_a_color_hex CHECK ((team_a_color ~ '^#[0-9A-Fa-f]{6}$'::text))
+restriccion clubs.clubs_team_a_name_length CHECK (((char_length(btrim(team_a_name)) >= 1) AND (char_length(btrim(team_a_name)) <= 24)))
+restriccion clubs.clubs_team_b_color_hex CHECK ((team_b_color ~ '^#[0-9A-Fa-f]{6}$'::text))
+restriccion clubs.clubs_team_b_name_length CHECK (((char_length(btrim(team_b_name)) >= 1) AND (char_length(btrim(team_b_name)) <= 24)))
+restriccion clubs.clubs_team_colors_distinct CHECK ((upper(team_a_color) <> upper(team_b_color)))
 restriccion confirmation_email_requests.confirmation_email_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion confirmation_email_requests.confirmation_email_requests_pkey PRIMARY KEY (id)
 restriccion directory_email_sends.directory_email_sends_check CHECK (((sent_count >= 0) AND (sent_count <= reserved_count)))

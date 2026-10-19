@@ -14,6 +14,8 @@ import {
   type TeamAssignment,
   type TeamBuilderEvent,
   type TeamBuilderGateways,
+  type TeamLabels,
+  DEFAULT_TEAM_LABELS,
 } from "@/lib/teams/team-builder";
 import type { MyTeamGateways } from "@/lib/teams/my-team";
 import { SEEDED_POSITIONS } from "./seeded-positions";
@@ -68,6 +70,8 @@ export type FakeTeamsClubOptions = {
   readonly events?: readonly TeamBuilderEvent[];
   readonly players?: readonly FakePlayer[];
   readonly split?: StoredTeamSplit | null;
+  /** Los equipos del club (#755); sin decirlo, Team Kelp y Team Tide. */
+  readonly clubTeams?: TeamLabels;
   /** Lo avisado en la última publicación. */
   readonly publishedAssignments?: readonly TeamAssignment[];
   readonly positions?: readonly ClubPosition[];
@@ -88,8 +92,14 @@ export type FakeTeamsClub = {
   readonly myTeamGateways: MyTeamGateways;
   readonly split: () => StoredTeamSplit | null;
   readonly saves: NewTeamSplit[];
+  readonly clubTeamChanges: ClubTeamChange[];
   readonly notices: SentNotice[];
   readonly auditRows: AuditLogInsertRow[];
+};
+
+export type ClubTeamChange = {
+  readonly clubId: string;
+  readonly teams: TeamLabels;
 };
 
 export function playerId(index: number): string {
@@ -134,6 +144,8 @@ export function fakeTeamsClub(
   let split = options.split ?? null;
   let published = options.publishedAssignments ?? [];
   const saves: NewTeamSplit[] = [];
+  let clubTeams = options.clubTeams ?? DEFAULT_TEAM_LABELS;
+  const clubTeamChanges: ClubTeamChange[] = [];
   const notices: SentNotice[] = [];
   const auditRows: AuditLogInsertRow[] = [];
   const members = {
@@ -213,12 +225,21 @@ export function fakeTeamsClub(
       };
     },
   };
+  const clubTeamsGateway: TeamBuilderGateways["clubTeams"] = {
+    findClubTeamLabels: async () => clubTeams,
+    saveClubTeamLabels: async (change) => {
+      clubTeamChanges.push(change);
+      clubTeams = change.teams;
+      return clubTeams;
+    },
+  };
   const positions = {
     findClubPositions: async () => options.positions ?? SEEDED_POSITIONS,
   };
   const gateways: TeamBuilderGateways = {
     members,
     teams,
+    clubTeams: clubTeamsGateway,
     positions,
     notifications: fakeNotifications(
       notices,
@@ -248,6 +269,7 @@ export function fakeTeamsClub(
     myTeamGateways,
     split: () => split,
     saves,
+    clubTeamChanges,
     notices,
     auditRows,
   };

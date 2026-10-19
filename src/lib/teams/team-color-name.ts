@@ -24,25 +24,31 @@ export type TeamColorName =
 
 type FamilyName = Exclude<TeamColorName, "gold" | "teal" | "navy">;
 
-export type BibSwatch = {
+/** El texto o la marca que va encima del color: claro u oscuro. */
+export type BibTextTone = "light" | "dark";
+
+export type TeamBibColor = {
   readonly name: TeamColorName;
   readonly hex: string;
+  readonly textTone: BibTextTone;
 };
 
-/** Los colores de peto del handoff de E28, en el orden en que se eligen. */
-export const BIB_SWATCHES: readonly BibSwatch[] = [
-  { name: "red", hex: "#D64545" },
-  { name: "orange", hex: "#E07B2E" },
-  { name: "gold", hex: "#C99A3E" },
-  { name: "yellow", hex: "#E8C547" },
-  { name: "green", hex: "#3E9B5F" },
-  { name: "teal", hex: "#2A9D9A" },
-  { name: "blue", hex: "#1C6EA4" },
-  { name: "navy", hex: "#2B3F7A" },
-  { name: "purple", hex: "#7A5BC4" },
-  { name: "pink", hex: "#D9669A" },
-  { name: "black", hex: "#2B2F36" },
-  { name: "white", hex: "#F2F4F6" },
+/** Los colores de peto del handoff de E28, en el orden en que se eligen,
+ * con el texto que el handoff pone encima de cada uno. Son los únicos que
+ * acepta el club para sus equipos (#755, D3). */
+export const TEAM_BIB_COLORS: readonly TeamBibColor[] = [
+  { name: "red", hex: "#D64545", textTone: "light" },
+  { name: "orange", hex: "#E07B2E", textTone: "dark" },
+  { name: "gold", hex: "#C99A3E", textTone: "dark" },
+  { name: "yellow", hex: "#E8C547", textTone: "dark" },
+  { name: "green", hex: "#3E9B5F", textTone: "light" },
+  { name: "teal", hex: "#2A9D9A", textTone: "light" },
+  { name: "blue", hex: "#1C6EA4", textTone: "light" },
+  { name: "navy", hex: "#2B3F7A", textTone: "light" },
+  { name: "purple", hex: "#7A5BC4", textTone: "light" },
+  { name: "pink", hex: "#D9669A", textTone: "light" },
+  { name: "black", hex: "#2B2F36", textTone: "light" },
+  { name: "white", hex: "#F2F4F6", textTone: "dark" },
 ];
 
 /** Por debajo de esta saturación el color no tiene tono: es un gris. */
@@ -140,7 +146,7 @@ function nameFamily(hex: string): FamilyName {
 
 export function nameTeamColor(hex: string): TeamColorName {
   const uppercaseHex = hex.toUpperCase();
-  const swatch = BIB_SWATCHES.find(
+  const swatch = TEAM_BIB_COLORS.find(
     (candidate) => candidate.hex === uppercaseHex,
   );
   return swatch?.name ?? nameFamily(hex);
