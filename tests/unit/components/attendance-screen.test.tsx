@@ -1007,6 +1007,19 @@ describe("la fila compacta (#764)", () => {
     }
   });
 
+  it("cada estado del segmento lleva su texto en una etiqueta aparte, que la tableta esconde a la vista", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    const mateo = await findRow(MATEO.fullName);
+    for (const status of ["Present", "Late", "Absent"]) {
+      expect(
+        choice(mateo, status).querySelector(".attendance-choice-label"),
+      ).toHaveTextContent(status);
+    }
+  });
+
   it("una hoja recién abierta no lleva ningún punto de sin guardar", async () => {
     stubClub([POOL_TRAINING], [POOL_SHEET]);
 

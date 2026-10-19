@@ -15501,6 +15501,29 @@ a.auth-brand-header:focus-visible {
   }
 }
 
+/* En la tableta, con la barra lateral, el segmento con texto dejaba los
+   nombres en cuatro o cinco letras (#764): ahí van sólo los iconos, y el
+   texto queda para el lector de pantalla con las declaraciones de
+   `.visually-hidden`. */
+@media (768px <= width < 1024px) {
+  .attendance-choice {
+    position: relative;
+    padding: 0 8px;
+  }
+
+  .attendance-choice-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 /* "Ir al calendario" y "Pasar lista" (#395) son enlaces con la forma del
    botón secundario. */
 .attendance-no-sessions a.admin-secondary,

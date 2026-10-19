@@ -162,7 +162,9 @@ function StatusSegment({
           <span className="attendance-choice-icon">
             <Icon glyph={STATUS_GLYPHS[choice]} weight="bold" />
           </span>
-          {translate(`attendance.status.${choice}`)}
+          <span className="attendance-choice-label">
+            {translate(`attendance.status.${choice}`)}
+          </span>
         </button>
       ))}
     </div>
