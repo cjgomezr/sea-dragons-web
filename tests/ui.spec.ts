@@ -21045,12 +21045,19 @@ async function stubTeams(page: Page, reads: TeamsReads): Promise<TeamsWrite[]> {
 }
 
 const TEAMS_AVAILABLE = /^(Available|Disponibles)$/;
-const TEAMS_BALANCE = /^(Balance teams|Balancear equipos)$/;
-const TEAMS_PUBLISH = /^(Publish teams|Publicar equipos)$/;
-const TEAMS_CONFIRM_PUBLISH = /^(Publish and notify|Publicar y avisar)$/;
+const TEAMS_BALANCE = /^Auto-balance$/;
+const TEAMS_PUBLISH = /^(Publish|Publicar)$/;
+const TEAMS_PUBLISH_QUESTION = /^(Publish teams\?|¿Publicar equipos\?)/;
 
 function teamsRegion(page: Page, name: string | RegExp): Locator {
   return page.getByRole("region", { name });
+}
+
+/** El Publicar de la confirmación: el de la cabecera se llama igual. */
+function teamsConfirmPublish(page: Page): Locator {
+  return page
+    .getByRole("group", { name: TEAMS_PUBLISH_QUESTION })
+    .getByRole("button", { name: TEAMS_PUBLISH });
 }
 
 function teamsPlayerRow(page: Page, fullName: string): Locator {
@@ -21067,7 +21074,7 @@ async function balanceTeams(page: Page): Promise<void> {
   await waitForTeamBuilder(page);
   await page.getByRole("button", { name: TEAMS_BALANCE }).click();
   await expect(
-    page.getByText(/^(Teams balanced|Equipos balanceados)/),
+    page.getByText(/^(Teams balanced|Equipos equilibrados)/),
   ).toBeVisible();
   await page.mouse.move(0, 0);
 }
@@ -21075,18 +21082,14 @@ async function balanceTeams(page: Page): Promise<void> {
 async function askToPublish(page: Page): Promise<void> {
   await waitForTeamBuilder(page);
   await page.getByRole("button", { name: TEAMS_PUBLISH }).click();
-  await expect(
-    page.getByRole("button", { name: TEAMS_CONFIRM_PUBLISH }),
-  ).toBeVisible();
+  await expect(teamsConfirmPublish(page)).toBeVisible();
   await page.mouse.move(0, 0);
 }
 
 async function publishTeams(page: Page): Promise<void> {
   await askToPublish(page);
-  await page.getByRole("button", { name: TEAMS_CONFIRM_PUBLISH }).click();
-  await expect(
-    page.getByText(/^(Teams published|Equipos publicados)/),
-  ).toBeVisible();
+  await teamsConfirmPublish(page).click();
+  await expect(page.getByText(/^(Published|Publicado) · /)).toBeVisible();
   await page.mouse.move(0, 0);
 }
 
@@ -21214,14 +21217,14 @@ test.describe("equipos en el navegador", () => {
   }) => {
     const writes = await goToTeams(page, TEAMS_MANUAL_STATE);
     const totals = page.getByRole("group", { name: "Totals" });
-    await expect(totals).toContainText("Difference 0.3");
+    await expect(totals).toContainText("Even");
 
     await page
       .getByRole("button", { name: "Move Daniela Vargas to Team Kelp" })
       .click();
 
-    await expect(totals).toContainText("Team Kelp · 31.2 pts");
-    await expect(totals).toContainText("Difference 8.3");
+    await expect(totals).toContainText("Team Kelp 31.2");
+    await expect(totals).toContainText("8.3 apart");
     await expect(teamsRegion(page, "Team Kelp")).toContainText(
       "Daniela Vargas",
     );
@@ -21253,12 +21256,12 @@ test.describe("equipos en el navegador", () => {
     await expect(
       teamsPlayerRow(page, "Ethan Brown").getByText("Unrated"),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Publish teams" }).click();
+    await page.getByRole("button", { name: TEAMS_PUBLISH }).click();
 
-    await page.getByRole("button", { name: "Publish and notify" }).dblclick();
+    await teamsConfirmPublish(page).dblclick();
 
     await expect(
-      page.getByText("Teams published. 12 players notified."),
+      page.getByText("Published · 12 players notified"),
     ).toBeVisible();
     expect(writes.map(({ method, path }) => `${method} ${path}`)).toEqual([
       `POST ${TEAMS_ENDPOINT}/${TEAMS_EVENT.id}/auto-balance`,
