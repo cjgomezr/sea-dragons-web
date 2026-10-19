@@ -300,6 +300,19 @@ export const englishMessages = {
   "dashboard.nextUp.draft.emphasis": "not published",
   "dashboard.nextUp.draft.end": " yet.",
   "dashboard.nextUp.openTeams": "Open teams",
+  // "Esta semana" (#748, RF-4 del PRD de E27).
+  "dashboard.week.title": "This week",
+  "dashboard.week.calendar": "Calendar",
+  "dashboard.week.days": "Days",
+  "dashboard.week.day": {
+    one: "{day} · {count} event",
+    other: "{day} · {count} events",
+  },
+  "dashboard.week.dayEmpty": "{day} · no events",
+  "dashboard.week.events": "Events on {day}",
+  "dashboard.week.empty": "Nothing on {day}.",
+  "dashboard.week.rsvp": "RSVP",
+  "dashboard.week.unavailable": "We couldn't load this week.",
   "dashboard.membership.expiredOn": "Your membership expired on {date}",
   "dashboard.membership.expired": "Your membership expired",
   "dashboard.membership.body":
