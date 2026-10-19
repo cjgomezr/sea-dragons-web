@@ -34,6 +34,7 @@ const STORED: ClubSettings = {
   initials: "HH",
   accentColor: "#1c6ea4",
   logoUrl: null,
+  seasonStartsOn: null,
 };
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));

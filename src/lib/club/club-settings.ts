@@ -4,6 +4,7 @@ import {
   recordAuditEvent,
 } from "@/lib/audit/audit-log";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
+import { isRealCalendarDate } from "@/lib/auth/registration";
 import type {
   RoleRequestGateways,
   RoleRequestMember,
@@ -18,8 +19,8 @@ import {
 /**
  * La configuración del club (#296, RF-6 del PRD de E18a), contada sin
  * Supabase delante. El Admin lee la marca entera y cambia el nombre, las
- * iniciales y el acento (#294); el logo se enseña aquí y se cambia con
- * `club-logo.ts` (#295).
+ * iniciales, el acento (#294) y el inicio de la temporada (#744); el logo se
+ * enseña aquí y se cambia con `club-logo.ts` (#295).
  *
  * Guardar sigue el patrón de la corrección de la fecha en la ficha del
  * miembro (`member_status_changed`): la escritura lleva lo que el Admin tenía
@@ -42,12 +43,15 @@ export type ClubSettings = {
   readonly accentColor: string;
   /** La dirección pública del logo; se cambia con `club-logo.ts` (#295). */
   readonly logoUrl: string | null;
+  /** YYYY-MM-DD, el día del club en que empieza la temporada (D1 de E27).
+   * Sin fecha es `null`, y cuenta desde el 1 de enero (`seasonStartFor`). */
+  readonly seasonStartsOn: string | null;
 };
 
 /** La parte de la configuración que esta pantalla escribe. */
 export type ClubIdentity = Pick<
   ClubSettings,
-  "name" | "initials" | "accentColor"
+  "name" | "initials" | "accentColor" | "seasonStartsOn"
 >;
 
 export type ClubIdentityField = keyof ClubIdentity;
@@ -64,6 +68,7 @@ export const CLUB_SETTINGS_ISSUE_CODES = [
   "initials_too_long",
   "accent_color_invalid",
   "accent_color_no_readable_text",
+  "season_starts_on_invalid",
 ] as const;
 
 export type ClubSettingsIssueCode = (typeof CLUB_SETTINGS_ISSUE_CODES)[number];
@@ -149,6 +154,7 @@ function normalizeIdentity(identity: ClubIdentity): ClubIdentity {
     name: identity.name.trim(),
     initials: initials === "" ? null : initials,
     accentColor: identity.accentColor.toLowerCase(),
+    seasonStartsOn: identity.seasonStartsOn,
   };
 }
 
@@ -163,7 +169,8 @@ export function isSameClubIdentity(
   return (
     a.name === b.name &&
     a.initials === b.initials &&
-    a.accentColor === b.accentColor
+    a.accentColor === b.accentColor &&
+    a.seasonStartsOn === b.seasonStartsOn
   );
 }
 
@@ -193,7 +200,8 @@ export function findClubSettingsIssues({
   identity,
   expected,
 }: ClubSettingsSubmission): readonly ClubSettingsIssue[] {
-  const { name, initials, accentColor } = normalizeIdentity(identity);
+  const { name, initials, accentColor, seasonStartsOn } =
+    normalizeIdentity(identity);
   const issues: ClubSettingsIssue[] = [];
   if (name === "") {
     issues.push({ field: "name", code: "name_required" });
@@ -212,6 +220,10 @@ export function findClubSettingsIssues({
   );
   if (accentIssue !== null) {
     issues.push(accentIssue);
+  }
+  // Una fecha futura vale: hasta que llegue, cuenta desde el 1 de enero (D1).
+  if (seasonStartsOn !== null && !isRealCalendarDate(seasonStartsOn)) {
+    issues.push({ field: "seasonStartsOn", code: "season_starts_on_invalid" });
   }
   return issues;
 }
@@ -238,9 +250,9 @@ function changedFields(
   identity: ClubIdentity,
   expected: ClubIdentity,
 ): readonly ClubIdentityField[] {
-  return (["name", "initials", "accentColor"] as const).filter(
-    (field) => identity[field] !== expected[field],
-  );
+  return (
+    ["name", "initials", "accentColor", "seasonStartsOn"] as const
+  ).filter((field) => identity[field] !== expected[field]);
 }
 
 export async function readClubSettings(

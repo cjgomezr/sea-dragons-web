@@ -1801,6 +1801,10 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.initials.optional": "opcional",
   "clubSettings.initials.hint":
     "Se ven cuando no hay logo. Hasta {max} letras.",
+  "clubSettings.season.title": "Temporada",
+  "clubSettings.season.label": "Inicio de temporada",
+  "clubSettings.season.hint":
+    "La asistencia del inicio cuenta desde aquí. Vacío: desde el 1 de enero.",
   "clubSettings.brand.title": "Marca",
   "clubSettings.accent.label": "Color de acento",
   "clubSettings.accent.suggested": "Colores sugeridos",
@@ -1842,6 +1846,7 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.issue.accentInvalid": "Usa un código como #33A1E0.",
   "clubSettings.issue.accentNoReadableText":
     "Ningún color de texto llega al contraste mínimo (4,5:1) sobre este acento. Elige uno más claro o más oscuro.",
+  "clubSettings.issue.seasonStartInvalid": "Elige una fecha que exista.",
   "clubSettings.error.changed":
     "Otro Admin cambió la configuración mientras la editabas. Carga la más reciente y vuelve a hacer tu cambio.",
   "clubSettings.error.signInRequired":

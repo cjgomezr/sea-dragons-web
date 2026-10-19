@@ -50,11 +50,13 @@ describeRls("configuración del club en Supabase", () => {
             name: "Harbour Hammerheads",
             initials: "HH",
             accentColor: SEEDED_ACCENT,
+            seasonStartsOn: null,
           },
           identity: {
             name: "Bay Barracudas",
             initials: null,
             accentColor: "#7b3fa0",
+            seasonStartsOn: "2026-03-02",
           },
         });
 
@@ -65,6 +67,7 @@ describeRls("configuración del club en Supabase", () => {
             initials: null,
             accentColor: "#7b3fa0",
             logoUrl: null,
+            seasonStartsOn: "2026-03-02",
           },
         });
       });
@@ -81,11 +84,13 @@ describeRls("configuración del club en Supabase", () => {
             name: "Harbour Hammerheads",
             initials: null,
             accentColor: SEEDED_ACCENT,
+            seasonStartsOn: null,
           },
           identity: {
             name: "Harbour Hammerheads",
             initials: "HQ",
             accentColor: SEEDED_ACCENT,
+            seasonStartsOn: null,
           },
         });
 
@@ -98,9 +103,53 @@ describeRls("configuración del club en Supabase", () => {
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
 
+  it(
+    "casa con un inicio de temporada guardado y lo vacía (#744)",
+    async () => {
+      await withThrowawayClub("HH", async (club) => {
+        const gateway = settingsGateway();
+        const loaded = {
+          name: "Harbour Hammerheads",
+          initials: "HH",
+          accentColor: SEEDED_ACCENT,
+        };
+        await gateway.updateClubIdentity(club.id, {
+          expected: { ...loaded, seasonStartsOn: null },
+          identity: { ...loaded, seasonStartsOn: "2026-03-02" },
+        });
+
+        const result = await gateway.updateClubIdentity(club.id, {
+          expected: { ...loaded, seasonStartsOn: "2026-03-02" },
+          identity: { ...loaded, seasonStartsOn: null },
+        });
+
+        expect(result).toMatchObject({
+          kind: "updated",
+          settings: { seasonStartsOn: null },
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
   it.each([
-    ["las iniciales", { initials: "XX", accentColor: SEEDED_ACCENT }],
-    ["el acento", { initials: "HH", accentColor: "#7b3fa0" }],
+    [
+      "las iniciales",
+      { initials: "XX", accentColor: SEEDED_ACCENT, seasonStartsOn: null },
+    ],
+    [
+      "el acento",
+      { initials: "HH", accentColor: "#7b3fa0", seasonStartsOn: null },
+    ],
+    // #744: la fila tiene null y el Admin creía tener una fecha.
+    [
+      "el inicio de temporada",
+      {
+        initials: "HH",
+        accentColor: SEEDED_ACCENT,
+        seasonStartsOn: "2026-03-02",
+      },
+    ],
   ])(
     "no pisa nada si otro Admin cambió %s entretanto",
     async (_field, changed) => {
@@ -113,6 +162,7 @@ describeRls("configuración del club en Supabase", () => {
             name: "Bay Barracudas",
             initials: "BB",
             accentColor: "#2e7d32",
+            seasonStartsOn: null,
           },
         });
 
