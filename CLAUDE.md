@@ -53,10 +53,13 @@ line and lets you stop.
    the app's URL, that is a blocker, not a nuisance: a server you did not
    start may belong to another project, and every screenshot taken against it
    is meaningless. Free the port or set `APP_URL`; never review around it.
-   The Stop gate runs Playwright only when the branch changed a path listed
-   in `.github/visual-paths.txt` (the same list `visual-baselines.yml`
-   filters on); otherwise it says so in one line and skips it. CI still runs
-   it on the PR. To run it by hand: `npx playwright test`.
+   The Stop gate does not run Playwright by default: the full suite takes
+   about 44 minutes and the hook stops after 10, so it only ever timed out.
+   CI runs it on every PR and the merge needs it green. With
+   `FABRICA_LOCAL_PLAYWRIGHT=1` the gate does run it, and only when the
+   branch changed a path listed in `.github/visual-paths.txt` (the same list
+   `visual-baselines.yml` filters on). To run it by hand:
+   `npx playwright test`.
    The `ui-reviewer` subagent (APPROVED) is additionally required according
    to the UI-review policy in `factory-models.json` → `review.uiReview`:
    `"always"` = every UI change; `"label"` (default) = only when this issue

@@ -59,6 +59,7 @@ describe("CLAUDE.md sobre los tests de integración y Playwright", () => {
 
     expect(definitionOfDone).toContain(".github/visual-paths.txt");
     expect(definitionOfDone).toContain("npx playwright test");
+    expect(definitionOfDone).toContain("FABRICA_LOCAL_PLAYWRIGHT=1");
   });
 
   it("dice en la sección de tests sin credenciales que se exigen en CI", () => {
