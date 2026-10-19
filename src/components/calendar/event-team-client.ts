@@ -14,12 +14,12 @@ import { TEAM_IDS } from "@/lib/teams/team-ids";
  * nunca llegue un OVR (D3), lo decide el servidor.
  */
 
-const positionSchema = z.object({
+export const positionSchema = z.object({
   id: z.uuid(),
   names: z.object({ en: z.string().nullable(), es: z.string().nullable() }),
 });
 
-const publishedTeamSchema = z.object({
+export const publishedTeamSchema = z.object({
   name: z.string(),
   // Como lo valida el servidor al guardar: `nameTeamColor` no sabe de otro.
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),

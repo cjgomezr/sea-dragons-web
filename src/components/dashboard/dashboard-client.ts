@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { agendaEventSchema } from "@/components/calendar/agenda-client";
+import {
+  agendaEventSchema,
+  audienceSchema,
+} from "@/components/calendar/agenda-client";
+import {
+  positionSchema,
+  publishedTeamSchema,
+} from "@/components/calendar/event-team-client";
+import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
 import {
   type ApiRequestFailure,
   readApiPayload,
@@ -91,20 +99,94 @@ const upcomingEventsSchema = z.discriminatedUnion("kind", [
   unavailableSchema,
 ]);
 
-const latestNewsSchema = z.discriminatedUnion("kind", [
+/** Lo que llega de una noticia al inicio reducido (D2 de E27). */
+const restrictedNewsItemSchema = z.object({
+  id: z.uuid(),
+  category: z.enum(NEWS_CATEGORIES),
+  title: z.string(),
+  publishedAt: z.iso.datetime({ offset: true }),
+});
+
+const memberNewsItemSchema = restrictedNewsItemSchema.extend({
+  coverUrl: z.url().nullable(),
+  excerpt: z.string(),
+  isPinned: z.boolean(),
+  isUnread: z.boolean(),
+});
+
+function latestNewsSchemaOf<Item extends z.ZodType>(item: Item) {
+  return z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("news"), posts: z.array(item) }),
+    unavailableSchema,
+  ]);
+}
+
+const nextUpEventSchema = agendaEventSchema
+  .pick({
+    id: true,
+    title: true,
+    eventType: true,
+    startsOn: true,
+    endsOn: true,
+    startTime: true,
+    endTime: true,
+    location: true,
+    place: true,
+    goingCount: true,
+    maybeCount: true,
+    myResponse: true,
+  })
+  .extend({
+    kind: z.literal("event"),
+    coverUrl: z.url().nullable(),
+    audience: audienceSchema,
+    myTeam: publishedTeamSchema
+      .pick({ name: true, color: true })
+      .extend({ position: positionSchema.nullable() })
+      .nullable(),
+    // Sólo a Admin y Coach (RF-2 de E27).
+    teamsStatus: z.enum(["none", "draft", "published"]).optional(),
+  });
+
+const nextUpSchema = z.discriminatedUnion("kind", [
+  nextUpEventSchema,
+  z.object({ kind: z.literal("none") }),
+  unavailableSchema,
+]);
+
+const weekSchema = z.discriminatedUnion("kind", [
   z.object({
-    kind: z.literal("news"),
-    posts: z.array(
-      z.object({
-        id: z.uuid(),
-        category: z.enum(NEWS_CATEGORIES),
-        title: z.string(),
-        publishedAt: z.iso.datetime({ offset: true }),
+    kind: z.literal("week"),
+    events: z.array(
+      agendaEventSchema.pick({
+        id: true,
+        title: true,
+        eventType: true,
+        startsOn: true,
+        endsOn: true,
+        startTime: true,
+        endTime: true,
+        location: true,
+        myResponse: true,
       }),
     ),
   }),
   unavailableSchema,
 ]);
+
+const membershipBlockSchema = z.enum(["pending", "past_due", "cancelled"]);
+
+const activeMembershipSchema = z.object({
+  status: z.literal("active"),
+  plan: z.enum(MEMBERSHIP_TYPES).nullable(),
+  renewsOn: z.iso.date().nullable(),
+});
+
+const restrictedMembershipSchema = z.object({
+  status: z.literal("restricted"),
+  block: membershipBlockSchema,
+  endedOn: z.iso.date().nullable(),
+});
 
 const viewerSchema = z.object({ firstName: z.string() });
 
@@ -126,17 +208,24 @@ const memberDashboardSchema = z.object({
     unreadNews: unreadNewsTileSchema,
   }),
   upcomingEvents: upcomingEventsSchema,
-  latestNews: latestNewsSchema,
+  latestNews: latestNewsSchemaOf(memberNewsItemSchema),
   contactReminder: contactReminderSchema,
+  nextUp: nextUpSchema,
+  week: weekSchema,
+  membership: activeMembershipSchema,
 });
 
 /** El de quien no tiene la membresía al día (#453). */
 const restrictedDashboardSchema = z.object({
   kind: z.literal("restricted"),
   viewer: viewerSchema,
-  block: z.enum(["pending", "past_due", "cancelled"]),
+  block: membershipBlockSchema,
   nextTraining: nextTrainingTileSchema,
   contactReminder: contactReminderSchema,
+  nextUp: nextUpSchema,
+  week: weekSchema,
+  membership: restrictedMembershipSchema,
+  latestNews: latestNewsSchemaOf(restrictedNewsItemSchema),
 });
 
 const dashboardResponseSchema = z.object({

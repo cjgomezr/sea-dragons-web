@@ -20,6 +20,17 @@ export const AA_NORMAL_TEXT_CONTRAST = 4.5;
 /** El `--color-accent` del tema claro, y lo que `0022_club_brand.sql` siembra. */
 export const DEFAULT_ACCENT_COLOR = "#1c6ea4";
 
+/** Los cinco colores que la pestaña General ofrece de un toque (#720), en el
+ * orden del handoff de E26. No son tokens del tema: sólo atajos para elegir,
+ * y cada uno pasa `evaluateAccentColor` en claro y en oscuro. */
+export const SUGGESTED_ACCENT_COLORS = [
+  "#33A1E0",
+  "#2E9E86",
+  "#E0A33A",
+  "#D9667A",
+  "#8C7AE6",
+] as const;
+
 /** El panel y el fondo del tema claro: donde un enlace de acento se lee. */
 export const LIGHT_ACCENT_SURFACES = ["#ffffff", "#eff3f7"] as const;
 

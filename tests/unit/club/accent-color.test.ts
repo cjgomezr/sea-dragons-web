@@ -10,6 +10,7 @@ import {
   evaluateAccentColor,
   isHexColor,
   normalizeAccentInput,
+  SUGGESTED_ACCENT_COLORS,
 } from "@/lib/club/accent-color";
 import {
   cssBlock,
@@ -400,4 +401,29 @@ describe("normalizar el código que escribe el Admin (#346)", () => {
     expect(normalizeAccentInput("purple")).toBe("#purple");
     expect(isHexColor(normalizeAccentInput("#12345"))).toBe(false);
   });
+});
+
+describe("los colores sugeridos (#720)", () => {
+  it("son los cinco del handoff de la configuración", () => {
+    expect(SUGGESTED_ACCENT_COLORS).toEqual([
+      "#33A1E0",
+      "#2E9E86",
+      "#E0A33A",
+      "#D9667A",
+      "#8C7AE6",
+    ]);
+  });
+
+  it.each(SUGGESTED_ACCENT_COLORS)(
+    "%s se acepta con texto legible en claro y en oscuro",
+    (color) => {
+      const { light, dark } = acceptedPalette(color);
+
+      for (const pair of [light, dark]) {
+        expect(
+          contrastRatio(pair.accent, pair.onAccent),
+        ).toBeGreaterThanOrEqual(AA_NORMAL_TEXT_CONTRAST);
+      }
+    },
+  );
 });

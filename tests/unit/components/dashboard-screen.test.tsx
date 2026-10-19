@@ -88,18 +88,30 @@ const LATEST_NEWS = [
     category: "announcement",
     title: "Nationals squad shortlist announced",
     publishedAt: daysAgo(2),
+    coverUrl: null,
+    excerpt: "",
+    isPinned: false,
+    isUnread: false,
   },
   {
     id: "eeeeeeee-0000-4000-8000-00000000000e",
     category: "news",
     title: "Winter training schedule is live",
     publishedAt: daysAgo(4),
+    coverUrl: null,
+    excerpt: "",
+    isPinned: false,
+    isUnread: false,
   },
   {
     id: "ffffffff-0000-4000-8000-00000000000f",
     category: "document",
     title: "Updated pool safety & dive policy",
     publishedAt: daysAgo(8),
+    coverUrl: null,
+    excerpt: "",
+    isPinned: false,
+    isUnread: false,
   },
 ] as const;
 
@@ -118,6 +130,9 @@ const ADMIN_DASHBOARD: MemberDashboard = {
   upcomingEvents: { kind: "events", events: UPCOMING },
   latestNews: { kind: "news", posts: LATEST_NEWS },
   contactReminder: { kind: "reminder", reminder: "none" },
+  nextUp: { kind: "none" },
+  week: { kind: "week", events: [] },
+  membership: { status: "active", plan: "Full", renewsOn: null },
 };
 
 const PLAYER_DASHBOARD: MemberDashboard = {
@@ -143,6 +158,9 @@ const EMPTY_DASHBOARD: MemberDashboard = {
   upcomingEvents: { kind: "events", events: [] },
   latestNews: { kind: "news", posts: [] },
   contactReminder: { kind: "reminder", reminder: "none" },
+  nextUp: { kind: "none" },
+  week: { kind: "week", events: [] },
+  membership: { status: "active", plan: "Full", renewsOn: null },
 };
 
 type RecordedRequest = { readonly method: string; readonly path: string };
@@ -699,6 +717,10 @@ const RESTRICTED_DASHBOARD: RestrictedDashboard = {
   block: "pending",
   nextTraining: { kind: "training", training: POOL_TRAINING },
   contactReminder: { kind: "reminder", reminder: "none" },
+  nextUp: { kind: "none" },
+  week: { kind: "week", events: [] },
+  membership: { status: "restricted", block: "pending", endedOn: null },
+  latestNews: { kind: "news", posts: [] },
 };
 
 describe("el inicio de quien no tiene la membresía al día (#453)", () => {
