@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import type { RequestFailure } from "@/components/auth/request-failure";
@@ -277,7 +278,8 @@ function SaveOutcome({
   switch (status.kind) {
     case "saved":
       return (
-        <p className="auth-note" role="status">
+        <p className="profile-strip profile-strip-success" role="status">
+          <CheckCircle aria-hidden="true" weight="regular" />
           {translate("account.profile.saved")}
         </p>
       );
