@@ -66,7 +66,10 @@ function ScreenHeading({
 }): React.JSX.Element {
   return (
     <header className="attendance-header">
-      <h1>{translate("nav.label.attendance")}</h1>
+      <div>
+        <p className="attendance-eyebrow">{translate("attendance.eyebrow")}</p>
+        <h1>{translate("nav.label.attendance")}</h1>
+      </div>
     </header>
   );
 }

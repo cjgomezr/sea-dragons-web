@@ -15074,24 +15074,55 @@ a.auth-brand-header:focus-visible {
 
 .attendance-header h1 {
   margin: 0;
+  font-size: 26px;
+  line-height: 1.2;
   overflow-wrap: break-word;
 }
 
 .attendance-eyebrow {
   margin: 0 0 var(--space-1);
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-text-secondary);
 }
 
-/* En el móvil ocupa el ancho, y con "Cambios sin guardar" parte la línea en
-   vez de empujar la pantalla hacia un lado. */
+/* En el móvil ocupa el ancho, y con "{n} sin guardar" parte la línea en vez
+   de empujar la pantalla hacia un lado (#765). */
 .attendance-save {
+  display: inline-flex;
   flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
+  font-size: 14px;
+}
+
+.attendance-save-divider {
+  align-self: stretch;
+  width: 1px;
+  background: currentcolor;
+  opacity: 0.35;
+}
+
+.attendance-unsaved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+/* El punto oscuro: toma el color del texto del botón principal. */
+.attendance-save-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: currentcolor;
+  border-radius: 50%;
 }
 
 .attendance-save:disabled {
@@ -15105,15 +15136,17 @@ a.auth-brand-header:focus-visible {
   gap: var(--space-2);
 }
 
+/* Las fichas de sesión (#765): sin relleno salvo la abierta, que lleva el
+   fondo de seleccionado del segmento y el borde de acento. */
 .attendance-session {
   min-height: var(--touch-target-min);
   padding: 0 var(--space-3);
   font-family: inherit;
   font-size: 13px;
   color: var(--color-text-secondary);
-  background: var(--color-panel);
+  background: transparent;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: 999px;
   cursor: pointer;
 }
 
@@ -15124,64 +15157,99 @@ a.auth-brand-header:focus-visible {
 
 .attendance-session[aria-pressed="true"] {
   font-weight: 700;
-  color: var(--color-on-accent);
-  background: var(--color-accent);
+  color: var(--color-text);
+  background: var(--color-segment-selected);
   border-color: var(--color-accent);
 }
 
 /* "Sesiones anteriores" (#580) cierra la fila de fichas: es un enlace de
-   texto, no otra ficha, porque saca de la hoja hacia el calendario. */
+   texto, no otra ficha, porque saca de la hoja hacia el calendario. Sin
+   subrayado desde E29: lo dicen la flecha y el color de acento. */
 .attendance-older-sessions {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-1);
   min-height: var(--touch-target-min);
   padding: 0 var(--space-1);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-accent-text);
+  text-decoration: none;
+}
+
+.attendance-older-sessions:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.attendance-older-sessions:hover {
-  text-decoration-thickness: 2px;
+/* Los totales (#765): un panel con los tres números en línea, cuántos
+   vinieron a la derecha y una barra apilada debajo. */
+.attendance-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
 }
 
-.attendance-totals {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
+.attendance-totals-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.attendance-totals-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .attendance-total {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-2);
-  padding: var(--space-3);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* El punto de color es decoración: el nombre del estado va escrito al lado. */
 .attendance-total::before {
   content: "";
   flex: none;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
 }
 
 .attendance-total-count {
   font-family: var(--font-family-mono);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.2;
+}
+
+.attendance-totals-came {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* Cada tramo ocupa lo que su número (`flex-grow` en línea). */
+.attendance-totals-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+}
+
+.attendance-totals-segment {
+  flex-basis: 0;
 }
 
 .attendance-total-label {
@@ -15189,15 +15257,18 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text-secondary);
 }
 
-.attendance-present::before {
+.attendance-present::before,
+.attendance-totals-segment.attendance-present {
   background: var(--color-success);
 }
 
-.attendance-late::before {
+.attendance-late::before,
+.attendance-totals-segment.attendance-late {
   background: var(--color-warning);
 }
 
-.attendance-absent::before {
+.attendance-absent::before,
+.attendance-totals-segment.attendance-absent {
   background: var(--color-danger);
 }
 
@@ -15209,13 +15280,30 @@ a.auth-brand-header:focus-visible {
   gap: var(--space-2);
 }
 
-.attendance-group-title {
+.attendance-group-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.attendance-group-title,
+.attendance-group-count {
   margin: 0;
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
+}
+
+.attendance-group-title {
   text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* El número va más ligero que el nombre: el tono apagado del diseño no
+   llega a AA sobre el fondo. */
+.attendance-group-count {
+  font-weight: 400;
   color: var(--color-text-secondary);
 }
 
@@ -15225,7 +15313,7 @@ a.auth-brand-header:focus-visible {
   list-style: none;
   background: var(--color-panel);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: 10px;
   box-shadow: var(--shadow-sm);
 }
 
@@ -15430,15 +15518,24 @@ a.auth-brand-header:focus-visible {
 }
 
 /* Como `.agenda-notice`: vacía no ocupa sitio, pero sigue en el DOM para que
-   la confirmación se anuncie al llegar. */
+   la confirmación se anuncie al llegar. Desde E29 (#765) es una franja
+   teñida de éxito, con el icono en el color de éxito y el texto normal. */
 .attendance-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: 10px 14px;
+  font-size: 14px;
   color: var(--color-text);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-success);
-  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-success) 12%, var(--color-panel));
+  border-radius: 10px;
+}
+
+.attendance-notice svg {
+  flex: none;
+  font-size: 18px;
+  color: var(--color-success);
 }
 
 .attendance-notice:empty {
@@ -15455,18 +15552,11 @@ a.auth-brand-header:focus-visible {
 @media (min-width: 768px) {
   .attendance-save {
     flex: none;
+    min-height: 40px;
   }
 
   .attendance-session {
-    min-height: 36px;
-  }
-
-  .attendance-totals {
-    gap: var(--space-4);
-  }
-
-  .attendance-total {
-    padding: var(--space-4);
+    min-height: 30px;
   }
 
   .attendance-row {

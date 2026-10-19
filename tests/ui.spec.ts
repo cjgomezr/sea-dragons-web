@@ -20372,7 +20372,7 @@ async function markLateAndSave(
   // la pantalla por su texto.
   await expect(
     outcome === "status"
-      ? page.getByText(/^(Attendance saved|Asistencia guardada)/)
+      ? page.getByText(/^(Saved · |Guardado · )/)
       : page.getByText(/cancelled: it doesn't|está cancelado: no/),
   ).toBeVisible();
   await page.mouse.move(0, 0);
@@ -20552,7 +20552,7 @@ test.describe("asistencia en el navegador", () => {
     await page.getByRole("button", { name: ATTENDANCE_SAVE }).dblclick();
 
     await expect(
-      page.getByText("Attendance saved: 5 present, 2 late, 5 absent."),
+      page.getByText("Saved · 5 present, 2 late, 5 absent"),
     ).toBeVisible();
     expect(saved.map((body) => body.records.length)).toEqual([
       ATTENDANCE_MEMBERS.length,
@@ -20579,14 +20579,14 @@ test.describe("asistencia en el navegador", () => {
     await goToAttendance(page, ATTENDANCE_SHEET_STATE);
 
     await expect(page.getByRole("heading", { level: 2 })).toHaveText([
-      "Confirmed",
+      "Going",
       "Maybe",
-      "No response",
-      "Said no",
+      "No reply",
+      "Can't go",
     ]);
     await expect(
       page
-        .getByRole("region", { name: "Said no" })
+        .getByRole("region", { name: "Can't go" })
         .getByRole("group", { name: "Noah Williams" }),
     ).toBeVisible();
   });
@@ -20791,7 +20791,7 @@ test.describe("asistencia en el navegador", () => {
     await goToAttendance(page, ATTENDANCE_COACH_SHEET_STATE);
 
     await expect(
-      page.getByRole("region", { name: "Confirmed" }).getByRole("link"),
+      page.getByRole("region", { name: "Going" }).getByRole("link"),
     ).toHaveCount(0);
     await expect(
       attendanceRow(page, FIRST_ATTENDEE).getByText(FIRST_ATTENDEE),

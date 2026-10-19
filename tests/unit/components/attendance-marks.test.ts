@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  countUnsaved,
   isMarkUnsaved,
   isMemberUnsaved,
   markMember,
@@ -53,5 +54,34 @@ describe("isMemberUnsaved", () => {
     });
 
     expect(isMemberUnsaved(restored, MATEO_ID)).toBe(false);
+  });
+});
+
+describe("countUnsaved", () => {
+  const opened = startMarks([
+    { userId: MATEO_ID, status: "present" },
+    { userId: RUBY_ID, status: "absent" },
+  ]);
+
+  it("devuelve 0 en una hoja recién abierta", () => {
+    expect(countUnsaved(opened)).toBe(0);
+  });
+
+  it("cuenta cada socio cambiado una sola vez", () => {
+    const changed = markMember(
+      markMember(opened, { userId: MATEO_ID, status: "late" }),
+      { userId: MATEO_ID, status: "absent" },
+    );
+
+    expect(countUnsaved(changed)).toBe(1);
+  });
+
+  it("cuenta a todos los socios cambiados", () => {
+    const changed = markMember(
+      markMember(opened, { userId: MATEO_ID, status: "late" }),
+      { userId: RUBY_ID, status: "late" },
+    );
+
+    expect(countUnsaved(changed)).toBe(2);
   });
 });
