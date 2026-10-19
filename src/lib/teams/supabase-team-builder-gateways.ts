@@ -1,12 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
+import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { POSITION_COVERAGES } from "@/lib/club/club-positions";
 import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
 import { EVENT_TYPES } from "@/lib/events/event-creation";
 import { toHoursAndMinutes } from "@/lib/events/supabase-event-management-gateways";
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
+import { signProfilePhotoUrls } from "@/lib/members/supabase-profile-photo-gateways";
 import { isStandingCurrent } from "@/lib/membership/membership";
 import {
   MEMBERSHIP_STANDING_EMBED,
@@ -55,7 +57,7 @@ const PUBLISH_SPLIT_FUNCTION = "publish_team_split";
 
 /** La posición por la clave compuesta que la ata al club (`0025`). */
 const PLAYER_COLUMNS = [
-  "user_id, full_name, position_id",
+  "user_id, full_name, position_id, account_status, photo_path",
   "position:club_positions!members_position_same_club_fkey(coverage)",
   "member_evaluations(member_evaluation_ratings(rating))",
   MEMBERSHIP_STANDING_EMBED,
@@ -89,6 +91,8 @@ const playerRowsSchema = z.array(
     user_id: z.string(),
     full_name: z.string(),
     position_id: z.string().nullable(),
+    account_status: z.enum(ACCOUNT_STATUSES),
+    photo_path: z.string().nullable(),
     // La membresía del `left join`; la estrecha `parseMembershipStanding`.
     memberships: z.unknown(),
     position: z
@@ -284,6 +288,8 @@ async function findPlayers(
         parseMembershipStanding(row.memberships),
         now,
       ),
+      accountStatus: row.account_status,
+      photoPath: row.photo_path,
     };
   });
 }
@@ -395,6 +401,10 @@ export function createTeamBuilderGateways(
     members: createRoleRequestGateways(serviceClient).members,
     teams: createTeamSplitsGateway(serviceClient),
     positions: cachedClubPositions,
+    photos: {
+      signPhotoUrls: (photoPaths) =>
+        signProfilePhotoUrls(serviceClient, photoPaths),
+    },
     notifications: createSupabaseNotificationWriter(serviceClient),
     audit: createSupabaseAuditLogWriter(serviceClient),
   };

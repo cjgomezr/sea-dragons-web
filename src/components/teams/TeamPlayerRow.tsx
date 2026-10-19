@@ -15,8 +15,10 @@ import type { Destination, RosterPlayer } from "./team-draft";
  * Asistencia, y cada uno dice además a quién mueve y a dónde.
  */
 
-/** En píxeles, como `.team-avatar`. */
-const AVATAR_SIZE = 32;
+/** En píxeles, como `.team-avatar` y `.team-avatar-ringed`: en un equipo el
+ * avatar crece para el anillo de su color (#757); en el banco no lo lleva. */
+const BENCH_AVATAR_SIZE = 32;
+const TEAM_AVATAR_SIZE = 34;
 
 /** El tipo que viaja en el arrastre: el `userId` del jugador. */
 export const PLAYER_DRAG_TYPE = "text/plain";
@@ -101,6 +103,7 @@ export function TeamPlayerRow({
   readonly teams: TeamLabels;
   readonly onMove: (destination: Destination) => void;
 }): React.JSX.Element {
+  const ringColor = team === null ? null : teams[team].color;
   return (
     <li
       className="team-player"
@@ -112,9 +115,12 @@ export function TeamPlayerRow({
     >
       <MemberAvatar
         fullName={player.fullName}
-        photoUrl={null}
-        size={AVATAR_SIZE}
-        className="team-avatar"
+        photoUrl={player.photoUrl}
+        size={ringColor === null ? BENCH_AVATAR_SIZE : TEAM_AVATAR_SIZE}
+        className={
+          ringColor === null ? "team-avatar" : "team-avatar team-avatar-ringed"
+        }
+        style={ringColor === null ? undefined : { borderColor: ringColor }}
       />
       <div className="team-player-text">
         <span className="team-player-name">{player.fullName}</span>

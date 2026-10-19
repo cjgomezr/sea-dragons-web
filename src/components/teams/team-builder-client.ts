@@ -57,6 +57,7 @@ const squadEntrySchema = z.object({
   coverage: z.enum(["goalkeeper", "defender", "forward"]).nullable(),
   rating: z.number(),
   isUnrated: z.boolean(),
+  photoUrl: z.string().nullable(),
 });
 
 const builderResponseSchema = z.object({

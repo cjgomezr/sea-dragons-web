@@ -20878,7 +20878,16 @@ function teamsPlayer(
     coverage: position,
     rating: rating ?? 5,
     isUnrated: rating === null,
+    photoUrl: null,
   };
+}
+
+/** El mismo jugador con la foto fija (#757): unos con foto y otros con
+ * iniciales, como en el mockup. */
+function withTeamsPhoto(
+  player: ReturnType<typeof teamsPlayer>,
+): ReturnType<typeof teamsPlayer> {
+  return { ...player, photoUrl: STUBBED_PHOTO_URL };
 }
 
 const LONG_NAMED_PLAYER =
@@ -20887,18 +20896,20 @@ const LONG_NAMED_PLAYER =
 /** Los doce del mockup, con Ethan sin evaluar, más un nombre de tres veces
  * lo normal para el caso de contenido largo. */
 const TEAMS_PLAYERS = {
-  mateo: teamsPlayer(1, "Mateo Restrepo", "forward", 8.6),
+  mateo: withTeamsPhoto(teamsPlayer(1, "Mateo Restrepo", "forward", 8.6)),
   daniela: teamsPlayer(2, "Daniela Vargas", "forward", 8),
-  valentina: teamsPlayer(3, "Valentina Gómez", "goalkeeper", 7.4),
+  valentina: withTeamsPhoto(
+    teamsPlayer(3, "Valentina Gómez", "goalkeeper", 7.4),
+  ),
   isabella: teamsPlayer(4, "Isabella Muñoz", "defender", 7.2),
-  jack: teamsPlayer(5, "Jack Thompson", "defender", 6.8),
+  jack: withTeamsPhoto(teamsPlayer(5, "Jack Thompson", "defender", 6.8)),
   ethan: teamsPlayer(6, "Ethan Brown", "forward", null),
-  camila: teamsPlayer(7, "Camila Ortiz", "forward", 8.3),
+  camila: withTeamsPhoto(teamsPlayer(7, "Camila Ortiz", "forward", 8.3)),
   liam: teamsPlayer(8, "Liam O'Connor", "defender", 8.1),
-  santiago: teamsPlayer(9, "Santiago Herrera", "defender", 7.8),
+  santiago: withTeamsPhoto(teamsPlayer(9, "Santiago Herrera", "defender", 7.8)),
   chloe: teamsPlayer(10, "Chloe Nguyen", "forward", 7),
   noah: teamsPlayer(11, "Noah Williams", "goalkeeper", 6.5),
-  ruby: teamsPlayer(12, "Ruby Tan", "goalkeeper", 5.9),
+  ruby: withTeamsPhoto(teamsPlayer(12, "Ruby Tan", "goalkeeper", 5.9)),
   long: teamsPlayer(13, LONG_NAMED_PLAYER, "forward", 6.1),
 } as const;
 
@@ -20992,6 +21003,7 @@ type TeamsReads = {
  * responden bien. Devuelve las escrituras que llegaron. */
 async function stubTeams(page: Page, reads: TeamsReads): Promise<TeamsWrite[]> {
   const writes: TeamsWrite[] = [];
+  await stubDirectoryPhoto(page);
   await page.route(
     (url) => url.pathname === TEAMS_ENDPOINT,
     (route) => route.fulfill(jsonBody({ events: reads.events })),
