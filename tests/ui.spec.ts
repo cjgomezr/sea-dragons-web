@@ -21742,7 +21742,15 @@ const DASHBOARD_LATEST_NEWS = [
 
 const ADMIN_DASHBOARD = {
   kind: "member",
+  column: "management",
+  todos: [],
+  club: {
+    attendance: { percent: 86, previousPercent: 80 },
+    members: { active: 48, joinedThisMonth: 3 },
+    unreadNews: { count: 3, announcements: 1 },
+  },
   viewer: { firstName: "Liam" },
+  me: { attendance: null },
   tiles: {
     attendance: {
       kind: "club_rate",
@@ -21762,6 +21770,7 @@ const ADMIN_DASHBOARD = {
 
 const PLAYER_DASHBOARD = {
   ...ADMIN_DASHBOARD,
+  column: "player",
   tiles: {
     ...ADMIN_DASHBOARD.tiles,
     attendance: {
@@ -21774,7 +21783,9 @@ const PLAYER_DASHBOARD = {
 // Un club recién creado: lo que el PRD describe en sus casos borde.
 const EMPTY_DASHBOARD = {
   kind: "member",
+  column: "player",
   viewer: { firstName: "Liam" },
+  me: { attendance: null },
   tiles: {
     attendance: { kind: "club_rate", rate: { kind: "no_data" } },
     members: { kind: "members", active: 1, joinedRecently: 0 },
@@ -21794,6 +21805,7 @@ const EMPTY_DASHBOARD = {
 const RESTRICTED_DASHBOARD = {
   kind: "restricted",
   viewer: { firstName: "Liam" },
+  me: { attendance: null },
   block: "pending",
   nextTraining: {
     kind: "training",
