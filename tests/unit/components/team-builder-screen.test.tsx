@@ -272,6 +272,37 @@ describe("la escuadra", () => {
     ]);
   });
 
+  it("abre el evento pedido desde el inicio cuando es armable (#747)", async () => {
+    stubClub();
+
+    render(<TeamBuilderScreen locale="en" initialEventId={COMPETITION.id} />);
+
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Sat 26 Jun · Geelong Cup",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("abre el más cercano si el evento pedido no es armable", async () => {
+    stubClub();
+
+    render(
+      <TeamBuilderScreen
+        locale="en"
+        initialEventId="00000000-0000-4000-8000-0000000000ff"
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Sat 19 Jun · Scrimmage",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("ofrece en el selector los eventos armables, con el abierto elegido", async () => {
     stubClub();
 
