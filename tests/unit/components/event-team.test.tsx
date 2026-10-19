@@ -376,8 +376,22 @@ describe("el equipo en el panel del evento", () => {
 
     expect(
       await within(panel).findByText(
-        "You're playing in Team Tide, colour yellow, with no position.",
+        "You're playing in Team Tide, colour gold, with no position.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["en", "You're playing in Team Tide, colour gold, as Goalkeeper."],
+    ["es", "Juegas en Team Tide, de color dorado, como Portero."],
+  ] as const)("dice el dorado por su nombre (%s)", async (locale, sentence) => {
+    stubEvent(SCRIMMAGE, {
+      ...PLAYING_IN_KELP,
+      me: { team: "b", position: GOALKEEPER },
+    });
+
+    const panel = await openPanel(SCRIMMAGE, locale);
+
+    expect(await within(panel).findByText(sentence)).toBeInTheDocument();
   });
 });

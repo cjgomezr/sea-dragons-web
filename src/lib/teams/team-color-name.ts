@@ -2,20 +2,48 @@
  * El color de un equipo dicho con palabras (#403, RF-8 del PRD de E10): el
  * reparto guarda un `#RRGGBB` cualquiera (D5) y la tarjeta del jugador dice
  * "de color azul", para el lector de pantalla y para quien no distingue el
- * color. Basta con la familia del color, que es lo que se dice de un peto.
+ * color. Basta con la familia del color, que es lo que se dice de un peto,
+ * salvo para los doce del muestrario, que tienen nombre propio (#756, D6 del
+ * PRD de E28): el dorado se dice "dorado", no "amarillo".
  */
 
 export type TeamColorName =
   | "red"
   | "orange"
+  | "gold"
   | "yellow"
   | "green"
+  | "teal"
   | "blue"
+  | "navy"
   | "purple"
   | "pink"
   | "black"
   | "white"
   | "grey";
+
+type FamilyName = Exclude<TeamColorName, "gold" | "teal" | "navy">;
+
+export type BibSwatch = {
+  readonly name: TeamColorName;
+  readonly hex: string;
+};
+
+/** Los colores de peto del handoff de E28, en el orden en que se eligen. */
+export const BIB_SWATCHES: readonly BibSwatch[] = [
+  { name: "red", hex: "#D64545" },
+  { name: "orange", hex: "#E07B2E" },
+  { name: "gold", hex: "#C99A3E" },
+  { name: "yellow", hex: "#E8C547" },
+  { name: "green", hex: "#3E9B5F" },
+  { name: "teal", hex: "#2A9D9A" },
+  { name: "blue", hex: "#1C6EA4" },
+  { name: "navy", hex: "#2B3F7A" },
+  { name: "purple", hex: "#7A5BC4" },
+  { name: "pink", hex: "#D9669A" },
+  { name: "black", hex: "#2B2F36" },
+  { name: "white", hex: "#F2F4F6" },
+];
 
 /** Por debajo de esta saturación el color no tiene tono: es un gris. */
 const MINIMUM_SATURATION = 0.15;
@@ -26,7 +54,7 @@ const WHITE_ABOVE_LIGHTNESS = 0.85;
  * la rueda: lo que pasa del rosa vuelve a ser rojo. */
 const HUE_FAMILIES: readonly {
   readonly upTo: number;
-  readonly name: TeamColorName;
+  readonly name: FamilyName;
 }[] = [
   { upTo: 15, name: "red" },
   { upTo: 38, name: "orange" },
@@ -87,14 +115,14 @@ function toHsl(hex: string): Hsl {
   return { hue: hueOf(channels, max, chroma), saturation, lightness };
 }
 
-function nameGrey(lightness: number): TeamColorName {
+function nameGrey(lightness: number): FamilyName {
   if (lightness < BLACK_BELOW_LIGHTNESS) {
     return "black";
   }
   return lightness > WHITE_ABOVE_LIGHTNESS ? "white" : "grey";
 }
 
-export function nameTeamColor(hex: string): TeamColorName {
+function nameFamily(hex: string): FamilyName {
   const { hue, saturation, lightness } = toHsl(hex);
   if (
     saturation < MINIMUM_SATURATION ||
@@ -108,4 +136,12 @@ export function nameTeamColor(hex: string): TeamColorName {
     throw new Error(`El tono ${hue} se sale de la rueda.`);
   }
   return family.name;
+}
+
+export function nameTeamColor(hex: string): TeamColorName {
+  const uppercaseHex = hex.toUpperCase();
+  const swatch = BIB_SWATCHES.find(
+    (candidate) => candidate.hex === uppercaseHex,
+  );
+  return swatch?.name ?? nameFamily(hex);
 }
