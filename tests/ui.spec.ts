@@ -10069,6 +10069,19 @@ const CLUB_SECTION_HEADINGS = {
   packs: "clubSettings.sessionPacks.title",
 } as const;
 
+/** Desde 768px el botón de la cuenta (#717) pinta las iniciales cuando
+ * llega el perfil, y General carga antes: sin esperar, la captura salía a
+ * veces con el círculo vacío. En el móvil el botón es un icono. */
+async function waitForAccountInitials(page: Page): Promise<void> {
+  if ((page.viewportSize()?.width ?? 0) < SIDEBAR_MIN_VIEWPORT_PX) {
+    return;
+  }
+  // Las del Admin sembrado salen del id de la corrida: pueden llevar cifras.
+  await expect(
+    page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
+  ).toHaveText(/\S/);
+}
+
 /** Sin esperar a que la sección cargue, la captura salía con ella en
  * "Loading…", según la corrida (#561). Desde #718 sólo se pinta la sección
  * abierta. */
@@ -10079,6 +10092,7 @@ async function waitForClubSettingsSection(
   if (tab === "general") {
     await expect(clubNameField(page)).toHaveValue(STUBBED_CLUB_SETTINGS.name);
     await waitForSectionsLoaded(page, []);
+    await waitForAccountInitials(page);
     return;
   }
   const lang = await page.locator("html").getAttribute("lang");
