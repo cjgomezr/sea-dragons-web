@@ -541,6 +541,11 @@ function isVisible(
   return matchesSearch(record, query.search);
 }
 
+/** Los dados de baja sólo los ve un Admin (AC-040). */
+function canSeeInactiveMembers(callerRole: Role): boolean {
+  return hasCapability(callerRole, "manageUsersAndRoles");
+}
+
 /** Si quien pregunta ve a este socio en el directorio cuando pide todo lo que
  * su rol le deja pedir. La foto grande de un socio (#353) sigue esta regla. */
 export function canSeeInDirectory(
@@ -549,8 +554,17 @@ export function canSeeInDirectory(
 ): boolean {
   return isVisible(record, {
     ...DEFAULT_DIRECTORY_QUERY,
-    includeInactive: hasCapability(callerRole, "manageUsersAndRoles"),
+    includeInactive: canSeeInactiveMembers(callerRole),
   });
+}
+
+/** La misma regla, cuando sólo se sabe el estado de la cuenta: las fotos del
+ * Team builder (#757) la siguen sin leer el directorio entero. */
+export function canSeeStatusInDirectory(
+  status: AccountStatus,
+  callerRole: Role,
+): boolean {
+  return status !== "inactive" || canSeeInactiveMembers(callerRole);
 }
 
 function withDirection(

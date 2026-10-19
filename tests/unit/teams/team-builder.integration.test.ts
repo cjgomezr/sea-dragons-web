@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { expect, it, vi } from "vitest";
 import type { Role } from "@/lib/auth/roles";
+import { PROFILE_PHOTO_BUCKET } from "@/lib/members/supabase-profile-photo-gateways";
 import { listBuildableEvents } from "@/lib/teams/buildable-events";
 import {
   changeClubTeamLabels,
@@ -46,6 +49,11 @@ const DAY_MS = 86_400_000;
 const DAYS_AHEAD = 2;
 const GOALKEEPER_COVERAGE = "goalkeeper";
 const PIA_RATING = 8;
+const PHOTO_BYTES = new Uint8Array(
+  readFileSync(
+    path.resolve(__dirname, "../../support/fixtures/foto-de-perfil.png"),
+  ),
+);
 
 type Squad = {
   readonly serviceClient: ServiceRoleClient;
@@ -262,6 +270,43 @@ async function withSquad(run: (squad: Squad) => Promise<void>): Promise<void> {
   );
 }
 
+/** Apunta la foto de un miembro a `photoPath`, exista o no el fichero. */
+async function pointPhotoAt(
+  squad: Squad,
+  member: TestUser,
+  photoPath: string,
+): Promise<void> {
+  await succeed(
+    "apuntar la foto",
+    squad.serviceClient.client
+      .from("members")
+      .update({ photo_path: photoPath })
+      .eq("user_id", member.id),
+  );
+}
+
+/** Pía con su foto subida y Beto con una ruta sin fichero; Maya sin foto. */
+async function withPhotos(
+  squad: Squad,
+  run: (piaPhotoPath: string) => Promise<void>,
+): Promise<void> {
+  const bucket = squad.serviceClient.client.storage.from(PROFILE_PHOTO_BUCKET);
+  const piaPhotoPath = `${squad.pia.id}/${randomUUID()}.png`;
+  const upload = await bucket.upload(piaPhotoPath, PHOTO_BYTES, {
+    contentType: "image/png",
+  });
+  expect(upload.error).toBeNull();
+  const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    await pointPhotoAt(squad, squad.pia, piaPhotoPath);
+    await pointPhotoAt(squad, squad.beto, `${squad.beto.id}/no-existe.png`);
+    await run(piaPhotoPath);
+  } finally {
+    logged.mockRestore();
+    await bucket.remove([piaPhotoPath]);
+  }
+}
+
 describeRls("el team builder en Supabase", () => {
   it(
     "arma la escuadra, balancea, guarda, publica con avisos y el jugador ve su equipo",
@@ -402,6 +447,55 @@ describeRls("el team builder en Supabase", () => {
             ]);
           },
         );
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "da a un Coach la foto firmada, null sin fichero o sin foto, y nada de un dado de baja (#757)",
+    async () => {
+      await withSquad(async (squad) => {
+        await withPhotos(squad, async (piaPhotoPath) => {
+          const gateways = createTeamBuilderGateways(
+            squad.serviceClient.client,
+          );
+          const request = {
+            callerId: squad.coach.id,
+            eventId: squad.eventId,
+            now: new Date(),
+          };
+
+          const builder = await openTeamBuilder(gateways, request);
+          const [beto, pia] = builder.available;
+          expect(pia?.photoUrl).toContain(piaPhotoPath);
+          expect(pia?.photoUrl).toContain("token=");
+          expect(beto?.photoUrl).toBeNull();
+          expect(builder.maybe[0]?.photoUrl).toBeNull();
+
+          const balanced = await autoBalanceEventTeams(gateways, request);
+          expect(
+            [...balanced.a, ...balanced.b].find(
+              (entry) => entry.userId === squad.pia.id,
+            )?.photoUrl,
+          ).toContain(piaPhotoPath);
+
+          await succeed(
+            "dar de baja a Pía",
+            squad.serviceClient.client
+              .from("members")
+              .update({ account_status: "inactive" })
+              .eq("user_id", squad.pia.id),
+          );
+          const afterLeaving = await openTeamBuilder(gateways, request);
+          expect(afterLeaving.split?.assignments).toContainEqual(
+            expect.objectContaining({
+              userId: squad.pia.id,
+              isOutsideSquad: true,
+              photoUrl: null,
+            }),
+          );
+        });
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,

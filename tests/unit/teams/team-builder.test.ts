@@ -24,6 +24,7 @@ import {
   TEAMS_NOW,
   fakeTeamsClub,
   playerId,
+  signedPhotoUrl,
 } from "../helpers/team-builder-club";
 import { GOALKEEPER } from "../helpers/seeded-positions";
 
@@ -110,6 +111,7 @@ describe("la escuadra", () => {
           coverage: null,
           rating: 8.5,
           isUnrated: false,
+          photoUrl: null,
         },
         {
           userId: BRUNO.userId,
@@ -118,6 +120,7 @@ describe("la escuadra", () => {
           coverage: "goalkeeper",
           rating: 7,
           isUnrated: false,
+          photoUrl: null,
         },
       ]);
       expect(builder.maybe.map((entry) => entry.userId)).toEqual([
@@ -277,6 +280,117 @@ describe("la escuadra", () => {
     const builder = await open({ events: [groupsOnly], players: [ANA] });
 
     expect(builder.available).toHaveLength(1);
+  });
+});
+
+describe("las fotos (#757)", () => {
+  const ANA_PHOTO = `${ANA.userId}/thumb.webp`;
+  const CARLA_PHOTO = `${CARLA.userId}/thumb.webp`;
+  const WITH_PHOTOS = [
+    { ...ANA, photoPath: ANA_PHOTO },
+    BRUNO,
+    { ...CARLA, photoPath: CARLA_PHOTO },
+  ];
+
+  it("da la foto firmada de cada jugador de la escuadra", async () => {
+    const builder = await open({ players: WITH_PHOTOS });
+
+    expect(
+      [...builder.available, ...builder.maybe].map((entry) => [
+        entry.fullName,
+        entry.photoUrl,
+      ]),
+    ).toEqual([
+      [ANA.fullName, signedPhotoUrl(ANA_PHOTO)],
+      [BRUNO.fullName, null],
+      [CARLA.fullName, signedPhotoUrl(CARLA_PHOTO)],
+    ]);
+  });
+
+  it("firma todas las fotos en una sola llamada", async () => {
+    const club = fakeTeamsClub({ players: WITH_PHOTOS });
+
+    await openTeamBuilder(club.gateways, {
+      callerId: TEAMS_CALLER_ID,
+      eventId: EVENT_ID,
+      now: TEAMS_NOW,
+    });
+
+    expect(club.signedPaths).toEqual([[ANA_PHOTO, CARLA_PHOTO]]);
+  });
+
+  it("da la foto firmada de cada asignado del reparto", async () => {
+    const builder = await open({
+      players: WITH_PHOTOS,
+      split: draftWith([
+        { userId: ANA.userId, team: "a" },
+        { userId: BRUNO.userId, team: "b" },
+      ]),
+    });
+
+    expect(builder.split?.assignments.map((entry) => entry.photoUrl)).toEqual([
+      signedPhotoUrl(ANA_PHOTO),
+      null,
+    ]);
+  });
+
+  it("responde con las fotos en null si firmarlas falla", async () => {
+    const builder = await open({ players: WITH_PHOTOS, failingPhotos: true });
+
+    expect(
+      [...builder.available, ...builder.maybe].map((entry) => entry.photoUrl),
+    ).toEqual([null, null, null]);
+  });
+
+  it("no da a un Coach la foto de un asignado dado de baja, como el directorio", async () => {
+    const departed = { ...ANA, accountStatus: "inactive" as const };
+    const club = fakeTeamsClub({
+      players: [{ ...departed, photoPath: ANA_PHOTO }],
+      split: draftWith([{ userId: ANA.userId, team: "a" }]),
+    });
+
+    const builder = await openTeamBuilder(club.gateways, {
+      callerId: TEAMS_CALLER_ID,
+      eventId: EVENT_ID,
+      now: TEAMS_NOW,
+    });
+
+    expect(builder.split?.assignments[0]?.photoUrl).toBeNull();
+    expect(club.signedPaths.flat()).not.toContain(ANA_PHOTO);
+  });
+
+  it("da a un Admin la foto de un asignado dado de baja, como el directorio", async () => {
+    const builder = await open({
+      callerRole: "Admin",
+      players: [{ ...ANA, accountStatus: "inactive", photoPath: ANA_PHOTO }],
+      split: draftWith([{ userId: ANA.userId, team: "a" }]),
+    });
+
+    expect(builder.split?.assignments[0]?.photoUrl).toBe(
+      signedPhotoUrl(ANA_PHOTO),
+    );
+  });
+
+  it("da la foto firmada de cada jugador que reparte el auto-balance", async () => {
+    const balanced = await autoBalanceEventTeams(
+      fakeTeamsClub({ players: WITH_PHOTOS }).gateways,
+      { callerId: TEAMS_CALLER_ID, eventId: EVENT_ID, now: TEAMS_NOW },
+    );
+
+    expect(
+      [...balanced.a, ...balanced.b].map((entry) => entry.photoUrl),
+    ).toEqual([signedPhotoUrl(ANA_PHOTO), null]);
+  });
+
+  it("balancea igual con las fotos en null si firmarlas falla", async () => {
+    const balanced = await autoBalanceEventTeams(
+      fakeTeamsClub({ players: WITH_PHOTOS, failingPhotos: true }).gateways,
+      { callerId: TEAMS_CALLER_ID, eventId: EVENT_ID, now: TEAMS_NOW },
+    );
+
+    expect(
+      [...balanced.a, ...balanced.b].map((entry) => entry.photoUrl),
+    ).toEqual([null, null]);
   });
 });
 

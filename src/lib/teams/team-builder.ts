@@ -1,7 +1,8 @@
 import type { AuditActor, AuditLogWriter } from "@/lib/audit/audit-log";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
+import type { AccountStatus } from "@/lib/auth/account-status";
 import type { RoleRequestGateways } from "@/lib/auth/role-request";
-import { hasCapability } from "@/lib/auth/roles";
+import { type Role, hasCapability } from "@/lib/auth/roles";
 import {
   type ClubPositionsGateway,
   type NamedPosition,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/club/club-positions";
 import type { EventStatus } from "@/lib/events/event-agenda";
 import type { EventAudience, EventType } from "@/lib/events/event-creation";
+import { canSeeStatusInDirectory } from "@/lib/directory/directory";
 import { EventNotFoundError } from "@/lib/events/event-rsvp";
 import { calculateOverallRating } from "@/lib/evaluations/overall-rating";
 import type { NotificationBroadcastWriter } from "@/lib/notifications/notify-member";
@@ -103,6 +105,10 @@ export type PlayerRecord = {
   readonly ratings: readonly number[] | null;
   /** Si su membresía está al día (#453): sin ella no entra en la escuadra. */
   readonly membershipCurrent: boolean;
+  /** Decide, como en el directorio, si quien arma ve su foto (#757). */
+  readonly accountStatus: AccountStatus;
+  /** Dónde está su foto en el almacenamiento; nunca sale tal cual. */
+  readonly photoPath: string | null;
 };
 
 export type StoredTeamSplit = {
@@ -191,6 +197,13 @@ export type TeamBuilderGateways = {
   readonly teams: TeamSplitsGateway;
   readonly clubTeams: ClubTeamLabelsGateway;
   readonly positions: ClubPositionsGateway;
+  readonly photos: {
+    /** Las direcciones firmadas, por ruta. Una ruta que no se pudo firmar
+     * falta en el mapa; un fallo de la llamada entera lanza. */
+    signPhotoUrls(
+      photoPaths: readonly string[],
+    ): Promise<ReadonlyMap<string, string>>;
+  };
   readonly notifications: NotificationBroadcastWriter;
   readonly audit: AuditLogWriter;
 };
@@ -204,6 +217,9 @@ export type SquadEntry = {
   readonly coverage: PositionCoverage | null;
   readonly rating: number;
   readonly isUnrated: boolean;
+  /** Null sin foto, sin firma o si quien arma no la ve: la fila enseña
+   * entonces las iniciales (#757). */
+  readonly photoUrl: string | null;
 };
 
 /** Un asignado. Fuera de la escuadra si cambió su RSVP o salió de la
@@ -318,10 +334,13 @@ export class TeamSplitInvalidError extends Error {
   }
 }
 
+/** Quien arma, con su rol: decide qué fotos ve (#757). */
+export type TeamBuilderActor = AuditActor & { readonly role: Role };
+
 export async function findTeamBuilderActor(
   gateways: Pick<TeamBuilderGateways, "members">,
   callerId: string,
-): Promise<AuditActor> {
+): Promise<TeamBuilderActor> {
   const caller = await gateways.members.findRoleRequestMember(callerId);
   if (caller === null) {
     throw new MemberNotFoundError(callerId);
@@ -329,7 +348,7 @@ export async function findTeamBuilderActor(
   if (!hasCapability(caller.role, "buildTeamsAndTrackAttendance")) {
     throw new TeamBuilderForbiddenError();
   }
-  return { id: callerId, clubId: caller.clubId };
+  return { id: callerId, clubId: caller.clubId, role: caller.role };
 }
 
 const REJECTION_CODES: Readonly<
@@ -408,11 +427,18 @@ function distinctPositionIds(
   ].sort();
 }
 
-/** Los jugadores ya leídos, listos para pintar, por id. */
+/** Los jugadores ya leídos, listos para pintar, por id. `photoUrls` va por
+ * `userId`: quien no está en él sale sin foto. */
 async function toSquadEntries(
   gateways: { readonly positions: ClubPositionsGateway },
   clubId: string,
-  players: readonly PlayerRecord[],
+  {
+    players,
+    photoUrls,
+  }: {
+    readonly players: readonly PlayerRecord[];
+    readonly photoUrls: ReadonlyMap<string, string>;
+  },
 ): Promise<ReadonlyMap<string, SquadEntry>> {
   const positions = await gateways.positions.findClubPositions(
     clubId,
@@ -429,6 +455,7 @@ async function toSquadEntries(
         coverage: player.coverage,
         rating: overall ?? UNRATED_PLAYER_RATING,
         isUnrated: overall === null,
+        photoUrl: photoUrls.get(player.userId) ?? null,
       };
       return [player.userId, entry];
     }),
@@ -447,7 +474,59 @@ export async function readSquadEntries(
     return new Map();
   }
   const players = await gateways.teams.findPlayers(query);
-  return toSquadEntries(gateways, query.clubId, players);
+  // "Mi equipo" enseña nombres y posiciones, no caras: no firma nada.
+  return toSquadEntries(gateways, query.clubId, {
+    players,
+    photoUrls: new Map(),
+  });
+}
+
+/** Sin foto para nadie, para lo que lee la escuadra sólo para validarla. */
+const WITHOUT_PHOTOS: TeamBuilderGateways["photos"] = {
+  signPhotoUrls: async () => new Map(),
+};
+
+/** Una foto que no se firma deja las iniciales, como en Asistencia: no tumba
+ * el builder. El fallo queda registrado con su motivo. */
+async function signPhotosOrNone(
+  gateways: Pick<TeamBuilderGateways, "photos">,
+  photoPaths: readonly string[],
+): Promise<ReadonlyMap<string, string>> {
+  try {
+    return await gateways.photos.signPhotoUrls(photoPaths);
+  } catch (error) {
+    console.error(
+      `[team-builder] no se pudieron firmar ${photoPaths.length} fotos; salen las iniciales: ${String(error)}`,
+    );
+    return new Map();
+  }
+}
+
+/** Las fotos firmadas, por `userId`, de quien `viewerRole` ve en el
+ * directorio (D7 del PRD de E28). A los demás ni se les firma. */
+async function signVisiblePhotos(
+  gateways: Pick<TeamBuilderGateways, "photos">,
+  players: readonly PlayerRecord[],
+  viewerRole: Role,
+): Promise<ReadonlyMap<string, string>> {
+  const visible = players.flatMap((player) =>
+    player.photoPath !== null &&
+    canSeeStatusInDirectory(player.accountStatus, viewerRole)
+      ? [{ userId: player.userId, photoPath: player.photoPath }]
+      : [],
+  );
+  if (visible.length === 0) {
+    return new Map();
+  }
+  const signed = await signPhotosOrNone(gateways, [
+    ...new Set(visible.map((player) => player.photoPath)),
+  ]);
+  return new Map(
+    visible.flatMap(({ userId, photoPath }) => {
+      const url = signed.get(photoPath);
+      return url === undefined ? [] : [[userId, url] as const];
+    }),
+  );
 }
 
 type Squad = {
@@ -485,17 +564,24 @@ async function readSquadPlayers(
  * no tiene la membresía al día no entra aunque respondiera (#453, D2 del PRD
  * de E12); si ya estaba asignado, sale como fuera de la escuadra. */
 async function readSquad(
-  gateways: Pick<TeamBuilderGateways, "teams" | "positions">,
-  event: TeamBuilderEvent,
-  assignedIds: readonly string[] = [],
+  gateways: Pick<TeamBuilderGateways, "teams" | "positions" | "photos">,
+  request: {
+    readonly event: TeamBuilderEvent;
+    readonly viewerRole: Role;
+    readonly assignedIds?: readonly string[];
+  },
 ): Promise<Squad> {
+  const { event, viewerRole, assignedIds = [] } = request;
   const responses = await gateways.teams.findLiveResponses(event.id);
   const players = await readSquadPlayers(gateways, {
     clubId: event.clubId,
     responses,
     assignedIds,
   });
-  const entries = await toSquadEntries(gateways, event.clubId, players);
+  const entries = await toSquadEntries(gateways, event.clubId, {
+    players,
+    photoUrls: await signVisiblePhotos(gateways, players, viewerRole),
+  });
   const currentIds = new Set(
     players
       .filter((player) => player.membershipCurrent)
@@ -552,11 +638,11 @@ export async function openTeamBuilder(
     clubId: actor.clubId,
   });
   const split = await gateways.teams.findSplit(event.id);
-  const squad = await readSquad(
-    gateways,
+  const squad = await readSquad(gateways, {
     event,
-    split?.assignments.map((assignment) => assignment.userId),
-  );
+    viewerRole: actor.role,
+    assignedIds: split?.assignments.map((assignment) => assignment.userId),
+  });
   return {
     event: {
       id: event.id,
@@ -630,7 +716,11 @@ export async function saveTeamSplit(
     ...request,
     clubId: actor.clubId,
   });
-  assertPlayersInSquad(await readSquad(gateways, event), request.assignments);
+  const squad = await readSquad(
+    { ...gateways, photos: WITHOUT_PHOTOS },
+    { event, viewerRole: actor.role },
+  );
+  assertPlayersInSquad(squad, request.assignments);
   await writeSplit(gateways, {
     clubId: actor.clubId,
     eventId: event.id,
@@ -697,7 +787,7 @@ export async function autoBalanceEventTeams(
     clubId: actor.clubId,
   });
   const [squad, stored] = await Promise.all([
-    readSquad(gateways, event),
+    readSquad(gateways, { event, viewerRole: actor.role }),
     gateways.teams.findSplit(event.id),
   ]);
   if (squad.available.length === 0) {

@@ -23,6 +23,9 @@ import type { Translator } from "@/lib/i18n/translator";
  * iniciales en vez de dejar un icono roto (#354). Se recuerda qué dirección
  * falló, no sólo que falló: una dirección nueva se vuelve a intentar.
  *
+ * Con `style`, quien la pinta le pone lo que su clase no puede saber, como el
+ * anillo del color del equipo en el Team builder (#757).
+ *
  * Con `viewer`, la foto es además un botón que la abre en grande (#355). Las
  * iniciales nunca lo son: no hay nada más grande que enseñar.
  */
@@ -40,6 +43,7 @@ export function MemberAvatar({
   size,
   className,
   alt = "",
+  style,
   viewer,
 }: {
   fullName: string;
@@ -48,12 +52,13 @@ export function MemberAvatar({
   size: number;
   className: string;
   alt?: string;
+  style?: React.CSSProperties;
   viewer?: PhotoViewer;
 }): React.JSX.Element {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   if (photoUrl === null || photoUrl === failedUrl) {
     return (
-      <span className={className} aria-hidden="true">
+      <span className={className} style={style} aria-hidden="true">
         {memberInitials(fullName)}
       </span>
     );
@@ -63,6 +68,7 @@ export function MemberAvatar({
       className={`${className} member-photo`}
       src={photoUrl}
       alt={alt}
+      style={style}
       width={size}
       height={size}
       unoptimized

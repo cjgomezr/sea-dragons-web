@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -829,9 +830,15 @@ describe("arrastrar por el asa", () => {
       },
     ]);
     expect(activeNames()).toEqual(["Forward", "Goalkeeper", "Defender"]);
-    expect(
-      screen.getByRole("button", { name: "Reorder Forward, position 1 of 3" }),
-    ).toHaveFocus();
+    // El foco vuelve en el pintado de después de la respuesta, no en el
+    // mismo que el anuncio.
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", {
+          name: "Reorder Forward, position 1 of 3",
+        }),
+      ).toHaveFocus();
+    });
   });
 
   it("mientras el servidor contesta, la fila ya está donde se soltó", async () => {
@@ -853,7 +860,9 @@ describe("arrastrar por el asa", () => {
       /couldn't reach the server/i,
     );
     expect(activeNames()).toEqual(["Goalkeeper", "Defender", "Forward"]);
-    expect(handleOf("Forward")).toHaveFocus();
+    await waitFor(() => {
+      expect(handleOf("Forward")).toHaveFocus();
+    });
   });
 
   it("si otro Admin cambió las posiciones, vuelve al orden y ofrece cargar las últimas", async () => {
@@ -1142,7 +1151,9 @@ describe("en el móvil", () => {
       expect(requests[0]?.body).toEqual({
         positionIds: [FORWARD.id, GOALKEEPER.id, DEFENDER.id],
       });
-      expect(handleOf("Forward")).toHaveFocus();
+      await waitFor(() => {
+        expect(handleOf("Forward")).toHaveFocus();
+      });
     });
 
     it("mientras el servidor contesta, la fila ya está donde se soltó", async () => {

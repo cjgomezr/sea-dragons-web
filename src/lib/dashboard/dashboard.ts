@@ -10,6 +10,11 @@ import {
   type OwnAttendanceGateways,
   readOwnAttendance,
 } from "@/lib/attendance/own-attendance";
+import {
+  type SeasonAttendance,
+  type SeasonAttendanceGateway,
+  readSeasonAttendance,
+} from "@/lib/attendance/season-attendance";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { RoleRequestGateways } from "@/lib/auth/role-request";
 import { type Role, hasCapability } from "@/lib/auth/roles";
@@ -57,7 +62,19 @@ import {
   listWeekEvents,
   readNextUpEvent,
 } from "./dashboard-events";
+import {
+  type ClubAttendanceTrend,
+  type DashboardTodo,
+  type TodoGateways,
+  listTodos,
+  readClubAttendanceTrend,
+  seesManagementColumn,
+} from "./dashboard-management";
 
+export type {
+  ClubAttendanceTrend,
+  DashboardTodo,
+} from "./dashboard-management";
 export type {
   DashboardNextUpEvent,
   NextUpTeam,
@@ -88,6 +105,10 @@ export type {
  * El rediseño de E27 (#745) añade a los dos el próximo evento, la semana, la
  * membresía y las noticias. Al inicio reducido las noticias le llegan sólo
  * con el título, la categoría y la fecha (D2).
+ *
+ * Los dos llevan también la asistencia de la temporada de quien mira (#746,
+ * D13). Admin, Coach y Committee al día reciben además la columna de
+ * gestión: los pendientes y los números del club (D3, D9, D11).
  */
 
 /** Cuántos eventos y noticias enseña el inicio (FR-077). */
@@ -198,10 +219,46 @@ export type ContactReminderPart =
 /** Quien mira, para el saludo de la pantalla (#426, RF-4). */
 export type DashboardViewer = { readonly firstName: string };
 
+/** Lo de quien mira (D13): null sin sesiones elegibles en la temporada. */
+export type DashboardMe = {
+  readonly attendance: SeasonAttendance | null | Unavailable;
+};
+
+/** Vacía si no hay nada pendiente. */
+export type DashboardTodos = readonly DashboardTodo[] | Unavailable;
+
+export type ClubMembersNumbers = {
+  readonly active: number;
+  /** Los activos que se unieron desde el día 1 del mes del club. */
+  readonly joinedThisMonth: number;
+};
+
+export type ClubUnreadNews = {
+  readonly count: number;
+  readonly announcements: number;
+};
+
+/** Los números del club de la columna de gestión (D11). */
+export type ClubNumbers = {
+  readonly attendance: ClubAttendanceTrend | Unavailable;
+  readonly members: ClubMembersNumbers | Unavailable;
+  readonly unreadNews: ClubUnreadNews | Unavailable;
+};
+
+/** Un Player no recibe ni los pendientes ni los números (D3). */
+export type PlayerColumn = { readonly column: "player" };
+
+export type ManagementColumn = {
+  readonly column: "management";
+  readonly todos: DashboardTodos;
+  readonly club: ClubNumbers;
+};
+
 /** El inicio de un socio al día. */
-export type MemberDashboard = {
+export type MemberDashboard = (PlayerColumn | ManagementColumn) & {
   readonly kind: "member";
   readonly viewer: DashboardViewer;
+  readonly me: DashboardMe;
   readonly tiles: {
     readonly attendance: AttendanceTile;
     readonly members: MembersTile;
@@ -220,6 +277,7 @@ export type MemberDashboard = {
 export type RestrictedDashboard = {
   readonly kind: "restricted";
   readonly viewer: DashboardViewer;
+  readonly me: DashboardMe;
   /** Por qué: lo que dice el aviso que lleva a Pagos. */
   readonly block: MembershipBlock;
   readonly nextTraining: NextTrainingTile;
@@ -259,13 +317,16 @@ export type DashboardSource =
   | "next_up"
   | "news"
   | "news_seen"
-  | "contact";
+  | "contact"
+  | "season_attendance"
+  | "todos"
+  | "club_attendance";
 
 export type DashboardFailureLog = {
   report(source: DashboardSource, error: unknown): void;
 };
 
-export type DashboardGateways = {
+export type DashboardGateways = TodoGateways & {
   readonly members: RoleRequestGateways["members"];
   readonly clubRate: ClubAttendanceRateGateways;
   readonly ownAttendance: OwnAttendanceGateways;
@@ -274,6 +335,7 @@ export type DashboardGateways = {
   readonly roster: DashboardRosterGateway;
   readonly membership: MembershipGateway;
   readonly myTeam: MyTeamGateways;
+  readonly seasonAttendance: SeasonAttendanceGateway;
   readonly failures: DashboardFailureLog;
 };
 
@@ -695,6 +757,113 @@ type DashboardCaller = NonNullable<
   Awaited<ReturnType<DashboardGateways["members"]["findRoleRequestMember"]>>
 >;
 
+type CallerRequest = DashboardRequest & { readonly caller: DashboardCaller };
+
+async function readMe(
+  gateways: DashboardGateways,
+  request: CallerRequest,
+): Promise<DashboardMe> {
+  const attendance = await orUnavailable(
+    gateways,
+    "season_attendance",
+    readSeasonAttendance(gateways.seasonAttendance, {
+      clubId: request.caller.clubId,
+      userId: request.callerId,
+      today: clubCalendarDate(request.now),
+    }),
+  );
+  return { attendance };
+}
+
+/** Sin el próximo evento no se sabe si falta publicar el reparto ni quién
+ * no ha respondido: los pendientes caen con él. Su fallo ya está en el log. */
+async function readTodos(
+  gateways: DashboardGateways,
+  request: CallerRequest & { readonly nextUp: NextUp },
+): Promise<DashboardTodos> {
+  const { nextUp } = request;
+  if (isUnavailable(nextUp)) {
+    return UNAVAILABLE;
+  }
+  return orUnavailable(
+    gateways,
+    "todos",
+    listTodos(gateways, {
+      callerId: request.callerId,
+      clubId: request.caller.clubId,
+      role: request.caller.role,
+      now: request.now,
+      nextEvent: nextUp.kind === "none" ? null : nextUp,
+    }),
+  );
+}
+
+/** El día 1 del mes de `today`, los dos días del club en YYYY-MM-DD. */
+function firstOfMonthOf(today: string): string {
+  return `${today.slice(0, 7)}-01`;
+}
+
+async function readClubMembers(
+  gateways: DashboardGateways,
+  request: { readonly clubId: string; readonly today: string },
+): Promise<ClubMembersNumbers> {
+  const counts = await gateways.roster.countActiveMembers({
+    clubId: request.clubId,
+    joinedSince: firstOfMonthOf(request.today),
+  });
+  return { active: counts.active, joinedThisMonth: counts.joinedRecently };
+}
+
+function toClubUnreadNews(tile: UnreadNewsTile): ClubUnreadNews | Unavailable {
+  return isUnavailable(tile)
+    ? tile
+    : { count: tile.count, announcements: tile.announcements };
+}
+
+async function readClubNumbers(
+  gateways: DashboardGateways,
+  request: CallerRequest & { readonly unreadNews: Promise<UnreadNewsTile> },
+): Promise<ClubNumbers> {
+  const scope = {
+    clubId: request.caller.clubId,
+    today: clubCalendarDate(request.now),
+  };
+  const [attendance, members, unreadNews] = await Promise.all([
+    orUnavailable(
+      gateways,
+      "club_attendance",
+      readClubAttendanceTrend(gateways.clubRate.clubRate, scope),
+    ),
+    orUnavailable(gateways, "members", readClubMembers(gateways, scope)),
+    request.unreadNews.then(toClubUnreadNews),
+  ]);
+  return { attendance, members, unreadNews };
+}
+
+/** La columna de gestión espera al próximo evento y a la cuenta sin leer,
+ * que ya se piden para el resto del inicio. */
+async function readColumn(
+  gateways: DashboardGateways,
+  request: CallerRequest & {
+    readonly eventParts: Promise<EventParts>;
+    readonly newsParts: Promise<NewsParts>;
+  },
+): Promise<PlayerColumn | ManagementColumn> {
+  if (!seesManagementColumn(request.caller.role)) {
+    return { column: "player" };
+  }
+  const [todos, club] = await Promise.all([
+    request.eventParts.then(({ nextUp }) =>
+      readTodos(gateways, { ...request, nextUp }),
+    ),
+    readClubNumbers(gateways, {
+      ...request,
+      unreadNews: request.newsParts.then(({ unreadNews }) => unreadNews),
+    }),
+  ]);
+  return { column: "management", todos, club };
+}
+
 async function readMemberDashboard(
   gateways: DashboardGateways,
   request: DashboardRequest & {
@@ -703,25 +872,45 @@ async function readMemberDashboard(
   },
 ): Promise<MemberDashboard> {
   const { caller } = request;
-  const [attendance, members, eventParts, newsParts, contactReminder] =
-    await Promise.all([
-      orUnavailable(
-        gateways,
-        "attendance",
-        readAttendanceTile(gateways, { ...request, role: caller.role }),
-      ),
-      orUnavailable(
-        gateways,
-        "members",
-        readMembersTile(gateways, { clubId: caller.clubId, now: request.now }),
-      ),
-      readEventParts(gateways, { ...request, isRestricted: false }),
-      readNewsParts(gateways, request),
-      readContactReminder(gateways, request.callerId),
-    ]);
+  const eventPartsRead = readEventParts(gateways, {
+    ...request,
+    isRestricted: false,
+  });
+  const newsPartsRead = readNewsParts(gateways, request);
+  const [
+    attendance,
+    members,
+    eventParts,
+    newsParts,
+    contactReminder,
+    me,
+    column,
+  ] = await Promise.all([
+    orUnavailable(
+      gateways,
+      "attendance",
+      readAttendanceTile(gateways, { ...request, role: caller.role }),
+    ),
+    orUnavailable(
+      gateways,
+      "members",
+      readMembersTile(gateways, { clubId: caller.clubId, now: request.now }),
+    ),
+    eventPartsRead,
+    newsPartsRead,
+    readContactReminder(gateways, request.callerId),
+    readMe(gateways, request),
+    readColumn(gateways, {
+      ...request,
+      eventParts: eventPartsRead,
+      newsParts: newsPartsRead,
+    }),
+  ]);
   return {
     kind: "member",
+    ...column,
     viewer: { firstName: firstNameOf(caller.fullName) },
+    me,
     tiles: {
       attendance,
       members,
@@ -744,14 +933,16 @@ async function readRestrictedDashboard(
     readonly membership: RestrictedMembershipSummary;
   },
 ): Promise<RestrictedDashboard> {
-  const [eventParts, contactReminder, latestNews] = await Promise.all([
+  const [eventParts, contactReminder, latestNews, me] = await Promise.all([
     readEventParts(gateways, { ...request, isRestricted: true }),
     readContactReminder(gateways, request.callerId),
     readRestrictedNews(gateways, request),
+    readMe(gateways, request),
   ]);
   return {
     kind: "restricted",
     viewer: { firstName: firstNameOf(request.caller.fullName) },
+    me,
     block: request.membership.block,
     nextTraining: eventParts.nextTraining,
     contactReminder,
