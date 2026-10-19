@@ -193,7 +193,7 @@ Todos con `ui-review`, salvo el 1, el 2 y el 3. Las capturas de Playwright `inic
 | 1   | Añade el inicio de temporada a la pestaña General del club                | S      | #720       | No: migración y permisos de General                    |
 | 2   | Devuelve en el inicio el próximo evento, la semana y la membresía         | M      | ninguna    | No: lógica nueva en la API, socios restringidos        |
 | 3   | Devuelve en el inicio la asistencia de la temporada, pendientes y números | M      | 1          | No: datos por rol (D9)                                 |
-| 4   | Rehace la cabecera, los avisos y la tarjeta Próximo con RSVP y equipo     | M      | 2          | No: pantalla nueva                                     |
+| 4   | Rehace la cabecera, los avisos y la tarjeta Próximo con RSVP y equipo     | M      | 2, #756    | No: pantalla nueva                                     |
 | 5   | Añade Esta semana con la franja de siete días                             | M      | 2          | No: pantalla nueva                                     |
 | 6   | Añade la columna del Player con mi asistencia y la membresía              | S      | 3, 4       | No: pantalla nueva                                     |
 | 7   | Añade la columna de gestión con pendientes y números del club             | M      | 3, 4       | No: pantalla nueva y datos por rol                     |
