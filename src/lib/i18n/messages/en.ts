@@ -1866,6 +1866,17 @@ export const englishMessages = {
   "clubSettings.sessionPacks.lead.noPrice":
     "Bundles Casual members can buy. Each pack costs the Casual session price × sessions.",
   "clubSettings.sessionPacks.loading": "Loading the session packs…",
+  "clubSettings.reorder.pickedUp":
+    "Picked up {item}, position {rank} of {total}.",
+  "clubSettings.reorder.over": "Moving {item} over position {rank} of {total}.",
+  "clubSettings.reorder.outside": "Moving {item} outside the list.",
+  "clubSettings.reorder.dropped":
+    "Dropped {item} at position {rank} of {total}.",
+  "clubSettings.reorder.droppedInPlace":
+    "Dropped {item} back at position {rank} of {total}.",
+  "clubSettings.reorder.cancelled":
+    "Stopped moving {item}. It stays at position {rank} of {total}.",
+  "clubSettings.sessionPacks.dragItem": "the {pack} pack",
   "clubSettings.sessionPacks.pack": {
     one: "{count} session",
     other: "{count} sessions",
@@ -1902,8 +1913,8 @@ export const englishMessages = {
   "clubSettings.positions.column.coverage": "Role in auto-balance",
   "clubSettings.positions.handle.label":
     "Reorder {name}, position {rank} of {total}",
-  "clubSettings.positions.handle.hint":
-    "Use the up and down arrow keys to move it.",
+  "clubSettings.reorder.hint":
+    "Drag it, or use the up and down arrow keys to move it.",
   "clubSettings.positions.languageCode.en": "EN",
   "clubSettings.positions.languageCode.es": "ES",
   "clubSettings.positions.name.placeholder.en": "English",

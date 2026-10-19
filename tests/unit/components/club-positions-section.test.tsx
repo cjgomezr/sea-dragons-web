@@ -1,3 +1,4 @@
+import type { DndContextProps } from "@dnd-kit/core";
 import {
   cleanup,
   fireEvent,
@@ -11,6 +12,24 @@ import { ClubPositionsSection } from "@/components/club/ClubPositionsSection";
 import type { ManagedPosition } from "@/lib/club/manage-club-positions";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
+import {
+  announcementsOf,
+  type CapturedDndContext,
+  dropOn,
+} from "../helpers/dnd-kit-drag";
+
+const dndContext = vi.hoisted((): CapturedDndContext => ({ props: null }));
+
+vi.mock("@dnd-kit/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@dnd-kit/core")>();
+  return {
+    ...actual,
+    DndContext: (props: DndContextProps) => {
+      dndContext.props = props;
+      return <actual.DndContext {...props} />;
+    },
+  };
+});
 
 /**
  * La sección de posiciones de la configuración del club (#300, RF-7 del PRD
@@ -792,6 +811,160 @@ describe("reordenar con el asa", () => {
   });
 });
 
+describe("arrastrar por el asa", () => {
+  it("soltar en otro puesto manda el orden entero, lo anuncia y deja el foco en el asa", async () => {
+    await renderSection();
+
+    dropOn(dndContext, FORWARD.id, GOALKEEPER.id);
+
+    expect(await screen.findByText("Forward moved to 1 of 3")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
+    expect(requests).toEqual([
+      {
+        method: "PUT",
+        url: ORDER_PATH,
+        body: { positionIds: [FORWARD.id, GOALKEEPER.id, DEFENDER.id] },
+      },
+    ]);
+    expect(activeNames()).toEqual(["Forward", "Goalkeeper", "Defender"]);
+    expect(
+      screen.getByRole("button", { name: "Reorder Forward, position 1 of 3" }),
+    ).toHaveFocus();
+  });
+
+  it("mientras el servidor contesta, la fila ya está donde se soltó", async () => {
+    await renderSection();
+    nextWriteResponse = neverAnswers;
+
+    dropOn(dndContext, GOALKEEPER.id, FORWARD.id);
+
+    expect(activeNames()).toEqual(["Defender", "Forward", "Goalkeeper"]);
+  });
+
+  it("si falla, la lista vuelve al orden anterior y dice el error", async () => {
+    await renderSection();
+    nextWriteResponse = networkFailure;
+
+    dropOn(dndContext, FORWARD.id, GOALKEEPER.id);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /couldn't reach the server/i,
+    );
+    expect(activeNames()).toEqual(["Goalkeeper", "Defender", "Forward"]);
+    expect(handleOf("Forward")).toHaveFocus();
+  });
+
+  it("si otro Admin cambió las posiciones, vuelve al orden y ofrece cargar las últimas", async () => {
+    await renderSection();
+    nextWriteResponse = () =>
+      errorResponse(409, "conflict", "club_positions_changed");
+
+    dropOn(dndContext, DEFENDER.id, FORWARD.id);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /another admin changed the positions/i,
+    );
+    expect(activeNames()).toEqual(["Goalkeeper", "Defender", "Forward"]);
+    expect(
+      screen.getByRole("button", { name: "Load the latest positions" }),
+    ).toBeInTheDocument();
+  });
+
+  it("soltar en el mismo puesto no manda nada", async () => {
+    await renderSection();
+
+    dropOn(dndContext, DEFENDER.id, DEFENDER.id);
+
+    expect(requests).toEqual([]);
+    expect(activeNames()).toEqual(["Goalkeeper", "Defender", "Forward"]);
+  });
+
+  it("soltar fuera de la lista no manda nada", async () => {
+    await renderSection();
+
+    dropOn(dndContext, DEFENDER.id, null);
+
+    expect(requests).toEqual([]);
+    expect(activeNames()).toEqual(["Goalkeeper", "Defender", "Forward"]);
+  });
+
+  it("con una acción esperando al servidor no deja arrastrar", async () => {
+    await renderSection();
+    nextWriteResponse = neverAnswers;
+    await userEvent.click(
+      screen.getByRole("button", { name: "Archive Defender" }),
+    );
+
+    dropOn(dndContext, FORWARD.id, GOALKEEPER.id);
+
+    expect(requests).toHaveLength(1);
+    expect(activeNames()).toEqual(["Goalkeeper", "Defender", "Forward"]);
+  });
+
+  it("anuncia el inicio, el destino y el final del arrastre", async () => {
+    await renderSection();
+
+    const announce = announcementsOf(dndContext);
+
+    expect(announce.start(FORWARD.id)).toBe(
+      "Picked up Forward, position 3 of 3.",
+    );
+    expect(announce.over(FORWARD.id, GOALKEEPER.id)).toBe(
+      "Moving Forward over position 1 of 3.",
+    );
+    expect(announce.over(FORWARD.id, null)).toBe(
+      "Moving Forward outside the list.",
+    );
+    expect(announce.end(FORWARD.id, GOALKEEPER.id)).toBe(
+      "Dropped Forward at position 1 of 3.",
+    );
+    expect(announce.end(FORWARD.id, null)).toBe(
+      "Dropped Forward back at position 3 of 3.",
+    );
+    expect(announce.cancel(FORWARD.id)).toBe(
+      "Stopped moving Forward. It stays at position 3 of 3.",
+    );
+  });
+
+  it("en español anuncia el arrastre en español", async () => {
+    await renderSection("es");
+
+    const announce = announcementsOf(dndContext);
+
+    expect(announce.start(FORWARD.id)).toBe(
+      "Has cogido Ataque, puesto 3 de 3.",
+    );
+    expect(announce.over(FORWARD.id, GOALKEEPER.id)).toBe(
+      "Llevas Ataque sobre el puesto 1 de 3.",
+    );
+    expect(announce.over(FORWARD.id, null)).toBe(
+      "Llevas Ataque fuera de la lista.",
+    );
+    expect(announce.end(FORWARD.id, GOALKEEPER.id)).toBe(
+      "Has soltado Ataque en el puesto 1 de 3.",
+    );
+    expect(announce.end(FORWARD.id, FORWARD.id)).toBe(
+      "Has soltado Ataque en su puesto, el 3 de 3.",
+    );
+    expect(announce.cancel(FORWARD.id)).toBe(
+      "Movimiento cancelado: Ataque sigue en el puesto 3 de 3.",
+    );
+  });
+
+  it("el asa sigue siendo un botón propio, sin el modo de teclado de dnd-kit", async () => {
+    await renderSection();
+
+    const handle = handleOf("Defender");
+
+    expect(handle).not.toHaveAttribute("aria-roledescription");
+    expect(handle).toHaveAccessibleDescription(
+      "Drag it, or use the up and down arrow keys to move it.",
+    );
+  });
+});
+
 describe("lo que pasa al guardar", () => {
   it("cuando el servidor confirma, sale un aviso corto de guardado", async () => {
     await renderSection();
@@ -956,6 +1129,29 @@ describe("en el móvil", () => {
       await vi.waitFor(() =>
         expect(activeNames()).toEqual(["Defender", "Goalkeeper", "Forward"]),
       );
+    });
+  });
+
+  describe("arrastrar por el asa", () => {
+    it("soltar en otro puesto manda el orden entero y deja el foco en el asa", async () => {
+      await renderSection();
+
+      dropOn(dndContext, FORWARD.id, GOALKEEPER.id);
+
+      expect(await screen.findByText("Forward moved to 1 of 3")).toBeVisible();
+      expect(requests[0]?.body).toEqual({
+        positionIds: [FORWARD.id, GOALKEEPER.id, DEFENDER.id],
+      });
+      expect(handleOf("Forward")).toHaveFocus();
+    });
+
+    it("mientras el servidor contesta, la fila ya está donde se soltó", async () => {
+      await renderSection();
+      nextWriteResponse = neverAnswers;
+
+      dropOn(dndContext, GOALKEEPER.id, FORWARD.id);
+
+      expect(activeNames()).toEqual(["Defender", "Forward", "Goalkeeper"]);
     });
   });
 

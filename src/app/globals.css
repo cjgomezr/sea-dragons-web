@@ -6543,6 +6543,53 @@ a.auth-brand-header:focus-visible {
   height: 32px;
 }
 
+/* #725: arrastrar por el asa. Con el dedo, el asa se queda el gesto: sin
+   esto la página haría scroll en vez de arrastrar. */
+.club-positions-handle,
+.club-packs-handle {
+  touch-action: none;
+}
+
+/* Con el ratón la fila se queda en su sitio y se apaga; con el dedo se
+   levanta y lo sigue. Las demás no se apartan: la línea marca el destino,
+   arriba si la fila sube y abajo si baja. */
+.sortable-row-dragging {
+  opacity: 0.45;
+}
+
+.sortable-row-lifted {
+  position: relative;
+  z-index: 5;
+  background: var(--color-segment-selected);
+  box-shadow: var(--shadow);
+}
+
+.sortable-row-drop-before,
+.sortable-row-drop-after {
+  position: relative;
+}
+
+/* Por encima de la fila levantada: con el dedo, esa fila pasa justo sobre
+   la de destino y taparía una línea pintada en ella. */
+.sortable-row-drop-before::before,
+.sortable-row-drop-after::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  z-index: 6;
+  height: 2px;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+
+.sortable-row-drop-before::before {
+  top: 0;
+}
+
+.sortable-row-drop-after::before {
+  bottom: 0;
+}
+
 .club-positions-handle:hover,
 .club-positions-icon-button:hover:not(:disabled) {
   color: var(--color-text);

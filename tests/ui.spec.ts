@@ -2841,10 +2841,14 @@ const ACCOUNT_STATES: readonly AccountState[] = [
   },
 ];
 
-async function expectNoAxeViolations(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
+async function expectNoAxeViolations(
+  page: Page,
+  excludedSelector?: string,
+): Promise<void> {
+  const builder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]);
+  const results = await (
+    excludedSelector === undefined ? builder : builder.exclude(excludedSelector)
+  ).analyze();
   expect(
     results.violations,
     JSON.stringify(results.violations, null, 2),
@@ -9945,6 +9949,84 @@ async function openArchivedPositions(page: Page): Promise<void> {
   await expect(section.getByRole("list").last()).toBeVisible();
 }
 
+/** Los pasos en que el puntero va del asa al destino: dnd-kit busca el
+ * destino en cada movimiento y el ratón empieza a arrastrar pasados 4 px. */
+const DRAG_STEP_COUNT = 10;
+
+async function centreOf(target: Locator): Promise<{ x: number; y: number }> {
+  const box = await target.boundingBox();
+  if (box === null) {
+    throw new Error("Lo que se iba a arrastrar no está en la pantalla");
+  }
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+/** Suelta lo que se tenía cogido. */
+type ReleaseDrag = () => Promise<void>;
+
+/** Coge el asa con el ratón y la deja encima de `target`, sin soltarla. */
+async function holdWithMouseOver(
+  page: Page,
+  handle: Locator,
+  target: Locator,
+): Promise<ReleaseDrag> {
+  const from = await centreOf(handle);
+  const to = await centreOf(target);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: DRAG_STEP_COUNT });
+  return () => page.mouse.up();
+}
+
+/** Mantiene el dedo en el asa hasta que la fila se levanta y lo lleva
+ * encima de `target`, sin soltarlo. Toques sueltos de CDP, como en
+ * `swipeWithFinger`: `page.touchscreen` sólo sabe dar toques cortos. El
+ * dedo se levanta por la misma sesión que lo apoyó. */
+async function holdWithFingerOver(
+  page: Page,
+  handle: Locator,
+  target: Locator,
+): Promise<ReleaseDrag> {
+  const from = await centreOf(handle);
+  const to = await centreOf(target);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [from],
+  });
+  await expect(page.locator(".sortable-row-lifted")).toHaveCount(1);
+  for (let step = 1; step <= DRAG_STEP_COUNT; step += 1) {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [
+        { x: from.x, y: from.y + ((to.y - from.y) * step) / DRAG_STEP_COUNT },
+      ],
+    });
+  }
+  return async () => {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await cdp.detach();
+  };
+}
+
+/** Deja la última fila de la lista a medio arrastrar sobre la primera: la
+ * captura sale con la línea de destino arriba (#725). */
+function holdLastRowOverFirst(
+  section: (page: Page) => Locator,
+): (page: Page) => Promise<void> {
+  return async (page: Page): Promise<void> => {
+    const rows = section(page).getByRole("list").first().getByRole("listitem");
+    const handle = rows.last().getByRole("button", { name: /^Reorder / });
+    // En el móvil se arrastra con el dedo; en lo demás, con el ratón.
+    const hold = isPhoneViewport(page) ? holdWithFingerOver : holdWithMouseOver;
+    await hold(page, handle, rows.first());
+    await expect(page.locator(".sortable-row-drop-before")).toHaveCount(1);
+  };
+}
+
 type ClubSettingsState = {
   readonly name: string;
   readonly save?: ClubSettingsSave;
@@ -9958,6 +10040,9 @@ type ClubSettingsState = {
   readonly createPosition?: PositionCreate;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
+  /** Un arrastre que se deja a medias (#725). Va después de apartar el
+   * puntero: apartarlo lo soltaría fuera de la lista. */
+  readonly hold?: (page: Page) => Promise<void>;
   /** La sección que abre (#718). Sin ella, General: en el móvil hace falta
    * nombrarla, porque sin `tab` sale la lista. */
   readonly tab?: ClubSettingsSection;
@@ -10128,6 +10213,7 @@ async function goToClubSettings(
   // El puntero se queda sobre el botón pulsado: la captura saldría con su
   // hover.
   await page.mouse.move(0, 0);
+  await state.hold?.(page);
 }
 
 for (const state of CLUB_SETTINGS_STATES) {
@@ -10686,6 +10772,15 @@ test.describe("la lista de la configuración en el móvil", () => {
 const TABLE_VIEWPORTS = viewports.filter((vp) => vp.name !== "mobile");
 const PHONE_VIEWPORTS = viewports.filter((vp) => vp.name === "mobile");
 
+/** La fila que se arrastra con el ratón se queda en su sitio al 45 %,
+ * apagada a propósito (el handoff de E26): axe la daría por falta de
+ * contraste. Sólo existe mientras dura el arrastre (#725). */
+const DRAGGED_ROW_SELECTOR = ".sortable-row-dragging";
+
+/** Arrastrando se fotografía con el dedo en el móvil y con el ratón en el
+ * escritorio (#725). */
+const DRAG_CAPTURE_VIEWPORTS = [viewports[0], viewports[2]] as const;
+
 const CLUB_POSITIONS_STATES = inClubSection("positions", [
   { name: "club-posiciones", viewports: TABLE_VIEWPORTS },
   {
@@ -10743,6 +10838,11 @@ const CLUB_POSITIONS_STATES = inClubSection("positions", [
       submit: "Añadir",
       issue: /Otra posición ya se llama así/,
     }),
+  },
+  {
+    name: "club-posiciones-arrastrando",
+    hold: holdLastRowOverFirst(positionsSection),
+    viewports: DRAG_CAPTURE_VIEWPORTS,
   },
 ]);
 
@@ -10802,7 +10902,7 @@ for (const state of CLUB_POSITIONS_STATES) {
       await expect(
         positionsSection(page).getByRole("list").first(),
       ).toBeVisible();
-      await expectNoAxeViolations(page);
+      await expectNoAxeViolations(page, DRAGGED_ROW_SELECTOR);
     });
   });
 }
@@ -10987,6 +11087,11 @@ const CLUB_SESSION_PACKS_STATES = inClubSection("packs", [
   { name: "club-packs-es", beforeVisit: chooseSpanish },
   { name: "club-packs-vacio", sessionPacks: [] },
   { name: "club-packs-error-al-anadir", prepare: addOutOfRangeSessionPack },
+  {
+    name: "club-packs-arrastrando",
+    hold: holdLastRowOverFirst(sessionPacksSection),
+    viewports: DRAG_CAPTURE_VIEWPORTS,
+  },
 ]);
 
 /* #469: como las posiciones, la sección se fotografía sola, sin la barra de
@@ -10997,7 +11102,7 @@ for (const state of CLUB_SESSION_PACKS_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of state.viewports ?? viewports) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -11033,7 +11138,7 @@ for (const state of CLUB_SESSION_PACKS_STATES) {
 
     test("has no accessibility violations (axe-core)", async ({ page }) => {
       await goToClubSettings(page, state);
-      await expectNoAxeViolations(page);
+      await expectNoAxeViolations(page, DRAGGED_ROW_SELECTOR);
     });
   });
 }
@@ -11075,6 +11180,200 @@ test.describe("club-packs en el móvil", () => {
     await expect(
       section.getByRole("button", { name: "Add", exact: true }),
     ).toHaveText("Add");
+  });
+});
+
+/** Seis activas, para arrastrar la sexta al primer puesto (#725). */
+const SIX_STUBBED_POSITIONS: readonly StubbedPosition[] = [
+  ...STUBBED_ACTIVE_POSITIONS,
+  ...(
+    [
+      ["Centre", "Centro"],
+      ["Wing", "Ala"],
+      ["Sweeper", "Libero"],
+    ] as const
+  ).map(([en, es], index): StubbedPosition => ({
+    id: `90000000-0000-4000-8000-00000000001${index}`,
+    names: { en, es },
+    isArchived: false,
+    coverage: null,
+  })),
+];
+
+/** El orden que manda soltar una posición, y la lista en ese orden de
+ * vuelta, como haría el servidor. Se registra después de las demás rutas
+ * fingidas, así que gana a la suya. */
+async function answerPositionsReorder(page: Page): Promise<string[][]> {
+  const sentOrders: string[][] = [];
+  await page.route(
+    (url) => url.pathname === `${CLUB_POSITIONS_ADMIN_ENDPOINT}/order`,
+    async (route, request) => {
+      const { positionIds } = request.postDataJSON() as {
+        positionIds: string[];
+      };
+      sentOrders.push(positionIds);
+      const byId = new Map(SIX_STUBBED_POSITIONS.map((p) => [p.id, p]));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { positions: positionIds.map((id) => byId.get(id)) },
+        }),
+      });
+    },
+  );
+  return sentOrders;
+}
+
+function positionRows(page: Page): Locator {
+  return positionsSection(page).getByRole("list").first().getByRole("listitem");
+}
+
+/** Una ventana en la que la lista de seis no cabe entera. */
+const SHORT_WINDOW_HEIGHT_PX = 480;
+
+/** La sexta: el id que le da `SIX_STUBBED_POSITIONS`. */
+const SWEEPER_ID = "90000000-0000-4000-8000-000000000012";
+
+const SWEEPER_FIRST_ORDER = [
+  SWEEPER_ID,
+  ...SIX_STUBBED_POSITIONS.map(({ id }) => id).filter(
+    (id) => id !== SWEEPER_ID,
+  ),
+];
+
+test.describe("arrastrar posiciones (#725)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  async function openSixPositions(page: Page): Promise<string[][]> {
+    await goToClubSettings(page, {
+      name: "club-posiciones",
+      tab: "positions",
+      positions: SIX_STUBBED_POSITIONS,
+    });
+    return answerPositionsReorder(page);
+  }
+
+  test.describe("con el ratón @ desktop", () => {
+    test.use({
+      viewport: { width: viewports[2].width, height: viewports[2].height },
+    });
+
+    test("soltar la sexta en el primer puesto guarda el orden nuevo", async ({
+      page,
+    }) => {
+      const sentOrders = await openSixPositions(page);
+      const handle = positionRows(page)
+        .nth(5)
+        .getByRole("button", { name: /^Reorder Sweeper/ });
+
+      const release = await holdWithMouseOver(
+        page,
+        handle,
+        positionRows(page).first(),
+      );
+      await release();
+
+      await expect(
+        positionsSection(page).getByRole("button", {
+          name: "Reorder Sweeper, position 1 of 6",
+        }),
+      ).toBeFocused();
+      expect(sentOrders).toEqual([SWEEPER_FIRST_ORDER]);
+    });
+  });
+
+  test.describe("con el ratón en una ventana baja", () => {
+    test.use({
+      viewport: { width: viewports[2].width, height: SHORT_WINDOW_HEIGHT_PX },
+    });
+
+    test("arrastrar cerca del borde de abajo hace scroll solo", async ({
+      page,
+    }) => {
+      await openSixPositions(page);
+      const handle = positionRows(page)
+        .first()
+        .getByRole("button", { name: /^Reorder Goalkeeper/ });
+      await handle.scrollIntoViewIfNeeded();
+      const scrollBefore = await page.evaluate(() => window.scrollY);
+      const from = await centreOf(handle);
+
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move(from.x, SHORT_WINDOW_HEIGHT_PX - 2, {
+        steps: DRAG_STEP_COUNT,
+      });
+
+      await expect
+        .poll(() => page.evaluate(() => window.scrollY))
+        .toBeGreaterThan(scrollBefore);
+      await page.mouse.up();
+    });
+  });
+
+  test.describe("con el dedo @ mobile", () => {
+    test.use({
+      hasTouch: true,
+      viewport: { width: viewports[0].width, height: viewports[0].height },
+    });
+
+    test("mantener el asa y arrastrar guarda el orden nuevo", async ({
+      page,
+    }) => {
+      const sentOrders = await openSixPositions(page);
+      const handle = positionRows(page)
+        .nth(5)
+        .getByRole("button", { name: /^Reorder Sweeper/ });
+
+      const release = await holdWithFingerOver(
+        page,
+        handle,
+        positionRows(page).first(),
+      );
+      await release();
+
+      await expect.poll(() => sentOrders).toEqual([SWEEPER_FIRST_ORDER]);
+    });
+
+    test("mover el dedo antes de 150 ms no arrastra", async ({ page }) => {
+      const sentOrders = await openSixPositions(page);
+      const handle = positionRows(page)
+        .nth(5)
+        .getByRole("button", { name: /^Reorder Sweeper/ });
+
+      const from = await centreOf(handle);
+      const to = await centreOf(positionRows(page).first());
+      const cdp = await page.context().newCDPSession(page);
+
+      // Sin esperar los 150 ms: el dedo pasa de la tolerancia antes y el
+      // gesto no es un arrastre. Sin el retraso, esto reordenaría.
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [from],
+      });
+      for (let step = 1; step <= DRAG_STEP_COUNT; step += 1) {
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [
+            {
+              x: from.x,
+              y: from.y + ((to.y - from.y) * step) / DRAG_STEP_COUNT,
+            },
+          ],
+        });
+      }
+      await expect(page.locator(".sortable-row-lifted")).toHaveCount(0);
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+      await cdp.detach();
+
+      expect(sentOrders).toEqual([]);
+    });
   });
 });
 

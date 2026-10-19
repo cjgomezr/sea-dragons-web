@@ -30,6 +30,7 @@ import {
   setManagedPositionArchived,
   setManagedPositionCoverage,
 } from "./club-positions-admin-client";
+import { SortableList } from "./SortableRows";
 import {
   ActivePositionRow,
   ArchivedPositions,
@@ -70,9 +71,13 @@ import {
  * respuesta trae el catálogo tal como quedó, y eso es lo que se pinta.
  * Entonces sale arriba a la derecha un aviso corto, además del anuncio.
  *
+ * La excepción es arrastrar por el asa (#725): la fila se queda donde se
+ * soltó mientras el servidor contesta, porque volver a su sitio y saltar
+ * después al nuevo parecería un fallo. Si falla, vuelve al orden de antes.
+ *
  * En el móvil (#724, RF-6) la tabla no cabe: cada activa es una fila que abre
  * una hoja con sus nombres y su rol (`ClubPositionsPhone`). Lo que se manda y
- * lo que se anuncia es lo mismo.
+ * lo que se anuncia es lo mismo, y también se arrastra.
  */
 
 type LoadState = { readonly kind: "loading" } | ManagedPositionsRead;
@@ -231,6 +236,10 @@ export function ClubPositionsSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sheetId, setSheetId] = useState<string | null>(null);
   const isPhone = useIsPhone();
+  /** El orden de las activas que se soltó y el servidor aún no confirma. */
+  const [droppedOrder, setDroppedOrder] = useState<ManagedPositions | null>(
+    null,
+  );
   const { pending, run } = usePendingAction<string>();
   const sectionRef = useRef<HTMLElement>(null);
   const focusAfterUpdate = useRef<string | null>(null);
@@ -316,16 +325,14 @@ export function ClubPositionsSection({
     return result?.kind === "loaded" ? { kind: "done" } : result;
   }
 
-  function move(
-    active: ManagedPositions,
+  function reorder(
     position: ManagedPosition,
-    direction: Direction,
-  ): void {
-    void runListAction(
+    order: readonly string[],
+  ): Promise<void> {
+    return runListAction(
       {
         key: `${position.id}:move`,
-        send: () =>
-          reorderManagedPositions(movedOrder(active, position.id, direction)),
+        send: () => reorderManagedPositions(order),
         describeDone: (positions) => {
           const nowActive = activeOf(positions);
           return translate("clubSettings.positions.moved", {
@@ -337,6 +344,29 @@ export function ClubPositionsSection({
       },
       handleFocusKey(position.id),
     );
+  }
+
+  function move(
+    active: ManagedPositions,
+    position: ManagedPosition,
+    direction: Direction,
+  ): void {
+    void reorder(position, movedOrder(active, position.id, direction));
+  }
+
+  async function drop(
+    position: ManagedPosition,
+    order: ManagedPositions,
+  ): Promise<void> {
+    setDroppedOrder(order);
+    try {
+      await reorder(
+        position,
+        order.map(({ id }) => id),
+      );
+    } finally {
+      setDroppedOrder(null);
+    }
   }
 
   function archiveAction(
@@ -516,14 +546,30 @@ export function ClubPositionsSection({
     );
   }
 
-  function renderActive(active: ManagedPositions): React.JSX.Element {
-    if (active.length === 0) {
+  function renderActive(saved: ManagedPositions): React.JSX.Element {
+    if (saved.length === 0) {
       return (
         <p className="club-positions-empty">
           {translate("clubSettings.positions.active.empty")}
         </p>
       );
     }
+    const active = droppedOrder ?? saved;
+    return (
+      <SortableList
+        translate={translate}
+        items={active}
+        idOf={(position) => position.id}
+        describeItem={nameOf}
+        isDisabled={isBusy}
+        onDrop={(order, moved) => void drop(moved, order)}
+      >
+        {renderActiveRows(active)}
+      </SortableList>
+    );
+  }
+
+  function renderActiveRows(active: ManagedPositions): React.JSX.Element {
     return (
       <ol
         className="club-positions-rows"
@@ -595,33 +641,43 @@ export function ClubPositionsSection({
     );
   }
 
-  function renderPhoneActive(active: ManagedPositions): React.JSX.Element {
-    if (active.length === 0) {
+  function renderPhoneActive(saved: ManagedPositions): React.JSX.Element {
+    if (saved.length === 0) {
       return (
         <p className="club-positions-empty club-positions-phone-card">
           {translate("clubSettings.positions.active.empty")}
         </p>
       );
     }
+    const active = droppedOrder ?? saved;
     return (
-      <ol
-        className="club-positions-rows club-positions-phone-card"
-        aria-label={translate("clubSettings.positions.active.title")}
+      <SortableList
+        translate={translate}
+        items={active}
+        idOf={(position) => position.id}
+        describeItem={nameOf}
+        isDisabled={isBusy}
+        onDrop={(order, moved) => void drop(moved, order)}
       >
-        {active.map((position, index) => (
-          <PhonePositionRow
-            key={position.id}
-            translate={translate}
-            locale={locale}
-            position={position}
-            rank={index + 1}
-            total={active.length}
-            handleHintId={handleHintId}
-            onMove={(direction) => move(active, position, direction)}
-            onOpen={() => setSheetId(position.id)}
-          />
-        ))}
-      </ol>
+        <ol
+          className="club-positions-rows club-positions-phone-card"
+          aria-label={translate("clubSettings.positions.active.title")}
+        >
+          {active.map((position, index) => (
+            <PhonePositionRow
+              key={position.id}
+              translate={translate}
+              locale={locale}
+              position={position}
+              rank={index + 1}
+              total={active.length}
+              handleHintId={handleHintId}
+              onMove={(direction) => move(active, position, direction)}
+              onOpen={() => setSheetId(position.id)}
+            />
+          ))}
+        </ol>
+      </SortableList>
     );
   }
 
@@ -679,7 +735,7 @@ export function ClubPositionsSection({
       <>
         {isPhone ? renderPhoneList(positions) : renderTable(positions)}
         <p className="visually-hidden" id={handleHintId}>
-          {translate("clubSettings.positions.handle.hint")}
+          {translate("clubSettings.reorder.hint")}
         </p>
         {listFailure === null ? null : (
           <ActionFailure
