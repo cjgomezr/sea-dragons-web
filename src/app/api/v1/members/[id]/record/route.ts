@@ -5,6 +5,7 @@ import { identifyAccountCaller } from "@/lib/auth/account-api";
 import {
   AUF_NUMBER_MAX_LENGTH,
   type MemberRecord,
+  type MemberRecordReading,
   type MemberRecordSubmission,
   readMemberRecord,
   updateMemberRecord,
@@ -22,15 +23,16 @@ import {
 import { clubCalendarDate } from "@/lib/time/club-calendar";
 
 /**
- * La ficha reservada al Admin de un socio (#242, RF-4 del PRD de E5): su
+ * La ficha de un socio (#242, RF-4 del PRD de E5): su
  * número de AUF, su vencimiento y sus grupos (FR-020, BR-008), y la
  * corrección de su fecha de nacimiento (#272, RF-10). Desde #499, también su
  * teléfono y su contacto de emergencia, con las reglas del perfil propio.
  *
- * Quién puede llamarlo lo decide la frontera: `RESTRICTED_ROUTES` lo reserva a
- * quien gestiona usuarios y roles, que sólo es Admin, y el dominio lo vuelve a
- * comprobar. El `[id]` es el `user_id` del socio, y sólo alcanza a los de su
- * club.
+ * Quién puede llamarlo lo decide la frontera: `RESTRICTED_ROUTES` reserva el
+ * PATCH a quien gestiona usuarios y roles, que sólo es Admin, y
+ * `READABLE_ROUTES` abre el GET también al Committee y al Coach (#770), cada
+ * uno con su vista. El dominio lo vuelve a comprobar. El `[id]` es el
+ * `user_id` del socio, y sólo alcanza a los de su club.
  *
  * El PATCH lleva la ficha entera en una sola petición: dos Admin que guardan a
  * la vez no dejan el número de uno con el vencimiento del otro. Un AUF que el
@@ -107,11 +109,15 @@ function toSubmission(body: RecordBody): MemberRecordSubmission {
 /** La ficha tal como está en la base después de la petición. */
 export type MemberRecordResponse = MemberRecord;
 
+/** La ficha en la vista de quien la pide (#770): `admin`, `committee` o
+ * `coach`, discriminada por `view`. */
+export type MemberRecordReadingResponse = MemberRecordReading;
+
 export function GET(
   request: NextRequest,
   context: MemberRecordRouteContext,
 ): Promise<NextResponse> {
-  const route = createApiRoute<MemberRecordResponse>({
+  const route = createApiRoute<MemberRecordReadingResponse>({
     handler: async ({ request: apiRequest, decorateResponse }) => {
       const callerId = await identifyAccountCaller({
         request: apiRequest,

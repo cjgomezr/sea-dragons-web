@@ -16,6 +16,9 @@ import {
 } from "@/lib/membership/supabase-membership-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
+import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
+import { parseExperienceLevel } from "./profile-fields";
+import { readOptionalCatalogValue } from "./supabase-own-profile-gateways";
 import { signProfilePhotoUrl } from "./supabase-profile-photo-gateways";
 import {
   CONTACT_COLUMNS,
@@ -46,6 +49,10 @@ import type {
  *
  * La foto se firma con la misma llave (#354): el bucket es privado.
  *
+ * Desde #770 la leen también el Committee y el Coach, y la fila trae lo que
+ * pinta su cabecera. Qué sale a cada uno lo recorta el dominio; el género no
+ * se lee (D4 del PRD de E30).
+ *
  * Del consentimiento del tutor sólo se lee si existe: su nombre y su correo
  * no salen de la fila. De la verificación del AUF (#274), igual: sólo si
  * existe. Quién la hizo está en la bitácora.
@@ -54,8 +61,9 @@ import type {
 const MEMBERS_TABLE = "members";
 // La membresía va por el `left join` del chip del Admin (#453), con el motivo
 // de la exención (#457). El teléfono y el contacto de emergencia (#499) los
-// corrige el Admin desde aquí.
-const RECORD_COLUMNS = `user_id, full_name, role, joined_on, account_status, auf_number, auf_expiry, auf_verified_at, date_of_birth, created_at, guardian_consent_at, photo_path, ${CONTACT_COLUMNS}, ${MEMBERSHIP_SUMMARY_EMBED}`;
+// corrige el Admin desde aquí. El correo, el país, la experiencia y la
+// posición son de la cabecera (#770).
+const RECORD_COLUMNS = `user_id, full_name, role, joined_on, account_status, auf_number, auf_expiry, auf_verified_at, date_of_birth, created_at, guardian_consent_at, photo_path, email, country, experience_level, position_id, ${CONTACT_COLUMNS}, ${MEMBERSHIP_SUMMARY_EMBED}`;
 const MEMBERSHIPS_RELATION = "memberships";
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -103,6 +111,15 @@ function toStoredMemberRecord(row: Row, now: Date): StoredMemberRecord {
     photoPath: readText(row, "photo_path", MEMBERS_TABLE),
     membershipStatus: membership.status,
     membershipWaiver: membership.waiver,
+    membershipPlan: membership.plan,
+    email: readRequiredText(row, "email", MEMBERS_TABLE),
+    country: readText(row, "country", MEMBERS_TABLE),
+    experienceLevel: readOptionalCatalogValue(
+      row,
+      "experience_level",
+      parseExperienceLevel,
+    ),
+    positionId: readText(row, "position_id", MEMBERS_TABLE),
     ...readProfileContact(row),
   };
 }
@@ -216,6 +233,7 @@ export function createMemberRecordGateways(
     members: groupMembersGateways.members,
     groupMembers: groupMembersGateways.groupMembers,
     groups: createGroupsGateways(serviceClient).groups,
+    positions: cachedClubPositions,
     audit: createSupabaseAuditLogWriter(serviceClient),
     photos: {
       signPhotoUrl: (photoPath) =>

@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
 import type { AuditLogInsertRow } from "@/lib/audit/audit-log";
 import type { AccountStatus } from "@/lib/auth/account-status";
-import type { MembershipStatus } from "@/lib/membership/membership";
+import type { ClubPositions } from "@/lib/club/club-positions";
+import type {
+  MembershipPlan,
+  MembershipStatus,
+} from "@/lib/membership/membership";
 import type { MembershipWaiverView } from "@/lib/membership/membership-view";
 import type { Role } from "@/lib/auth/roles";
 import { InactiveMemberError } from "@/lib/groups/group-members";
@@ -18,6 +22,7 @@ import {
   type MemberRecordSubmission,
   MemberAufChangedError,
   type MemberRecord,
+  type MemberRecordReading,
   readMemberRecord,
   updateMemberRecord,
   verifyMemberAuf,
@@ -88,7 +93,18 @@ type FakeOptions = {
   /** Su teléfono y su contacto de emergencia (#499); sin decirlo, ninguno. */
   readonly phone?: string | null;
   readonly emergencyContact?: EmergencyContact | null;
+  /** Su posición del catálogo del club (#770); sin decirlo, la de portero. */
+  readonly positionId?: string | null;
+  /** Su plan (#770); sin decirlo, Full. */
+  readonly membershipPlan?: MembershipPlan | null;
 };
+
+const GOALKEEPER_ID = "7e7e7e7e-0000-4000-8000-000000000001";
+const GOALKEEPER_NAMES = { en: "Goalkeeper", es: "Portero" } as const;
+const CLUB_POSITIONS: ClubPositions = [
+  { id: GOALKEEPER_ID, names: GOALKEEPER_NAMES, isArchived: false },
+];
+const MEMBER_EMAIL = "paula@example.com";
 
 const MEMBER_ATTENDANCE: MemberAttendance = {
   kind: "rate",
@@ -161,6 +177,17 @@ function fake(options: FakeOptions = {}): Fake {
                   ? "active"
                   : options.membershipStatus,
               membershipWaiver: options.membershipWaiver ?? null,
+              membershipPlan:
+                options.membershipPlan === undefined
+                  ? "Full"
+                  : options.membershipPlan,
+              email: MEMBER_EMAIL,
+              country: "AU",
+              experienceLevel: "Intermediate",
+              positionId:
+                options.positionId === undefined
+                  ? GOALKEEPER_ID
+                  : options.positionId,
               ...contact,
             }
           : null;
@@ -231,6 +258,12 @@ function fake(options: FakeOptions = {}): Fake {
             .filter((userId) => isClubMember(clubId, userId))
             .map((userId) => [userId, options.attendance ?? MEMBER_ATTENDANCE]),
         );
+      },
+    },
+    positions: {
+      findClubPositions: async (clubId, referencedIds) => {
+        reads.push(`positions ${clubId} ${referencedIds.join(",")}`);
+        return clubId === CLUB_ID ? CLUB_POSITIONS : [];
       },
     },
     photos: {
@@ -342,6 +375,29 @@ async function saveKeepingAuf(
   });
 }
 
+function readAs(
+  gateways: MemberRecordGateways,
+  callerId: string = ADMIN_ID,
+): Promise<MemberRecordReading> {
+  return readMemberRecord(gateways, {
+    callerId,
+    userId: MEMBER_ID,
+    todayInClub: TODAY_IN_CLUB,
+  });
+}
+
+/** La ficha que lee un Admin, que es la única vista con el AUF y la fecha de
+ * nacimiento. */
+async function readAsAdmin(
+  gateways: MemberRecordGateways,
+): Promise<MemberRecord> {
+  const reading = await readAs(gateways);
+  if (reading.view !== "admin") {
+    throw new Error(`Un Admin leyó la vista ${reading.view}.`);
+  }
+  return reading;
+}
+
 async function issuesOf(promise: Promise<unknown>): Promise<unknown> {
   const error = await promise.then(
     () => null,
@@ -359,16 +415,17 @@ describe("ficha reservada al Admin: lectura", () => {
       groupIds: [SENIOR_ID, MASTERS_ID],
     });
 
-    const record = await readMemberRecord(gateways, {
-      callerId: ADMIN_ID,
-      userId: MEMBER_ID,
-      todayInClub: TODAY_IN_CLUB,
-    });
+    const record = await readAsAdmin(gateways);
 
     expect(record).toEqual({
+      view: "admin",
       userId: MEMBER_ID,
       fullName: "Paula Player",
       role: "Player",
+      positionName: GOALKEEPER_NAMES,
+      experienceLevel: "Intermediate",
+      country: "AU",
+      email: MEMBER_EMAIL,
       joinedOn: JOINED_ON,
       accountStatus: "active",
       aufNumber: "AUF-1",
@@ -377,6 +434,7 @@ describe("ficha reservada al Admin: lectura", () => {
       dateOfBirth: ADULT_BIRTH,
       registeredAt: REGISTERED_AT,
       hasGuardianConsent: false,
+      membershipPlan: "Full",
       membershipStatus: "active",
       membershipWaiver: null,
       phone: null,
@@ -394,11 +452,7 @@ describe("ficha reservada al Admin: lectura", () => {
   it("trae el porcentaje y el total de asistencia, contados en el club del Admin (FR-022)", async () => {
     const { gateways, reads } = fake();
 
-    const record = await readMemberRecord(gateways, {
-      callerId: ADMIN_ID,
-      userId: MEMBER_ID,
-      todayInClub: TODAY_IN_CLUB,
-    });
+    const record = await readAsAdmin(gateways);
 
     expect(record.attendance).toEqual({
       kind: "rate",
@@ -411,11 +465,7 @@ describe("ficha reservada al Admin: lectura", () => {
   it("dice sin datos de asistencia a quien no tiene sesiones elegibles (AC-017b)", async () => {
     const { gateways } = fake({ attendance: { kind: "no_data" } });
 
-    const record = await readMemberRecord(gateways, {
-      callerId: ADMIN_ID,
-      userId: MEMBER_ID,
-      todayInClub: TODAY_IN_CLUB,
-    });
+    const record = await readAsAdmin(gateways);
 
     expect(record.attendance).toEqual({ kind: "no_data" });
   });
@@ -423,11 +473,7 @@ describe("ficha reservada al Admin: lectura", () => {
   it("marca vencido un AUF que caducó antes de hoy", async () => {
     const { gateways } = fake({ aufNumber: "AUF-1", aufExpiry: "2026-09-20" });
 
-    const record = await readMemberRecord(gateways, {
-      callerId: ADMIN_ID,
-      userId: MEMBER_ID,
-      todayInClub: TODAY_IN_CLUB,
-    });
+    const record = await readAsAdmin(gateways);
 
     expect(record.isAufExpired).toBe(true);
   });
@@ -435,41 +481,172 @@ describe("ficha reservada al Admin: lectura", () => {
   it("no marca vencido un AUF que caduca hoy", async () => {
     const { gateways } = fake({ aufNumber: "AUF-1", aufExpiry: TODAY_IN_CLUB });
 
-    const record = await readMemberRecord(gateways, {
-      callerId: ADMIN_ID,
-      userId: MEMBER_ID,
-      todayInClub: TODAY_IN_CLUB,
-    });
+    const record = await readAsAdmin(gateways);
 
     expect(record.isAufExpired).toBe(false);
   });
 
-  it.each(["Coach", "Committee", "Player"] as const)(
-    "rechaza a un %s sin leer la ficha",
-    async (callerRole) => {
-      const { gateways, reads } = fake({ callerRole });
+  it("rechaza a un Player sin leer la ficha", async () => {
+    const { gateways, reads } = fake({ callerRole: "Player" });
 
-      await expect(
-        readMemberRecord(gateways, {
-          callerId: ADMIN_ID,
-          userId: MEMBER_ID,
-          todayInClub: TODAY_IN_CLUB,
-        }),
-      ).rejects.toBeInstanceOf(MemberRecordForbiddenError);
-      expect(reads).toEqual([`caller ${ADMIN_ID}`]);
+    await expect(readAs(gateways)).rejects.toBeInstanceOf(
+      MemberRecordForbiddenError,
+    );
+    expect(reads).toEqual([`caller ${ADMIN_ID}`]);
+  });
+
+  it.each(["Admin", "Committee", "Coach"] as const)(
+    "responde a un %s que no existe un miembro de otro club",
+    async (callerRole) => {
+      const { gateways } = fake({ callerRole, memberClubId: OTHER_CLUB_ID });
+
+      await expect(readAs(gateways)).rejects.toBeInstanceOf(
+        MemberRecordNotFoundError,
+      );
+    },
+  );
+});
+
+describe("la ficha por rol (#770, D1, D3, D4 y D11 del PRD de E30)", () => {
+  it("un Committee recibe sólo su parte, con el contacto", async () => {
+    const { gateways } = fake({
+      callerRole: "Committee",
+      groupIds: [SENIOR_ID],
+      phone: "0412 345 678",
+      emergencyContact: {
+        name: "Rosa Player",
+        phone: "0499 111 222",
+        relationship: "Madre",
+      },
+    });
+
+    const record = await readAs(gateways);
+
+    expect(record).toStrictEqual({
+      view: "committee",
+      userId: MEMBER_ID,
+      fullName: "Paula Player",
+      photoUrl: null,
+      role: "Player",
+      positionName: GOALKEEPER_NAMES,
+      experienceLevel: "Intermediate",
+      country: "AU",
+      email: MEMBER_EMAIL,
+      phone: "0412 345 678",
+      emergencyContact: {
+        name: "Rosa Player",
+        phone: "0499 111 222",
+        relationship: "Madre",
+      },
+      membershipPlan: "Full",
+      membershipStatus: "active",
+      attendance: MEMBER_ATTENDANCE,
+      groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
+    });
+  });
+
+  it("un Coach recibe lo mismo que el Committee sin el correo ni el teléfono", async () => {
+    const { gateways } = fake({
+      callerRole: "Coach",
+      phone: "0412 345 678",
+    });
+
+    const record = await readAs(gateways);
+
+    expect(record).toStrictEqual({
+      view: "coach",
+      userId: MEMBER_ID,
+      fullName: "Paula Player",
+      photoUrl: null,
+      role: "Player",
+      positionName: GOALKEEPER_NAMES,
+      experienceLevel: "Intermediate",
+      country: "AU",
+      emergencyContact: null,
+      membershipPlan: "Full",
+      membershipStatus: "active",
+      attendance: MEMBER_ATTENDANCE,
+      groups: [],
+    });
+  });
+
+  it.each(["Committee", "Coach"] as const)(
+    "a un %s no le llegan el AUF, la fecha de nacimiento, el alta ni la exención",
+    async (callerRole) => {
+      const { gateways } = fake({
+        callerRole,
+        aufNumber: "AUF-1",
+        aufExpiry: "2027-01-01",
+        membershipStatus: "waived",
+        membershipWaiver: { reason: "Entrenador", until: null },
+      });
+
+      const record = await readAs(gateways);
+
+      for (const field of [
+        "aufNumber",
+        "aufExpiry",
+        "isAufVerified",
+        "isAufExpired",
+        "dateOfBirth",
+        "joinedOn",
+        "registeredAt",
+        "hasGuardianConsent",
+        "accountStatus",
+        "membershipWaiver",
+      ]) {
+        expect(record).not.toHaveProperty(field);
+      }
     },
   );
 
-  it("responde que no existe un miembro de otro club", async () => {
-    const { gateways } = fake({ memberClubId: OTHER_CLUB_ID });
+  it.each(["Admin", "Committee", "Coach"] as const)(
+    "a un %s no le llega nunca el género",
+    async (callerRole) => {
+      const { gateways } = fake({ callerRole });
 
-    await expect(
-      readMemberRecord(gateways, {
-        callerId: ADMIN_ID,
-        userId: MEMBER_ID,
-        todayInClub: TODAY_IN_CLUB,
-      }),
-    ).rejects.toBeInstanceOf(MemberRecordNotFoundError);
+      const record = await readAs(gateways);
+
+      expect(record).not.toHaveProperty("gender");
+    },
+  );
+
+  it("firma la foto también para el Committee", async () => {
+    const { gateways } = fake({
+      callerRole: "Committee",
+      photoPath: PHOTO_PATH,
+    });
+
+    const record = await readAs(gateways);
+
+    expect(record.photoUrl).toBe(
+      `${SIGNED_PHOTO_ORIGIN}/${PHOTO_PATH}?token=firma`,
+    );
+  });
+
+  it("trae la posición en null, sin leer el catálogo, a quien no tiene", async () => {
+    const { gateways, reads } = fake({ positionId: null });
+
+    const record = await readAsAdmin(gateways);
+
+    expect(record.positionName).toBeNull();
+    expect(reads.some((read) => read.startsWith("positions"))).toBe(false);
+  });
+
+  it("lee la posición del catálogo del club de quien llama", async () => {
+    const { gateways, reads } = fake();
+
+    await readAsAdmin(gateways);
+
+    expect(reads).toContain(`positions ${CLUB_ID} ${GOALKEEPER_ID}`);
+  });
+
+  it("trae el plan en null a quien no eligió ninguno", async () => {
+    const { gateways } = fake({ membershipPlan: null });
+
+    const record = await readAsAdmin(gateways);
+
+    expect(record.membershipPlan).toBeNull();
   });
 });
 
@@ -479,11 +656,7 @@ describe("la membresía en la ficha (#453)", () => {
     async (membershipStatus) => {
       const { gateways } = fake({ membershipStatus });
 
-      const record = await readMemberRecord(gateways, {
-        callerId: ADMIN_ID,
-        userId: MEMBER_ID,
-        todayInClub: TODAY_IN_CLUB,
-      });
+      const record = await readAsAdmin(gateways);
 
       expect(record.membershipStatus).toBe(membershipStatus);
     },
@@ -498,11 +671,7 @@ describe("la exención en la ficha (#457)", () => {
     };
     const { gateways } = fake({ membershipStatus: "waived", membershipWaiver });
 
-    const record = await readMemberRecord(gateways, {
-      callerId: ADMIN_ID,
-      userId: MEMBER_ID,
-      todayInClub: TODAY_IN_CLUB,
-    });
+    const record = await readAsAdmin(gateways);
 
     expect(record.membershipWaiver).toEqual(membershipWaiver);
   });
@@ -510,11 +679,7 @@ describe("la exención en la ficha (#457)", () => {
 
 describe("la foto en la ficha", () => {
   function readRecord(gateways: MemberRecordGateways): Promise<MemberRecord> {
-    return readMemberRecord(gateways, {
-      callerId: ADMIN_ID,
-      userId: MEMBER_ID,
-      todayInClub: TODAY_IN_CLUB,
-    });
+    return readAsAdmin(gateways);
   }
 
   it("trae la dirección firmada de la foto del miembro", async () => {
@@ -1237,11 +1402,7 @@ describe("verificar el AUF", () => {
       isAufVerified: true,
     });
 
-    const record = await readMemberRecord(store.gateways, {
-      callerId: ADMIN_ID,
-      userId: MEMBER_ID,
-      todayInClub: TODAY_IN_CLUB,
-    });
+    const record = await readAsAdmin(store.gateways);
 
     expect(record).toMatchObject({ isAufVerified: true, isAufExpired: true });
   });
@@ -1272,11 +1433,7 @@ describe("el contacto en la ficha (#499)", () => {
       emergencyContact: ROSA,
     });
 
-    const record = await readMemberRecord(gateways, {
-      callerId: ADMIN_ID,
-      userId: MEMBER_ID,
-      todayInClub: TODAY_IN_CLUB,
-    });
+    const record = await readAsAdmin(gateways);
 
     expect(record).toMatchObject({
       phone: "0412 345 678",

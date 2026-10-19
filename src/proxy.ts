@@ -87,7 +87,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       : { kind: "anonymous" as const };
 
   const response = buildResponse(
-    decideSessionBoundary({ pathname, session: state }),
+    decideSessionBoundary({ pathname, method: request.method, session: state }),
     request,
   );
 

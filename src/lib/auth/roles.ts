@@ -23,6 +23,7 @@ export type Capability =
   | "manageGroups"
   | "configureSessionPacks"
   | "viewLevyPayers"
+  | "viewMemberRecords"
   | "useMemberFeatures";
 
 /** Una fila de la matriz. Al ser un `Record` de los cuatro roles, una fila que
@@ -73,6 +74,16 @@ export const CAPABILITY_MATRIX: Readonly<Record<Capability, RoleGrants>> = {
   viewLevyPayers: {
     Admin: true,
     Coach: false,
+    Committee: true,
+    Player: false,
+  },
+  // Abrir la ficha de un socio en lectura (#770). Tampoco está en la sección
+  // 4: el dueño la abrió el 19 de octubre de 2026 al Committee y al Coach
+  // (D1 y D3 del PRD de E30). Lo que cada uno ve de ella lo decide la ficha;
+  // escribirla sigue siendo `manageUsersAndRoles`.
+  viewMemberRecords: {
+    Admin: true,
+    Coach: true,
     Committee: true,
     Player: false,
   },

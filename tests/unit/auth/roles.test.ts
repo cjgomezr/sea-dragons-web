@@ -75,6 +75,8 @@ const SRD_MATRIX: Readonly<
   configureSessionPacks: [true, false, true, false],
   // Tampoco: es la ampliación de FR-069 del 8 de octubre de 2026 (#531).
   viewLevyPayers: [true, false, true, false],
+  // Tampoco: D1 y D3 del PRD de E30, del 19 de octubre de 2026 (#770).
+  viewMemberRecords: [true, true, true, false],
   useMemberFeatures: [true, true, true, true],
 };
 
@@ -89,8 +91,8 @@ const SRD_CELLS = Object.entries(SRD_MATRIX).flatMap(([capability, row]) =>
 );
 
 describe("matriz de capacidades", () => {
-  it("recorre las 28 celdas de la tabla del SRD, las cuatro de FR-080 y las cuatro de #531", () => {
-    expect(SRD_CELLS).toHaveLength(36);
+  it("recorre las 28 celdas de la tabla del SRD, las cuatro de FR-080, las cuatro de #531 y las cuatro de #770", () => {
+    expect(SRD_CELLS).toHaveLength(40);
   });
 
   it("no tiene capacidades que el SRD no liste", () => {

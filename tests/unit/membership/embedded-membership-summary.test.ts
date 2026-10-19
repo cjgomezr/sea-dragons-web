@@ -4,7 +4,7 @@ import { readEmbeddedMembershipSummary } from "@/lib/membership/supabase-members
 /**
  * Lo que la ficha del Admin (#457) lee de la membresía embebida en la fila del
  * socio: el estado que cuenta hoy y, si está exento, el motivo y la fecha de
- * fin de la exención.
+ * fin de la exención. Desde #770, también el plan.
  */
 
 const NOW = new Date("2026-10-04T00:00:00.000Z");
@@ -14,6 +14,7 @@ function embeddedRow(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
+    plan: "Full",
     status: "waived",
     stripe_subscription_id: null,
     trial_end: null,
@@ -28,6 +29,7 @@ describe("readEmbeddedMembershipSummary", () => {
   it("trae el motivo y la fecha de fin de una exención vigente", () => {
     expect(readEmbeddedMembershipSummary(embeddedRow(), NOW)).toEqual({
       status: "waived",
+      plan: "Full",
       waiver: {
         reason: "Entrenador",
         until: new Date(WAIVED_UNTIL).toISOString(),
@@ -40,6 +42,7 @@ describe("readEmbeddedMembershipSummary", () => {
       readEmbeddedMembershipSummary(embeddedRow({ waived_until: null }), NOW),
     ).toEqual({
       status: "waived",
+      plan: "Full",
       waiver: { reason: "Entrenador", until: null },
     });
   });
@@ -50,7 +53,7 @@ describe("readEmbeddedMembershipSummary", () => {
         embeddedRow({ waived_until: "2026-09-01T00:00:00+00:00" }),
         NOW,
       ),
-    ).toEqual({ status: "pending", waiver: null });
+    ).toEqual({ status: "pending", plan: "Full", waiver: null });
   });
 
   it("trae el estado sin exención de una membresía que no está exenta", () => {
@@ -59,13 +62,23 @@ describe("readEmbeddedMembershipSummary", () => {
         [embeddedRow({ status: "active", waived_reason: null })],
         NOW,
       ),
-    ).toEqual({ status: "active", waiver: null });
+    ).toEqual({ status: "active", plan: "Full", waiver: null });
+  });
+
+  it("trae el plan en null a quien todavía no eligió ninguno", () => {
+    expect(
+      readEmbeddedMembershipSummary(
+        embeddedRow({ plan: null, status: "pending", waived_reason: null }),
+        NOW,
+      ),
+    ).toMatchObject({ plan: null });
   });
 
   it("trae un estado nulo a quien no tiene membresía", () => {
     expect(readEmbeddedMembershipSummary(null, NOW)).toEqual({
       status: null,
       waiver: null,
+      plan: null,
     });
   });
 });
