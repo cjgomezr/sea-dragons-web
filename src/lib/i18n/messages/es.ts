@@ -1791,29 +1791,33 @@ export const spanishMessages: MessageCatalog = {
     one: "{sizes} sesión",
     other: "{sizes} sesiones",
   },
-  "clubSettings.identity.title": "Nombre e iniciales",
+  "clubSettings.identity.title": "Identidad",
   "clubSettings.name.label": "Nombre del club",
-  "clubSettings.name.hint": "Hasta {max} caracteres.",
+  "clubSettings.name.counter": "{count} / {max}",
   "clubSettings.initials.label": "Iniciales",
+  "clubSettings.initials.optional": "opcional",
   "clubSettings.initials.hint":
-    "Hasta {max} caracteres. Déjalas vacías para usar las primeras letras del nombre.",
-  "clubSettings.brand.title": "Color y logo",
+    "Se ven cuando no hay logo. Hasta {max} letras.",
+  "clubSettings.brand.title": "Marca",
   "clubSettings.accent.label": "Color de acento",
-  "clubSettings.accent.hint":
-    "Un código hexadecimal, como #1C6EA4. Pégalo de tu guía de marca o elígelo en pantalla.",
+  "clubSettings.accent.suggested": "Colores sugeridos",
   "clubSettings.accent.picker":
     "Elegir el color de acento en pantalla (ahora {color})",
-  "clubSettings.accent.previewText": "Texto de ejemplo",
-  "clubSettings.accent.previewLink": "Enlace de ejemplo",
+  "clubSettings.preview.title": "Vista previa",
+  "clubSettings.preview.button": "Botón principal",
+  "clubSettings.preview.textWith": "Texto con",
+  "clubSettings.preview.link": "un enlace",
+  "clubSettings.preview.note":
+    "La app comprueba que el color se lea bien en claro y en oscuro.",
   "clubSettings.logo.label": "Logo",
-  "clubSettings.logo.none":
-    "Todavía no hay logo: en su lugar salen las iniciales.",
-  "clubSettings.logo.present": "El club tiene logo.",
-  "clubSettings.logo.add": "Subir logo",
-  "clubSettings.logo.change": "Cambiar logo",
-  "clubSettings.logo.remove": "Quitar logo",
+  "clubSettings.logo.none": "Sin logo todavía",
+  "clubSettings.logo.present": "Logo en uso",
+  "clubSettings.logo.add": "Subir",
+  "clubSettings.logo.change": "Cambiar",
+  "clubSettings.logo.remove": "Quitar",
   "clubSettings.logo.choose": "Elegir un logo",
-  "clubSettings.logo.hint": "PNG o WebP, hasta {max} KB.",
+  "clubSettings.logo.hint":
+    "PNG o WebP, cuadrado, de al menos 256 px y hasta {max} KB. Se guarda al momento.",
   "clubSettings.logo.uploading": "Subiendo…",
   "clubSettings.logo.removing": "Quitando…",
   "clubSettings.logo.saved": "Logo actualizado.",
@@ -1832,8 +1836,7 @@ export const spanishMessages: MessageCatalog = {
     "El nombre puede tener como mucho {max} caracteres.",
   "clubSettings.issue.initialsTooLong":
     "Las iniciales pueden tener como mucho {max} caracteres.",
-  "clubSettings.issue.accentInvalid":
-    "El color de acento tiene que ser un código hexadecimal, como #1C6EA4.",
+  "clubSettings.issue.accentInvalid": "Usa un código como #33A1E0.",
   "clubSettings.issue.accentNoReadableText":
     "Ningún color de texto llega al contraste mínimo (4,5:1) sobre este acento. Elige uno más claro o más oscuro.",
   "clubSettings.error.changed":

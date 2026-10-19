@@ -56,6 +56,12 @@
      que la hoja lee tiene su valor en :root (tests/unit/theme-css.test.ts). */
   --club-accent-link-light: var(--color-accent-text);
   --club-accent-link-dark: var(--color-accent-text);
+  /* El relleno de la vista previa de General (#720), uno por tema: el
+     formulario los pone en línea con el acento del borrador. */
+  --club-preview-accent-light: var(--color-accent);
+  --club-preview-on-accent-light: var(--color-on-accent);
+  --club-preview-accent-dark: var(--color-accent);
+  --club-preview-on-accent-dark: var(--color-on-accent);
   /* El color del equipo de quien mira en el evento desplegado (#403): la
      tarjeta lo pone en línea con el del reparto. */
   --team-color: var(--color-accent);
@@ -7025,51 +7031,159 @@ a.auth-brand-header:focus-visible {
   min-height: 48px;
 }
 
-.club-settings-brand {
+/* La pestaña General (#720, docs/design/design_handoff_club_settings,
+   "03-desktop-general"): IDENTIDAD y MARCA y, desde 768px, la vista previa
+   fija a la derecha en 300px. La sección deja la columna de 640px. */
+.club-settings-panel:has(.club-general) {
+  max-width: none;
+}
+
+.club-general {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.club-general-editor {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+/* IDENTIDAD, MARCA y VISTA PREVIA: rótulos pequeños, no títulos grandes.
+   Ganan a `.auth-pending h2`. */
+.club-general .club-general-heading,
+.club-general-preview figcaption {
   margin: 0;
-}
-
-.club-settings-brand-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-/* Con el aspecto de las etiquetas de los campos de arriba: son los mismos
-   datos del club, agrupados con su muestra. */
-.club-settings-brand-row dt {
   font-family: var(--font-family-mono);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-text-secondary);
 }
 
-.club-settings-brand-row dd {
+/* La etiqueta y, a la derecha, el contador: el nombre del club y los textos
+   de la página de inicio de sesión. */
+.club-field-heading {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: var(--space-3);
-  margin: 0;
+  align-items: baseline;
+  justify-content: space-between;
 }
 
-/* El aviso de un acento que ya no vale va debajo de la muestra, a lo ancho. */
-.club-settings-brand-row dd .auth-field-error {
-  flex-basis: 100%;
-  margin: 0;
+.club-field-counter {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
-/* El acento en la configuración (#346): el selector, el código y la muestra
-   en una fila que se parte en móvil, y la ayuda y el aviso debajo. */
+.club-field-counter-over {
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+/* Las etiquetas de General van como en el handoff, en negrita y sin
+   mayúsculas: los rótulos de arriba ya son los de mayúsculas. */
+.club-general .auth-field label,
+.club-logo-field .club-logo-label {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-text);
+}
+
+.club-field-optional {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.club-initials-field input {
+  width: min(220px, 100%);
+}
+
+/* El acento (#346, rehecho en #720): los sugeridos, una raya, el código y
+   el selector del navegador, en una fila que se parte si no cabe. */
 .club-accent-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
+}
+
+.club-accent-suggested {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* El radio escondido se coloca encima de su muestra: sin `relative` se
+   saldría de ella y ensancharía la página. */
+.club-accent-swatch {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.club-accent-swatch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* El borde deja ver un sugerido claro sobre el panel blanco; el anillo de
+   2px marca el elegido, y el del foco se ve aparte. */
+.club-accent-swatch-color {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+}
+
+.club-accent-swatch input:checked + .club-accent-swatch-color {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.club-accent-swatch input:focus-visible + .club-accent-swatch-color {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 4px;
+}
+
+.club-accent-swatch:has(input:disabled),
+.club-accent-swatch input:disabled {
+  cursor: not-allowed;
+}
+
+.club-accent-divider {
+  align-self: stretch;
+  width: 1px;
+  background: var(--color-border);
+}
+
+/* La raya separa los sugeridos del código sólo si caben en una fila: cuando
+   el código salta a la siguiente, se quedaría colgando al final. Los anchos
+   son los de la fila entera: cinco muestras, la raya, el código y el
+   selector, con sus huecos. */
+.club-accent-field {
+  container-type: inline-size;
+}
+
+@container (width < 400px) {
+  .club-accent-divider {
+    display: none;
+  }
+}
+
+/* Cabe un código de siete caracteres en mono, sin estirarse. */
+.club-accent-field .club-accent-code {
+  width: 110px;
+  font-family: var(--font-family-mono);
 }
 
 .club-accent-field .club-accent-picker {
@@ -7078,56 +7192,210 @@ a.auth-brand-header:focus-visible {
   cursor: pointer;
 }
 
-/* Cabe un código de siete caracteres con aire, sin estirarse a lo ancho. */
-.club-accent-field .club-accent-code {
-  width: 9em;
-  font-family: var(--font-family-mono);
+/* El logo (#295, en una fila desde #720): la marca de 56px, qué logo vale y
+   los botones. Se guarda al momento, sin la barra. */
+.club-logo-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
-.club-accent-preview {
+.club-logo-field p {
+  margin: 0;
+}
+
+.club-logo-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
-}
-
-/* La muestra lleva borde: un acento claro sobre el panel blanco se perdería
-   sin él. El código va al lado, así que el color no es la única forma de
-   saberlo. */
-.club-accent-preview-swatch {
-  display: inline-flex;
-  align-items: center;
-  min-width: var(--space-8);
-  min-height: var(--space-8);
-  padding: 0 var(--space-3);
-  font-size: 14px;
-  font-weight: 700;
+  padding: var(--space-3);
+  background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
 }
 
-/* Como la hoja del acento (#294): un enlace para cada tema, porque el que se
-   lee sobre el panel claro se pierde sobre el oscuro. */
-.club-accent-preview-link {
-  font-weight: 700;
-  color: var(--club-accent-link-light);
-  text-decoration: underline;
+.club-logo-preview {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
 }
 
+.club-logo-preview .club-logo {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.club-logo-initials {
+  font-family: var(--font-family-heading);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--club-accent-link-light);
+}
+
+.club-logo-text {
+  display: flex;
+  flex: 1 1 12rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.club-logo-field .club-logo-state {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.club-logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.club-logo-actions .auth-secondary {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* La vista previa: la cabecera de la barra lateral, azul oscuro en los dos
+   temas, y debajo un botón y un enlace sobre el panel. */
+.club-general-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+}
+
+.club-general-preview-card {
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.club-general-preview-header {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-sidebar-background);
+  border-bottom: 1px solid var(--color-sidebar-border);
+}
+
+.club-general-preview-header .auth-brand-mark {
+  flex-shrink: 0;
+  color: var(--club-preview-on-accent-light);
+  background: var(--club-preview-accent-light);
+}
+
+.club-general-preview-name {
+  min-width: 0;
+  font-weight: 700;
+  color: var(--color-sidebar-text);
+  overflow-wrap: anywhere;
+}
+
+.club-general-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-4);
+}
+
+/* Gana a `.auth-pending p`: es el texto del panel, no una ayuda gris. */
+.club-general-preview-body p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.club-general-preview-button {
+  padding: var(--space-2) var(--space-4);
+  font-weight: 700;
+  color: var(--club-preview-on-accent-light);
+  background: var(--club-preview-accent-light);
+  border-radius: var(--radius);
+}
+
+.club-general-preview-link {
+  font-weight: 700;
+  color: var(--club-accent-link-light);
+}
+
+.club-general-preview-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* Un relleno y un enlace para cada tema, como la hoja del acento (#294):
+   el que se lee sobre el panel claro se pierde sobre el oscuro. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .club-accent-preview-link {
+  :root:not([data-theme="light"]) .club-general-preview-header .auth-brand-mark,
+  :root:not([data-theme="light"]) .club-general-preview-button {
+    color: var(--club-preview-on-accent-dark);
+    background: var(--club-preview-accent-dark);
+  }
+
+  :root:not([data-theme="light"]) .club-general-preview-link,
+  :root:not([data-theme="light"]) .club-logo-initials {
     color: var(--club-accent-link-dark);
   }
 }
 
-:root[data-theme="dark"] .club-accent-preview-link {
+:root[data-theme="dark"] .club-general-preview-header .auth-brand-mark,
+:root[data-theme="dark"] .club-general-preview-button {
+  color: var(--club-preview-on-accent-dark);
+  background: var(--club-preview-accent-dark);
+}
+
+:root[data-theme="dark"] .club-general-preview-link,
+:root[data-theme="dark"] .club-logo-initials {
   color: var(--club-accent-link-dark);
 }
 
-.club-settings-brand-row .auth-brand-mark {
-  flex-shrink: 0;
+@media (min-width: 768px) {
+  .club-general {
+    grid-template-columns: minmax(0, 1fr) min(300px, 40%);
+    align-items: start;
+  }
+
+  .club-general-preview {
+    position: sticky;
+    top: var(--space-6);
+  }
 }
 
+/* En el móvil, toques de 44px y texto de 16px, que no hace zoom al enfocar. */
+@media (width < 768px) {
+  .club-general input[type="text"] {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .club-accent-swatch-color {
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+  }
+
+  @container (width < 460px) {
+    .club-accent-divider {
+      display: none;
+    }
+  }
+
+  .club-logo-actions .auth-secondary {
+    min-height: var(--touch-target-min);
+  }
+}
 /* La página de inicio de sesión (#721, docs/design/
    design_handoff_club_settings, "04-desktop-sign-in"): un idioma a la vez y
    la vista previa debajo; desde 768px, al lado. La sección deja la columna
@@ -7170,25 +7438,6 @@ a.auth-brand-header:focus-visible {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-.club-sign-in-field-heading {
-  display: flex;
-  gap: var(--space-3);
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.club-sign-in-counter {
-  font-family: var(--font-family-mono);
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.club-sign-in-counter-over {
-  font-weight: 700;
-  color: var(--color-danger);
 }
 
 .club-sign-in-editor textarea {
@@ -7294,31 +7543,6 @@ a.auth-brand-header:focus-visible {
   .club-sign-in-intro .segmented-choice {
     flex: none;
   }
-}
-
-/* El logo en la configuración (#295): la marca con su estado, los botones
-   debajo y la ayuda y los avisos al final, todo alineado a la izquierda. */
-.club-logo-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.club-logo-preview {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.club-logo-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.club-logo-field p {
-  margin: 0;
 }
 
 /* Noticias (#329, rehecho en #594). El feed sigue el handoff de E22

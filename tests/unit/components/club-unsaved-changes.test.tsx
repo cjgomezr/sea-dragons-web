@@ -271,9 +271,7 @@ describe("guardar desde la barra", () => {
     await userEvent.click(saveChangesButton());
 
     await waitFor(() =>
-      expect(
-        screen.getByRole("heading", { name: "Name and initials" }),
-      ).toHaveFocus(),
+      expect(screen.getByRole("heading", { name: "Identity" })).toHaveFocus(),
     );
   });
 

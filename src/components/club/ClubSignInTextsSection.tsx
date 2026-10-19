@@ -143,15 +143,15 @@ function SignInTextInput({
   };
   return (
     <div className="auth-field">
-      <div className="club-sign-in-field-heading">
+      <div className="club-field-heading">
         <label htmlFor={id}>
           {translate(`clubSettings.signInTexts.${field.kind}`)}
         </label>
         <span
           className={
             isInvalid
-              ? "club-sign-in-counter club-sign-in-counter-over"
-              : "club-sign-in-counter"
+              ? "club-field-counter club-field-counter-over"
+              : "club-field-counter"
           }
           id={counterId}
         >
