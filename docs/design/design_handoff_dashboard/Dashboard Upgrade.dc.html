@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+body{margin:0;background:#070f16;color:#e8f0f7;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+a{color:#33a1e0}a:hover{color:#5ab4e8}
+button:focus-visible,a:focus-visible{outline:2px solid #33a1e0;outline-offset:2px}
+</style>
+</helmet>
+
+<section id="t1" style="padding:48px 56px 80px;display:flex;flex-direction:column;gap:26px;background:#070f16;min-height:100vh;width:max-content;box-sizing:border-box">
+<div style="display:flex;flex-direction:column;gap:10px;max-width:1000px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t1" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">1</a><span style="font-size:20px;font-weight:700">Inicio — lo próximo arriba, el resto según el rol</span></div>
+<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14.5px;line-height:1.5;color:#cfdeea">
+<li><strong>Arriba, para todos</strong>: el próximo evento con imagen/color, hora de inicio y fin, "Cómo llegar", Voy / Quizás / No puedo, y <strong>tu equipo</strong> si ya está publicado.</li>
+<li><strong>Esta semana</strong>: 7 días con puntos del color de cada evento; tocá un día para ver qué hay.</li>
+<li><strong>Jugador</strong>: tu asistencia y tu membresía. <strong>Admin/Coach</strong>: "Pendientes" con acceso directo y los números del club en una línea.</li>
+<li><strong>Noticias</strong> con foto: la fijada (o la más nueva) grande y dos en miniatura.</li>
+</ul>
+</div>
+
+<div style="display:flex;gap:14px;align-items:center">
+<span style="font-size:14px;font-weight:600;color:#cfdeea">Ver como</span>
+<div style="display:flex;padding:3px;gap:2px;border:1px solid #274055;border-radius:10px;background:#13283a">
+<sc-for list="{{ roles }}" as="r"><button onClick="{{ r.pick }}" aria-pressed="{{ r.on }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:7px;align-items:center;height:34px;padding:0 16px;border-radius:7px;font-size:14px;font-weight:{{ r.w }};background:{{ r.bg }};color:{{ r.color }}"><i class="ph {{ r.icon }}"></i>{{ r.label }}</button></sc-for>
+</div>
+<span style="font-size:13px;color:#8aa1b5">Cambia escritorio y celular a la vez.</span>
+</div>
+
+<div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+
+<div id="1a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1a</a><span style="font-size:13.5px;color:#8aa1b5">Escritorio · {{ roleLabel }}</span></div>
+<div style="width:1120px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;padding:26px 28px 30px;display:flex;flex-direction:column;gap:18px">
+
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">THU 15 OCT · HOME</span><h1 style="margin:0;font-size:28px;line-height:1.1;font-weight:700">{{ greeting }}</h1></div>
+<sc-if value="{{ isAdmin }}"><button style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:7px;align-items:center;height:40px;padding:0 16px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:14px;font-weight:700" style-hover="background:#5ab4e8"><i class="ph-bold ph-plus"></i>Event</button></sc-if>
+</div>
+
+<sc-if value="{{ isExpired }}"><div role="status" style="display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:10px;background:color-mix(in srgb,#f2887a 14%,#13283a);border:1px solid color-mix(in srgb,#f2887a 50%,transparent)"><i class="ph ph-warning-circle" style="font-size:22px;color:#f2887a"></i><span style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-size:14.5px;font-weight:700">Your membership expired on 30 Sep</span><span style="font-size:13px;color:#cfdeea">You can still see what's on. Renew to RSVP, be picked for teams and get the member price on sessions.</span></span><a href="#1a" style="flex:none;display:flex;gap:6px;align-items:center;height:38px;padding:0 16px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:14px;font-weight:700;text-decoration:none">Renew membership</a></div></sc-if>
+<sc-if value="{{ isMember }}"><div style="display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:8px;background:color-mix(in srgb,#f2ce78 12%,#13283a);font-size:13.5px"><i class="ph ph-phone" style="font-size:17px;color:#f2ce78"></i><span style="flex:1">Add an emergency contact so coaches can reach someone if needed.</span><a href="#1a" style="font-weight:700;color:#5ab4e8;text-decoration:none">Add contact</a><button aria-label="Dismiss" style="all:unset;cursor:pointer;width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:#8aa1b5"><i class="ph ph-x"></i></button></div></sc-if>
+
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+
+<article style="display:grid;grid-template-columns:280px minmax(0,1fr);border:1px solid #274055;border-radius:14px;background:#13283a;overflow:hidden">
+<div style="position:relative;background:linear-gradient(135deg,color-mix(in srgb,#33a1e0 34%,#13283a),#13283a 85%);display:grid;place-items:center;min-height:250px">
+<i class="ph ph-timer" style="font-size:84px;color:#33a1e0;opacity:.85"></i>
+<span style="position:absolute;left:14px;top:14px;display:flex;gap:6px;align-items:center;padding:4px 10px;border-radius:999px;background:rgba(12,26,38,.7);font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.06em">NEXT UP · IN 2 DAYS</span>
+<span style="position:absolute;left:0;right:0;bottom:0;height:4px;background:#33a1e0"></span>
+</div>
+<div style="padding:18px 20px;display:flex;flex-direction:column;gap:12px;min-width:0">
+<div style="display:flex;gap:8px;align-items:center"><span style="padding:2px 9px;border-radius:999px;background:color-mix(in srgb,#33a1e0 24%,#13283a);font-size:12px;font-weight:600">Training</span><span style="font-size:12.5px;color:#8aa1b5">All members</span></div>
+<h2 style="margin:0;font-size:22px;line-height:1.2;font-weight:700">Saturday scrimmage</h2>
+<div style="display:flex;flex-direction:column;gap:7px;font-size:14px;color:#cfdeea">
+<span style="display:flex;gap:9px;align-items:center"><i class="ph ph-clock" style="font-size:17px;color:#33a1e0"></i>Sat 17 Oct · 9:00 am – 11:00 am <span style="color:#8aa1b5">· 2 h</span></span>
+<span style="display:flex;gap:9px;align-items:center"><i class="ph ph-map-pin" style="font-size:17px;color:#33a1e0"></i>Princes Park · Field 2<a href="#1a" style="margin-left:6px;display:flex;gap:4px;align-items:center;font-weight:700;color:#5ab4e8;text-decoration:none"><i class="ph ph-navigation-arrow"></i>Directions</a></span>
+</div>
+<sc-if value="{{ isExpired }}"><div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;background:#0c1a26;border:1px solid #274055"><i class="ph ph-lock-simple" style="font-size:18px;color:#8aa1b5"></i><span style="flex:1;font-size:13.5px;color:#cfdeea">RSVP is for current members.</span><a href="#1a" style="font-size:13.5px;font-weight:700;color:#5ab4e8;text-decoration:none">Renew</a></div></sc-if>
+<sc-if value="{{ canRsvp }}"><div role="group" aria-label="Are you going?" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+<sc-for list="{{ rsvp }}" as="o"><button onClick="{{ o.pick }}" aria-pressed="{{ o.on }}" style="all:unset;cursor:pointer;display:flex;gap:7px;align-items:center;justify-content:center;height:40px;box-sizing:border-box;border-radius:8px;font-size:14px;font-weight:{{ o.w }};border:1px solid {{ o.border }};background:{{ o.bg }};color:#e8f0f7"><i class="ph-bold {{ o.icon }}" style="color:{{ o.ic }}"></i>{{ o.label }}</button></sc-for>
+</div>
+<span style="font-size:12.5px;color:#8aa1b5">{{ goingLine }}</span></sc-if>
+<sc-if value="{{ isMember }}">
+<a href="#1a" style="display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,#1C6EA4 26%,#0c1a26);border:1px solid color-mix(in srgb,#1C6EA4 60%,transparent);text-decoration:none;color:#e8f0f7">
+<span style="flex:none;width:30px;height:30px;border-radius:7px;background:#1C6EA4;display:grid;place-items:center"><i class="ph-fill ph-t-shirt" style="font-size:17px;color:#e8f0f7"></i></span>
+<span style="flex:1;display:flex;flex-direction:column;gap:1px"><span style="font:700 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#cfdeea">YOU'RE PLAYING IN</span><span style="font-size:15px;font-weight:700">Team Kelp <span style="font-weight:500;color:#cfdeea">· blue bib · Full back</span></span></span>
+<span style="display:flex;gap:4px;align-items:center;font-size:13px;font-weight:600;color:#5ab4e8">Lineups<i class="ph ph-caret-right"></i></span>
+</a>
+</sc-if>
+<sc-if value="{{ isAdmin }}">
+<div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;background:#0c1a26;border:1px dashed #274055">
+<i class="ph ph-users-three" style="font-size:19px;color:#f2ce78"></i>
+<span style="flex:1;font-size:13.5px;color:#cfdeea">Teams are saved but <strong style="color:#e8f0f7">not published</strong> yet.</span>
+<a href="#1a" style="display:flex;gap:4px;align-items:center;font-size:13px;font-weight:700;color:#5ab4e8;text-decoration:none">Open teams<i class="ph ph-caret-right"></i></a>
+</div>
+</sc-if>
+</div>
+</article>
+
+<section style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0;font-size:17px;font-weight:700">This week</h2><a href="#1a" style="display:flex;gap:4px;align-items:center;font-size:13.5px;font-weight:600;color:#5ab4e8;text-decoration:none">Calendar<i class="ph ph-arrow-right"></i></a></div>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+<sc-for list="{{ week }}" as="d"><button onClick="{{ d.pick }}" aria-pressed="{{ d.on }}" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 0 10px;border-radius:10px;border:1px solid {{ d.border }};background:{{ d.bg }}"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:{{ d.wkColor }}">{{ d.wk }}</span><span style="font-size:18px;font-weight:700">{{ d.n }}</span><span style="display:flex;gap:3px;height:7px"><sc-for list="{{ d.dots }}" as="c"><span style="width:7px;height:7px;border-radius:50%;background:{{ c }}"></span></sc-for></span></button></sc-for>
+</div>
+<div style="border:1px solid #274055;border-radius:10px;background:#13283a;overflow:hidden">
+<sc-for list="{{ dayEvents }}" as="e"><a href="#1a" style="display:grid;grid-template-columns:4px 92px minmax(0,1fr) auto;gap:12px;align-items:center;min-height:50px;padding:0 14px 0 0;border-top:{{ e.sep }};text-decoration:none;color:#e8f0f7" style-hover="background:#16304a"><span style="align-self:stretch;background:{{ e.c }}"></span><span style="display:flex;flex-direction:column"><span style="font:700 13px ui-monospace,Menlo,monospace">{{ e.start }}</span><span style="font:12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ e.end }}</span></span><span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.title }}</span><span style="font-size:12.5px;color:#8aa1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.place }}</span></span><span style="font-size:12.5px;font-weight:600;color:{{ e.meColor }}">{{ e.me }}</span></a></sc-for>
+<sc-if value="{{ dayEmpty }}"><div style="padding:14px;font-size:13.5px;color:#8aa1b5">Nothing on {{ dayLabel }}.</div></sc-if>
+</div>
+</section>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:14px">
+<sc-if value="{{ isPlayer }}">
+<section style="display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid #274055;border-radius:12px;background:#13283a">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0;font-size:15px;font-weight:700">My attendance</h2><span style="font-size:12.5px;color:#8aa1b5">This season</span></div>
+<div style="display:flex;gap:10px;align-items:baseline"><span style="font:700 34px ui-monospace,Menlo,monospace;line-height:1">82%</span><span style="font-size:13px;color:#8aa1b5">18 of 22 sessions</span></div>
+<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:#8aa1b5">Last 10</span><div style="display:flex;gap:4px"><sc-for list="{{ last10 }}" as="c"><span style="flex:1;height:22px;border-radius:4px;background:{{ c }}"></span></sc-for></div><div style="display:flex;gap:12px;font-size:11.5px;color:#8aa1b5"><span style="display:flex;gap:5px;align-items:center"><span style="width:8px;height:8px;border-radius:2px;background:#6fd6b4"></span>Present</span><span style="display:flex;gap:5px;align-items:center"><span style="width:8px;height:8px;border-radius:2px;background:#f2ce78"></span>Late</span><span style="display:flex;gap:5px;align-items:center"><span style="width:8px;height:8px;border-radius:2px;background:#f2887a"></span>Absent</span></div></div>
+</section>
+<section style="display:flex;gap:12px;align-items:center;padding:14px 16px;border:1px solid #274055;border-radius:12px;background:#13283a">
+<span style="flex:none;width:38px;height:38px;border-radius:10px;background:{{ memTint }};display:grid;place-items:center"><i class="ph ph-identification-badge" style="font-size:20px;color:{{ memColor }}"></i></span>
+<span style="flex:1;display:flex;flex-direction:column;gap:1px"><span style="font-size:14.5px;font-weight:700">{{ memTitle }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ memSub }}</span></span>
+<a href="#1a" aria-label="Open payments" style="width:32px;height:32px;display:grid;place-items:center;border-radius:8px;color:#8aa1b5"><i class="ph ph-caret-right"></i></a>
+</section>
+</sc-if>
+<sc-if value="{{ isAdmin }}">
+<section style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px"><h2 style="margin:0;font-size:15px;font-weight:700">To do</h2><span style="min-width:22px;height:22px;padding:0 7px;box-sizing:border-box;border-radius:999px;background:#f2ce78;color:#0c1a26;display:grid;place-items:center;font:700 12px ui-monospace,Menlo,monospace">{{ todoCount }}</span></div>
+<sc-for list="{{ todos }}" as="t"><a href="#1a" onClick="{{ t.done }}" style="display:flex;gap:12px;align-items:center;min-height:56px;padding:6px 12px 6px 16px;border-top:1px solid #22394d;text-decoration:none;color:#e8f0f7" style-hover="background:#16304a"><span style="flex:none;width:32px;height:32px;border-radius:8px;background:{{ t.tint }};display:grid;place-items:center"><i class="ph {{ t.icon }}" style="font-size:17px;color:{{ t.c }}"></i></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:14px;font-weight:600">{{ t.title }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ t.sub }}</span></span><span style="font-size:13px;font-weight:700;color:#5ab4e8;white-space:nowrap">{{ t.cta }}</span></a></sc-for>
+<sc-if value="{{ todoEmpty }}"><div style="display:flex;gap:8px;align-items:center;padding:14px 16px;border-top:1px solid #22394d;font-size:13.5px;color:#6fd6b4"><i class="ph ph-check-circle"></i>All caught up.</div></sc-if>
+</section>
+<section style="display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #274055;border-radius:12px;background:#13283a">
+<sc-for list="{{ stats }}" as="s"><a href="#1a" style="display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-left:{{ s.sepL }};border-top:{{ s.sepT }};text-decoration:none;color:#e8f0f7" style-hover="background:#16304a"><span style="font-size:12px;color:#8aa1b5">{{ s.label }}</span><span style="font:700 20px ui-monospace,Menlo,monospace">{{ s.value }}</span><span style="display:flex;gap:4px;align-items:center;font-size:11.5px;color:{{ s.subColor }}"><sc-if value="{{ s.trend }}"><i class="ph-bold {{ s.trend }}"></i></sc-if>{{ s.sub }}</span></a></sc-for>
+</section>
+</sc-if>
+</div>
+</div>
+
+<section style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0;font-size:17px;font-weight:700">News</h2><a href="#1a" style="display:flex;gap:4px;align-items:center;font-size:13.5px;font-weight:600;color:#5ab4e8;text-decoration:none">All news<i class="ph ph-arrow-right"></i></a></div>
+<div style="display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px">
+<a href="#1a" style="display:grid;grid-template-columns:240px minmax(0,1fr);border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden;text-decoration:none;color:#e8f0f7" style-hover="border-color:#33a1e0">
+<span style="background:linear-gradient(135deg,color-mix(in srgb,#6fd6b4 30%,#13283a),#13283a 85%);display:grid;place-items:center;min-height:160px"><i class="ph ph-confetti" style="font-size:56px;color:#6fd6b4"></i></span>
+<span style="padding:14px 16px;display:flex;flex-direction:column;gap:8px"><span style="display:flex;gap:8px;align-items:center"><span style="display:flex;gap:4px;align-items:center;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#f2ce78"><i class="ph-fill ph-push-pin"></i>PINNED</span><span style="font-size:12px;color:#8aa1b5">Events · 2 d ago</span></span><span style="font-size:17px;line-height:1.3;font-weight:700;text-wrap:pretty">Season launch night — food, awards and the new kit</span><span style="font-size:13.5px;line-height:1.5;color:#cfdeea;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Friday 30 Oct at the clubhouse. Bring the family — RSVP in the calendar so we know how much food to order.</span></span>
+</a>
+<div style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ news }}" as="n"><a href="#1a" style="display:flex;gap:12px;align-items:center;padding:8px;border:1px solid #274055;border-radius:10px;background:#13283a;text-decoration:none;color:#e8f0f7" style-hover="border-color:#33a1e0"><span style="flex:none;width:64px;height:64px;border-radius:8px;background:{{ n.bg }};display:grid;place-items:center"><i class="ph {{ n.icon }}" style="font-size:26px;color:{{ n.c }}"></i></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="font-size:12px;color:#8aa1b5">{{ n.meta }}</span><span style="font-size:14px;line-height:1.35;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ n.title }}</span></span><sc-if value="{{ n.unread }}"><span title="Unread" style="flex:none;width:8px;height:8px;border-radius:50%;background:#33a1e0;margin-right:4px"></span></sc-if></a></sc-for>
+</div>
+</div>
+</section>
+</div>
+</div>
+
+<div id="2a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#2a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2a</a><span style="font-size:13.5px;color:#8aa1b5">Celular · {{ roleLabel }}</span></div>
+<div style="width:390px;height:844px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;display:flex;flex-direction:column">
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:18px 14px 24px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px"><div style="display:flex;flex-direction:column;gap:3px"><span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">THU 15 OCT</span><span style="font-size:24px;font-weight:700;line-height:1.15">{{ greeting }}</span></div><sc-if value="{{ isAdmin }}"><button aria-label="New event" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:10px;background:#33a1e0;color:#0c1a26;display:grid;place-items:center"><i class="ph-bold ph-plus" style="font-size:19px"></i></button></sc-if></div>
+
+<sc-if value="{{ isExpired }}"><div role="status" style="flex:none;display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:12px;background:color-mix(in srgb,#f2887a 14%,#13283a);border:1px solid color-mix(in srgb,#f2887a 50%,transparent)"><span style="display:flex;gap:10px;align-items:flex-start"><i class="ph ph-warning-circle" style="font-size:21px;color:#f2887a"></i><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:700">Membership expired on 30 Sep</span><span style="font-size:13px;line-height:1.45;color:#cfdeea">Renew to RSVP and be picked for teams.</span></span></span><a href="#2a" style="display:flex;align-items:center;justify-content:center;height:46px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700;text-decoration:none">Renew membership</a></div></sc-if>
+<article style="flex:none;border:1px solid #274055;border-radius:14px;background:#13283a;overflow:hidden">
+<div style="position:relative;height:130px;background:linear-gradient(135deg,color-mix(in srgb,#33a1e0 34%,#13283a),#13283a 85%);display:grid;place-items:center"><i class="ph ph-timer" style="font-size:58px;color:#33a1e0;opacity:.85"></i><span style="position:absolute;left:12px;top:12px;padding:4px 9px;border-radius:999px;background:rgba(12,26,38,.7);font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.06em">NEXT UP · IN 2 DAYS</span><span style="position:absolute;left:0;right:0;bottom:0;height:4px;background:#33a1e0"></span></div>
+<div style="padding:14px;display:flex;flex-direction:column;gap:11px">
+<span style="font-size:19px;font-weight:700;line-height:1.25">Saturday scrimmage</span>
+<div style="display:flex;flex-direction:column;gap:6px;font-size:14px;color:#cfdeea"><span style="display:flex;gap:8px;align-items:center"><i class="ph ph-clock" style="font-size:17px;color:#33a1e0"></i>Sat 17 Oct · 9:00 – 11:00 am</span><span style="display:flex;gap:8px;align-items:center"><i class="ph ph-map-pin" style="font-size:17px;color:#33a1e0"></i>Princes Park · Field 2</span></div>
+<a href="#2a" style="display:flex;gap:7px;align-items:center;justify-content:center;height:44px;border-radius:10px;border:1px solid #274055;font-size:14.5px;font-weight:700;color:#5ab4e8;text-decoration:none"><i class="ph ph-navigation-arrow"></i>Directions</a>
+<sc-if value="{{ isExpired }}"><div style="display:flex;gap:10px;align-items:center;min-height:48px;padding:6px 12px;border-radius:10px;background:#0c1a26;border:1px solid #274055"><i class="ph ph-lock-simple" style="font-size:18px;color:#8aa1b5"></i><span style="flex:1;font-size:13.5px;color:#cfdeea">RSVP is for current members.</span></div></sc-if>
+<sc-if value="{{ canRsvp }}"><div role="group" aria-label="Are you going?" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+<sc-for list="{{ rsvp }}" as="o"><button onClick="{{ o.pick }}" aria-pressed="{{ o.on }}" style="all:unset;cursor:pointer;display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;height:56px;box-sizing:border-box;border-radius:10px;font-size:13.5px;font-weight:{{ o.w }};border:1px solid {{ o.border }};background:{{ o.bg }};color:#e8f0f7"><i class="ph-bold {{ o.icon }}" style="font-size:18px;color:{{ o.ic }}"></i>{{ o.label }}</button></sc-for>
+</div>
+<span style="font-size:12.5px;color:#8aa1b5;text-align:center">{{ goingLine }}</span></sc-if>
+<sc-if value="{{ isMember }}"><a href="#2a" style="display:flex;gap:10px;align-items:center;min-height:52px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,#1C6EA4 26%,#0c1a26);border:1px solid color-mix(in srgb,#1C6EA4 60%,transparent);text-decoration:none;color:#e8f0f7"><span style="flex:none;width:30px;height:30px;border-radius:7px;background:#1C6EA4;display:grid;place-items:center"><i class="ph-fill ph-t-shirt" style="font-size:17px;color:#e8f0f7"></i></span><span style="flex:1;display:flex;flex-direction:column;gap:1px"><span style="font:700 10px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#cfdeea">YOU'RE PLAYING IN</span><span style="font-size:14.5px;font-weight:700">Team Kelp <span style="font-weight:500;color:#cfdeea">· blue · Full back</span></span></span><i class="ph ph-caret-right" style="color:#8aa1b5"></i></a></sc-if>
+<sc-if value="{{ isAdmin }}"><a href="#2a" style="display:flex;gap:10px;align-items:center;min-height:48px;padding:6px 10px;border-radius:10px;background:#0c1a26;border:1px dashed #274055;text-decoration:none;color:#cfdeea;font-size:13.5px"><i class="ph ph-users-three" style="font-size:18px;color:#f2ce78"></i><span style="flex:1">Teams not published yet</span><span style="font-weight:700;color:#5ab4e8">Open</span></a></sc-if>
+</div>
+</article>
+
+<sc-if value="{{ isAdmin }}">
+<section style="flex:none;display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px 8px"><span style="font-size:16px;font-weight:700">To do</span><span style="min-width:22px;height:22px;padding:0 7px;box-sizing:border-box;border-radius:999px;background:#f2ce78;color:#0c1a26;display:grid;place-items:center;font:700 12px ui-monospace,Menlo,monospace">{{ todoCount }}</span></div>
+<sc-for list="{{ todos }}" as="t"><a href="#2a" onClick="{{ t.done }}" style="display:flex;gap:12px;align-items:center;min-height:60px;padding:6px 10px 6px 14px;border-top:1px solid #22394d;text-decoration:none;color:#e8f0f7"><span style="flex:none;width:34px;height:34px;border-radius:9px;background:{{ t.tint }};display:grid;place-items:center"><i class="ph {{ t.icon }}" style="font-size:18px;color:{{ t.c }}"></i></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:14.5px;font-weight:600">{{ t.title }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ t.sub }}</span></span><i class="ph ph-caret-right" style="color:#5a7086"></i></a></sc-for>
+<sc-if value="{{ todoEmpty }}"><div style="display:flex;gap:8px;align-items:center;padding:14px;border-top:1px solid #22394d;font-size:14px;color:#6fd6b4"><i class="ph ph-check-circle"></i>All caught up.</div></sc-if>
+</section>
+</sc-if>
+
+<section style="flex:none;display:flex;flex-direction:column;gap:8px">
+<span style="font-size:16px;font-weight:700;padding:0 2px">This week</span>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+<sc-for list="{{ week }}" as="d"><button onClick="{{ d.pick }}" aria-pressed="{{ d.on }}" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0 8px;border-radius:9px;border:1px solid {{ d.border }};background:{{ d.bg }}"><span style="font:600 10px ui-monospace,Menlo,monospace;color:{{ d.wkColor }}">{{ d.wk1 }}</span><span style="font-size:16px;font-weight:700">{{ d.n }}</span><span style="display:flex;gap:2px;height:6px"><sc-for list="{{ d.dots }}" as="c"><span style="width:6px;height:6px;border-radius:50%;background:{{ c }}"></span></sc-for></span></button></sc-for>
+</div>
+<div style="border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ dayEvents }}" as="e"><a href="#2a" style="display:flex;gap:10px;align-items:center;min-height:56px;padding:0 12px 0 0;border-top:{{ e.sep }};text-decoration:none;color:#e8f0f7"><span style="align-self:stretch;width:4px;background:{{ e.c }}"></span><span style="flex:none;width:52px;font:700 13px ui-monospace,Menlo,monospace">{{ e.start }}</span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.title }}</span><span style="font-size:12.5px;color:#8aa1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.end }} · {{ e.place }}</span></span><span style="font-size:12px;font-weight:600;color:{{ e.meColor }}">{{ e.me }}</span></a></sc-for>
+<sc-if value="{{ dayEmpty }}"><div style="padding:14px;font-size:14px;color:#8aa1b5">Nothing on {{ dayLabel }}.</div></sc-if>
+</div>
+</section>
+
+<sc-if value="{{ isPlayer }}">
+<section style="flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<a href="#2a" style="display:flex;flex-direction:column;gap:4px;padding:12px;border:1px solid #274055;border-radius:12px;background:#13283a;text-decoration:none;color:#e8f0f7"><span style="font-size:12.5px;color:#8aa1b5">My attendance</span><span style="font:700 24px ui-monospace,Menlo,monospace">82%</span><div style="display:flex;gap:2px"><sc-for list="{{ last10 }}" as="c"><span style="flex:1;height:10px;border-radius:2px;background:{{ c }}"></span></sc-for></div></a>
+<a href="#2a" style="display:flex;flex-direction:column;gap:4px;padding:12px;border:1px solid #274055;border-radius:12px;background:#13283a;text-decoration:none;color:#e8f0f7"><span style="font-size:12.5px;color:#8aa1b5">Membership</span><span style="display:flex;gap:6px;align-items:center;font-size:16px;font-weight:700"><i class="ph-fill {{ memIcon }}" style="color:{{ memColor }}"></i>{{ memShort }}</span><span style="font-size:12px;color:#8aa1b5">{{ memSubShort }}</span></a>
+</section>
+</sc-if>
+<sc-if value="{{ isAdmin }}">
+<section style="flex:none;display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #274055;border-radius:12px;background:#13283a">
+<sc-for list="{{ stats }}" as="s"><a href="#2a" style="display:flex;flex-direction:column;gap:2px;min-height:44px;padding:10px 12px;border-left:{{ s.sepL }};border-top:{{ s.sepT }};text-decoration:none;color:#e8f0f7"><span style="font-size:12px;color:#8aa1b5">{{ s.label }}</span><span style="font:700 18px ui-monospace,Menlo,monospace">{{ s.value }}</span><span style="display:flex;gap:4px;align-items:center;font-size:11.5px;color:{{ s.subColor }}"><sc-if value="{{ s.trend }}"><i class="ph-bold {{ s.trend }}"></i></sc-if>{{ s.sub }}</span></a></sc-for>
+</section>
+</sc-if>
+
+<section style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:0 2px"><span style="font-size:16px;font-weight:700">News</span><a href="#2a" style="display:flex;gap:4px;align-items:center;min-height:44px;font-size:14px;font-weight:600;color:#5ab4e8;text-decoration:none">All<i class="ph ph-arrow-right"></i></a></div>
+<a href="#2a" style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden;text-decoration:none;color:#e8f0f7"><span style="height:120px;background:linear-gradient(135deg,color-mix(in srgb,#6fd6b4 30%,#13283a),#13283a 85%);display:grid;place-items:center"><i class="ph ph-confetti" style="font-size:46px;color:#6fd6b4"></i></span><span style="padding:12px;display:flex;flex-direction:column;gap:6px"><span style="display:flex;gap:8px;align-items:center"><span style="display:flex;gap:4px;align-items:center;font:700 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#f2ce78"><i class="ph-fill ph-push-pin"></i>PINNED</span><span style="font-size:12px;color:#8aa1b5">2 d ago</span></span><span style="font-size:16px;line-height:1.3;font-weight:700">Season launch night — food, awards and the new kit</span></span></a>
+<sc-for list="{{ news }}" as="n"><a href="#2a" style="display:flex;gap:12px;align-items:center;padding:8px;border:1px solid #274055;border-radius:12px;background:#13283a;text-decoration:none;color:#e8f0f7"><span style="flex:none;width:56px;height:56px;border-radius:8px;background:{{ n.bg }};display:grid;place-items:center"><i class="ph {{ n.icon }}" style="font-size:22px;color:{{ n.c }}"></i></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#8aa1b5">{{ n.meta }}</span><span style="font-size:14px;line-height:1.35;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ n.title }}</span></span><sc-if value="{{ n.unread }}"><span style="flex:none;width:8px;height:8px;border-radius:50%;background:#33a1e0;margin-right:4px"></span></sc-if></a></sc-for>
+</section>
+</div>
+<nav style="display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid #274055;background:#13283a;padding:6px 4px 14px">
+<sc-for list="{{ tabbar }}" as="b"><a href="#2a" style="display:flex;flex-direction:column;align-items:center;gap:3px;min-height:44px;justify-content:center;font-size:11px;font-weight:600;color:{{ b.color }};text-decoration:none"><i class="{{ b.icon }}" style="font-size:21px"></i>{{ b.label }}</a></sc-for>
+</nav>
+</div>
+</div>
+
+</div>
+
+<ul style="margin:0;padding-left:18px;max-width:1000px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+<li>"Tu equipo" aparece solo si el reparto del próximo evento está publicado y estás en él. Si no, la tarjeta queda sin esa franja.</li>
+<li>Admin/Coach: "Club attendance" es el promedio del club en los últimos 30 días con la tendencia contra los 30 anteriores (abre Asistencia). "My attendance" es la suya propia, para quien también entrena; si no tiene sesiones registradas, esa cifra no aparece.</li>
+<li>"Pendientes" se arma solo con lo que haya; tocá uno en el mockup para marcarlo hecho. Sin nada pendiente dice "All caught up".</li>
+<li><strong>Membresía vencida</strong> (botón "Expired member" arriba): ve el mismo inicio, pero con un aviso rojo y "Renew membership" arriba de todo. En lugar de Going / Maybe / Can't go aparece "RSVP is for current members"; no se muestra la franja de equipo y su tarjeta de membresía dice "Expired". Sigue viendo la semana, su asistencia y las noticias.</li>
+<li>El aviso de "falta contacto" sigue siendo una franja fina; con membresía vencida no se muestra, para no tapar el aviso importante.</li>
+</ul>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const T = {training:'#33a1e0', competition:'#f2ce78', social:'#6fd6b4', meeting:'#b7c7d6'};
+const DAYS = [['THU','T',15],['FRI','F',16],['SAT','S',17],['SUN','S',18],['MON','M',19],['TUE','T',20],['WED','W',21]];
+const EV = {
+  17:[{t:'training',title:'Saturday scrimmage',start:'9:00',end:'11:00 am',place:'Princes Park · Field 2',key:'next'}],
+  18:[{t:'social',title:'Sunday BBQ & recovery swim',start:'12:00',end:'3:00 pm',place:'Clubhouse',me:'Maybe',meColor:'#f2ce78'}],
+  19:[{t:'training',title:'Monday open training',start:'6:00',end:'7:30 pm',place:'Princes Park · Field 1',me:'Going',meColor:'#6fd6b4'}],
+  20:[{t:'meeting',title:'Committee meeting',start:'7:00',end:'8:00 pm',place:'Online',admin:true}],
+  21:[{t:'training',title:'Wednesday training',start:'6:00',end:'7:30 pm',place:'Princes Park · Field 2',me:'RSVP',meColor:'#5ab4e8'},{t:'competition',title:'Island Cup: draw night',start:'8:00',end:'9:00 pm',place:'Clubhouse',me:'RSVP',meColor:'#5ab4e8'}]
+};
+const TODOS = [
+  {id:'r',icon:'ph-user-switch',c:'#33a1e0',title:'3 role requests',sub:'Waiting for your approval',cta:'Review'},
+  {id:'a',icon:'ph-clipboard-text',c:'#f2887a',title:'Take attendance',sub:'Wednesday training · Wed 14 Oct',cta:'Take'},
+  {id:'t',icon:'ph-users-three',c:'#f2ce78',title:'Publish teams',sub:'Saturday scrimmage · saved, not published',cta:'Open'},
+  {id:'n',icon:'ph-chat-circle-dots',c:'#b7c7d6',title:'6 haven\u2019t replied',sub:'Saturday scrimmage',cta:'See who'}
+];
+const LAST10 = ['p','p','l','p','a','p','p','p','l','p'].map(k=>({p:'#6fd6b4',l:'#f2ce78',a:'#f2887a'})[k]);
+
+class Component extends DCLogic {
+  state = { role:'player', rsvp:null, day:17, done:[] };
+  renderVals(){
+    const s = this.state, admin = s.role==='admin', exp = s.role==='expired';
+    const R = {yes:['Going','ph-check','#6fd6b4'], maybe:['Maybe','ph-question','#f2ce78'], no:["Can't go",'ph-x','#f2887a']};
+    const going = 14 + (s.rsvp==='yes'?1:0), maybe = 3 + (s.rsvp==='maybe'?1:0);
+    const evs = (EV[s.day]||[]).filter(e=>admin || !e.admin);
+    const nextMe = s.rsvp ? R[s.rsvp][0] : 'RSVP', nextMeColor = s.rsvp ? R[s.rsvp][2] : '#5ab4e8';
+    const todos = TODOS.filter(t=>!s.done.includes(t.id));
+    const dl = DAYS.find(d=>d[2]===s.day);
+    return {
+      roles: [['player','Player','ph-user'],['expired','Expired member','ph-warning-circle'],['admin','Admin / Coach','ph-shield-star']].map(([k,l,ic])=>({label:l, icon:ic, on:s.role===k, w:s.role===k?700:500, bg:s.role===k?'#1d4869':'transparent', color:s.role===k?'#e8f0f7':'#8aa1b5', pick:()=>this.setState({role:k})})),
+      roleLabel: admin ? 'Admin / Coach' : (exp ? 'Expired member' : 'Player'),
+      isAdmin: admin, isPlayer: !admin, isMember: s.role==='player', isExpired: exp, canRsvp: !exp,
+      memTitle: exp ? 'Membership expired' : 'Membership active', memSub: exp ? 'Expired 30 Sep 2026 · renew in Payments' : 'Full member · renews 30 Jun 2027',
+      memShort: exp ? 'Expired' : 'Active', memSubShort: exp ? 'Since 30 Sep' : 'Renews 30 Jun 2027',
+      memColor: exp ? '#f2887a' : '#6fd6b4', memIcon: exp ? 'ph-warning-circle' : 'ph-check-circle', memTint: exp ? 'color-mix(in srgb,#f2887a 20%,#13283a)' : 'color-mix(in srgb,#6fd6b4 20%,#13283a)',
+      greeting: admin ? 'Good afternoon, Camilo' : (exp ? 'Good afternoon, Jack' : 'Good afternoon, Sofia'),
+      rsvp: Object.keys(R).map(k=>{ const on = s.rsvp===k, [l,ic,c] = R[k]; return {label:l, icon:ic, on, w:on?700:500, ic: on?c:'#8aa1b5', bg: on?`color-mix(in srgb, ${c} 22%, #13283a)`:'#0c1a26', border: on?`color-mix(in srgb, ${c} 60%, transparent)`:'#274055', pick:()=>this.setState(st=>({rsvp: st.rsvp===k?null:k}))}; }),
+      goingLine: `${going} going · ${maybe} maybe`,
+      week: DAYS.map(([wk,wk1,n])=>{ const on = s.day===n; const dots = (EV[n]||[]).filter(e=>admin||!e.admin).map(e=>T[e.t]);
+        return {wk, wk1, n, on, dots, bg: on?'#1d4869':'#13283a', border: on?'#33a1e0':'#274055', wkColor: n===15 ? '#5ab4e8' : '#8aa1b5', pick:()=>this.setState({day:n})}; }),
+      dayEvents: evs.map((e,i)=>({...e, c:T[e.t], sep: i===0?'none':'1px solid #22394d', me: exp ? '' : (e.key==='next' ? nextMe : (e.me||'')), meColor: e.key==='next' ? nextMeColor : (e.meColor||'#8aa1b5')})),
+      dayEmpty: evs.length===0, dayLabel: dl ? `${dl[0][0]+dl[0].slice(1).toLowerCase()} ${dl[2]}` : '',
+      last10: LAST10,
+      todos: todos.map(t=>({...t, tint:`color-mix(in srgb, ${t.c} 18%, #13283a)`, done:e=>{ e.preventDefault(); this.setState(st=>({done:[...st.done, t.id]})); }})),
+      todoCount: todos.length, todoEmpty: todos.length===0,
+      stats: [['Club attendance','78%','4 pts vs last month','#6fd6b4','ph-trend-up'],['My attendance','85%','11 of 13 sessions','#8aa1b5',null],['Members','86','+4 this month','#6fd6b4',null],['Unread news','2','1 announcement','#8aa1b5',null]].map(([l,v,sub,sc,tr],i)=>({label:l, value:v, sub, subColor:sc, trend:tr, sepL: i%2===0?'none':'1px solid #274055', sepT: i<2?'none':'1px solid #274055'})),
+      news: [
+        {title:'New training times from November', meta:'Announcement · 4 d ago', icon:'ph-megaphone', c:'#33a1e0', bg:'linear-gradient(135deg,color-mix(in srgb,#33a1e0 30%,#13283a),#13283a 85%)', unread:true},
+        {title:'Island Cup: we\u2019re in the final round!', meta:'Results · 1 w ago', icon:'ph-trophy', c:'#f2ce78', bg:'linear-gradient(135deg,color-mix(in srgb,#f2ce78 30%,#13283a),#13283a 85%)', unread:false}
+      ],
+      tabbar: [['Home','ph-fill ph-house','#e8f0f7'],['Calendar','ph ph-calendar-blank','#8aa1b5'],['News','ph ph-newspaper','#8aa1b5'],['Directory','ph ph-address-book','#8aa1b5'],['More','ph ph-dots-three-outline','#8aa1b5']].map(([l,ic,c])=>({label:l, icon:ic, color:c}))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+body{margin:0;background:#070f16;color:#e8f0f7;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+a{color:#33a1e0}a:hover{color:#5ab4e8}
+input::placeholder{color:#5a7086}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #33a1e0;outline-offset:2px}
+</style>
+</helmet>
+
+<section id="t1" style="padding:48px 56px 80px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:10px;max-width:980px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t1" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">1</a><span style="font-size:20px;font-weight:700">Equipos — nombre y color editables, fotos y filas más limpias</span></div>
+<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14.5px;line-height:1.5;color:#cfdeea">
+<li><strong>Nombre y color</strong>: tocá el lápiz en la cabecera de cada equipo. Colores de peto con nombre (para el lector de pantalla y la tarjeta "Juegas en…"), y el color del otro equipo queda bloqueado para que no se repitan.</li>
+<li><strong>Fotos</strong> en el avatar, con un aro del color del equipo; si no hay foto, iniciales.</li>
+<li><strong>Otras mejoras</strong>: "Switch / Remove" pasan a íconos; Manual/Auto + "Balance teams" se juntan en un botón; cada equipo muestra su cobertura (POR · DEF · ATA) y avisa si falta portero.</li>
+</ul>
+<p style="margin:0;font-size:14px;color:#8aa1b5">Probá: editá un equipo, mové jugadores, aplicá la sugerencia, balanceá. <a href="#1a">1a</a> escritorio · <a href="#2a">2a</a> celular (comparten datos).</p>
+</div>
+
+<div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+
+<div id="1a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1a</a><span style="font-size:13.5px;color:#8aa1b5">Escritorio</span></div>
+<div style="width:1040px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;padding:24px 28px 28px;display:flex;flex-direction:column;gap:16px;position:relative">
+
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">TEAMS</span><h1 style="margin:0;font-size:26px;line-height:1.15;font-weight:700">Sat 17 Oct · Scrimmage</h1></div>
+<div style="display:flex;gap:8px">
+<button onClick="{{ save }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center;height:40px;padding:0 16px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:14px;font-weight:600" style-hover="border-color:#33a1e0">Save<sc-if value="{{ dirty }}"><span style="display:flex;gap:6px;align-items:center;font-weight:500;color:#f2ce78"><span style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span>Unsaved</span></sc-if></button>
+<button onClick="{{ askPublish }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center;height:40px;padding:0 18px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:14px;font-weight:700" style-hover="background:#5ab4e8"><i class="ph-bold ph-paper-plane-tilt"></i>Publish</button>
+</div>
+</div>
+
+<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+<label style="display:flex;gap:8px;align-items:center;font-size:13.5px;color:#8aa1b5">Event<select style="height:36px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#13283a;color:#e8f0f7;font-size:13.5px"><option>Sat 17 Oct · 9:00 am · Scrimmage</option><option>Wed 21 Oct · 6:00 pm · Training</option></select></label>
+<span style="flex:1"></span>
+<span style="display:flex;gap:6px;align-items:center;font-size:13px;color:#8aa1b5"><i class="ph {{ modeIcon }}"></i>{{ modeText }}</span>
+<button onClick="{{ balance }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:7px;align-items:center;height:36px;padding:0 14px;border-radius:8px;border:1px solid #33a1e0;color:#5ab4e8;font-size:13.5px;font-weight:700" style-hover="background:#13283a"><i class="ph-bold ph-scales"></i>Auto-balance</button>
+</div>
+
+<sc-if value="{{ confirming }}"><div style="display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:10px;background:#13283a;border:1px solid #33a1e0"><i class="ph ph-paper-plane-tilt" style="font-size:18px;color:#5ab4e8"></i><span style="flex:1;font-size:14px">Publish teams? {{ assignedCount }} players will be notified which team they're on.</span><button onClick="{{ cancelPublish }}" style="all:unset;cursor:pointer;padding:7px 14px;border-radius:8px;font-size:13.5px;font-weight:600;color:#cfdeea" style-hover="background:#1a3349">Cancel</button><button onClick="{{ publish }}" style="all:unset;cursor:pointer;padding:7px 16px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13.5px;font-weight:700">Publish</button></div></sc-if>
+<sc-if value="{{ notice }}"><div style="display:flex;gap:8px;align-items:center;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+
+<div style="display:flex;flex-direction:column;gap:8px;padding:12px 14px;border:1px solid #274055;border-radius:10px;background:#13283a">
+<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px">
+<span style="display:flex;gap:8px;align-items:baseline"><span style="font-weight:700">{{ ta.name }}</span><span style="font:700 16px ui-monospace,Menlo,monospace">{{ ta.sum }}</span></span>
+<span style="display:flex;gap:6px;align-items:center;color:{{ diffColor }}"><i class="ph {{ diffIcon }}"></i>{{ diffText }}</span>
+<span style="display:flex;gap:8px;align-items:baseline"><span style="font:700 16px ui-monospace,Menlo,monospace">{{ tb.sum }}</span><span style="font-weight:700">{{ tb.name }}</span></span>
+</div>
+<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px"><span style="flex:{{ ta.share }};background:{{ ta.color }}"></span><span style="flex:{{ tb.share }};background:{{ tb.color }}"></span></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+<sc-for list="{{ teams }}" as="t">
+<section onDragOver="{{ t.dragOver }}" onDrop="{{ t.drop }}" style="position:relative;display:flex;flex-direction:column;border:1px solid {{ t.border }};border-radius:12px;background:#13283a">
+<div style="height:4px;border-radius:12px 12px 0 0;background:{{ t.color }}"></div>
+<div style="display:flex;gap:10px;align-items:center;padding:12px 12px 10px 14px">
+<span style="flex:none;width:22px;height:22px;border-radius:6px;background:{{ t.color }};box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)"></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ t.meta }}</span></span>
+<button onClick="{{ t.edit }}" aria-label="{{ t.editLabel }}" title="Edit name and colour" style="all:unset;cursor:pointer;width:34px;height:34px;border-radius:8px;display:grid;place-items:center;color:#cfdeea;border:1px solid #274055" style-hover="border-color:#33a1e0;color:#e8f0f7"><i class="ph ph-pencil-simple" style="font-size:16px"></i></button>
+</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 10px">
+<sc-for list="{{ t.cov }}" as="c"><span style="display:flex;gap:5px;align-items:center;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:600;background:{{ c.bg }};color:{{ c.color }}"><i class="ph {{ c.icon }}" style="font-size:13px"></i>{{ c.label }}</span></sc-for>
+</div>
+<div style="border-top:1px solid #22394d">
+<sc-for list="{{ t.rows }}" as="p">
+<div draggable="true" onDragStart="{{ p.dragStart }}" style="display:grid;grid-template-columns:36px minmax(0,1fr) 40px auto;gap:10px;align-items:center;min-height:48px;padding:5px 8px 5px 12px;border-bottom:1px solid #22394d;cursor:grab" style-hover="background:#16304a">
+<span style="position:relative;width:34px;height:34px;border-radius:50%;box-shadow:0 0 0 2px {{ t.color }};overflow:hidden;background:{{ p.av }};display:grid;place-items:center;font:700 11.5px ui-monospace,Menlo,monospace"><sc-if value="{{ p.photo }}"><span style="width:100%;height:100%;background-image:{{ p.bgImg }};background-size:cover;background-position:center"></span></sc-if><sc-if value="{{ p.noPhoto }}">{{ p.ini }}</sc-if></span>
+<span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span><span style="font:11.5px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ p.pos }}</span></span>
+<span style="font:700 14px ui-monospace,Menlo,monospace;text-align:right;color:{{ p.ovrColor }}">{{ p.ovr }}</span>
+<span role="group" aria-label="{{ p.name }}" style="display:flex;gap:2px">
+<button onClick="{{ p.switch }}" aria-label="{{ p.switchLabel }}" title="{{ p.switchLabel }}" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:7px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph ph-arrows-left-right" style="font-size:16px"></i></button>
+<button onClick="{{ p.remove }}" aria-label="{{ p.removeLabel }}" title="Back to the bench" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:7px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349;color:#f2887a"><i class="ph ph-x" style="font-size:16px"></i></button>
+</span>
+</div>
+</sc-for>
+<sc-if value="{{ t.empty }}"><div style="padding:18px 14px;font-size:13.5px;color:#8aa1b5;text-align:center">Drag players here or use "Add" on the bench.</div></sc-if>
+</div>
+
+<sc-if value="{{ t.editing }}">
+<div style="position:absolute;z-index:10;top:52px;right:8px;width:320px;box-sizing:border-box;padding:14px;border-radius:12px;background:#13283a;border:1px solid #274055;box-shadow:0 1px 2px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:12px">
+<span style="font-size:15px;font-weight:700">Edit team</span>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">Name</span><input value="{{ edName }}" onChange="{{ onEdName }}" maxlength="24" style="all:unset;box-sizing:border-box;height:38px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;color:#e8f0f7"></label>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:13px;font-weight:600">Bib colour <span style="font-weight:400;color:#8aa1b5">· {{ edColorName }}</span></span>
+<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+<sc-for list="{{ swatches }}" as="s"><button onClick="{{ s.pick }}" aria-label="{{ s.label }}" title="{{ s.label }}" aria-pressed="{{ s.on }}" disabled="{{ s.taken }}" style="all:unset;cursor:{{ s.cursor }};position:relative;width:36px;height:36px;border-radius:50%;background:{{ s.hex }};box-shadow:{{ s.ring }};opacity:{{ s.op }};display:grid;place-items:center"><sc-if value="{{ s.on }}"><i class="ph-bold ph-check" style="font-size:15px;color:{{ s.check }}"></i></sc-if><sc-if value="{{ s.taken }}"><i class="ph-bold ph-prohibit" style="font-size:15px;color:#e8f0f7"></i></sc-if></button></sc-for>
+</div>
+<span style="font-size:12px;color:#8aa1b5">The crossed one is the other team's colour.</span>
+<span style="display:flex;gap:6px;align-items:flex-start;font-size:12px;line-height:1.4;color:#cfdeea"><i class="ph ph-info" style="font-size:14px;color:#8aa1b5;margin-top:1px"></i>Used for every event from now on. Teams already published keep their colours.</span>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button onClick="{{ cancelEdit }}" style="all:unset;cursor:pointer;padding:7px 14px;border-radius:8px;font-size:13.5px;font-weight:600;color:#cfdeea" style-hover="background:#1a3349">Cancel</button><button onClick="{{ applyEdit }}" style="all:unset;cursor:pointer;padding:7px 16px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13.5px;font-weight:700">Apply</button></div>
+</div>
+</sc-if>
+</section>
+</sc-for>
+</div>
+
+<sc-if value="{{ sug }}">
+<div style="display:flex;gap:12px;align-items:center;padding:10px 12px 10px 14px;border-radius:10px;background:#13283a;border:1px dashed #33a1e0">
+<i class="ph ph-lightbulb" style="font-size:19px;color:#f2ce78"></i>
+<span style="flex:1;font-size:13.5px;line-height:1.45;color:#cfdeea"><strong style="color:#e8f0f7">Suggestion:</strong> {{ sugText }}</span>
+<button onClick="{{ applySug }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center;padding:7px 14px;border-radius:8px;border:1px solid #274055;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0"><i class="ph ph-arrows-left-right"></i>Swap</button>
+</div>
+</sc-if>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+<sc-for list="{{ benches }}" as="b">
+<section onDragOver="{{ b.dragOver }}" onDrop="{{ b.drop }}" style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;gap:8px;align-items:center;padding:0 2px"><span style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">{{ b.label }}</span><span style="font:12px ui-monospace,Menlo,monospace;color:#5a7086">{{ b.n }}</span></div>
+<div style="border:1px solid #274055;border-radius:10px;background:#13283a;overflow:hidden">
+<sc-for list="{{ b.rows }}" as="p">
+<div draggable="true" onDragStart="{{ p.dragStart }}" style="display:grid;grid-template-columns:32px minmax(0,1fr) 34px auto;gap:10px;align-items:center;min-height:46px;padding:5px 8px 5px 12px;border-top:{{ p.sep }};cursor:grab" style-hover="background:#16304a">
+<span style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:{{ p.av }};display:grid;place-items:center;font:700 11px ui-monospace,Menlo,monospace"><sc-if value="{{ p.photo }}"><span style="width:100%;height:100%;background-image:{{ p.bgImg }};background-size:cover;background-position:center"></span></sc-if><sc-if value="{{ p.noPhoto }}">{{ p.ini }}</sc-if></span>
+<span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span><span style="font:11.5px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ p.pos }}</span></span>
+<span style="font:700 13.5px ui-monospace,Menlo,monospace;text-align:right;color:{{ p.ovrColor }}">{{ p.ovr }}</span>
+<span role="group" aria-label="{{ p.name }}" style="display:flex;gap:4px">
+<sc-for list="{{ p.adds }}" as="a"><button onClick="{{ a.go }}" aria-label="{{ a.label }}" title="{{ a.label }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center;height:30px;padding:0 10px;border-radius:7px;border:1px solid #274055;font-size:12.5px;font-weight:600" style-hover="border-color:#33a1e0"><span style="width:9px;height:9px;border-radius:50%;background:{{ a.color }}"></span>{{ a.short }}</button></sc-for>
+</span>
+</div>
+</sc-for>
+<sc-if value="{{ b.empty }}"><div style="padding:14px;font-size:13.5px;color:#8aa1b5">{{ b.emptyText }}</div></sc-if>
+</div>
+</section>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div id="2a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#2a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2a</a><span style="font-size:13.5px;color:#8aa1b5">Celular</span></div>
+<div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;display:flex;flex-direction:column;position:relative">
+<div style="padding:16px 16px 12px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #274055">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px"><div style="display:flex;flex-direction:column;gap:2px"><span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">TEAMS</span><span style="font-size:20px;font-weight:700;line-height:1.2">Sat 17 Oct · Scrimmage</span></div>
+<button onClick="{{ balance }}" aria-label="Auto-balance" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:10px;border:1px solid #33a1e0;display:grid;place-items:center;color:#5ab4e8"><i class="ph-bold ph-scales" style="font-size:19px"></i></button></div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;font-size:12.5px"><span style="font:700 14px ui-monospace,Menlo,monospace">{{ ta.sum }}</span><span style="display:flex;gap:5px;align-items:center;color:{{ diffColor }}"><i class="ph {{ diffIcon }}"></i>{{ diffText }}</span><span style="font:700 14px ui-monospace,Menlo,monospace">{{ tb.sum }}</span></div>
+<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;gap:2px"><span style="flex:{{ ta.share }};background:{{ ta.color }}"></span><span style="flex:{{ tb.share }};background:{{ tb.color }}"></span></div>
+</div>
+<div role="tablist" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:3px;border-radius:10px;background:#13283a;border:1px solid #274055">
+<sc-for list="{{ mTabs }}" as="x"><button onClick="{{ x.pick }}" role="tab" aria-selected="{{ x.on }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:40px;border-radius:7px;font-size:13.5px;font-weight:{{ x.w }};background:{{ x.bg }};color:{{ x.color }};min-width:0"><span style="flex:none;width:9px;height:9px;border-radius:50%;background:{{ x.dot }}"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ x.label }}</span><span style="font:12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ x.n }}</span></button></sc-for>
+</div>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:12px 12px 20px;display:flex;flex-direction:column;gap:10px">
+<sc-if value="{{ notice }}"><div style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+<sc-if value="{{ mIsTeam }}">
+<div style="flex:none;display:flex;flex-direction:column;border:1px solid {{ mt.border }};border-radius:12px;background:#13283a;overflow:hidden">
+<div style="height:4px;background:{{ mt.color }}"></div>
+<div style="display:flex;gap:10px;align-items:center;padding:8px 6px 8px 12px">
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:16px;font-weight:700">{{ mt.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ mt.meta }}</span></span>
+<button onClick="{{ mt.edit }}" aria-label="{{ mt.editLabel }}" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-pencil-simple" style="font-size:19px"></i></button>
+</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 10px"><sc-for list="{{ mt.cov }}" as="c"><span style="display:flex;gap:5px;align-items:center;height:26px;padding:0 10px;border-radius:999px;font-size:12.5px;font-weight:600;background:{{ c.bg }};color:{{ c.color }}"><i class="ph {{ c.icon }}"></i>{{ c.label }}</span></sc-for></div>
+<sc-for list="{{ mt.rows }}" as="p">
+<div style="display:flex;gap:10px;align-items:center;min-height:58px;padding:4px 4px 4px 12px;border-top:1px solid #22394d">
+<span style="flex:none;width:38px;height:38px;border-radius:50%;box-shadow:0 0 0 2px {{ mt.color }};overflow:hidden;background:{{ p.av }};display:grid;place-items:center;font:700 12px ui-monospace,Menlo,monospace"><sc-if value="{{ p.photo }}"><span style="width:100%;height:100%;background-image:{{ p.bgImg }};background-size:cover;background-position:center"></span></sc-if><sc-if value="{{ p.noPhoto }}">{{ p.ini }}</sc-if></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:15px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ p.name }}</span><span style="font:11.5px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ p.pos }} · <span style="color:{{ p.ovrColor }}">{{ p.ovrLong }}</span></span></span>
+<button onClick="{{ p.switch }}" aria-label="{{ p.switchLabel }}" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-arrows-left-right" style="font-size:19px"></i></button>
+<button onClick="{{ p.remove }}" aria-label="{{ p.removeLabel }}" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-x" style="font-size:19px"></i></button>
+</div>
+</sc-for>
+<sc-if value="{{ mt.empty }}"><div style="padding:16px 12px;font-size:13.5px;color:#8aa1b5">No players yet. Add them from the Bench tab.</div></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ mIsBench }}">
+<sc-for list="{{ benches }}" as="b">
+<div style="flex:none;display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;gap:8px;align-items:center;padding:0 4px"><span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">{{ b.label }}</span><span style="font:11.5px ui-monospace,Menlo,monospace;color:#5a7086">{{ b.n }}</span></div>
+<div style="flex:none;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ b.rows }}" as="p">
+<div style="display:flex;gap:10px;align-items:center;min-height:58px;padding:4px 6px 4px 12px;border-top:{{ p.sep }}">
+<span style="flex:none;width:36px;height:36px;border-radius:50%;overflow:hidden;background:{{ p.av }};display:grid;place-items:center;font:700 11.5px ui-monospace,Menlo,monospace"><sc-if value="{{ p.photo }}"><span style="width:100%;height:100%;background-image:{{ p.bgImg }};background-size:cover;background-position:center"></span></sc-if><sc-if value="{{ p.noPhoto }}">{{ p.ini }}</sc-if></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:15px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ p.name }}</span><span style="font:11.5px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ p.pos }} · <span style="color:{{ p.ovrColor }}">{{ p.ovrLong }}</span></span></span>
+<span role="group" aria-label="{{ p.name }}" style="flex:none;display:flex;gap:4px">
+<sc-for list="{{ p.adds }}" as="a"><button onClick="{{ a.go }}" aria-label="{{ a.label }}" style="all:unset;cursor:pointer;width:44px;height:44px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;display:grid;place-items:center"><span style="width:16px;height:16px;border-radius:50%;background:{{ a.color }};display:grid;place-items:center"><i class="ph-bold ph-plus" style="font-size:10px;color:{{ a.ink }}"></i></span></button></sc-for>
+</span>
+</div>
+</sc-for>
+<sc-if value="{{ b.empty }}"><div style="padding:14px 12px;font-size:13.5px;color:#8aa1b5">{{ b.emptyText }}</div></sc-if>
+</div>
+</div>
+</sc-for>
+</sc-if>
+</div>
+<div style="display:flex;gap:8px;padding:10px 12px 16px;border-top:1px solid {{ mBarBorder }};background:#13283a">
+<button onClick="{{ save }}" style="all:unset;cursor:pointer;flex:1;display:flex;gap:7px;align-items:center;justify-content:center;height:48px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:15px;font-weight:600">Save<sc-if value="{{ dirty }}"><span style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span></sc-if></button>
+<button onClick="{{ askPublish }}" style="all:unset;cursor:pointer;flex:1.3;display:flex;gap:7px;align-items:center;justify-content:center;height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700"><i class="ph-bold ph-paper-plane-tilt"></i>Publish</button>
+</div>
+<sc-if value="{{ mEditing }}">
+<div onClick="{{ cancelEdit }}" style="position:absolute;inset:0;background:color-mix(in srgb,#0c1a26 60%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 16px 22px;display:flex;flex-direction:column;gap:14px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055"></span>
+<span style="font-size:18px;font-weight:700">Edit team</span>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Name</span><input value="{{ edName }}" onChange="{{ onEdName }}" maxlength="24" style="all:unset;box-sizing:border-box;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:16px;color:#e8f0f7"></label>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:600">Bib colour <span style="font-weight:400;color:#8aa1b5">· {{ edColorName }}</span></span>
+<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;justify-items:center">
+<sc-for list="{{ swatches }}" as="s"><button onClick="{{ s.pick }}" aria-label="{{ s.label }}" aria-pressed="{{ s.on }}" disabled="{{ s.taken }}" style="all:unset;cursor:{{ s.cursor }};width:44px;height:44px;border-radius:50%;background:{{ s.hex }};box-shadow:{{ s.ring }};opacity:{{ s.op }};display:grid;place-items:center"><sc-if value="{{ s.on }}"><i class="ph-bold ph-check" style="font-size:17px;color:{{ s.check }}"></i></sc-if><sc-if value="{{ s.taken }}"><i class="ph-bold ph-prohibit" style="font-size:17px;color:#e8f0f7"></i></sc-if></button></sc-for>
+</div></div>
+<span style="display:flex;gap:6px;align-items:flex-start;font-size:13px;line-height:1.4;color:#cfdeea"><i class="ph ph-info" style="font-size:15px;color:#8aa1b5;margin-top:1px"></i>Used for every event from now on. Teams already published keep their colours.</span>
+<div style="display:flex;gap:8px"><button onClick="{{ cancelEdit }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:46px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:15px;font-weight:600">Cancel</button><button onClick="{{ applyEdit }}" style="all:unset;cursor:pointer;flex:1.4;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Apply</button></div>
+</div>
+</sc-if>
+<sc-if value="{{ confirming }}">
+<div onClick="{{ cancelPublish }}" style="position:absolute;inset:0;background:color-mix(in srgb,#0c1a26 60%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:18px 16px 22px;display:flex;flex-direction:column;gap:14px">
+<span style="font-size:17px;font-weight:700">Publish teams?</span><span style="font-size:14.5px;line-height:1.5;color:#cfdeea">{{ assignedCount }} players will be notified which team they're on.</span>
+<div style="display:flex;gap:8px"><button onClick="{{ cancelPublish }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:46px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:15px;font-weight:600">Cancel</button><button onClick="{{ publish }}" style="all:unset;cursor:pointer;flex:1.4;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Publish</button></div>
+</div>
+</sc-if>
+</div>
+</div>
+
+</div>
+
+<ul style="margin:0;padding-left:18px;max-width:980px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+<li>Nombre y color son del club: se eligen una vez y se usan en todos los eventos siguientes. Se editan desde acá mismo (no hace falta ir a Configuración). Los repartos ya publicados guardan los colores con los que se publicaron, así nadie ve cambiar su tarjeta "Juegas en…".</li>
+<li>Los 12 colores son de peto, con nombre ("Rojo", "Azul"…), así la tarjeta del jugador dice "de color rojo" sin depender del color.</li>
+<li>Celular: pestañas Equipo A · Equipo B · Banco en vez de 4 listas apiladas. Desde el banco se agrega con los botones del color de cada equipo.</li>
+</ul>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const P = [
+  ['u1','Liam Carter','Goalkeeper','gk',7.8,12],['u2','Sofia Reyes','Full back','def',7.2,47],['u3','Noah Williams','Half back','def',6.9,13],
+  ['u4','Mia Thompson','Centre','att',8.1,45],['u5','Oliver Nguyen','Forward','att',7.5,null],['u6','Ava Martinez','Forward','att',6.4,44],
+  ['u7','Ethan Brown','Half back','def',7.0,15],['u8','Isla Patel','Centre','att',6.8,49],['u9','Zoe Walker','Goalkeeper','gk',6.6,41],
+  ['u10','Lucas Kim','Full back','def',7.4,60],['u11','Chloe Davis','Centre','att',7.7,48],['u12','Jack Wilson','Forward','att',null,59],
+  ['u13','Grace Lee','Half back','def',6.2,null],['u14','Henry Clark','Utility','',5.9,57],
+  ['u15','Maximiliano Fernández-Gutiérrez','Full back','def',7.1,53],['u16','Ruby Scott','Forward','att',6.5,32],['u17','Leo Harris','Half back','def',null,null]
+].map(([id,name,pos,cov,ovr,img])=>({id,name,pos,cov,ovr,photo: img ? `https://i.pravatar.cc/96?img=${img}` : null}));
+const ORIGIN = {u15:'available',u16:'available',u14:'available',u12:'maybe',u17:'maybe'};
+const A0 = {u1:'a',u2:'a',u3:'a',u4:'a',u5:'a',u6:'a',u13:'a', u9:'b',u10:'b',u7:'b',u11:'b',u8:'b'};
+const SW = [['Red','#D64545'],['Orange','#E07B2E'],['Gold','#C99A3E'],['Yellow','#E8C547'],['Green','#3E9B5F'],['Teal','#2A9D9A'],['Blue','#1C6EA4'],['Navy','#2B3F7A'],['Purple','#7A5BC4'],['Pink','#D9669A'],['Black','#2B2F36'],['White','#F2F4F6']];
+const LIGHT = new Set(['#E8C547','#F2F4F6','#C99A3E','#E07B2E']);
+const AV = ['#1d4869','#2a4a3f','#4a3a2a','#3a2f4f','#24465a'];
+const r1 = x => (Math.round(x*10)/10).toFixed(1);
+const ovrOf = p => p.ovr ?? 5;
+
+class Component extends DCLogic {
+  state = { asg:{...A0}, saved:{...A0}, teams:{a:{name:'Team Kelp',color:'#1C6EA4'}, b:{name:'Team Tide',color:'#C99A3E'}}, mode:'manual',
+    edit:null, mEdit:false, ed:{name:'',color:''}, confirming:false, notice:null, mTab:'a', drag:null };
+  componentWillUnmount(){ clearTimeout(this._t); }
+  flash(t){ clearTimeout(this._t); this.setState({notice:t}); this._t = setTimeout(()=>this.setState({notice:null}), 3200); }
+  move(id, dest){ this.setState(st=>{ const asg = {...st.asg}; if(dest==='bench') delete asg[id]; else asg[id]=dest; return {asg, mode:'manual'}; }); }
+  renderVals(){
+    const s = this.state, T = s.teams;
+    const on = t => P.filter(p=>s.asg[p.id]===t).sort((x,y)=>ovrOf(y)-ovrOf(x)||x.name.localeCompare(y.name));
+    const sum = t => on(t).reduce((a,p)=>a+ovrOf(p),0);
+    const sa = sum('a'), sb = sum('b'), diff = Math.abs(sa-sb);
+    const dirty = JSON.stringify(Object.entries(s.asg).sort())!==JSON.stringify(Object.entries(s.saved).sort());
+    const other = t => t==='a'?'b':'a';
+    const covOf = t => { const ps = on(t); const n = k => ps.filter(p=>p.cov===k).length;
+      return [['gk','GK','ph-hand-palm'],['def','DEF','ph-shield'],['att','ATT','ph-lightning']].map(([k,l,ic])=>{ const c = n(k), bad = k==='gk' && c===0 && ps.length>0;
+        return {label: bad ? 'No goalkeeper' : `${l} ${c}`, icon: bad ? 'ph-warning' : ic, bg: bad ? 'color-mix(in srgb,#f2ce78 18%,#13283a)' : '#0c1a26', color: bad ? '#f2ce78' : '#cfdeea'}; }); };
+    const base = (p,i) => ({ name:p.name, pos:p.pos||'No position', ini:p.name.split(' ').map(w=>w[0]).slice(0,2).join(''), av:AV[i%AV.length],
+      photo:p.photo, bgImg: p.photo ? `url(${p.photo})` : 'none', noPhoto:!p.photo, ovr: p.ovr==null ? '—' : r1(p.ovr), ovrLong: p.ovr==null ? 'Not rated' : 'OVR '+r1(p.ovr), ovrColor: p.ovr==null ? '#8aa1b5' : '#e8f0f7',
+      dragStart: e=>{ try{ e.dataTransfer.setData('text/plain', p.id); }catch(x){} e.dataTransfer.effectAllowed='move'; this.setState({drag:p.id}); } });
+    const dropTo = dest => ({ dragOver: e=>e.preventDefault(), drop: e=>{ e.preventDefault(); const id = s.drag; this.setState({drag:null}); if(id) this.move(id, dest); } });
+    const team = t => { const ps = on(t); const avg = ps.length ? r1(sum(t)/ps.length) : null;
+      return { ...dropTo(t), name:T[t].name, color:T[t].color, border: s.edit===t ? '#33a1e0' : '#274055',
+        meta: `${ps.length} players${avg ? ' · avg '+avg : ''}`, cov: covOf(t), empty: ps.length===0,
+        editLabel:`Edit ${T[t].name} name and colour`, edit:()=>this.setState({edit:t, mEdit:false, ed:{...T[t]}}), editing: s.edit===t && !s.mEdit,
+        rows: ps.map((p,i)=>({...base(p,i), switchLabel:`Move ${p.name} to ${T[other(t)].name}`, removeLabel:`Take ${p.name} off ${T[t].name}`,
+          switch:()=>this.move(p.id, other(t)), remove:()=>this.move(p.id,'bench')})) }; };
+    const bench = (origin,label,emptyText) => { const ps = P.filter(p=>!s.asg[p.id] && ORIGIN[p.id]===origin);
+      return { ...dropTo('bench'), label, n:ps.length, empty:ps.length===0, emptyText,
+        rows: ps.map((p,i)=>({...base(p,i), sep: i===0?'none':'1px solid #22394d',
+          adds:['a','b'].map(t=>({color:T[t].color, ink: LIGHT.has(T[t].color)?'#0c1a26':'#e8f0f7', short:T[t].name.replace(/^Team\s+/,''), label:`Add ${p.name} to ${T[t].name}`, go:()=>this.move(p.id,t)}))})) }; };
+    // suggestion: best single swap
+    let best = null; const A = on('a'), B = on('b');
+    A.forEach(x=>B.forEach(y=>{ const d = Math.abs((sa-ovrOf(x)+ovrOf(y))-(sb-ovrOf(y)+ovrOf(x))); if(d < diff-0.25 && (!best || d<best.d)) best = {x,y,d}; }));
+    const edT = s.edit, takenColor = edT ? T[other(edT)].color : null;
+    const swName = hex => (SW.find(w=>w[1]===hex)||['Custom'])[0];
+    const teamsArr = [team('a'), team('b')];
+    const mt = team(s.mTab==='bench' ? 'a' : s.mTab);
+    const editingT = edT;
+    return {
+      dirty, ta:{name:T.a.name, color:T.a.color, sum:r1(sa), share: Math.max(sa,0.1)}, tb:{name:T.b.name, color:T.b.color, sum:r1(sb), share: Math.max(sb,0.1)},
+      diffText: diff<0.05 ? 'Even' : `${r1(diff)} apart`, diffIcon: diff<=1 ? 'ph-check-circle' : 'ph-warning', diffColor: diff<=1 ? '#6fd6b4' : '#f2ce78',
+      modeText: s.mode==='auto' ? 'Auto-balanced' : 'Edited by hand', modeIcon: s.mode==='auto' ? 'ph-scales' : 'ph-hand',
+      teams: teamsArr,
+      benches: [bench('available','AVAILABLE · GOING','Everyone who said yes is on a team.'), bench('maybe','MAYBE','No maybes.')],
+      sug: !!best, sugText: best ? `swap ${best.x.name} (${T.a.name}) with ${best.y.name} (${T.b.name}) to bring the gap down to ${r1(best.d)}.` : '',
+      applySug: ()=>{ if(!best) return; this.setState(st=>({asg:{...st.asg,[best.x.id]:'b',[best.y.id]:'a'}, mode:'manual'})); },
+      balance: ()=>{ const yes = P.filter(p=>s.asg[p.id] || ORIGIN[p.id]==='available').sort((x,y)=>ovrOf(y)-ovrOf(x)); const asg = {}; let ta=0,tb=0,na=0,nb=0;
+        const gks = yes.filter(p=>p.cov==='gk'), rest = yes.filter(p=>p.cov!=='gk');
+        [...gks, ...rest].forEach(p=>{ const toA = (na<nb) || (na===nb && ta<=tb); if(toA){asg[p.id]='a'; ta+=ovrOf(p); na++;} else {asg[p.id]='b'; tb+=ovrOf(p); nb++;} });
+        this.setState({asg, saved:asg, mode:'auto'}); this.flash('Teams balanced and saved'); },
+      save: ()=>{ if(!dirty) return; this.setState(st=>({saved:{...st.asg}})); this.flash('Saved — not published yet'); },
+      confirming: s.confirming, assignedCount: Object.keys(s.asg).length,
+      askPublish: ()=>this.setState({confirming:true}), cancelPublish: ()=>this.setState({confirming:false}),
+      publish: ()=>{ this.setState(st=>({confirming:false, saved:{...st.asg}})); this.flash(`Published · ${Object.keys(s.asg).length} players notified`); },
+      notice: s.notice,
+      edName: s.ed.name, onEdName: e=>this.setState(st=>({ed:{...st.ed, name:e.target.value}})), edColorName: swName(s.ed.color),
+      swatches: SW.map(([l,h])=>{ const on = s.ed.color===h, taken = h===takenColor;
+        return {label: taken ? `${l} (used by ${T[other(edT)].name})` : l, hex:h, on, taken, pick:()=>{ if(!taken) this.setState(st=>({ed:{...st.ed, color:h}})); },
+          ring: on ? '0 0 0 2px #13283a, 0 0 0 4px #e8f0f7' : 'inset 0 0 0 1px rgba(255,255,255,.14)', op: taken ? .35 : 1, cursor: taken ? 'not-allowed' : 'pointer', check: LIGHT.has(h) ? '#0c1a26' : '#ffffff'}; }),
+      cancelEdit: ()=>this.setState({edit:null, mEdit:false}),
+      applyEdit: ()=>{ const name = s.ed.name.trim(); if(!name || !editingT) return; this.setState(st=>({teams:{...st.teams, [editingT]:{name, color:st.ed.color}}, edit:null, mEdit:false})); this.flash('Team updated · used for every event from now on'); },
+      mTabs: [['a',T.a.name.replace(/^Team\s+/,''),T.a.color,on('a').length],['b',T.b.name.replace(/^Team\s+/,''),T.b.color,on('b').length],['bench','Bench','#5a7086',P.filter(p=>!s.asg[p.id]).length]].map(([k,l,c,n])=>({label:l, dot:c, n, on:s.mTab===k, w:s.mTab===k?700:500, bg:s.mTab===k?'#1d4869':'transparent', color:s.mTab===k?'#e8f0f7':'#cfdeea', pick:()=>this.setState({mTab:k})})),
+      mIsTeam: s.mTab!=='bench', mIsBench: s.mTab==='bench',
+      mt: {...mt, edit:()=>{ const t = s.mTab; this.setState({edit:t, mEdit:true, ed:{...T[t]}}); }},
+      mEditing: s.mEdit && !!s.edit,
+      mBarBorder: dirty ? 'color-mix(in srgb,#f2ce78 40%,transparent)' : '#274055'
+    };
+  }
+}
+</script>
+</body>
+</html>
