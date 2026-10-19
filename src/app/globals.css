@@ -16294,11 +16294,16 @@ a.dashboard-tile:hover {
   color: var(--color-text-soft);
 }
 
+/* El acento lo elige el club y sólo se comprueba contra el panel: sobre el
+   tinte de aviso puede no llegar a AA (un morado da 3,6:1 en oscuro). El
+   enlace va en el color del texto, en negrita. */
 .contact-reminder-strip .contact-reminder-text a {
   display: inline-flex;
   align-items: center;
   min-height: var(--touch-target-min);
   margin-left: auto;
+  font-weight: 700;
+  color: var(--color-text);
   text-decoration: none;
 }
 
