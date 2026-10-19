@@ -1,8 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
+import { createAttendanceSessionsGateways } from "@/lib/attendance/supabase-attendance-gateways";
 import {
   createClubAttendanceRateGateways,
   createMemberAttendanceGateway,
 } from "@/lib/attendance/supabase-attendance-stats";
+import { createSeasonAttendanceGateway } from "@/lib/attendance/supabase-season-attendance";
+import { createClubAdministrationGateways } from "@/lib/auth/supabase-club-administration-gateways";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { createEventAgendaGateways } from "@/lib/events/supabase-event-agenda-gateways";
 import { readText } from "@/lib/auth/supabase-auth-gateways";
@@ -20,11 +24,13 @@ import type {
   DashboardGateways,
   DashboardRosterGateway,
 } from "./dashboard";
+import type { UnansweredGateway } from "./dashboard-management";
 
 /**
  * Adaptador entre el dashboard (#424) y Supabase. Cada fuente se cablea con
  * el mismo adaptador que usa su sección; lo único nuevo son las lecturas de
- * `members` que ninguna sección hacía.
+ * `members` que ninguna sección hacía y quién no respondió al próximo
+ * evento (#746).
  */
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -106,6 +112,28 @@ export function createDashboardRosterGateway(
   };
 }
 
+const UNANSWERED_FUNCTION = "event_unanswered_count";
+
+/** `event_unanswered_count` (`0076`) sólo la ejecuta `service_role`. */
+export function createUnansweredGateway(
+  serviceClient: SupabaseClient,
+): UnansweredGateway {
+  return {
+    async countUnanswered({ clubId, eventId }) {
+      const { data, error } = await serviceClient.rpc(UNANSWERED_FUNCTION, {
+        p_club_id: clubId,
+        p_event_id: eventId,
+      });
+      if (error) {
+        throw new Error(
+          `No se pudo contar quién no respondió al evento ${eventId}: ${error.message}`,
+        );
+      }
+      return z.number().int().nonnegative().parse(data);
+    },
+  };
+}
+
 /** Una fuente caída no rompe la respuesta, así que el envoltorio de la API
  * nunca la ve: sin esto el fallo no quedaría en ningún sitio (RF-6). */
 const consoleFailureLog: DashboardFailureLog = {
@@ -133,6 +161,10 @@ export function createDashboardGateways(
     roster: createDashboardRosterGateway(serviceClient),
     membership: createMembershipGateway(serviceClient),
     myTeam: createMyTeamGateways(serviceClient),
+    seasonAttendance: createSeasonAttendanceGateway(serviceClient),
+    administration: createClubAdministrationGateways(serviceClient),
+    attendanceSessions: createAttendanceSessionsGateways(serviceClient),
+    unanswered: createUnansweredGateway(serviceClient),
     failures: consoleFailureLog,
   };
 }

@@ -9,12 +9,21 @@ import type {
   MemberAttendance,
 } from "@/lib/attendance/attendance-stats";
 import type { ClubRateWindow } from "@/lib/attendance/club-attendance-rate";
+import type { RecentTraining } from "@/lib/attendance/attendance-sessions";
+import type {
+  AttendedSession,
+  MemberSessionsQuery,
+} from "@/lib/attendance/season-attendance";
+import type { PendingRoleRequestRecord } from "@/lib/auth/club-administration";
 import type { Role } from "@/lib/auth/roles";
+import type { AttendanceStatus } from "@/lib/attendance/attendance-status";
 import {
   type Dashboard,
   type DashboardGateways,
   type DashboardNextUpEvent,
   type DashboardSource,
+  type DashboardTodo,
+  type ManagementColumn,
   type MemberDashboard,
   type RestrictedDashboard,
   readDashboard,
@@ -75,7 +84,11 @@ type FakeSource =
   | "newsSeen"
   | "contact"
   | "eventDetail"
-  | "teams";
+  | "teams"
+  | "season"
+  | "roleRequests"
+  | "sessions"
+  | "unanswered";
 
 type Club = {
   role: Role;
@@ -85,6 +98,9 @@ type Club = {
   /** La fijada vigente, que el feed trae aparte de `posts` (#592). */
   pinned: NewsPinnedFeedRow | null;
   clubRate: ClubAttendanceRate;
+  /** La tasa de una ventana concreta, por su primer día; las demás dan
+   * `clubRate`. */
+  clubRatesBySince: Map<string, ClubAttendanceRate>;
   ownAttendance: MemberAttendance;
   activeMembers: { active: number; joinedRecently: number };
   newsSeenAt: string | null;
@@ -100,12 +116,24 @@ type Club = {
   players: PlayerRecord[];
   /** Las portadas de noticias que existen en el bucket, por id. */
   newsCoverIds: Set<string>;
+  /** `clubs.season_starts_on` (#744). */
+  seasonStartsOn: string | null;
+  /** Todas las sesiones elegibles de quien mira, de la más vieja a la más
+   * nueva. */
+  ownSessions: AttendedSession[];
+  /** Las solicitudes de rol pendientes del club. */
+  pendingRequests: PendingRoleRequestRecord[];
+  /** Los entrenamientos programados del club, con su hoja. */
+  recentTrainings: RecentTraining[];
+  /** Cuántos de la audiencia no respondieron, por evento. */
+  unanswered: Map<string, number>;
   failing: Set<FakeSource>;
 };
 
 let club: Club;
 const clubRateWindows: ClubRateWindow[] = [];
 const joinedSinceAsked: string[] = [];
+const sessionQueries: Omit<MemberSessionsQuery, "clubId">[] = [];
 const reported: { source: DashboardSource; error: unknown }[] = [];
 
 function failIf(source: FakeSource): void {
@@ -282,7 +310,7 @@ function gateways(): DashboardGateways {
         findClubAttendanceRate: async (_clubId, window) => {
           failIf("clubRate");
           clubRateWindows.push(window);
-          return club.clubRate;
+          return club.clubRatesBySince.get(window.since) ?? club.clubRate;
         },
       },
     },
@@ -376,12 +404,64 @@ function gateways(): DashboardGateways {
       },
       positions: { findClubPositions: async () => SEEDED_POSITIONS },
     },
+    seasonAttendance: {
+      findSeasonStartsOn: async () => {
+        failIf("season");
+        return club.seasonStartsOn;
+      },
+      findMemberSessions: async ({ userId, since, until, recent }) => {
+        failIf("season");
+        sessionQueries.push({ userId, since, until, recent });
+        return memberSessionsIn({ since, until, recent });
+      },
+    },
+    administration: {
+      members: { ...members, findClubMembers: async () => [] },
+      requests: {
+        findPendingRequests: async () => {
+          failIf("roleRequests");
+          return club.pendingRequests;
+        },
+      },
+    },
+    attendanceSessions: {
+      members,
+      sessions: {
+        findRecentTrainings: async ({ since, until }) => {
+          failIf("sessions");
+          return club.recentTrainings.filter(
+            ({ startsAt }) => startsAt >= since && startsAt <= until,
+          );
+        },
+      },
+    },
+    unanswered: {
+      countUnanswered: async ({ eventId }) => {
+        failIf("unanswered");
+        return club.unanswered.get(eventId) ?? 0;
+      },
+    },
     failures: {
       report: (source, error) => {
         reported.push({ source, error });
       },
     },
   };
+}
+
+/** Lo que hace `member_attendance_sessions` (`0076`): las de la temporada
+ * hasta hoy y, además, las `recent` más recientes. */
+function memberSessionsIn(
+  query: Omit<MemberSessionsQuery, "clubId" | "userId">,
+): readonly AttendedSession[] {
+  const upToToday = club.ownSessions.filter(
+    (session) => session.startsOn <= query.until,
+  );
+  return upToToday.filter(
+    (session, index) =>
+      session.startsOn >= query.since ||
+      index >= upToToday.length - query.recent,
+  );
 }
 
 function membershipWith(status: MembershipStatus): MembershipRecord {
@@ -401,10 +481,10 @@ function membershipWith(status: MembershipStatus): MembershipRecord {
 }
 
 /** El inicio de un socio al día, que es el de casi todos los tests. */
-async function dashboard(): Promise<MemberDashboard> {
+async function dashboard(now: Date = NOW): Promise<MemberDashboard> {
   const result = await readDashboard(gateways(), {
     callerId: CALLER_ID,
-    now: NOW,
+    now,
   });
   if (result.kind !== "member") {
     throw new Error(`Se esperaba el inicio de socio y llegó ${result.kind}`);
@@ -427,6 +507,7 @@ async function restrictedDashboard(): Promise<RestrictedDashboard> {
 beforeEach(() => {
   clubRateWindows.length = 0;
   joinedSinceAsked.length = 0;
+  sessionQueries.length = 0;
   reported.length = 0;
   club = {
     role: "Player",
@@ -435,6 +516,7 @@ beforeEach(() => {
     posts: [],
     pinned: null,
     clubRate: { kind: "rate", percent: 86, records: 42 },
+    clubRatesBySince: new Map(),
     ownAttendance: { kind: "rate", percent: 75, sessions: 6 },
     activeMembers: { active: 1, joinedRecently: 0 },
     newsSeenAt: null,
@@ -444,6 +526,11 @@ beforeEach(() => {
     splits: new Map(),
     players: [],
     newsCoverIds: new Set(),
+    seasonStartsOn: null,
+    ownSessions: [],
+    pendingRequests: [],
+    recentTrainings: [],
+    unanswered: new Map(),
     failing: new Set(),
   };
 });
@@ -460,9 +547,10 @@ describe("la primera tesela", () => {
         kind: "club_rate",
         rate: { kind: "rate", percent: 86, records: 42 },
       });
-      expect(clubRateWindows).toEqual([
-        { since: "2026-09-01", until: TODAY_IN_CLUB },
-      ]);
+      expect(clubRateWindows).toContainEqual({
+        since: "2026-09-01",
+        until: TODAY_IN_CLUB,
+      });
     },
   );
 
@@ -489,9 +577,14 @@ describe("la primera tesela", () => {
         kind: "own_attendance",
         attendance: { kind: "rate", percent: 75, sessions: 6 },
       });
-      expect(clubRateWindows).toEqual([]);
     },
   );
+
+  it("a un Player no le pide la tasa del club", async () => {
+    await dashboard();
+
+    expect(clubRateWindows).toEqual([]);
+  });
 
   it("dice sin datos a un Player sin sesiones elegibles", async () => {
     club.ownAttendance = { kind: "no_data" };
@@ -901,12 +994,20 @@ describe("fuentes caídas", () => {
 
     await dashboard();
 
-    expect(reported).toEqual([
-      {
-        source: "attendance",
-        error: new Error("la base no contesta: clubRate"),
-      },
-    ]);
+    // La tesela y los números del club leen la tasa a la vez.
+    expect(reported).toHaveLength(2);
+    expect(reported).toEqual(
+      expect.arrayContaining([
+        {
+          source: "attendance",
+          error: new Error("la base no contesta: clubRate"),
+        },
+        {
+          source: "club_attendance",
+          error: new Error("la base no contesta: clubRate"),
+        },
+      ]),
+    );
   });
 
   it("sin agenda, el entrenamiento y los eventos no están disponibles", async () => {
@@ -949,7 +1050,9 @@ describe("vacío", () => {
 
     expect(result).toEqual({
       kind: "member",
+      column: "player",
       viewer: { firstName: "Alba" },
+      me: { attendance: null },
       tiles: {
         attendance: { kind: "own_attendance", attendance: { kind: "no_data" } },
         members: { kind: "members", active: 1, joinedRecently: 0 },
@@ -1056,6 +1159,7 @@ describe("quien no tiene la membresía al día (#453)", () => {
       "contactReminder",
       "kind",
       "latestNews",
+      "me",
       "membership",
       "nextTraining",
       "nextUp",
@@ -1272,6 +1376,8 @@ describe("mi equipo en el próximo evento (#745)", () => {
       coverage: null,
       ratings: null,
       membershipCurrent: true,
+      accountStatus: "active",
+      photoPath: null,
     };
   }
 
@@ -1732,5 +1838,475 @@ describe("bloques nuevos caídos (#745)", () => {
     expect(result.nextUp).toEqual({ kind: "unavailable" });
     expect(result.week).toEqual({ kind: "unavailable" });
     expect(result.latestNews).toEqual({ kind: "news", posts: [] });
+  });
+});
+function session(
+  startsOn: string,
+  status: AttendanceStatus = "present",
+): AttendedSession {
+  return { eventId: uuid(), startsOn, status };
+}
+
+describe("mi asistencia de la temporada (#746)", () => {
+  it("cuenta presente o tarde sobre las sesiones desde el inicio guardado hasta hoy", async () => {
+    club.seasonStartsOn = "2026-08-01";
+    club.ownSessions = [
+      session("2026-07-29", "absent"),
+      session("2026-08-05", "present"),
+      session("2026-08-12", "late"),
+      session("2026-09-02", "absent"),
+    ];
+
+    const result = await dashboard();
+
+    expect(result.me.attendance).toMatchObject({
+      percent: 67,
+      attended: 2,
+      sessions: 3,
+    });
+    expect(sessionQueries).toEqual([
+      {
+        userId: CALLER_ID,
+        since: "2026-08-01",
+        until: TODAY_IN_CLUB,
+        recent: 10,
+      },
+    ]);
+  });
+
+  it.each([
+    ["sin fecha guardada", null],
+    ["con una fecha futura", "2026-11-01"],
+  ])("%s cuenta desde el 1 de enero", async (_label, seasonStartsOn) => {
+    club.seasonStartsOn = seasonStartsOn;
+
+    await dashboard();
+
+    expect(sessionQueries).toMatchObject([{ since: "2026-01-01" }]);
+  });
+
+  it("da las 10 sesiones más recientes, también de antes de la temporada, de la más vieja a la más nueva", async () => {
+    club.seasonStartsOn = "2026-09-01";
+    const older = Array.from({ length: 9 }, (_, index) =>
+      session(`2026-08-${String(index + 10).padStart(2, "0")}`),
+    );
+    const late = session("2026-09-02", "late");
+    const absent = session("2026-09-09", "absent");
+    club.ownSessions = [...older, late, absent];
+
+    const result = await dashboard();
+
+    expect(result.me.attendance).toEqual({
+      percent: 50,
+      attended: 1,
+      sessions: 2,
+      last10: [...older.slice(1), late, absent],
+    });
+  });
+
+  it("con menos de 10 sesiones da las que hay", async () => {
+    const only = session("2026-09-02", "late");
+    club.ownSessions = [only];
+
+    const result = await dashboard();
+
+    expect(result.me.attendance).toEqual({
+      percent: 100,
+      attended: 1,
+      sessions: 1,
+      last10: [only],
+    });
+  });
+
+  it("es null sin sesiones elegibles en la temporada", async () => {
+    club.seasonStartsOn = "2026-09-01";
+    club.ownSessions = [session("2026-08-20")];
+
+    const result = await dashboard();
+
+    expect(result.me.attendance).toBeNull();
+  });
+
+  it("también le llega a un socio restringido", async () => {
+    club.membership = membershipWith("past_due");
+    club.ownSessions = [session("2026-09-02")];
+
+    const result = await restrictedDashboard();
+
+    expect(result.me.attendance).toMatchObject({ percent: 100, sessions: 1 });
+  });
+
+  it("si falla, llega no disponible con el fallo en el log y el resto se sirve", async () => {
+    club.failing.add("season");
+
+    const result = await dashboard();
+
+    expect(result.me.attendance).toEqual({ kind: "unavailable" });
+    expect(result.membership).toMatchObject({ status: "active" });
+    expect(reported.map(({ source }) => source)).toEqual(["season_attendance"]);
+  });
+});
+
+/** El inicio de quien ve la columna de gestión (D3). */
+async function managementDashboard(
+  now: Date = NOW,
+): Promise<MemberDashboard & ManagementColumn> {
+  const result = await dashboard(now);
+  if (result.column !== "management") {
+    throw new Error(
+      `Se esperaba la columna de gestión y llegó ${result.column}`,
+    );
+  }
+  return result;
+}
+
+async function todos(): Promise<readonly DashboardTodo[]> {
+  const result = await managementDashboard();
+  if (!Array.isArray(result.todos)) {
+    throw new Error("Se esperaban los pendientes y no llegaron");
+  }
+  return result.todos;
+}
+
+function pendingRequest(
+  requesterStatus: PendingRoleRequestRecord["requesterStatus"] = "active",
+): PendingRoleRequestRecord {
+  return {
+    id: uuid(),
+    userId: uuid(),
+    fullName: "Pablo Player",
+    currentRole: "Player",
+    requestedRole: "Coach",
+    justification: null,
+    createdAt: "2026-09-20T00:00:00.000Z",
+    requesterStatus,
+  };
+}
+
+function training(
+  startsAt: string,
+  statuses: readonly AttendanceStatus[] = [],
+  title = "Entrenamiento",
+): RecentTraining {
+  return { eventId: uuid(), title, startsAt: new Date(startsAt), statuses };
+}
+
+function teamSplit(publishedAt: Date | null): StoredTeamSplit {
+  return {
+    teams: DEFAULT_TEAM_LABELS,
+    mode: "auto",
+    publishedAt,
+    assignments: [],
+  };
+}
+
+/** El próximo evento de los tests de pendientes. */
+function upcomingScrimmage(): EventRow {
+  const row = event({
+    startsOn: "2026-10-01",
+    startTime: "19:00",
+    eventType: "competition",
+    title: "Partido amistoso",
+  });
+  club.events = [row];
+  return row;
+}
+
+describe("la columna de cada rol (#746, D3)", () => {
+  it("un Player no recibe pendientes ni números del club", async () => {
+    const result = await dashboard();
+
+    expect(result.column).toBe("player");
+    expect(result).not.toHaveProperty("todos");
+    expect(result).not.toHaveProperty("club");
+  });
+
+  it.each<Role>(["Admin", "Coach", "Committee"])(
+    "un %s restringido no recibe pendientes ni números del club",
+    async (role) => {
+      club.role = role;
+      club.membership = membershipWith("cancelled");
+
+      const result = await restrictedDashboard();
+
+      expect(result).not.toHaveProperty("todos");
+      expect(result).not.toHaveProperty("club");
+    },
+  );
+
+  it.each<Role>(["Admin", "Coach", "Committee"])(
+    "un %s sin nada pendiente recibe la lista vacía y los números",
+    async (role) => {
+      club.role = role;
+
+      const result = await managementDashboard();
+
+      expect(result.todos).toEqual([]);
+      expect(result.club.members).toEqual({ active: 1, joinedThisMonth: 0 });
+    },
+  );
+});
+
+describe("los pendientes (#746, D9 y D10)", () => {
+  it("a un Admin le cuenta las solicitudes de rol pendientes, sin las de socios de baja", async () => {
+    club.role = "Admin";
+    club.pendingRequests = [
+      pendingRequest(),
+      pendingRequest(),
+      pendingRequest("inactive"),
+    ];
+
+    await expect(todos()).resolves.toEqual([
+      { kind: "role_requests", count: 2 },
+    ]);
+  });
+
+  it.each<Role>(["Coach", "Committee"])(
+    "a un %s nunca le da las solicitudes de rol",
+    async (role) => {
+      club.role = role;
+      club.pendingRequests = [pendingRequest()];
+
+      await expect(todos()).resolves.toEqual([]);
+    },
+  );
+
+  it.each<Role>(["Admin", "Coach"])(
+    "a un %s le da el entrenamiento sin hoja más reciente de los últimos 30 días, uno solo",
+    async (role) => {
+      club.role = role;
+      const recent = training("2026-09-23T09:00:00.000Z", [], "Miércoles");
+      club.recentTrainings = [
+        training("2026-09-16T09:00:00.000Z"),
+        recent,
+        training("2026-09-28T09:00:00.000Z", ["present"]),
+      ];
+
+      await expect(todos()).resolves.toEqual([
+        {
+          kind: "attendance_missing",
+          eventId: recent.eventId,
+          title: "Miércoles",
+          startsOn: "2026-09-23",
+        },
+      ]);
+    },
+  );
+
+  it("da el día de Melbourne del entrenamiento sin hoja", async () => {
+    club.role = "Coach";
+    club.recentTrainings = [training("2026-09-22T21:30:00.000Z")];
+
+    await expect(todos()).resolves.toMatchObject([
+      { kind: "attendance_missing", startsOn: "2026-09-23" },
+    ]);
+  });
+
+  it("no da asistencia pendiente con la hoja guardada, de hace más de 30 días ni de lo que no empezó", async () => {
+    club.role = "Admin";
+    club.recentTrainings = [
+      training("2026-08-20T09:00:00.000Z"),
+      training("2026-09-28T09:00:00.000Z", ["late"]),
+      training("2026-09-30T09:00:00.000Z"),
+    ];
+
+    await expect(todos()).resolves.toEqual([]);
+  });
+
+  it("a un Committee nunca le da la asistencia pendiente", async () => {
+    club.role = "Committee";
+    club.recentTrainings = [training("2026-09-23T09:00:00.000Z")];
+
+    await expect(todos()).resolves.toEqual([]);
+  });
+
+  it.each<Role>(["Admin", "Coach"])(
+    "a un %s le da el reparto sin publicar del próximo evento",
+    async (role) => {
+      club.role = role;
+      const row = upcomingScrimmage();
+      club.splits.set(row.id, teamSplit(null));
+
+      await expect(todos()).resolves.toEqual([
+        {
+          kind: "teams_unpublished",
+          eventId: row.id,
+          title: "Partido amistoso",
+        },
+      ]);
+    },
+  );
+
+  it("no da reparto pendiente con el reparto publicado", async () => {
+    club.role = "Coach";
+    const row = upcomingScrimmage();
+    club.splits.set(row.id, teamSplit(new Date("2026-09-29T00:00:00.000Z")));
+
+    await expect(todos()).resolves.toEqual([]);
+  });
+
+  it("a un Committee nunca le da el reparto sin publicar", async () => {
+    club.role = "Committee";
+    const row = upcomingScrimmage();
+    club.splits.set(row.id, teamSplit(null));
+
+    await expect(todos()).resolves.toEqual([]);
+  });
+
+  it.each<Role>(["Admin", "Coach", "Committee"])(
+    "a un %s le cuenta quién de la audiencia del próximo evento no ha respondido",
+    async (role) => {
+      club.role = role;
+      const row = upcomingScrimmage();
+      club.unanswered.set(row.id, 4);
+
+      await expect(todos()).resolves.toEqual([
+        {
+          kind: "no_reply",
+          eventId: row.id,
+          title: "Partido amistoso",
+          count: 4,
+        },
+      ]);
+    },
+  );
+
+  it("no lo da con todos respondidos", async () => {
+    club.role = "Committee";
+    upcomingScrimmage();
+
+    await expect(todos()).resolves.toEqual([]);
+  });
+
+  it("los da en el orden de la columna", async () => {
+    club.role = "Admin";
+    club.pendingRequests = [pendingRequest()];
+    club.recentTrainings = [training("2026-09-23T09:00:00.000Z")];
+    const row = upcomingScrimmage();
+    club.splits.set(row.id, teamSplit(null));
+    club.unanswered.set(row.id, 1);
+
+    const result = await todos();
+
+    expect(result.map(({ kind }) => kind)).toEqual([
+      "role_requests",
+      "attendance_missing",
+      "teams_unpublished",
+      "no_reply",
+    ]);
+  });
+
+  it.each<[FakeSource, Role]>([
+    ["roleRequests", "Admin"],
+    ["sessions", "Coach"],
+    ["unanswered", "Committee"],
+    ["teams", "Admin"],
+  ])(
+    "sin %s, los pendientes de un %s no están disponibles y el resto se sirve",
+    async (source, role) => {
+      club.role = role;
+      club.failing.add(source);
+      upcomingScrimmage();
+
+      const result = await managementDashboard();
+
+      expect(result.todos).toEqual({ kind: "unavailable" });
+      expect(result.club.members).toMatchObject({ active: 1 });
+      expect(result.week).toMatchObject({ kind: "week" });
+    },
+  );
+});
+
+describe("los números del club (#746, D11)", () => {
+  it.each<Role>(["Admin", "Coach", "Committee"])(
+    "a un %s le compara la asistencia de los últimos 30 días con los 30 anteriores",
+    async (role) => {
+      club.role = role;
+      club.clubRatesBySince.set("2026-09-01", {
+        kind: "rate",
+        percent: 82,
+        records: 40,
+      });
+      club.clubRatesBySince.set("2026-08-02", {
+        kind: "rate",
+        percent: 77,
+        records: 38,
+      });
+
+      const result = await managementDashboard();
+
+      expect(result.club.attendance).toEqual({
+        percent: 82,
+        previousPercent: 77,
+      });
+      expect(clubRateWindows).toContainEqual({
+        since: "2026-08-02",
+        until: "2026-08-31",
+      });
+    },
+  );
+
+  it("deja en null el periodo sin datos", async () => {
+    club.role = "Coach";
+    club.clubRatesBySince.set("2026-08-02", { kind: "no_data" });
+
+    const result = await managementDashboard();
+
+    expect(result.club.attendance).toEqual({
+      percent: 86,
+      previousPercent: null,
+    });
+  });
+
+  it("cuenta los socios activos y las altas desde el día 1 del mes del club", async () => {
+    club.role = "Committee";
+    club.activeMembers = { active: 31, joinedRecently: 2 };
+
+    const result = await managementDashboard(
+      new Date("2026-10-15T08:00:00.000Z"),
+    );
+
+    expect(result.club.members).toEqual({ active: 31, joinedThisMonth: 2 });
+    expect(joinedSinceAsked).toContain("2026-10-01");
+  });
+
+  it("cuenta las noticias sin leer y los avisos entre ellas", async () => {
+    club.role = "Admin";
+    club.newsSeenAt = "2026-09-20T00:00:00.000Z";
+    club.posts = [
+      post({ publishedAt: "2026-09-25T00:00:00.000Z" }),
+      post({
+        publishedAt: "2026-09-26T00:00:00.000Z",
+        category: "announcement",
+      }),
+      post({ publishedAt: "2026-09-10T00:00:00.000Z" }),
+    ];
+
+    const result = await managementDashboard();
+
+    expect(result.club.unreadNews).toEqual({ count: 2, announcements: 1 });
+  });
+
+  it("sin la tasa del club, sólo cae su asistencia", async () => {
+    club.role = "Committee";
+    club.failing.add("clubRate");
+
+    const result = await managementDashboard();
+
+    expect(result.club.attendance).toEqual({ kind: "unavailable" });
+    expect(result.club.members).toMatchObject({ active: 1 });
+    expect(result.club.unreadNews).toMatchObject({ count: 0 });
+    expect(reported.map(({ source }) => source)).toEqual(["club_attendance"]);
+  });
+
+  it("sin la fila de socios, caen los socios y las noticias sin leer", async () => {
+    club.role = "Admin";
+    club.failing.add("roster");
+
+    const result = await managementDashboard();
+
+    expect(result.club.members).toEqual({ kind: "unavailable" });
+    expect(result.club.unreadNews).toEqual({ kind: "unavailable" });
+    expect(result.club.attendance).toMatchObject({ percent: 86 });
   });
 });

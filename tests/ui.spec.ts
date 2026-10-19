@@ -9494,7 +9494,11 @@ const STUBBED_CLUB_SETTINGS = {
   initials: "AD",
   accentColor: "#1c6ea4",
   logoUrl: null,
+  seasonStartsOn: null,
 } as const;
+
+/** Un inicio de temporada elegido en General (#744). */
+const CHOSEN_SEASON_START = "2026-03-02";
 
 /** Guardar cambios, en la barra de cambios sin guardar (#719). */
 const ENGLISH_SAVE_SETTINGS = "Save changes";
@@ -9594,6 +9598,16 @@ function chooseSuggestedAccent(saveLabel: string) {
     const swatch = page.getByRole("radio", { name: CHOSEN_SUGGESTED_ACCENT });
     await swatch.check();
     await expect(clubAccentField(page)).toHaveValue(CHOSEN_SUGGESTED_ACCENT);
+    await expect(page.getByRole("button", { name: saveLabel })).toBeEnabled();
+  };
+}
+
+/** Elige el inicio de la temporada (#744): sale la barra para guardarlo. */
+function chooseSeasonStart(saveLabel: string) {
+  return async (page: Page): Promise<void> => {
+    const field = page.getByLabel(/^(Season start|Inicio de temporada)$/);
+    await field.fill(CHOSEN_SEASON_START);
+    await expect(field).toHaveValue(CHOSEN_SEASON_START);
     await expect(page.getByRole("button", { name: saveLabel })).toBeEnabled();
   };
 }
@@ -10082,6 +10096,18 @@ const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
     beforeCapture: fitViewportToPage,
   },
   { name: "club-general-sin-logo" },
+  // #744: General con un inicio de temporada elegido, en los dos idiomas.
+  {
+    name: "club-general-temporada",
+    prepare: chooseSeasonStart(ENGLISH_SAVE_SETTINGS),
+    beforeCapture: fitViewportToPage,
+  },
+  {
+    name: "club-general-temporada-es",
+    beforeVisit: chooseSpanish,
+    prepare: chooseSeasonStart(SPANISH_SAVE_SETTINGS),
+    beforeCapture: fitViewportToPage,
+  },
   {
     name: "club-general-color-rechazado",
     prepare: typeUnreadableAccent(
@@ -11550,12 +11576,18 @@ test.describe("un Admin frente a la configuración de verdad", () => {
     const read = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
     expect(read.status()).toBe(200);
     const { data } = (await read.json()) as {
-      data: { name: string; initials: string | null; accentColor: string };
+      data: {
+        name: string;
+        initials: string | null;
+        accentColor: string;
+        seasonStartsOn: string | null;
+      };
     };
     const identity = {
       name: data.name,
       initials: data.initials,
       accentColor: data.accentColor,
+      seasonStartsOn: data.seasonStartsOn,
     };
 
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
@@ -11619,13 +11651,21 @@ test.describe("un Admin frente a la configuración de verdad", () => {
   });
 
   test("el endpoint rechaza un nombre vacío con 400", async ({ request }) => {
-    const empty = { name: "", initials: null, accentColor: "#1c6ea4" };
+    const empty = {
+      name: "",
+      initials: null,
+      accentColor: "#1c6ea4",
+      seasonStartsOn: null,
+    };
 
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
       data: { ...empty, expected: empty },
     });
 
     expect(write.status()).toBe(400);
+    await expect(write.json()).resolves.toMatchObject({
+      error: { code: "validation_error", reason: "name_required" },
+    });
   });
 
   // #294 (RF-3): un color que no es hexadecimal no llega a la base.
@@ -11634,12 +11674,18 @@ test.describe("un Admin frente a la configuración de verdad", () => {
   }) => {
     const before = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
     const { data } = (await before.json()) as {
-      data: { name: string; initials: string | null; accentColor: string };
+      data: {
+        name: string;
+        initials: string | null;
+        accentColor: string;
+        seasonStartsOn: string | null;
+      };
     };
     const expected = {
       name: data.name,
       initials: data.initials,
       accentColor: data.accentColor,
+      seasonStartsOn: data.seasonStartsOn,
     };
 
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
@@ -11682,6 +11728,7 @@ test.describe("un Player frente a la configuración del club", () => {
       name: "Otro club",
       initials: null,
       accentColor: "#7b3fa0",
+      seasonStartsOn: null,
     };
 
     const read = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
@@ -20831,7 +20878,16 @@ function teamsPlayer(
     coverage: position,
     rating: rating ?? 5,
     isUnrated: rating === null,
+    photoUrl: null,
   };
+}
+
+/** El mismo jugador con la foto fija (#757): unos con foto y otros con
+ * iniciales, como en el mockup. */
+function withTeamsPhoto(
+  player: ReturnType<typeof teamsPlayer>,
+): ReturnType<typeof teamsPlayer> {
+  return { ...player, photoUrl: STUBBED_PHOTO_URL };
 }
 
 const LONG_NAMED_PLAYER =
@@ -20840,18 +20896,20 @@ const LONG_NAMED_PLAYER =
 /** Los doce del mockup, con Ethan sin evaluar, más un nombre de tres veces
  * lo normal para el caso de contenido largo. */
 const TEAMS_PLAYERS = {
-  mateo: teamsPlayer(1, "Mateo Restrepo", "forward", 8.6),
+  mateo: withTeamsPhoto(teamsPlayer(1, "Mateo Restrepo", "forward", 8.6)),
   daniela: teamsPlayer(2, "Daniela Vargas", "forward", 8),
-  valentina: teamsPlayer(3, "Valentina Gómez", "goalkeeper", 7.4),
+  valentina: withTeamsPhoto(
+    teamsPlayer(3, "Valentina Gómez", "goalkeeper", 7.4),
+  ),
   isabella: teamsPlayer(4, "Isabella Muñoz", "defender", 7.2),
-  jack: teamsPlayer(5, "Jack Thompson", "defender", 6.8),
+  jack: withTeamsPhoto(teamsPlayer(5, "Jack Thompson", "defender", 6.8)),
   ethan: teamsPlayer(6, "Ethan Brown", "forward", null),
-  camila: teamsPlayer(7, "Camila Ortiz", "forward", 8.3),
+  camila: withTeamsPhoto(teamsPlayer(7, "Camila Ortiz", "forward", 8.3)),
   liam: teamsPlayer(8, "Liam O'Connor", "defender", 8.1),
-  santiago: teamsPlayer(9, "Santiago Herrera", "defender", 7.8),
+  santiago: withTeamsPhoto(teamsPlayer(9, "Santiago Herrera", "defender", 7.8)),
   chloe: teamsPlayer(10, "Chloe Nguyen", "forward", 7),
   noah: teamsPlayer(11, "Noah Williams", "goalkeeper", 6.5),
-  ruby: teamsPlayer(12, "Ruby Tan", "goalkeeper", 5.9),
+  ruby: withTeamsPhoto(teamsPlayer(12, "Ruby Tan", "goalkeeper", 5.9)),
   long: teamsPlayer(13, LONG_NAMED_PLAYER, "forward", 6.1),
 } as const;
 
@@ -20945,6 +21003,7 @@ type TeamsReads = {
  * responden bien. Devuelve las escrituras que llegaron. */
 async function stubTeams(page: Page, reads: TeamsReads): Promise<TeamsWrite[]> {
   const writes: TeamsWrite[] = [];
+  await stubDirectoryPhoto(page);
   await page.route(
     (url) => url.pathname === TEAMS_ENDPOINT,
     (route) => route.fulfill(jsonBody({ events: reads.events })),
@@ -21730,7 +21789,15 @@ const DASHBOARD_LATEST_NEWS = [
 
 const ADMIN_DASHBOARD = {
   kind: "member",
+  column: "management",
+  todos: [],
+  club: {
+    attendance: { percent: 86, previousPercent: 80 },
+    members: { active: 48, joinedThisMonth: 3 },
+    unreadNews: { count: 3, announcements: 1 },
+  },
   viewer: { firstName: "Liam" },
+  me: { attendance: null },
   tiles: {
     attendance: {
       kind: "club_rate",
@@ -21750,6 +21817,7 @@ const ADMIN_DASHBOARD = {
 
 const PLAYER_DASHBOARD = {
   ...ADMIN_DASHBOARD,
+  column: "player",
   tiles: {
     ...ADMIN_DASHBOARD.tiles,
     attendance: {
@@ -21780,7 +21848,9 @@ const NOTHING_NEXT_DASHBOARD = {
 // Un club recién creado: lo que el PRD describe en sus casos borde.
 const EMPTY_DASHBOARD = {
   kind: "member",
+  column: "player",
   viewer: { firstName: "Liam" },
+  me: { attendance: null },
   tiles: {
     attendance: { kind: "club_rate", rate: { kind: "no_data" } },
     members: { kind: "members", active: 1, joinedRecently: 0 },
@@ -21801,6 +21871,7 @@ const EMPTY_DASHBOARD = {
 const RESTRICTED_DASHBOARD = {
   kind: "restricted",
   viewer: { firstName: "Liam" },
+  me: { attendance: null },
   block: "cancelled",
   nextTraining: {
     kind: "training",

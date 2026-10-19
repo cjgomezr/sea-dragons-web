@@ -31,16 +31,19 @@ const STORED: ClubSettings = {
   initials: "HH",
   accentColor: "#1c6ea4",
   logoUrl: null,
+  seasonStartsOn: null,
 };
 
 const VALID_BODY = {
   name: "Bay Barracudas",
   initials: "BB",
   accentColor: STORED.accentColor,
+  seasonStartsOn: STORED.seasonStartsOn,
   expected: {
     name: STORED.name,
     initials: STORED.initials,
     accentColor: STORED.accentColor,
+    seasonStartsOn: STORED.seasonStartsOn,
   },
 } as const;
 
@@ -333,6 +336,102 @@ describe("endpoint de la configuración: PATCH", () => {
     );
 
     expect(response.status).toBe(405);
+  });
+});
+
+// #744 (RF-1 y D1 del PRD de E27)
+describe("endpoint de la configuración: inicio de temporada", () => {
+  const SEASON_BODY = {
+    ...VALID_BODY,
+    name: STORED.name,
+    initials: STORED.initials,
+    seasonStartsOn: "2026-03-02",
+  } as const;
+
+  it("guarda la fecha elegida y la devuelve", async () => {
+    const response = await patchSettings(SEASON_BODY);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: { ...STORED, seasonStartsOn: "2026-03-02" },
+    });
+    expect(writes).toEqual([
+      `identity ${STORED.name}`,
+      "audit club.settings_changed",
+    ]);
+  });
+
+  it("vacía la fecha con null", async () => {
+    const response = await patchSettings({
+      ...SEASON_BODY,
+      seasonStartsOn: null,
+      expected: { ...SEASON_BODY.expected, seasonStartsOn: "2026-03-02" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { seasonStartsOn: null },
+    });
+  });
+
+  it.each([
+    ["que no existe en el calendario", "2026-02-30"],
+    ["que no es una fecha", "el lunes"],
+  ])(
+    "responde 400 a una fecha %s, con el campo en el motivo",
+    async (_case, seasonStartsOn) => {
+      const response = await patchSettings({ ...SEASON_BODY, seasonStartsOn });
+
+      expect(response.status).toBe(400);
+      await expect(errorOf(response)).resolves.toEqual(
+        expect.objectContaining({
+          code: "validation_error",
+          reason: "season_starts_on_invalid",
+        }),
+      );
+      expect(writes).toEqual([]);
+    },
+  );
+
+  it.each([
+    ["con la fecha como número", { ...SEASON_BODY, seasonStartsOn: 20260302 }],
+    ["sin la fecha", { ...SEASON_BODY, seasonStartsOn: undefined }],
+    [
+      "sin la fecha esperada",
+      {
+        ...SEASON_BODY,
+        expected: { ...SEASON_BODY.expected, seasonStartsOn: undefined },
+      },
+    ],
+  ])("responde 400 a un cuerpo %s", async (_case, body) => {
+    const response = await patchSettings(body);
+
+    expect(response.status).toBe(400);
+    expect(writes).toEqual([]);
+  });
+
+  it.each(["Coach", "Committee"] as const)(
+    "responde 403 a un %s sin escribir nada",
+    async (role) => {
+      givenSession({ kind: "active", role, membershipCurrent: true });
+
+      const response = await patchSettings(SEASON_BODY);
+
+      expect(response.status).toBe(403);
+      expect(writes).toEqual([]);
+    },
+  );
+
+  it("responde 409 si otro Admin guardó entretanto", async () => {
+    identityUpdate = { kind: "changed_meanwhile" };
+
+    const response = await patchSettings(SEASON_BODY);
+
+    expect(response.status).toBe(409);
+    await expect(errorOf(response)).resolves.toMatchObject({
+      code: "conflict",
+      reason: "club_settings_changed",
+    });
   });
 });
 

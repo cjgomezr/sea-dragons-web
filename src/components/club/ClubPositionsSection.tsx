@@ -259,8 +259,13 @@ export function ClubPositionsSection({
 
   // El foco vuelve a su sitio cuando la lista nueva ya está pintada: mientras
   // esperaba, el control estaba desactivado, o su fila cambió de sitio, y lo
-  // había perdido.
+  // había perdido. Espera también a que no quede nada en vuelo: un botón
+  // todavía desactivado no acepta el foco, y bajo carga la lista nueva puede
+  // pintarse antes de que se reactive.
   useEffect(() => {
+    if (pending !== null) {
+      return;
+    }
     const key = focusAfterUpdate.current;
     focusAfterUpdate.current = null;
     if (key !== null) {
@@ -268,7 +273,7 @@ export function ClubPositionsSection({
         ?.querySelector<HTMLElement>(`[${FOCUS_KEY_ATTRIBUTE}="${key}"]`)
         ?.focus();
     }
-  }, [state, editingId, sheetId, listFailure]);
+  }, [state, editingId, sheetId, listFailure, pending]);
 
   const nameOf = (position: ClubPosition): string =>
     positionName(position.names, locale);
@@ -284,8 +289,14 @@ export function ClubPositionsSection({
    * fallo; `null` es que había otra acción en vuelo. */
   async function send(
     action: PositionsAction,
+    focusKey?: string | null,
   ): Promise<ManagedPositionsRead | null> {
     const result = await run(action.key, action.send);
+    // Antes de pintar la respuesta: si el foco se apunta después, el efecto
+    // que lo devuelve puede correr con la lista nueva y no encontrarlo.
+    if (result !== null && focusKey !== undefined) {
+      focusAfterUpdate.current = focusKey;
+    }
     if (result?.kind === "loaded") {
       const done = action.describeDone(result.positions);
       setListFailure(null);
@@ -305,11 +316,10 @@ export function ClubPositionsSection({
     action: PositionsAction,
     focusKey: string | null = null,
   ): Promise<void> {
-    const result = await send(action);
+    const result = await send(action, focusKey);
     if (result === null) {
       return;
     }
-    focusAfterUpdate.current = focusKey;
     if (result.kind === "failed") {
       setListFailure({
         failure: result,

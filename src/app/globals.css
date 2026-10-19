@@ -15778,6 +15778,13 @@ a.agenda-take-attendance {
   object-fit: cover;
 }
 
+/* El color del anillo llega en línea: es el del equipo (#757). */
+.team-avatar-ringed {
+  width: 34px;
+  height: 34px;
+  border-width: 2px;
+}
+
 .team-player-text {
   display: flex;
   flex-direction: column;

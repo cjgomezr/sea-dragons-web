@@ -13,6 +13,7 @@ const STORED_IDENTITY = {
   name: "Harbour Hammerheads",
   initials: "HH",
   accentColor: "#1c6ea4",
+  seasonStartsOn: null,
 } as const;
 
 describe("la identidad del club sin cambios", () => {
@@ -53,6 +54,13 @@ describe("la identidad del club sin cambios", () => {
 
   it("cuenta un acento distinto como cambio", () => {
     const draft = { ...STORED_IDENTITY, accentColor: "#7b3fa0" };
+
+    expect(isSameClubIdentity(draft, STORED_IDENTITY)).toBe(false);
+  });
+
+  // #744
+  it("cuenta un inicio de temporada nuevo como cambio", () => {
+    const draft = { ...STORED_IDENTITY, seasonStartsOn: "2026-03-02" };
 
     expect(isSameClubIdentity(draft, STORED_IDENTITY)).toBe(false);
   });

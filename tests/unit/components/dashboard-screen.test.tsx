@@ -152,7 +152,15 @@ const KELP_TEAM: NextUpTeam = {
 
 const ADMIN_DASHBOARD: MemberDashboard = {
   kind: "member",
+  column: "management",
+  todos: [],
+  club: {
+    attendance: { percent: 86, previousPercent: 80 },
+    members: { active: 48, joinedThisMonth: 3 },
+    unreadNews: { count: 3, announcements: 1 },
+  },
   viewer: { firstName: "Alba" },
+  me: { attendance: null },
   tiles: {
     attendance: {
       kind: "club_rate",
@@ -172,6 +180,7 @@ const ADMIN_DASHBOARD: MemberDashboard = {
 
 const PLAYER_DASHBOARD: MemberDashboard = {
   ...ADMIN_DASHBOARD,
+  column: "player",
   tiles: {
     ...ADMIN_DASHBOARD.tiles,
     attendance: {
@@ -184,7 +193,9 @@ const PLAYER_DASHBOARD: MemberDashboard = {
 
 const EMPTY_DASHBOARD: MemberDashboard = {
   kind: "member",
+  column: "player",
   viewer: { firstName: "Alba" },
+  me: { attendance: null },
   tiles: {
     attendance: { kind: "club_rate", rate: { kind: "no_data" } },
     members: { kind: "members", active: 1, joinedRecently: 0 },
@@ -894,6 +905,7 @@ describe("errores", () => {
 const RESTRICTED_DASHBOARD: RestrictedDashboard = {
   kind: "restricted",
   viewer: { firstName: "Alba" },
+  me: { attendance: null },
   block: "pending",
   nextTraining: { kind: "training", training: POOL_TRAINING },
   contactReminder: { kind: "reminder", reminder: "none" },

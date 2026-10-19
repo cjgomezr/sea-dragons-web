@@ -1824,6 +1824,10 @@ export const englishMessages = {
   "clubSettings.initials.optional": "optional",
   "clubSettings.initials.hint":
     "Shown when there's no logo. Up to {max} letters.",
+  "clubSettings.season.title": "Season",
+  "clubSettings.season.label": "Season start",
+  "clubSettings.season.hint":
+    "Home attendance counts from here. Empty: from 1 January.",
   "clubSettings.brand.title": "Brand",
   "clubSettings.accent.label": "Accent colour",
   "clubSettings.accent.suggested": "Suggested colours",
@@ -1866,6 +1870,7 @@ export const englishMessages = {
   "clubSettings.issue.accentInvalid": "Use a code like #33A1E0.",
   "clubSettings.issue.accentNoReadableText":
     "No text colour reaches the minimum contrast (4.5:1) on this accent. Pick a lighter or darker one.",
+  "clubSettings.issue.seasonStartInvalid": "Pick a real date.",
   "clubSettings.error.changed":
     "Another Admin changed the settings while you were editing. Load the latest settings and make your change again.",
   "clubSettings.error.signInRequired":

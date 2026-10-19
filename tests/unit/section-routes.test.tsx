@@ -153,7 +153,9 @@ describe("panel principal", () => {
             JSON.stringify({
               data: {
                 kind: "member",
+                column: "player",
                 viewer: { firstName: "Alba" },
+                me: { attendance: null },
                 tiles: {
                   attendance: { kind: "unavailable" },
                   members: { kind: "unavailable" },

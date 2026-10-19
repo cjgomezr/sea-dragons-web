@@ -38,6 +38,7 @@ const SETTINGS: ClubSettings = {
   initials: CLUB.initials,
   accentColor: "#33a1e0",
   logoUrl: "https://logos.example.test/club.png",
+  seasonStartsOn: null,
 };
 
 const POSITION_NAMES = [

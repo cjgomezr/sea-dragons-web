@@ -31,6 +31,7 @@ const settingsSchema = z.object({
   initials: z.string().nullable(),
   accentColor: z.string(),
   logoUrl: z.url({ protocol: /^https?$/ }).nullable(),
+  seasonStartsOn: z.string().nullable(),
 });
 
 const responseSchema = z.object({ data: settingsSchema });
@@ -104,6 +105,8 @@ export function describeClubSettingsIssue(
       return translate("clubSettings.issue.accentInvalid");
     case "accent_color_no_readable_text":
       return translate("clubSettings.issue.accentNoReadableText");
+    case "season_starts_on_invalid":
+      return translate("clubSettings.issue.seasonStartInvalid");
   }
 }
 

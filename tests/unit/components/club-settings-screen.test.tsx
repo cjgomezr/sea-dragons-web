@@ -33,6 +33,7 @@ const STORED: ClubSettings = {
   initials: "HH",
   accentColor: "#1c6ea4",
   logoUrl: null,
+  seasonStartsOn: null,
 };
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
@@ -262,10 +263,13 @@ describe("pantalla de configuración: guardar", () => {
         initials: "HH",
         // #294: sin tocarlo, el acento viaja como está guardado.
         accentColor: "#1c6ea4",
+        // #744: la fecha también viaja como está guardada, aquí sin ninguna.
+        seasonStartsOn: null,
         expected: {
           name: "Harbour Hammerheads",
           initials: "HH",
           accentColor: "#1c6ea4",
+          seasonStartsOn: null,
         },
       },
     ]);

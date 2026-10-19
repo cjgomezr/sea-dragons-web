@@ -30,6 +30,7 @@ const STORED: ClubSettings = {
   initials: null,
   accentColor: "#1c6ea4",
   logoUrl: null,
+  seasonStartsOn: null,
 };
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
@@ -208,6 +209,105 @@ describe("General: identidad", () => {
     expect(
       screen.getByRole("figure", { name: "Vista previa" }),
     ).toBeInTheDocument();
+  });
+});
+
+// #744 (RF-1 y D1 del PRD de E27)
+describe("General: inicio de temporada", () => {
+  const SEASON_HINT =
+    "Home attendance counts from here. Empty: from 1 January.";
+
+  function seasonField(): HTMLElement {
+    return screen.getByLabelText("Season start");
+  }
+
+  async function chooseSeasonStart(date: string): Promise<void> {
+    await userEvent.clear(seasonField());
+    if (date !== "") {
+      await userEvent.type(seasonField(), date);
+    }
+  }
+
+  it("es un campo de fecha vacío con su ayuda", async () => {
+    stubApi();
+    await renderScreen();
+
+    expect(screen.getByRole("heading", { name: "Season" })).toBeInTheDocument();
+    expect(seasonField()).toHaveAttribute("type", "date");
+    expect(seasonField()).toHaveValue("");
+    expect(seasonField()).toHaveAccessibleDescription(SEASON_HINT);
+  });
+
+  it("enseña la fecha guardada", async () => {
+    stubApi({ ...STORED, seasonStartsOn: "2026-03-02" });
+    await renderScreen();
+
+    expect(seasonField()).toHaveValue("2026-03-02");
+  });
+
+  it("elegir una fecha saca la barra sin guardar nada", async () => {
+    stubApi();
+    await renderScreen();
+
+    await chooseSeasonStart("2026-03-02");
+
+    expect(unsavedBar()).toBeInTheDocument();
+    expect(patches).toEqual([]);
+  });
+
+  it("guarda la fecha con la barra, con lo que había en expected", async () => {
+    stubApi();
+    await renderScreen();
+    await chooseSeasonStart("2026-03-02");
+
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Saved");
+    expect(patches).toMatchObject([
+      {
+        seasonStartsOn: "2026-03-02",
+        expected: { seasonStartsOn: null },
+      },
+    ]);
+    expect(unsavedBar()).toBeNull();
+  });
+
+  it("vaciar el campo guarda null", async () => {
+    stubApi({ ...STORED, seasonStartsOn: "2026-03-02" });
+    await renderScreen();
+    await chooseSeasonStart("");
+
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await screen.findByRole("status");
+    expect(patches).toMatchObject([
+      { seasonStartsOn: null, expected: { seasonStartsOn: "2026-03-02" } },
+    ]);
+  });
+
+  it("descartar vuelve a la fecha guardada", async () => {
+    stubApi({ ...STORED, seasonStartsOn: "2026-03-02" });
+    await renderScreen();
+    await chooseSeasonStart("2026-04-01");
+
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
+
+    expect(seasonField()).toHaveValue("2026-03-02");
+    expect(unsavedBar()).toBeNull();
+  });
+
+  it("habla en español", async () => {
+    stubApi();
+    await renderScreen("es");
+
+    expect(
+      screen.getByRole("heading", { name: "Temporada" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Inicio de temporada"),
+    ).toHaveAccessibleDescription(
+      "La asistencia del inicio cuenta desde aquí. Vacío: desde el 1 de enero.",
+    );
   });
 });
 

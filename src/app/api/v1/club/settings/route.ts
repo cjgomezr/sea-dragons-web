@@ -24,7 +24,8 @@ import { createSupabaseClubSettingsGateways } from "@/lib/club/supabase-club-set
 
 /**
  * La configuración del club (#296, RF-6 del PRD de E18a): GET la lee y PATCH
- * cambia el nombre, las iniciales y el acento (#294, RF-3).
+ * cambia el nombre, las iniciales, el acento (#294, RF-3) y el inicio de la
+ * temporada (#744, RF-1 de E27).
  *
  * Quién puede llamarlo lo decide la frontera: `RESTRICTED_ROUTES` lo reserva
  * al Admin, y el dominio lo vuelve a comprobar. El PATCH lleva lo que el
@@ -41,11 +42,14 @@ const NAME_BODY_MAX_LENGTH = CLUB_NAME_MAX_LENGTH * 4;
 const INITIALS_BODY_MAX_LENGTH = CLUB_INITIALS_MAX_LENGTH * 4;
 /** `#rrggbb` son siete; que sea un color lo dice el dominio. */
 const ACCENT_BODY_MAX_LENGTH = 32;
+/** `YYYY-MM-DD` son diez; que sea una fecha lo dice el dominio. */
+const SEASON_START_BODY_MAX_LENGTH = 32;
 
 const identityShape = {
   name: z.string().max(NAME_BODY_MAX_LENGTH),
   initials: z.string().max(INITIALS_BODY_MAX_LENGTH).nullable(),
   accentColor: z.string().max(ACCENT_BODY_MAX_LENGTH),
+  seasonStartsOn: z.string().max(SEASON_START_BODY_MAX_LENGTH).nullable(),
 };
 
 /** Sólo la forma. `strict` responde 400 a cualquier campo que no sea de esta
