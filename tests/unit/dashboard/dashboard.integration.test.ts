@@ -4,6 +4,7 @@ import { type DashboardSource, readDashboard } from "@/lib/dashboard/dashboard";
 import { createDashboardGateways } from "@/lib/dashboard/supabase-dashboard-gateways";
 import { markNewsSeen } from "@/lib/news/news-seen";
 import { createNewsSeenGateway } from "@/lib/news/supabase-news-seen-gateway";
+import { DEFAULT_TEAM_LABELS } from "@/lib/teams/team-builder";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
@@ -117,6 +118,108 @@ function withTrainingAndPost<T>(
           run({ trainingId: String(training?.id), postId: String(post?.id) }),
       ),
   );
+}
+
+async function succeed(
+  action: string,
+  query: PromiseLike<{ readonly error: { readonly message: string } | null }>,
+): Promise<void> {
+  const { error } = await query;
+  if (error) {
+    throw new Error(`No se pudo ${action}: ${error.message}`);
+  }
+}
+
+/** Un grupo sin nadie dentro y un evento de pasado mañana sólo para él:
+ * no va dirigido a Pía, así que no sale ni en el próximo ni en la semana. */
+function withOtherGroupEvent<T>(
+  home: Home,
+  clubId: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  const inTwoDays = clubCalendarDate(new Date(Date.now() + 2 * DAY_MS));
+  return withSeededRows(
+    home.serviceClient,
+    "groups",
+    [{ club_id: clubId, name: "Senior" }],
+    ([group]) =>
+      withSeededRows(
+        home.serviceClient,
+        "events",
+        [
+          {
+            club_id: clubId,
+            title: "Sólo para Senior",
+            event_type: "competition",
+            starts_on: inTwoDays,
+            start_time: "10:00",
+            location: "MSAC",
+            audience: "groups",
+            author_id: home.player.id,
+          },
+        ],
+        async ([event]) => {
+          await succeed(
+            "dirigir el evento al grupo",
+            home.serviceClient.client.from("event_groups").insert({
+              event_id: event?.id,
+              group_id: group?.id,
+              club_id: clubId,
+            }),
+          );
+          return run();
+        },
+      ),
+  );
+}
+
+/** El reparto publicado del entrenamiento, con Pía en el equipo B. Sus
+ * filas se van con el reparto en cascada. */
+function withPublishedSplit<T>(
+  home: Home,
+  clubId: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  return withSeededRows(
+    home.serviceClient,
+    "team_splits",
+    [
+      {
+        event_id: home.trainingId,
+        club_id: clubId,
+        team_a_name: DEFAULT_TEAM_LABELS.a.name,
+        team_a_color: DEFAULT_TEAM_LABELS.a.color,
+        team_b_name: DEFAULT_TEAM_LABELS.b.name,
+        team_b_color: DEFAULT_TEAM_LABELS.b.color,
+        mode: "manual",
+        published_at: new Date().toISOString(),
+      },
+    ],
+    async ([split]) => {
+      await succeed(
+        "poner a Pía en el reparto",
+        home.serviceClient.client.from("team_split_members").insert({
+          split_id: split?.id,
+          user_id: home.player.id,
+          club_id: clubId,
+          team: "b",
+        }),
+      );
+      return run();
+    },
+  );
+}
+
+async function clubIdOf(home: Home): Promise<string> {
+  const { data, error } = await home.serviceClient.client
+    .from("members")
+    .select("club_id")
+    .eq("user_id", home.player.id)
+    .single();
+  if (error) {
+    throw new Error(`No se encontró el club de Pía: ${error.message}`);
+  }
+  return String(data.club_id);
 }
 
 async function withHome(run: (home: Home) => Promise<void>): Promise<void> {
@@ -270,6 +373,108 @@ describeRls("el dashboard en Supabase", () => {
             training: expect.objectContaining({ id: home.trainingId }),
           },
           contactReminder: { kind: "reminder", reminder: "both" },
+          nextUp: expect.objectContaining({ id: home.trainingId }),
+          week: {
+            kind: "week",
+            events: [expect.objectContaining({ id: home.trainingId })],
+          },
+          membership: expect.objectContaining({
+            status: "restricted",
+            block: "past_due",
+          }),
+          latestNews: expect.anything(),
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "el próximo y la semana siguen la audiencia, y el reparto publicado da mi equipo (#745)",
+    async () => {
+      await withHome(async (home) => {
+        const clubId = await clubIdOf(home);
+        await withOtherGroupEvent(home, clubId, () =>
+          withPublishedSplit(home, clubId, async () => {
+            const reported: DashboardSource[] = [];
+            const gateways = {
+              ...createDashboardGateways(home.serviceClient.client),
+              failures: {
+                report: (source: DashboardSource) => {
+                  reported.push(source);
+                },
+              },
+            };
+
+            const result = await readDashboard(gateways, {
+              callerId: home.player.id,
+              now: new Date(),
+            });
+
+            expect(reported).toEqual([]);
+            expect(result.nextUp).toMatchObject({
+              kind: "event",
+              id: home.trainingId,
+              eventType: "training",
+              audience: { kind: "club" },
+              coverUrl: null,
+              myTeam: {
+                name: DEFAULT_TEAM_LABELS.b.name,
+                color: DEFAULT_TEAM_LABELS.b.color,
+                position: null,
+              },
+            });
+            expect(result.nextUp).not.toHaveProperty("teamsStatus");
+            expect(result.week).toEqual({
+              kind: "week",
+              events: [
+                expect.objectContaining({
+                  id: home.trainingId,
+                  title: "Entrenamiento del inicio",
+                }),
+              ],
+            });
+          }),
+        );
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "al socio restringido no le manda ni el extracto ni la portada, ni su equipo (#745, D2)",
+    async () => {
+      await withHome(async (home) => {
+        const clubId = await clubIdOf(home);
+        await withPublishedSplit(home, clubId, async () => {
+          await succeed(
+            "mover la membresía",
+            home.serviceClient.client
+              .from("memberships")
+              .update({ status: "cancelled" })
+              .eq("user_id", home.player.id),
+          );
+
+          const result = await readDashboard(
+            createDashboardGateways(home.serviceClient.client),
+            { callerId: home.player.id, now: new Date() },
+          );
+
+          expect(result.latestNews).toEqual({
+            kind: "news",
+            posts: [
+              {
+                id: home.postId,
+                category: "announcement",
+                title: "Cambio de piscina",
+                publishedAt: expect.any(String),
+              },
+            ],
+          });
+          expect(result.nextUp).toMatchObject({
+            id: home.trainingId,
+            myTeam: null,
+          });
         });
       });
     },

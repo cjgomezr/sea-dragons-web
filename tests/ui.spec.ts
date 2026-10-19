@@ -21576,18 +21576,30 @@ const DASHBOARD_LATEST_NEWS = [
     category: "announcement",
     title: "Nationals squad shortlist announced",
     publishedAt: dashboardDaysAgo(2),
+    coverUrl: null,
+    excerpt: "",
+    isPinned: false,
+    isUnread: false,
   },
   {
     id: "d0d0d0d0-0000-4000-8000-0000000000d5",
     category: "news",
     title: "Winter training schedule is live",
     publishedAt: dashboardDaysAgo(4),
+    coverUrl: null,
+    excerpt: "",
+    isPinned: false,
+    isUnread: false,
   },
   {
     id: "d0d0d0d0-0000-4000-8000-0000000000d6",
     category: "document",
     title: "Updated pool safety & dive policy",
     publishedAt: dashboardDaysAgo(8),
+    coverUrl: null,
+    excerpt: "",
+    isPinned: false,
+    isUnread: false,
   },
 ];
 
@@ -21606,6 +21618,9 @@ const ADMIN_DASHBOARD = {
   upcomingEvents: { kind: "events", events: DASHBOARD_UPCOMING },
   latestNews: { kind: "news", posts: DASHBOARD_LATEST_NEWS },
   contactReminder: { kind: "reminder", reminder: "none" },
+  nextUp: { kind: "none" },
+  week: { kind: "week", events: [] },
+  membership: { status: "active", plan: "Full", renewsOn: null },
 };
 
 const PLAYER_DASHBOARD = {
@@ -21632,6 +21647,9 @@ const EMPTY_DASHBOARD = {
   upcomingEvents: { kind: "events", events: [] },
   latestNews: { kind: "news", posts: [] },
   contactReminder: { kind: "reminder", reminder: "none" },
+  nextUp: { kind: "none" },
+  week: { kind: "week", events: [] },
+  membership: { status: "active", plan: "Full", renewsOn: null },
 };
 
 // El inicio reducido de quien no tiene la membresía al día (#453): el aviso
@@ -21645,6 +21663,10 @@ const RESTRICTED_DASHBOARD = {
     training: { ...DASHBOARD_TRAINING, myResponse: null },
   },
   contactReminder: { kind: "reminder", reminder: "none" },
+  nextUp: { kind: "none" },
+  week: { kind: "week", events: [] },
+  membership: { status: "restricted", block: "pending", endedOn: null },
+  latestNews: { kind: "news", posts: [] },
 };
 
 // El aviso de los datos de contacto que faltan (#498). Sin ninguno de los dos
@@ -21662,7 +21684,11 @@ const PHONE_REMINDER_DASHBOARD = {
 
 // El inicio de quien tiene un cobro fallido (#474): el reducido, con la
 // alerta de la cáscara encima.
-const PAST_DUE_DASHBOARD = { ...RESTRICTED_DASHBOARD, block: "past_due" };
+const PAST_DUE_DASHBOARD = {
+  ...RESTRICTED_DASHBOARD,
+  block: "past_due",
+  membership: { status: "restricted", block: "past_due", endedOn: null },
+};
 
 type DashboardScreenState = {
   readonly name: string;

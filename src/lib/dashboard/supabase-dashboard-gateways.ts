@@ -11,6 +11,7 @@ import { readEmergencyContact } from "@/lib/members/supabase-profile-contact";
 import { createMembershipGateway } from "@/lib/membership/supabase-membership-gateways";
 import { createNewsGateways } from "@/lib/news/supabase-news-gateways";
 import { createNewsSeenGateway } from "@/lib/news/supabase-news-seen-gateway";
+import { createMyTeamGateways } from "@/lib/teams/supabase-team-builder-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type {
@@ -131,6 +132,7 @@ export function createDashboardGateways(
     news: createNewsGateways(serviceClient),
     roster: createDashboardRosterGateway(serviceClient),
     membership: createMembershipGateway(serviceClient),
+    myTeam: createMyTeamGateways(serviceClient),
     failures: consoleFailureLog,
   };
 }

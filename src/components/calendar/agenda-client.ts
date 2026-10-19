@@ -77,7 +77,7 @@ const tallySchema = agendaEventSchema.pick({
   myResponse: true,
 });
 
-const audienceSchema = z.discriminatedUnion("kind", [
+export const audienceSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("club") }),
   z.object({
     kind: z.literal("groups"),
