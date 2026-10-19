@@ -2947,7 +2947,7 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
   test("ve su rol y el formulario con Coach y Committee", async ({ page }) => {
     await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
 
-    await expect(page.getByText("Role: Player")).toBeVisible();
+    await expect(page.getByText("Player", { exact: true })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Coach" })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Committee" })).toBeVisible();
   });
@@ -2956,7 +2956,7 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
     await chooseSpanish(page);
     await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
 
-    await expect(page.getByText("Rol: Jugador")).toBeVisible();
+    await expect(page.getByText("Jugador", { exact: true })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Comité" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Enviar solicitud" }),
@@ -8327,7 +8327,10 @@ test.describe("un Admin frente a la ficha con los datos de verdad", () => {
 
     // Desde #549 la fila no escribe el AUF: con número y un vencimiento
     // lejano, su fila ya no lleva ningún punto del AUF.
-    await page.getByRole("link", { name: /Back to the directory/ }).click();
+    await page
+      .getByRole("main")
+      .getByRole("link", { name: "Directory", exact: true })
+      .click();
     const ownRow = page.getByRole("row", { name: ADMINISTRATION_ADMIN_NAME });
     await expect(ownRow).toBeVisible();
     await expect(ownRow.getByRole("img", { name: /AUF/ })).toHaveCount(0);
