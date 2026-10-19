@@ -216,14 +216,14 @@ function MemberContent({
 export function DashboardScreen({
   locale,
   userId,
-  canCreateTrainings,
+  canCreateEvents,
 }: {
   readonly locale: Locale;
   /** Quien mira: el cierre del aviso del teléfono es de su cuenta (#498). */
   readonly userId: string;
-  /** Si se pinta "Nuevo entrenamiento". Sólo decide el botón: crear lo
+  /** Si se pinta "+ Evento". Sólo decide el botón: crear lo
    * vuelve a comprobar el endpoint (#307). */
-  readonly canCreateTrainings: boolean;
+  readonly canCreateEvents: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [state, setState] = useState<DashboardState>({ kind: "loading" });
@@ -277,7 +277,7 @@ export function DashboardScreen({
           userId={userId}
           dashboard={state.dashboard}
           loadedAt={state.loadedAt}
-          canCreateEvents={canCreateTrainings}
+          canCreateEvents={canCreateEvents}
           onRetry={retry}
         />
       ) : null}
@@ -287,7 +287,7 @@ export function DashboardScreen({
           userId={userId}
           dashboard={state.dashboard}
           loadedAt={state.loadedAt}
-          canCreateEvents={canCreateTrainings}
+          canCreateEvents={canCreateEvents}
           onRetry={retry}
         />
       ) : null}

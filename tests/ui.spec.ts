@@ -22004,17 +22004,20 @@ test.describe("el inicio en el navegador", () => {
       boxOf(card.locator(".dashboard-next-up-body")),
       boxOf(card.getByRole("button", { name: "Going" })),
     ]);
-    const [icon, label] = await Promise.all([
-      boxOf(card.getByRole("button", { name: "Going" }).locator("svg")),
-      boxOf(card.getByRole("button", { name: "Going" }).getByText("Going")),
-    ]);
+    const icon = await boxOf(
+      card.getByRole("button", { name: "Going" }).locator("svg"),
+    );
 
     expect(Math.round(cover.height)).toBe(130);
     expect(title.y).toBeGreaterThan(cover.y + cover.height);
     expect(Math.round(directions.height)).toBeGreaterThanOrEqual(44);
     expect(Math.round(directions.width)).toBe(Math.round(body.width - 2 * 16));
     expect(Math.round(going.height)).toBe(56);
-    expect(icon.y + icon.height).toBeLessThanOrEqual(label.y);
+    // Con el icono encima del texto, el icono queda centrado en el botón; al
+    // lado del texto quedaría desplazado a la izquierda.
+    expect(Math.round(icon.x + icon.width / 2)).toBe(
+      Math.round(going.x + going.width / 2),
+    );
   });
 
   test("a 375px la franja del equipo mide al menos 52px", async ({ page }) => {

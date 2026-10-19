@@ -251,14 +251,14 @@ function setClubTime(instant: string): void {
 async function renderScreen(
   options: {
     readonly locale?: "en" | "es";
-    readonly canCreateTrainings?: boolean;
+    readonly canCreateEvents?: boolean;
   } = {},
 ): Promise<ReturnType<typeof render>> {
   const view = render(
     <DashboardScreen
       locale={options.locale ?? "en"}
       userId={USER_ID}
-      canCreateTrainings={options.canCreateTrainings ?? false}
+      canCreateEvents={options.canCreateEvents ?? false}
     />,
   );
   await screen.findByRole("heading", { level: 1, name: /Alba/ });
@@ -433,11 +433,7 @@ describe("próximos y noticias", () => {
     const view = await renderScreen();
 
     view.rerender(
-      <DashboardScreen
-        locale="es"
-        userId={USER_ID}
-        canCreateTrainings={false}
-      />,
+      <DashboardScreen locale="es" userId={USER_ID} canCreateEvents={false} />,
     );
 
     expect(
@@ -472,7 +468,7 @@ describe("la cabecera (#747)", () => {
   it("ofrece + Evento a quien puede crear eventos y abre el calendario con el formulario", async () => {
     stubDashboard(ADMIN_DASHBOARD);
 
-    await renderScreen({ canCreateTrainings: true });
+    await renderScreen({ canCreateEvents: true });
 
     const newEvent = screen.getByRole("link", { name: "New event" });
     expect(newEvent).toHaveAttribute("href", "/calendario?nuevo=training");
@@ -482,7 +478,7 @@ describe("la cabecera (#747)", () => {
   it("no ofrece + Evento a quien no puede", async () => {
     stubDashboard(PLAYER_DASHBOARD);
 
-    await renderScreen({ canCreateTrainings: false });
+    await renderScreen({ canCreateEvents: false });
 
     expect(
       screen.queryByRole("link", { name: "New event" }),
@@ -627,7 +623,7 @@ describe("la tarjeta Próximo (#747)", () => {
   it("sin nada próximo lo dice y ofrece + Evento a quien puede crearlo", async () => {
     stubDashboard(withNextUp({ kind: "none" }, ADMIN_DASHBOARD));
 
-    await renderScreen({ canCreateTrainings: true });
+    await renderScreen({ canCreateEvents: true });
 
     const card = nextUpCard();
     expect(within(card).getByText("Nothing coming up.")).toBeInTheDocument();
@@ -860,11 +856,7 @@ describe("errores", () => {
       return jsonResponse(200, { data: ADMIN_DASHBOARD });
     });
     render(
-      <DashboardScreen
-        locale="en"
-        userId={USER_ID}
-        canCreateTrainings={false}
-      />,
+      <DashboardScreen locale="en" userId={USER_ID} canCreateEvents={false} />,
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -887,11 +879,7 @@ describe("errores", () => {
       }),
     );
     render(
-      <DashboardScreen
-        locale="en"
-        userId={USER_ID}
-        canCreateTrainings={false}
-      />,
+      <DashboardScreen locale="en" userId={USER_ID} canCreateEvents={false} />,
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -1098,7 +1086,7 @@ describe("el aviso del contacto (#498)", () => {
       <DashboardScreen
         locale="en"
         userId="00000000-0000-4000-8000-0000000000aa"
-        canCreateTrainings={false}
+        canCreateEvents={false}
       />,
     );
 
@@ -1187,11 +1175,7 @@ describe("el aviso del contacto (#498)", () => {
     const requestsBefore = requests.length;
 
     view.rerender(
-      <DashboardScreen
-        locale="es"
-        userId={USER_ID}
-        canCreateTrainings={false}
-      />,
+      <DashboardScreen locale="es" userId={USER_ID} canCreateEvents={false} />,
     );
 
     const note = screen.getByRole("note", {

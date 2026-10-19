@@ -16607,9 +16607,11 @@ a.dashboard-tile:hover {
   color: var(--color-text-secondary);
 }
 
-/* En la franja del equipo el tinte cambia con el color: el texto secundario
-   no llega a AA sobre todos, así que va en el color del texto. */
-.dashboard-next-up-team .dashboard-next-up-eyebrow {
+/* En la franja del equipo el tinte cambia con el color: ni el texto
+   secundario ni el acento llegan a AA sobre todos, así que van en el color
+   del texto. */
+.dashboard-next-up-team .dashboard-next-up-eyebrow,
+.dashboard-next-up-team-link {
   color: var(--color-text);
 }
 

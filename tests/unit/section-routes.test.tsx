@@ -174,19 +174,22 @@ describe("panel principal", () => {
     );
   }
 
-  it("ofrece + Evento al Admin cuando llega el dashboard", async () => {
-    callerRole.current = "Admin";
-    stubLoadedDashboard();
+  it.each<Role>(["Admin", "Committee"])(
+    "ofrece + Evento a un %s, que puede crear eventos, cuando llega el dashboard",
+    async (role) => {
+      callerRole.current = role;
+      stubLoadedDashboard();
 
-    await renderIn("en", HomePage);
+      await renderIn("en", HomePage);
 
-    // Sin nada próximo, la tarjeta "Próximo" también lo ofrece (#747).
-    expect(
-      await screen.findAllByRole("link", { name: "New event" }),
-    ).toHaveLength(2);
-  });
+      // Sin nada próximo, la tarjeta "Próximo" también lo ofrece (#747).
+      expect(
+        await screen.findAllByRole("link", { name: "New event" }),
+      ).toHaveLength(2);
+    },
+  );
 
-  it.each<Role>(["Coach", "Committee", "Player"])(
+  it.each<Role>(["Coach", "Player"])(
     "no ofrece + Evento a un %s ni con el dashboard cargado",
     async (role) => {
       callerRole.current = role;
