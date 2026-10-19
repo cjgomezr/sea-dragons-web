@@ -1458,9 +1458,7 @@ async function openContact(
   user: ReturnType<typeof userEvent.setup>,
 ): Promise<HTMLElement> {
   const card = contactCard();
-  await user.click(
-    within(card).getByRole("button", { name: "Edit Contact" }),
-  );
+  await user.click(within(card).getByRole("button", { name: "Edit Contact" }));
   return card;
 }
 
@@ -1529,9 +1527,7 @@ describe("ficha en pantalla: contacto (#499, #772)", () => {
     const card = contactCard();
     expect(within(card).getByText("0412 345 678")).toBeInTheDocument();
     expect(within(card).getByText("paula@example.com")).toBeInTheDocument();
-    expect(
-      within(card).getByText("Rosa Player · Mother"),
-    ).toBeInTheDocument();
+    expect(within(card).getByText("Rosa Player · Mother")).toBeInTheDocument();
     expect(within(card).getByText("0499 111 222")).toBeInTheDocument();
     expect(within(card).queryByRole("textbox")).not.toBeInTheDocument();
   });

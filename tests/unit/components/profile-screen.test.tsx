@@ -899,9 +899,7 @@ describe("perfil propio: las posiciones del club (#299)", () => {
       positionOptions: [],
     });
 
-    expect(
-      within(aboutCard()).queryByText("Position"),
-    ).toBeNull();
+    expect(within(aboutCard()).queryByText("Position")).toBeNull();
     await openAbout(user);
     expect(screen.queryByLabelText("Position")).not.toBeInTheDocument();
     expect(

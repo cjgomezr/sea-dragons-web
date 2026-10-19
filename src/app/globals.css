@@ -2316,6 +2316,288 @@ a.auth-brand-header:focus-visible {
   outline-offset: 2px;
 }
 
+/* Las tarjetas de Sobre mí y Contacto (#772, RF-3 del PRD de E30), de
+   docs/design/design_handoff_profile/screenshots/01 y 02: se leen primero y
+   se editan aparte. La cabecera lleva el título y su Editar; mientras se
+   edita, el borde pasa al acento. */
+.profile-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.profile-card-editing {
+  border-color: var(--color-accent);
+}
+
+.profile-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 6px 6px 6px 16px;
+}
+
+.app-main .profile-card-header h2 {
+  margin: 0;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-text);
+}
+
+/* Lo pintado mide 32 px como en el diseño; el relleno lo lleva a la medida
+   táctil. */
+.profile-card-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--touch-target-min);
+  padding: 0 12px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.profile-card-edit:hover {
+  background: var(--color-segment-selected);
+}
+
+.profile-card-edit:focus-visible,
+.profile-card-cancel:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.profile-card > .profile-strip-success {
+  margin: 0 16px 12px;
+}
+
+/* La lectura de Sobre mí: dos columnas, con la etiqueta de 12 px encima del
+   valor de 14,5 px y una raya bajo cada fila. */
+.profile-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.profile-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.profile-detail:nth-last-child(-n + 2):nth-child(odd),
+.profile-detail:last-child {
+  border-bottom: 0;
+}
+
+.profile-detail dt,
+.profile-contact dt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.profile-detail dt svg {
+  flex: none;
+  font-size: 11px;
+}
+
+.profile-detail dd,
+.profile-contact dd {
+  margin: 0;
+  font-size: 14.5px;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+}
+
+/* La lectura de Contacto: dos mitades separadas por una raya, cada una con
+   su baldosa de 34 px. */
+.profile-contact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--color-border);
+}
+
+.profile-contact-half {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 16px;
+}
+
+.profile-contact-half + .profile-contact-half {
+  border-left: 1px solid var(--color-border);
+}
+
+.profile-contact-half dl {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+}
+
+.profile-contact-tile {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  font-size: 17px;
+  color: var(--color-text);
+  background: var(--color-segment-selected);
+  border-radius: 9px;
+}
+
+.profile-contact-tile-danger {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 20%, var(--color-panel));
+}
+
+.profile-contact .profile-contact-number {
+  font-family: var(--font-family-mono);
+}
+
+.profile-contact .profile-contact-extra {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.profile-contact .profile-contact-missing {
+  font-size: 14px;
+  color: color-mix(in srgb, var(--color-warning) 55%, var(--color-text));
+}
+
+/* La edición: los campos en dos columnas, con el nombre a lo ancho, y
+   Cancelar y Guardar abajo a la derecha. Las etiquetas son las del diseño,
+   no las mayúsculas de los formularios de la cuenta. */
+.profile-card-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.profile-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.profile-card-wide {
+  grid-column: 1 / -1;
+}
+
+.profile-card-form .auth-field label,
+.profile-card-form .segmented-choice-label {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-text);
+}
+
+.profile-card-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-card-only-you {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* El rótulo del contacto de emergencia va en mayúsculas pequeñas, como en
+   el diseño. */
+.profile-card-form .account-emergency-contact {
+  gap: 12px;
+}
+
+.profile-card-form .account-emergency-contact legend {
+  margin: 4px 0 var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.profile-card-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.profile-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.profile-card-cancel {
+  min-height: var(--touch-target-min);
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.profile-card-cancel:hover:not(:disabled) {
+  background: var(--color-segment-selected);
+}
+
+.profile-card-form .profile-card-save {
+  padding: 0 18px;
+  font-size: 13.5px;
+}
+
+/* El móvil es otro ticket de E30: aquí sólo se apila lo que no cabe en dos
+   columnas, para que nada desborde. */
+@media (max-width: 559px) {
+  .profile-card-grid,
+  .profile-card-pair,
+  .profile-contact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-contact-half + .profile-contact-half {
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
+  }
+}
+
 /* La foto de perfil (#245). La imagen ocupa el mismo círculo que las
    iniciales y se recorta a él sin deformarse. */
 .member-photo {
