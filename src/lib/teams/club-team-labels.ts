@@ -17,7 +17,7 @@ import {
  * cualquier `#RRGGBB` (D5). Sólo esto exige el muestrario.
  */
 
-/** El límite de `clubs_team_a_name_length` en `0076_club_team_labels.sql`. */
+/** El límite de `clubs_team_a_name_length` en `0077_club_team_labels.sql`. */
 export const CLUB_TEAM_NAME_MAX_LENGTH = 24;
 
 const BIB_HEXES = TEAM_BIB_COLORS.map((color) => color.hex);

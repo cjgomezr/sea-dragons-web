@@ -63,7 +63,7 @@ export {
 
 /** D5: "Team Kelp" azul y "Team Tide" amarillo, los del mockup, con los
  * colores de acento y de aviso de `design-system.md`. Desde #755 los equipos
- * son del club (`0076_club_team_labels.sql`) y éstos son sólo los que la
+ * son del club (`0077_club_team_labels.sql`) y éstos son sólo los que la
  * migración pone por defecto; los tests los usan con ese sentido. */
 export const DEFAULT_TEAM_LABELS: TeamLabels = {
   a: { name: "Team Kelp", color: "#1C6EA4" },

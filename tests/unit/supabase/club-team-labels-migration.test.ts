@@ -7,13 +7,13 @@ import {
 } from "../../support/postgres";
 
 /**
- * `0076_club_team_labels.sql` contra un Postgres desechable (#755, RF-1 y D1
+ * `0077_club_team_labels.sql` contra un Postgres desechable (#755, RF-1 y D1
  * del PRD de E28). El nombre y el color de los dos equipos pasan a ser del
  * club. Viven en `public.clubs`, como el resto de su configuración desde
  * `0022_club_brand.sql`, con Team Kelp y Team Tide por defecto.
  */
 
-const THIS_TICKETS_MIGRATION = "0076";
+const THIS_TICKETS_MIGRATION = "0077";
 
 const CLUB = "slug = 'victoria-seadragons'";
 
