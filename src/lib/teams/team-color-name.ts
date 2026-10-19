@@ -139,8 +139,9 @@ function nameFamily(hex: string): FamilyName {
 }
 
 export function nameTeamColor(hex: string): TeamColorName {
+  const uppercaseHex = hex.toUpperCase();
   const swatch = BIB_SWATCHES.find(
-    (candidate) => candidate.hex.toUpperCase() === hex.toUpperCase(),
+    (candidate) => candidate.hex === uppercaseHex,
   );
   return swatch?.name ?? nameFamily(hex);
 }
