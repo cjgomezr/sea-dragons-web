@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { type HeroMember, ProfileHero } from "@/components/account/ProfileHero";
-import type { ContactDraft } from "@/components/account/OwnContactSection";
 import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -15,12 +14,11 @@ import {
   correctionRequiresGuardianConsent,
   isAufNumberTooLong,
 } from "@/lib/members/member-record";
-import { contactIssuesOf } from "@/lib/members/profile-contact";
 import { AufPendingStrip, type PendingAuf } from "./AufPendingStrip";
+import { MemberRecordAbout } from "./MemberRecordAbout";
 import {
+  FIELD_OF_CONTACT_ISSUE,
   MemberRecordContact,
-  recordContactDraftOf,
-  toRecordContactSubmission,
 } from "./MemberRecordContact";
 import { GroupsField, TextField } from "./record-fields";
 import {
@@ -47,8 +45,8 @@ import {
  * guardado y no el de los controles; por eso su botón desaparece en cuanto el
  * número o el vencimiento se editan: entonces guardar ya lo deja verificado.
  *
- * El teléfono y el contacto de emergencia (#499) siguen la misma regla que el
- * AUF: sólo se mandan si el Admin los tocó.
+ * Encima van Sobre mí, para leer, y Contacto (#499), que el Admin edita en
+ * su tarjeta y guarda aparte (#772). Este formulario no lo manda nunca.
  */
 
 type Status =
@@ -65,7 +63,7 @@ type Request = "sending" | "verifying";
 
 /** Lo que hay en los controles. Una cadena vacía es "sin valor", y se manda
  * como null. */
-type Draft = ContactDraft & {
+type Draft = {
   readonly aufNumber: string;
   readonly aufExpiry: string;
   readonly groupIds: ReadonlySet<string>;
@@ -91,7 +89,6 @@ function toDraft(record: MemberRecord): Draft {
     aufExpiry: record.aufExpiry ?? "",
     groupIds: new Set(record.groups.map((group) => group.id)),
     dateOfBirth: record.dateOfBirth ?? "",
-    ...recordContactDraftOf(record),
   };
 }
 
@@ -122,7 +119,7 @@ function toSubmission(
         },
     groupIds: [...draft.groupIds],
     dateOfBirth: orNull(draft.dateOfBirth),
-    contact: toRecordContactSubmission(record, draft),
+    contact: null,
   };
 }
 
@@ -136,17 +133,7 @@ const FIELD_OF_ISSUE: Readonly<
   date_of_birth_in_future: "dateOfBirth",
   date_of_birth_too_early: "dateOfBirth",
   date_of_birth_required: "dateOfBirth",
-  phone_invalid_characters: "phone",
-  phone_too_short: "phone",
-  phone_too_long: "phone",
-  emergency_contact_name_missing: "emergencyContactName",
-  emergency_contact_name_too_long: "emergencyContactName",
-  emergency_contact_phone_missing: "emergencyContactPhone",
-  emergency_contact_phone_invalid_characters: "emergencyContactPhone",
-  emergency_contact_phone_too_short: "emergencyContactPhone",
-  emergency_contact_phone_too_long: "emergencyContactPhone",
-  emergency_contact_relationship_missing: "emergencyContactRelationship",
-  emergency_contact_relationship_too_long: "emergencyContactRelationship",
+  ...FIELD_OF_CONTACT_ISSUE,
 };
 
 function toFieldIssue(code: MemberRecordIssueCode): FieldIssue {
@@ -315,16 +302,12 @@ function serverIssuesOf(status: Status): readonly FieldIssue[] {
   return code === null ? [] : [toFieldIssue(code)];
 }
 
-/** Lo que se puede avisar antes de mandar nada: el largo del AUF y el
- * contacto, con las reglas del perfil (#499). */
+/** Lo que se puede avisar antes de mandar nada: el largo del AUF. */
 function localIssuesOf(submission: MemberRecordSubmission): FieldIssue[] {
   const aufNumber = submission.auf?.aufNumber ?? "";
-  return [
-    ...(isAufNumberTooLong(aufNumber)
-      ? [toFieldIssue("auf_number_too_long")]
-      : []),
-    ...(submission.contact === null ? [] : contactIssuesOf(submission.contact)),
-  ];
+  return isAufNumberTooLong(aufNumber)
+    ? [toFieldIssue("auf_number_too_long")]
+    : [];
 }
 
 export function MemberRecordForm({
@@ -439,6 +422,13 @@ export function MemberRecordForm({
         />
       )}
       <VerifyOutcome translate={translate} status={status} />
+      <MemberRecordAbout translate={translate} record={record} />
+      <MemberRecordContact
+        translate={translate}
+        locale={locale}
+        record={record}
+        onSaved={setRecord}
+      />
       <form
         className="auth-pending member-record-form"
         onSubmit={handleSubmit}
@@ -476,13 +466,6 @@ export function MemberRecordForm({
             value={draft.dateOfBirth}
             issueText={issueTextFor("dateOfBirth")}
             onChange={(dateOfBirth) => update({ dateOfBirth })}
-          />
-          <MemberRecordContact
-            translate={translate}
-            fullName={record.fullName}
-            draft={draft}
-            issueTextOf={issueTextFor}
-            onChange={update}
           />
           <GroupsField
             translate={translate}
