@@ -17124,7 +17124,7 @@ p.dashboard-next-up-line {
 }
 
 /* Las columnas del inicio (#749): "Próximo" a la izquierda y la del Player a
-   la derecha, de 320px, cuando caben las dos sin que la tarjeta pierda su
+   la derecha, de 340px, cuando caben las dos sin que la tarjeta pierda su
    imagen al lado (720px). Por debajo van una encima de otra. */
 .dashboard-columns {
   display: grid;
@@ -17148,9 +17148,9 @@ p.dashboard-next-up-line {
   min-width: 0;
 }
 
-@container dashboard (min-width: 1056px) {
+@container dashboard (min-width: 1076px) {
   .dashboard-columns {
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
 

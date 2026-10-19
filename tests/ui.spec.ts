@@ -21821,9 +21821,39 @@ const ADMIN_DASHBOARD = {
   membership: { status: "active", plan: "Full", renewsOn: null },
 };
 
+// "Mi asistencia" de la columna del Player (#749): las últimas 10 con los
+// tres estados, como en la captura 01 del handoff de E27.
+const DASHBOARD_LAST_10 = (
+  [
+    "present",
+    "present",
+    "late",
+    "present",
+    "absent",
+    "present",
+    "present",
+    "present",
+    "late",
+    "present",
+  ] as const
+).map((status, index) => ({
+  eventId: `d0d0d0d0-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`,
+  startsOn: `2026-09-${String(index + 10).padStart(2, "0")}`,
+  status,
+}));
+
+const DASHBOARD_SEASON_ATTENDANCE = {
+  percent: 82,
+  attended: 18,
+  sessions: 22,
+  last10: DASHBOARD_LAST_10,
+};
+
 const PLAYER_DASHBOARD = {
   ...ADMIN_DASHBOARD,
   column: "player",
+  me: { attendance: DASHBOARD_SEASON_ATTENDANCE },
+  membership: { status: "active", plan: "Full", renewsOn: "2027-06-30" },
   tiles: {
     ...ADMIN_DASHBOARD.tiles,
     attendance: {
@@ -21844,6 +21874,12 @@ const MY_TEAM_DASHBOARD = {
 const UNPUBLISHED_TEAMS_DASHBOARD = {
   ...ADMIN_DASHBOARD,
   nextUp: { ...DASHBOARD_NEXT_UP, teamsStatus: "draft" },
+};
+
+// La columna del Player sin sesiones elegibles en la temporada (#749).
+const NO_SESSIONS_DASHBOARD = {
+  ...PLAYER_DASHBOARD,
+  me: { attendance: null },
 };
 
 const NOTHING_NEXT_DASHBOARD = {
@@ -21877,7 +21913,7 @@ const EMPTY_DASHBOARD = {
 const RESTRICTED_DASHBOARD = {
   kind: "restricted",
   viewer: { firstName: "Liam" },
-  me: { attendance: null },
+  me: { attendance: DASHBOARD_SEASON_ATTENDANCE },
   block: "cancelled",
   nextTraining: {
     kind: "training",
@@ -21938,6 +21974,11 @@ const DASHBOARD_STATES: readonly DashboardScreenState[] = [
   ...dashboardStates(
     "inicio-jugador",
     PLAYER_DASHBOARD,
+    E2E_STORAGE_STATE_PATH,
+  ),
+  ...dashboardStates(
+    "inicio-jugador-sin-sesiones",
+    NO_SESSIONS_DASHBOARD,
     E2E_STORAGE_STATE_PATH,
   ),
   ...dashboardStates("inicio-vacio", EMPTY_DASHBOARD, ADMIN_STORAGE_STATE),
@@ -22046,6 +22087,54 @@ for (const state of DASHBOARD_STATES) {
     });
   });
 }
+
+test.describe("la columna del Player en el navegador (#749)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  async function topOf(locator: Locator): Promise<number> {
+    const box = await locator.boundingBox();
+    if (box === null) {
+      throw new Error(`${locator.toString()} no se ve.`);
+    }
+    return box.y;
+  }
+
+  async function leftOf(locator: Locator): Promise<number> {
+    const box = await locator.boundingBox();
+    if (box === null) {
+      throw new Error(`${locator.toString()} no se ve.`);
+    }
+    return box.x;
+  }
+
+  test("en el móvil Mi asistencia y Membresía van lado a lado", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: PLAYER_DASHBOARD });
+
+    const attendance = page.getByRole("region", { name: "My attendance" });
+    const membership = page.getByRole("region", { name: "Membership" });
+
+    expect(await topOf(membership)).toBe(await topOf(attendance));
+    expect(await leftOf(membership)).toBeGreaterThan(await leftOf(attendance));
+  });
+
+  test("en escritorio la columna va a la derecha de Próximo", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToDashboard(page, { dashboard: PLAYER_DASHBOARD });
+
+    const nextUp = page.getByRole("region", { name: "Next up" });
+    const attendance = page.getByRole("region", { name: "My attendance" });
+
+    expect(await topOf(attendance)).toBe(await topOf(nextUp));
+    expect(await leftOf(attendance)).toBeGreaterThan(await leftOf(nextUp));
+  });
+});
 
 test.describe("el inicio en el navegador", () => {
   skipWithoutSession();
