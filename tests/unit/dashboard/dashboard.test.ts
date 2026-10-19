@@ -116,7 +116,7 @@ type Club = {
   players: PlayerRecord[];
   /** Las portadas de noticias que existen en el bucket, por id. */
   newsCoverIds: Set<string>;
-  /** `club_settings.season_starts_on` (#744). */
+  /** `clubs.season_starts_on` (#744). */
   seasonStartsOn: string | null;
   /** Todas las sesiones elegibles de quien mira, de la más vieja a la más
    * nueva. */
