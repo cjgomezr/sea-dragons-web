@@ -11,7 +11,9 @@ import type {
 import type { ClubRateWindow } from "@/lib/attendance/club-attendance-rate";
 import type { Role } from "@/lib/auth/roles";
 import {
+  type Dashboard,
   type DashboardGateways,
+  type DashboardNextUpEvent,
   type DashboardSource,
   type MemberDashboard,
   type RestrictedDashboard,
@@ -26,7 +28,12 @@ import type {
   AgendaQuery,
   EventRow,
   EventStatus,
+  RsvpTally,
 } from "@/lib/events/event-agenda";
+import type { RsvpResponse } from "@/lib/events/event-rsvp";
+import type { PlayerRecord, StoredTeamSplit } from "@/lib/teams/team-builder";
+import { DEFAULT_TEAM_LABELS } from "@/lib/teams/team-builder";
+import { GOALKEEPER, SEEDED_POSITIONS } from "../helpers/seeded-positions";
 import type {
   NewsCategory,
   NewsFeedQuery,
@@ -66,7 +73,9 @@ type FakeSource =
   | "feed"
   | "roster"
   | "newsSeen"
-  | "contact";
+  | "contact"
+  | "eventDetail"
+  | "teams";
 
 type Club = {
   role: Role;
@@ -83,6 +92,14 @@ type Club = {
   contact: ProfileContact;
   /** La membresía de quien mira; `null` si no tiene. */
   membership: MembershipRecord | null;
+  /** Los conteos de respuestas por evento. */
+  tallies: RsvpTally[];
+  /** El reparto de cada evento, por id. */
+  splits: Map<string, StoredTeamSplit>;
+  /** Los jugadores que puede leer el reparto. */
+  players: PlayerRecord[];
+  /** Las portadas de noticias que existen en el bucket, por id. */
+  newsCoverIds: Set<string>;
   failing: Set<FakeSource>;
 };
 
@@ -97,6 +114,8 @@ function failIf(source: FakeSource): void {
   }
 }
 
+const SIGNED_URL_PREFIX = "https://storage.test/";
+
 let nextId = 0;
 function uuid(): string {
   nextId += 1;
@@ -106,10 +125,14 @@ function uuid(): string {
 function event(overrides: {
   startsOn: string;
   startTime: string;
+  endTime?: string | null;
+  endsOn?: string | null;
   eventType?: EventType;
   status?: EventStatus;
   groupIds?: string[];
   title?: string;
+  coverUploadId?: string | null;
+  myResponse?: RsvpResponse | null;
 }): EventRow {
   const { groupIds, ...rest } = overrides;
   return {
@@ -143,6 +166,8 @@ function post(overrides: {
   category?: NewsCategory;
   status?: NewsPostStatus;
   title?: string;
+  body?: string;
+  coverUploadId?: string | null;
 }): NewsFeedRow {
   return {
     id: uuid(),
@@ -165,12 +190,55 @@ function isVisible(row: EventRow, query: AgendaQuery): boolean {
   return row.audience.groups.some((group) => groupIds.includes(group.id));
 }
 
+function isInPeriod(row: EventRow, query: AgendaQuery): boolean {
+  return query.period === "upcoming"
+    ? row.startsOn >= query.today
+    : row.startsOn < query.today;
+}
+
 function findAgendaPage(query: AgendaQuery): readonly EventRow[] {
   failIf("agenda");
+  const direction = query.period === "upcoming" ? 1 : -1;
   return club.events
-    .filter((row) => row.startsOn >= query.today && isVisible(row, query))
-    .sort((first, second) => first.startsAt.localeCompare(second.startsAt))
+    .filter((row) => isInPeriod(row, query) && isVisible(row, query))
+    .sort(
+      (first, second) =>
+        direction * first.startsAt.localeCompare(second.startsAt),
+    )
     .slice(0, query.limit);
+}
+
+function findEvent(eventId: string): EventRow | null {
+  failIf("eventDetail");
+  return club.events.find((row) => row.id === eventId) ?? null;
+}
+
+/** El evento como lo lee el reparto: la audiencia con ids, sin nombres. */
+function findTeamBuilderEvent(eventId: string) {
+  const row = club.events.find((candidate) => candidate.id === eventId);
+  if (row === undefined) {
+    return null;
+  }
+  return {
+    id: row.id,
+    clubId: CLUB_ID,
+    eventType: row.eventType,
+    title: row.title,
+    status: row.status,
+    startsOn: row.startsOn,
+    startTime: row.startTime,
+    audience:
+      row.audience.kind === "club"
+        ? { kind: "club" as const }
+        : {
+            kind: "groups" as const,
+            groupIds: row.audience.groups.map((group) => group.id),
+          },
+  };
+}
+
+function signedUrlsOf(paths: readonly string[]): ReadonlyMap<string, string> {
+  return new Map(paths.map((path) => [path, `${SIGNED_URL_PREFIX}${path}`]));
 }
 
 function isOlderThan(row: NewsFeedRow, query: NewsFeedQuery): boolean {
@@ -232,12 +300,13 @@ function gateways(): DashboardGateways {
       memberGroups,
       agenda: {
         findAgendaPage: async (query) => findAgendaPage(query),
-        findEvent: async () => null,
-        countResponses: async () => [],
+        findEvent: async ({ eventId }) => findEvent(eventId),
+        countResponses: async (eventIds) =>
+          club.tallies.filter((tally) => eventIds.includes(tally.eventId)),
         listResponders: async () => [],
         summarizeSeries: async () => null,
       },
-      eventCovers: { signUrls: async () => new Map() },
+      eventCovers: { signUrls: async (paths) => signedUrlsOf(paths) },
     },
     news: {
       members,
@@ -261,7 +330,15 @@ function gateways(): DashboardGateways {
           throw new Error("el dashboard no desfija");
         },
       },
-      covers: fakeCoverlessGateway(),
+      covers: {
+        ...fakeCoverlessGateway(),
+        signUrls: async (paths) =>
+          signedUrlsOf(
+            paths.filter((path) =>
+              [...club.newsCoverIds].some((id) => path.includes(id)),
+            ),
+          ),
+      },
       inlineImages: fakeImagelessGateway(),
       authorPhotos: fakeAuthorPhotosGateway(),
       audit: { insertAuditLogRow: async () => ({ error: null }) },
@@ -284,6 +361,20 @@ function gateways(): DashboardGateways {
     },
     membership: {
       findByUserId: async () => club.membership,
+    },
+    myTeam: {
+      members,
+      memberGroups,
+      teams: {
+        findEvent: async ({ eventId }) => findTeamBuilderEvent(eventId),
+        findSplit: async (eventId) => {
+          failIf("teams");
+          return club.splits.get(eventId) ?? null;
+        },
+        findPlayers: async ({ userIds }) =>
+          club.players.filter((player) => userIds.includes(player.userId)),
+      },
+      positions: { findClubPositions: async () => SEEDED_POSITIONS },
     },
     failures: {
       report: (source, error) => {
@@ -349,6 +440,10 @@ beforeEach(() => {
     newsSeenAt: null,
     contact: { phone: "0412 345 678", emergencyContact: SISTER },
     membership: membershipWith("active"),
+    tallies: [],
+    splits: new Map(),
+    players: [],
+    newsCoverIds: new Set(),
     failing: new Set(),
   };
 });
@@ -602,18 +697,30 @@ describe("las últimas noticias", () => {
           category: "announcement",
           title: "Cambio de piscina",
           publishedAt: "2026-09-29T00:00:00.000Z",
+          coverUrl: null,
+          excerpt: "Ganamos los tres partidos.",
+          isPinned: false,
+          isUnread: true,
         },
         {
           id: second.id,
           category: "news",
           title: "Crónica del torneo",
           publishedAt: "2026-09-27T00:00:00.000Z",
+          coverUrl: null,
+          excerpt: "Ganamos los tres partidos.",
+          isPinned: false,
+          isUnread: true,
         },
         {
           id: third.id,
           category: "document",
           title: "Crónica del torneo",
           publishedAt: "2026-09-20T00:00:00.000Z",
+          coverUrl: null,
+          excerpt: "Ganamos los tres partidos.",
+          isPinned: false,
+          isUnread: true,
         },
       ],
     });
@@ -627,9 +734,9 @@ describe("la fijada en el inicio", () => {
     return { ...post(overrides), pinnedUntil: null };
   }
 
-  it("sale entre las últimas en su sitio por fecha aunque el feed la traiga aparte", async () => {
+  it("va primera, marcada, y detrás las más nuevas (#745)", async () => {
     const newest = post({ publishedAt: "2026-09-29T00:00:00.000Z" });
-    const pinned = pinnedPost({ publishedAt: "2026-09-28T00:00:00.000Z" });
+    const pinned = pinnedPost({ publishedAt: "2026-09-20T00:00:00.000Z" });
     const older = post({ publishedAt: "2026-09-27T00:00:00.000Z" });
     const oldest = post({ publishedAt: "2026-09-26T00:00:00.000Z" });
     club.posts = [oldest, older, newest];
@@ -639,7 +746,11 @@ describe("la fijada en el inicio", () => {
 
     expect(result.latestNews).toMatchObject({
       kind: "news",
-      posts: [{ id: newest.id }, { id: pinned.id }, { id: older.id }],
+      posts: [
+        { id: pinned.id, isPinned: true },
+        { id: newest.id, isPinned: false },
+        { id: older.id, isPinned: false },
+      ],
     });
   });
 
@@ -848,6 +959,9 @@ describe("vacío", () => {
       upcomingEvents: { kind: "events", events: [] },
       latestNews: { kind: "news", posts: [] },
       contactReminder: { kind: "reminder", reminder: "none" },
+      nextUp: { kind: "none" },
+      week: { kind: "week", events: [] },
+      membership: { status: "active", plan: "Full", renewsOn: null },
     });
     expect(reported).toEqual([]);
   });
@@ -931,7 +1045,7 @@ describe("quien no tiene la membresía al día (#453)", () => {
     },
   );
 
-  it("no le da teselas de club ni noticias", async () => {
+  it("no le da teselas de club ni la lista de próximos", async () => {
     club.membership = membershipWith("pending");
     club.posts = [post({ publishedAt: "2026-09-29T08:00:00.000Z" })];
 
@@ -941,8 +1055,12 @@ describe("quien no tiene la membresía al día (#453)", () => {
       "block",
       "contactReminder",
       "kind",
+      "latestNews",
+      "membership",
       "nextTraining",
+      "nextUp",
       "viewer",
+      "week",
     ]);
   });
 
@@ -977,5 +1095,642 @@ describe("quien no tiene la membresía al día (#453)", () => {
     const result = await dashboard();
 
     expect(result.kind).toBe("member");
+  });
+});
+
+/** El próximo evento de un inicio, cuando lo hay. */
+function nextUpEventOf(result: Dashboard): DashboardNextUpEvent {
+  if (result.nextUp.kind !== "event") {
+    throw new Error(`Se esperaba un evento y llegó ${result.nextUp.kind}`);
+  }
+  return result.nextUp;
+}
+
+describe("el próximo evento (#745)", () => {
+  it("es el primero que ve, de cualquier tipo, con lo que pinta la tarjeta", async () => {
+    const coverId = "c0c0c0c0-0000-4000-8000-000000000001";
+    const social = event({
+      startsOn: "2026-10-02",
+      startTime: "19:00",
+      endTime: "21:00",
+      eventType: "social",
+      title: "Cena del club",
+      coverUploadId: coverId,
+      myResponse: "yes",
+    });
+    club.events = [
+      event({ startsOn: "2026-10-03", startTime: "19:00" }),
+      social,
+    ];
+    club.tallies = [{ eventId: social.id, goingCount: 4, maybeCount: 1 }];
+
+    const result = await dashboard();
+
+    expect(result.nextUp).toEqual({
+      kind: "event",
+      id: social.id,
+      title: "Cena del club",
+      eventType: "social",
+      startsOn: "2026-10-02",
+      endsOn: null,
+      startTime: "19:00",
+      endTime: "21:00",
+      location: "MSAC",
+      place: null,
+      coverUrl: `${SIGNED_URL_PREFIX}${CLUB_ID}/${coverId}-large.webp`,
+      audience: { kind: "club" },
+      goingCount: 4,
+      maybeCount: 1,
+      myResponse: "yes",
+      myTeam: null,
+    });
+  });
+
+  it("dice que no hay ninguno cuando no hay nada a la vista", async () => {
+    const result = await dashboard();
+
+    expect(result.nextUp).toEqual({ kind: "none" });
+  });
+
+  it("no cuenta un evento cancelado", async () => {
+    club.events = [
+      event({
+        startsOn: "2026-10-01",
+        startTime: "19:00",
+        status: "cancelled",
+      }),
+    ];
+
+    const result = await dashboard();
+
+    expect(result.nextUp).toEqual({ kind: "none" });
+  });
+
+  it("a un Admin no le da uno que no va dirigido a él", async () => {
+    club.role = "Admin";
+    club.events = [
+      event({
+        startsOn: "2026-10-01",
+        startTime: "19:00",
+        groupIds: [COACHES_GROUP],
+      }),
+    ];
+
+    const result = await dashboard();
+
+    expect(result.nextUp).toEqual({ kind: "none" });
+  });
+
+  it("un evento que ya empezó sigue siendo el próximo hasta su hora de fin", async () => {
+    club.events = [
+      event({
+        startsOn: TODAY_IN_CLUB,
+        startTime: "16:00",
+        endTime: "17:30",
+        title: "Ya terminó",
+      }),
+      event({
+        startsOn: TODAY_IN_CLUB,
+        startTime: "17:00",
+        endTime: "19:00",
+        title: "En curso",
+      }),
+    ];
+
+    const result = await dashboard();
+
+    expect(nextUpEventOf(result).title).toBe("En curso");
+  });
+
+  it("sin hora de fin, sigue siendo el próximo hasta el final del día", async () => {
+    club.events = [
+      event({ startsOn: TODAY_IN_CLUB, startTime: "10:00", title: "Hoy" }),
+    ];
+
+    const result = await dashboard();
+
+    expect(nextUpEventOf(result).title).toBe("Hoy");
+  });
+
+  it("un evento de varios días que empezó ayer sigue siendo el próximo", async () => {
+    club.events = [
+      event({
+        startsOn: "2026-09-29",
+        startTime: "09:00",
+        endsOn: "2026-10-01",
+        endTime: "17:00",
+        eventType: "competition",
+        title: "Torneo",
+      }),
+      event({ startsOn: "2026-10-01", startTime: "19:00" }),
+    ];
+
+    const result = await dashboard();
+
+    expect(nextUpEventOf(result).title).toBe("Torneo");
+  });
+
+  it("uno de ayer sin hora de fin ya no cuenta", async () => {
+    club.events = [event({ startsOn: "2026-09-29", startTime: "19:00" })];
+
+    const result = await dashboard();
+
+    expect(result.nextUp).toEqual({ kind: "none" });
+  });
+});
+
+describe("mi equipo en el próximo evento (#745)", () => {
+  const PUBLISHED_AT = new Date("2026-09-29T00:00:00.000Z");
+
+  function scrimmage(): EventRow {
+    const row = event({
+      startsOn: "2026-10-01",
+      startTime: "19:00",
+      eventType: "competition",
+    });
+    club.events = [row];
+    return row;
+  }
+
+  function splitWith(
+    assignments: StoredTeamSplit["assignments"],
+    publishedAt: Date | null = PUBLISHED_AT,
+  ): StoredTeamSplit {
+    return {
+      teams: DEFAULT_TEAM_LABELS,
+      mode: "auto",
+      publishedAt,
+      assignments,
+    };
+  }
+
+  function playerWith(positionId: string | null): PlayerRecord {
+    return {
+      userId: CALLER_ID,
+      fullName: "Alba Ferrer",
+      positionId,
+      coverage: null,
+      ratings: null,
+      membershipCurrent: true,
+    };
+  }
+
+  it("da a un Player del reparto publicado su equipo, su color y su posición", async () => {
+    const row = scrimmage();
+    club.players = [playerWith(GOALKEEPER.id)];
+    club.splits.set(row.id, splitWith([{ userId: CALLER_ID, team: "b" }]));
+
+    const result = await dashboard();
+
+    expect(nextUpEventOf(result).myTeam).toEqual({
+      name: DEFAULT_TEAM_LABELS.b.name,
+      color: DEFAULT_TEAM_LABELS.b.color,
+      position: { id: GOALKEEPER.id, names: GOALKEEPER.names },
+    });
+  });
+
+  it("deja la posición en null si no tiene", async () => {
+    const row = scrimmage();
+    club.players = [playerWith(null)];
+    club.splits.set(row.id, splitWith([{ userId: CALLER_ID, team: "a" }]));
+
+    const result = await dashboard();
+
+    expect(nextUpEventOf(result).myTeam).toEqual({
+      name: DEFAULT_TEAM_LABELS.a.name,
+      color: DEFAULT_TEAM_LABELS.a.color,
+      position: null,
+    });
+  });
+
+  it("es null con el reparto en borrador", async () => {
+    const row = scrimmage();
+    club.players = [playerWith(GOALKEEPER.id)];
+    club.splits.set(
+      row.id,
+      splitWith([{ userId: CALLER_ID, team: "b" }], null),
+    );
+
+    const result = await dashboard();
+
+    expect(nextUpEventOf(result).myTeam).toBeNull();
+  });
+
+  it("es null sin reparto", async () => {
+    scrimmage();
+
+    const result = await dashboard();
+
+    expect(nextUpEventOf(result).myTeam).toBeNull();
+  });
+
+  it("es null para un Player que no está en el reparto", async () => {
+    const row = scrimmage();
+    club.splits.set(
+      row.id,
+      splitWith([
+        { userId: "11111111-0000-4000-8000-000000000001", team: "a" },
+      ]),
+    );
+
+    const result = await dashboard();
+
+    expect(nextUpEventOf(result).myTeam).toBeNull();
+  });
+
+  it("es null para un socio restringido aunque esté en el reparto", async () => {
+    const row = scrimmage();
+    club.membership = membershipWith("past_due");
+    club.players = [playerWith(GOALKEEPER.id)];
+    club.splits.set(row.id, splitWith([{ userId: CALLER_ID, team: "b" }]));
+
+    const result = await restrictedDashboard();
+
+    expect(nextUpEventOf(result).myTeam).toBeNull();
+  });
+
+  it.each(["Admin", "Coach"] as const)(
+    "a un %s le dice none sin reparto",
+    async (role) => {
+      club.role = role;
+      scrimmage();
+
+      const result = await dashboard();
+
+      expect(nextUpEventOf(result)).toMatchObject({ teamsStatus: "none" });
+    },
+  );
+
+  it.each(["Admin", "Coach"] as const)(
+    "a un %s le dice draft con el reparto guardado sin publicar",
+    async (role) => {
+      club.role = role;
+      const row = scrimmage();
+      club.splits.set(row.id, splitWith([], null));
+
+      const result = await dashboard();
+
+      expect(nextUpEventOf(result)).toMatchObject({ teamsStatus: "draft" });
+    },
+  );
+
+  it.each(["Admin", "Coach"] as const)(
+    "a un %s le dice published con el reparto publicado",
+    async (role) => {
+      club.role = role;
+      const row = scrimmage();
+      club.splits.set(row.id, splitWith([]));
+
+      const result = await dashboard();
+
+      expect(nextUpEventOf(result)).toMatchObject({
+        teamsStatus: "published",
+      });
+    },
+  );
+
+  it.each<Role>(["Committee", "Player"])(
+    "a un %s no le manda el estado del reparto",
+    async (role) => {
+      club.role = role;
+      const row = scrimmage();
+      club.splits.set(row.id, splitWith([], null));
+
+      const result = await dashboard();
+
+      expect(nextUpEventOf(result)).not.toHaveProperty("teamsStatus");
+    },
+  );
+});
+
+describe("la semana (#745)", () => {
+  it("trae los eventos con algún día de hoy a hoy + 6, por inicio, con lo que pinta la franja", async () => {
+    const tournament = event({
+      startsOn: "2026-09-28",
+      startTime: "09:00",
+      endsOn: "2026-10-01",
+      endTime: "17:00",
+      eventType: "competition",
+      title: "Torneo",
+    });
+    const earlierToday = event({
+      startsOn: TODAY_IN_CLUB,
+      startTime: "07:00",
+      endTime: "08:00",
+      title: "Temprano",
+      myResponse: "maybe",
+    });
+    const lastDay = event({
+      startsOn: "2026-10-06",
+      startTime: "19:00",
+      title: "Último día",
+    });
+    club.events = [
+      lastDay,
+      event({ startsOn: "2026-10-07", startTime: "19:00", title: "Fuera" }),
+      event({
+        startsOn: "2026-10-02",
+        startTime: "19:00",
+        status: "cancelled",
+        title: "Cancelado",
+      }),
+      event({ startsOn: "2026-09-29", startTime: "19:00", title: "Ayer" }),
+      earlierToday,
+      tournament,
+    ];
+
+    const result = await dashboard();
+
+    expect(result.week).toEqual({
+      kind: "week",
+      events: [
+        {
+          id: tournament.id,
+          title: "Torneo",
+          eventType: "competition",
+          startsOn: "2026-09-28",
+          endsOn: "2026-10-01",
+          startTime: "09:00",
+          endTime: "17:00",
+          location: "MSAC",
+          myResponse: null,
+        },
+        {
+          id: earlierToday.id,
+          title: "Temprano",
+          eventType: "training",
+          startsOn: TODAY_IN_CLUB,
+          endsOn: null,
+          startTime: "07:00",
+          endTime: "08:00",
+          location: "MSAC",
+          myResponse: "maybe",
+        },
+        {
+          id: lastDay.id,
+          title: "Último día",
+          eventType: "training",
+          startsOn: "2026-10-06",
+          endsOn: null,
+          startTime: "19:00",
+          endTime: null,
+          location: "MSAC",
+          myResponse: null,
+        },
+      ],
+    });
+  });
+
+  it("a un Player le enseña una reunión dirigida a todo el club (D5)", async () => {
+    club.events = [
+      event({
+        startsOn: "2026-10-02",
+        startTime: "19:00",
+        eventType: "meeting",
+        title: "Asamblea",
+      }),
+    ];
+
+    const result = await dashboard();
+
+    expect(result.week).toMatchObject({
+      kind: "week",
+      events: [{ title: "Asamblea", eventType: "meeting" }],
+    });
+  });
+
+  it("no trae lo que no va dirigido a quien mira", async () => {
+    club.role = "Admin";
+    club.events = [
+      event({
+        startsOn: "2026-10-02",
+        startTime: "19:00",
+        groupIds: [COACHES_GROUP],
+      }),
+    ];
+
+    const result = await dashboard();
+
+    expect(result.week).toEqual({ kind: "week", events: [] });
+  });
+
+  it("también le llega al socio restringido", async () => {
+    club.membership = membershipWith("cancelled");
+    club.events = [
+      event({ startsOn: "2026-10-02", startTime: "19:00", title: "Piscina" }),
+    ];
+
+    const result = await restrictedDashboard();
+
+    expect(result.week).toMatchObject({
+      kind: "week",
+      events: [{ title: "Piscina" }],
+    });
+  });
+});
+
+describe("la membresía en el inicio (#745)", () => {
+  it("a un socio al día le da el plan y el día de Melbourne en que renueva", async () => {
+    club.membership = {
+      ...membershipWith("active"),
+      // El 16 a la 01:00 en Melbourne (AEDT, UTC+11).
+      currentPeriodEnd: new Date("2026-10-15T14:00:00.000Z"),
+    };
+
+    const result = await dashboard();
+
+    expect(result.membership).toEqual({
+      status: "active",
+      plan: "Full",
+      renewsOn: "2026-10-16",
+    });
+  });
+
+  it("deja la renovación en null si no renueva", async () => {
+    club.membership = { ...membershipWith("active"), plan: "Casual" };
+
+    const result = await dashboard();
+
+    expect(result.membership).toEqual({
+      status: "active",
+      plan: "Casual",
+      renewsOn: null,
+    });
+  });
+
+  it("a un socio restringido le da el motivo y el fin del último periodo pagado", async () => {
+    club.membership = {
+      ...membershipWith("cancelled"),
+      currentPeriodEnd: new Date("2026-09-01T02:00:00.000Z"),
+    };
+
+    const result = await restrictedDashboard();
+
+    expect(result.membership).toEqual({
+      status: "restricted",
+      block: "cancelled",
+      endedOn: "2026-09-01",
+    });
+  });
+
+  it("deja la fecha en null a quien no tiene membresía", async () => {
+    club.membership = null;
+
+    const result = await restrictedDashboard();
+
+    expect(result.membership).toEqual({
+      status: "restricted",
+      block: "pending",
+      endedOn: null,
+    });
+  });
+});
+
+describe("las noticias del inicio (#745)", () => {
+  it("lleva la portada grande de la que la tiene y null en la que no", async () => {
+    const coverId = "c0c0c0c0-0000-4000-8000-0000000000aa";
+    const withCover = post({
+      publishedAt: "2026-09-29T00:00:00.000Z",
+      coverUploadId: coverId,
+    });
+    const withoutCover = post({ publishedAt: "2026-09-28T00:00:00.000Z" });
+    club.posts = [withoutCover, withCover];
+    club.newsCoverIds = new Set([coverId]);
+
+    const result = await dashboard();
+
+    expect(result.latestNews).toMatchObject({
+      kind: "news",
+      posts: [
+        {
+          id: withCover.id,
+          coverUrl: `${SIGNED_URL_PREFIX}${CLUB_ID}/covers/${coverId}-large.webp`,
+        },
+        { id: withoutCover.id, coverUrl: null },
+      ],
+    });
+  });
+
+  it("marca sin leer sólo lo publicado después de la última visita", async () => {
+    club.newsSeenAt = "2026-09-28T00:00:00.000Z";
+    const fresh = post({ publishedAt: "2026-09-29T00:00:00.000Z" });
+    const seen = post({ publishedAt: "2026-09-27T00:00:00.000Z" });
+    club.posts = [seen, fresh];
+
+    const result = await dashboard();
+
+    expect(result.latestNews).toMatchObject({
+      kind: "news",
+      posts: [
+        { id: fresh.id, isUnread: true },
+        { id: seen.id, isUnread: false },
+      ],
+    });
+  });
+
+  it("al socio restringido le da las mismas tres, sólo con título, categoría y fecha (D2)", async () => {
+    club.membership = membershipWith("pending");
+    const pinned: NewsPinnedFeedRow = {
+      ...post({
+        publishedAt: "2026-09-10T00:00:00.000Z",
+        category: "announcement",
+        title: "Fijada",
+        coverUploadId: "c0c0c0c0-0000-4000-8000-0000000000bb",
+      }),
+      pinnedUntil: null,
+    };
+    const newest = post({ publishedAt: "2026-09-29T00:00:00.000Z" });
+    const second = post({ publishedAt: "2026-09-28T00:00:00.000Z" });
+    club.posts = [
+      post({ publishedAt: "2026-09-27T00:00:00.000Z" }),
+      second,
+      newest,
+    ];
+    club.pinned = pinned;
+    club.newsCoverIds = new Set(["c0c0c0c0-0000-4000-8000-0000000000bb"]);
+
+    const result = await restrictedDashboard();
+
+    expect(result.latestNews).toEqual({
+      kind: "news",
+      posts: [
+        {
+          id: pinned.id,
+          category: "announcement",
+          title: "Fijada",
+          publishedAt: "2026-09-10T00:00:00.000Z",
+        },
+        {
+          id: newest.id,
+          category: "news",
+          title: "Crónica del torneo",
+          publishedAt: "2026-09-29T00:00:00.000Z",
+        },
+        {
+          id: second.id,
+          category: "news",
+          title: "Crónica del torneo",
+          publishedAt: "2026-09-28T00:00:00.000Z",
+        },
+      ],
+    });
+  });
+});
+
+describe("bloques nuevos caídos (#745)", () => {
+  it("sin agenda, el próximo y la semana no están disponibles y el resto se sirve", async () => {
+    club.failing.add("agenda");
+    club.posts = [post({ publishedAt: "2026-09-29T00:00:00.000Z" })];
+
+    const result = await dashboard();
+
+    expect(result.nextUp).toEqual({ kind: "unavailable" });
+    expect(result.week).toEqual({ kind: "unavailable" });
+    expect(result.membership).toMatchObject({ status: "active" });
+    expect(result.latestNews).toMatchObject({ kind: "news" });
+  });
+
+  it("sin el detalle del evento, sólo cae el próximo", async () => {
+    club.failing.add("eventDetail");
+    club.events = [event({ startsOn: "2026-10-01", startTime: "19:00" })];
+
+    const result = await dashboard();
+
+    expect(result.nextUp).toEqual({ kind: "unavailable" });
+    expect(result.week).toMatchObject({ kind: "week", events: [{}] });
+    expect(reported.map((failure) => failure.source)).toEqual(["next_up"]);
+  });
+
+  it("sin el reparto, sólo cae el próximo", async () => {
+    club.failing.add("teams");
+    club.events = [event({ startsOn: "2026-10-01", startTime: "19:00" })];
+
+    const result = await dashboard();
+
+    expect(result.nextUp).toEqual({ kind: "unavailable" });
+    expect(result.week).toMatchObject({ kind: "week" });
+    expect(reported.map((failure) => failure.source)).toEqual(["next_up"]);
+  });
+
+  it("en el inicio reducido, sin feed sólo caen las noticias", async () => {
+    club.membership = membershipWith("pending");
+    club.failing.add("feed");
+
+    const result = await restrictedDashboard();
+
+    expect(result.latestNews).toEqual({ kind: "unavailable" });
+    expect(result.week).toEqual({ kind: "week", events: [] });
+    expect(result.nextUp).toEqual({ kind: "none" });
+  });
+
+  it("en el inicio reducido, sin agenda caen el próximo y la semana y las noticias llegan", async () => {
+    club.membership = membershipWith("pending");
+    club.failing.add("agenda");
+
+    const result = await restrictedDashboard();
+
+    expect(result.nextUp).toEqual({ kind: "unavailable" });
+    expect(result.week).toEqual({ kind: "unavailable" });
+    expect(result.latestNews).toEqual({ kind: "news", posts: [] });
   });
 });

@@ -242,7 +242,7 @@ function monthlyPriceOf(
 
 /** Stripe cobra al acabar la prueba o el periodo en curso; en cualquier otro
  * estado no hay cobro a la vista. */
-function nextChargeOf(membership: Membership): Date | null {
+export function nextChargeOf(membership: Membership): Date | null {
   if (
     membership.plan === null ||
     membership.plan === "Casual" ||

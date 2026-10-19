@@ -111,6 +111,16 @@ function dashboardGateways(): DashboardGateways {
         scheduledChange: null,
       }),
     },
+    myTeam: {
+      members,
+      memberGroups,
+      teams: {
+        findEvent: async () => null,
+        findSplit: async () => null,
+        findPlayers: async () => [],
+      },
+      positions: { findClubPositions: async () => [] },
+    },
     failures: { report: () => undefined },
   };
 }
@@ -217,6 +227,9 @@ describe("GET /api/v1/dashboard", () => {
         upcomingEvents: { kind: "events", events: [] },
         latestNews: { kind: "news", posts: [] },
         contactReminder: { kind: "reminder", reminder: "both" },
+        nextUp: { kind: "none" },
+        week: { kind: "week", events: [] },
+        membership: { status: "active", plan: "Full", renewsOn: null },
       },
     });
   });
@@ -269,7 +282,7 @@ describe("GET /api/v1/dashboard", () => {
 });
 
 describe("GET /api/v1/dashboard sin la membresía al día (#453)", () => {
-  it("sirve el inicio reducido, sin teselas ni noticias", async () => {
+  it("sirve el inicio reducido, sin teselas y con las noticias sólo en título", async () => {
     givenSession({ kind: "active", role: "Player", membershipCurrent: false });
     membershipStatus = "past_due";
 
@@ -283,6 +296,10 @@ describe("GET /api/v1/dashboard sin la membresía al día (#453)", () => {
         block: "past_due",
         nextTraining: { kind: "none" },
         contactReminder: { kind: "reminder", reminder: "both" },
+        nextUp: { kind: "none" },
+        week: { kind: "week", events: [] },
+        membership: { status: "restricted", block: "past_due", endedOn: null },
+        latestNews: { kind: "news", posts: [] },
       },
     });
   });

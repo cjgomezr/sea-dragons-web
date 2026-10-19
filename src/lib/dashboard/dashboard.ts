@@ -15,6 +15,7 @@ import type { RoleRequestGateways } from "@/lib/auth/role-request";
 import { type Role, hasCapability } from "@/lib/auth/roles";
 import {
   type AgendaEvent,
+  type AgendaPeriod,
   type EventAgendaGateways,
   listAgenda,
 } from "@/lib/events/event-agenda";
@@ -22,9 +23,12 @@ import { isStillAhead } from "@/lib/events/event-occurrences";
 import {
   type MembershipBlock,
   type MembershipGateway,
-  membershipBlockOf,
+  type MembershipPlan,
+  type MembershipReading,
+  membershipBlockOfStatus,
   readMembership,
 } from "@/lib/membership/membership";
+import { nextChargeOf } from "@/lib/membership/membership-view";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
 import {
   type NewsFeedItem,
@@ -38,11 +42,29 @@ import {
   contactReminderOf,
 } from "@/lib/members/contact-reminder";
 import type { ProfileContact } from "@/lib/members/profile-contact";
+import type { MyTeamGateways } from "@/lib/teams/my-team";
 import {
   clubCalendarDate,
   clubMoment,
   subtractClubDays,
 } from "@/lib/time/club-calendar";
+import {
+  type AgendaWindow,
+  type DashboardNextUpEvent,
+  type StaffNextUpEvent,
+  type WeekEvent,
+  findNextUpCandidate,
+  listWeekEvents,
+  readNextUpEvent,
+} from "./dashboard-events";
+
+export type {
+  DashboardNextUpEvent,
+  NextUpTeam,
+  StaffNextUpEvent,
+  TeamsStatus,
+  WeekEvent,
+} from "./dashboard-events";
 
 /**
  * El dashboard de la pantalla de inicio (#424, RF-1, RF-2, RF-5 y RF-6 del
@@ -62,6 +84,10 @@ import {
  *
  * Los dos inicios llevan el aviso de los datos de contacto que faltan (#498,
  * RF-2 del PRD de E19): no depende de tener la membresía al día.
+ *
+ * El rediseño de E27 (#745) añade a los dos el próximo evento, la semana, la
+ * membresía y las noticias. Al inicio reducido las noticias le llegan sólo
+ * con el título, la categoría y la fecha (D2).
  */
 
 /** Cuántos eventos y noticias enseña el inicio (FR-077). */
@@ -118,6 +144,7 @@ export type UpcomingEvents =
   | { readonly kind: "events"; readonly events: readonly AgendaEvent[] }
   | Unavailable;
 
+/** Lo que ve de una noticia quien no tiene la membresía al día (D2). */
 export type LatestNewsItem = {
   readonly id: string;
   readonly category: NewsCategory;
@@ -125,9 +152,43 @@ export type LatestNewsItem = {
   readonly publishedAt: string;
 };
 
-export type LatestNews =
-  | { readonly kind: "news"; readonly posts: readonly LatestNewsItem[] }
+export type MemberLatestNewsItem = LatestNewsItem & {
+  /** La portada grande firmada, o null sin portada. */
+  readonly coverUrl: string | null;
+  readonly excerpt: string;
+  readonly isPinned: boolean;
+  /** Publicada después de la última visita a Noticias (D7). */
+  readonly isUnread: boolean;
+};
+
+export type LatestNews<Item = MemberLatestNewsItem> =
+  { readonly kind: "news"; readonly posts: readonly Item[] } | Unavailable;
+
+/** El próximo evento que ve quien mira (D4). */
+export type NextUp =
+  | DashboardNextUpEvent
+  | StaffNextUpEvent
+  | { readonly kind: "none" }
   | Unavailable;
+
+/** Hoy y los seis días siguientes (D14). */
+export type Week =
+  | { readonly kind: "week"; readonly events: readonly WeekEvent[] }
+  | Unavailable;
+
+export type ActiveMembershipSummary = {
+  readonly status: "active";
+  readonly plan: MembershipPlan | null;
+  /** `YYYY-MM-DD` del club del próximo cobro, o null si no renueva. */
+  readonly renewsOn: string | null;
+};
+
+export type RestrictedMembershipSummary = {
+  readonly status: "restricted";
+  readonly block: MembershipBlock;
+  /** `YYYY-MM-DD` del club en que acabó el último periodo pagado (D8). */
+  readonly endedOn: string | null;
+};
 
 /** Qué dato de contacto le falta a quien mira (#498). */
 export type ContactReminderPart =
@@ -150,6 +211,9 @@ export type MemberDashboard = {
   readonly upcomingEvents: UpcomingEvents;
   readonly latestNews: LatestNews;
   readonly contactReminder: ContactReminderPart;
+  readonly nextUp: NextUp;
+  readonly week: Week;
+  readonly membership: ActiveMembershipSummary;
 };
 
 /** El inicio de quien no tiene la membresía al día (#453). */
@@ -160,6 +224,10 @@ export type RestrictedDashboard = {
   readonly block: MembershipBlock;
   readonly nextTraining: NextTrainingTile;
   readonly contactReminder: ContactReminderPart;
+  readonly nextUp: NextUp;
+  readonly week: Week;
+  readonly membership: RestrictedMembershipSummary;
+  readonly latestNews: LatestNews<LatestNewsItem>;
 };
 
 export type Dashboard = MemberDashboard | RestrictedDashboard;
@@ -185,7 +253,13 @@ export type DashboardRosterGateway = {
 
 /** Las partes que pueden caer por separado, para el log. */
 export type DashboardSource =
-  "attendance" | "members" | "agenda" | "news" | "news_seen" | "contact";
+  | "attendance"
+  | "members"
+  | "agenda"
+  | "next_up"
+  | "news"
+  | "news_seen"
+  | "contact";
 
 export type DashboardFailureLog = {
   report(source: DashboardSource, error: unknown): void;
@@ -199,6 +273,7 @@ export type DashboardGateways = {
   readonly news: NewsGateways;
   readonly roster: DashboardRosterGateway;
   readonly membership: MembershipGateway;
+  readonly myTeam: MyTeamGateways;
   readonly failures: DashboardFailureLog;
 };
 
@@ -291,18 +366,24 @@ function toNextTrainingTile(events: readonly AgendaEvent[]): NextTrainingTile {
   };
 }
 
-/** La primera página de próximos: 50 eventos sobran para encontrar tres y
- * un entrenamiento. */
-async function readUpcomingAhead(
+/** La primera página de próximos y la de pasados: 50 eventos sobran para
+ * encontrar tres, un entrenamiento y la semana, y los pasados recientes son
+ * donde está un evento de varios días que sigue en curso (D4). */
+async function readAgendaWindow(
   gateways: DashboardGateways,
   request: DashboardRequest,
-): Promise<readonly AgendaEvent[]> {
-  const page = await listAgenda(gateways.agenda, {
-    callerId: request.callerId,
-    period: "upcoming",
-    now: request.now,
-  });
-  return page.events.filter((event) => isAheadForViewer(event, request.now));
+): Promise<AgendaWindow> {
+  const readPage = (period: AgendaPeriod) =>
+    listAgenda(gateways.agenda, {
+      callerId: request.callerId,
+      period,
+      now: request.now,
+    });
+  const [upcoming, started] = await Promise.all([
+    readPage("upcoming"),
+    readPage("past"),
+  ]);
+  return { upcoming: upcoming.events, started: started.events };
 }
 
 /** Retirada sólo le llega a quien la publicó; no es algo que leer. */
@@ -310,30 +391,45 @@ function isReadable(post: NewsFeedItem): boolean {
   return post.status === "published";
 }
 
-/** La primera página con la fijada vigente en su sitio por fecha. El feed
- * la trae aparte (#592), pero el inicio la enseña como una más. */
-function withPinnedByDate(page: NewsFeedPage): readonly NewsFeedItem[] {
-  if (page.pinned === null) {
-    return page.posts;
-  }
-  return [page.pinned, ...page.posts].sort(
-    (first, second) =>
-      Date.parse(second.publishedAt) - Date.parse(first.publishedAt),
-  );
+type HomePost = { readonly post: NewsFeedItem; readonly isPinned: boolean };
+
+/** Las que enseña el inicio: la fijada primero y detrás las más nuevas
+ * (#745). El feed trae la fijada aparte (#592). */
+function homePostsOf(page: NewsFeedPage): readonly HomePost[] {
+  const pinned = page.pinned === null ? [] : [page.pinned];
+  return [
+    ...pinned.map((post) => ({ post, isPinned: true })),
+    ...page.posts.map((post) => ({ post, isPinned: false })),
+  ]
+    .filter(({ post }) => isReadable(post))
+    .slice(0, DASHBOARD_LIST_SIZE);
 }
 
-function toLatestNews(page: NewsFeedPage): LatestNews {
+function toLatestNewsItem(post: NewsFeedItem): LatestNewsItem {
+  return {
+    id: post.id,
+    category: post.category,
+    title: post.title,
+    publishedAt: post.publishedAt,
+  };
+}
+
+/** `unreadCutoff` es nulo si no se pudo leer la marca de visita: el fallo
+ * ya está en el log y la tesela sin leer lo dice, y sin saber qué es nuevo
+ * es mejor no marcar ninguna que marcarlas todas. */
+function toMemberLatestNews(
+  page: NewsFeedPage,
+  unreadCutoff: number | null,
+): LatestNews {
   return {
     kind: "news",
-    posts: withPinnedByDate(page)
-      .filter(isReadable)
-      .slice(0, DASHBOARD_LIST_SIZE)
-      .map((post) => ({
-        id: post.id,
-        category: post.category,
-        title: post.title,
-        publishedAt: post.publishedAt,
-      })),
+    posts: homePostsOf(page).map(({ post, isPinned }) => ({
+      ...toLatestNewsItem(post),
+      coverUrl: post.coverUrl,
+      excerpt: post.excerpt,
+      isPinned,
+      isUnread: unreadCutoff !== null && isNewsUnread(post, unreadCutoff),
+    })),
   };
 }
 
@@ -444,26 +540,68 @@ function isUnavailable<T>(value: T | Unavailable): value is Unavailable {
 type EventParts = {
   readonly nextTraining: NextTrainingTile;
   readonly upcomingEvents: UpcomingEvents;
+  readonly nextUp: NextUp;
+  readonly week: Week;
 };
+
+const UNAVAILABLE_EVENT_PARTS: EventParts = {
+  nextTraining: UNAVAILABLE,
+  upcomingEvents: UNAVAILABLE,
+  nextUp: UNAVAILABLE,
+  week: UNAVAILABLE,
+};
+
+type EventPartsRequest = DashboardRequest & {
+  readonly caller: DashboardCaller;
+  readonly isRestricted: boolean;
+};
+
+/** Lo que no trae la agenda (la imagen, la audiencia y el reparto) se lee
+ * aparte y puede caer solo: entonces cae el próximo y nada más. */
+async function readNextUp(
+  gateways: DashboardGateways,
+  request: EventPartsRequest & { readonly window: AgendaWindow },
+): Promise<NextUp> {
+  const event = findNextUpCandidate(request.window, request.now);
+  if (event === null) {
+    return { kind: "none" };
+  }
+  return orUnavailable(
+    gateways,
+    "next_up",
+    readNextUpEvent(gateways, {
+      event,
+      callerId: request.callerId,
+      clubId: request.caller.clubId,
+      role: request.caller.role,
+      isRestricted: request.isRestricted,
+    }),
+  );
+}
 
 async function readEventParts(
   gateways: DashboardGateways,
-  request: DashboardRequest,
+  request: EventPartsRequest,
 ): Promise<EventParts> {
-  const events = await orUnavailable(
+  const window = await orUnavailable(
     gateways,
     "agenda",
-    readUpcomingAhead(gateways, request),
+    readAgendaWindow(gateways, request),
   );
-  if (isUnavailable(events)) {
-    return { nextTraining: UNAVAILABLE, upcomingEvents: UNAVAILABLE };
+  if (isUnavailable(window)) {
+    return UNAVAILABLE_EVENT_PARTS;
   }
+  const ahead = window.upcoming.filter((event) =>
+    isAheadForViewer(event, request.now),
+  );
   return {
-    nextTraining: toNextTrainingTile(events),
+    nextTraining: toNextTrainingTile(ahead),
     upcomingEvents: {
       kind: "events",
-      events: events.slice(0, DASHBOARD_LIST_SIZE),
+      events: ahead.slice(0, DASHBOARD_LIST_SIZE),
     },
+    nextUp: await readNextUp(gateways, { ...request, window }),
+    week: { kind: "week", events: listWeekEvents(window, request.now) },
   };
 }
 
@@ -496,16 +634,45 @@ async function readNewsParts(
   if (isUnavailable(firstPage)) {
     return { unreadNews: UNAVAILABLE, latestNews: UNAVAILABLE };
   }
-  const latestNews = toLatestNews(firstPage);
   if (isUnavailable(seenAt)) {
-    return { unreadNews: UNAVAILABLE, latestNews };
+    return {
+      unreadNews: UNAVAILABLE,
+      latestNews: toMemberLatestNews(firstPage, null),
+    };
   }
+  const latestNews = toMemberLatestNews(
+    firstPage,
+    newsUnreadCutoff(seenAt, request.now),
+  );
   const unreadNews = await orUnavailable(
     gateways,
     "news",
     readUnreadNewsTile(gateways, { ...request, firstPage, seenAt }),
   );
   return { unreadNews, latestNews };
+}
+
+/** Las mismas tres que el inicio de socio, sin portada, extracto ni punto
+ * de sin leer (D2). */
+async function readRestrictedNews(
+  gateways: DashboardGateways,
+  request: DashboardRequest,
+): Promise<LatestNews<LatestNewsItem>> {
+  const page = await orUnavailable(
+    gateways,
+    "news",
+    listNewsFeed(gateways.news, {
+      callerId: request.callerId,
+      now: request.now,
+    }),
+  );
+  if (isUnavailable(page)) {
+    return page;
+  }
+  return {
+    kind: "news",
+    posts: homePostsOf(page).map(({ post }) => toLatestNewsItem(post)),
+  };
 }
 
 async function readContactReminder(
@@ -528,7 +695,10 @@ type DashboardCaller = NonNullable<
 
 async function readMemberDashboard(
   gateways: DashboardGateways,
-  request: DashboardRequest & { readonly caller: DashboardCaller },
+  request: DashboardRequest & {
+    readonly caller: DashboardCaller;
+    readonly membership: ActiveMembershipSummary;
+  },
 ): Promise<MemberDashboard> {
   const { caller } = request;
   const [attendance, members, eventParts, newsParts, contactReminder] =
@@ -543,7 +713,7 @@ async function readMemberDashboard(
         "members",
         readMembersTile(gateways, { clubId: caller.clubId, now: request.now }),
       ),
-      readEventParts(gateways, request),
+      readEventParts(gateways, { ...request, isRestricted: false }),
       readNewsParts(gateways, request),
       readContactReminder(gateways, request.callerId),
     ]);
@@ -559,6 +729,9 @@ async function readMemberDashboard(
     upcomingEvents: eventParts.upcomingEvents,
     latestNews: newsParts.latestNews,
     contactReminder,
+    nextUp: eventParts.nextUp,
+    week: eventParts.week,
+    membership: request.membership,
   };
 }
 
@@ -566,19 +739,52 @@ async function readRestrictedDashboard(
   gateways: DashboardGateways,
   request: DashboardRequest & {
     readonly caller: DashboardCaller;
-    readonly block: MembershipBlock;
+    readonly membership: RestrictedMembershipSummary;
   },
 ): Promise<RestrictedDashboard> {
-  const [{ nextTraining }, contactReminder] = await Promise.all([
-    readEventParts(gateways, request),
+  const [eventParts, contactReminder, latestNews] = await Promise.all([
+    readEventParts(gateways, { ...request, isRestricted: true }),
     readContactReminder(gateways, request.callerId),
+    readRestrictedNews(gateways, request),
   ]);
   return {
     kind: "restricted",
     viewer: { firstName: firstNameOf(request.caller.fullName) },
-    block: request.block,
-    nextTraining,
+    block: request.membership.block,
+    nextTraining: eventParts.nextTraining,
     contactReminder,
+    nextUp: eventParts.nextUp,
+    week: eventParts.week,
+    membership: request.membership,
+    latestNews,
+  };
+}
+
+function toClubDate(instant: Date | null): string | null {
+  return instant === null ? null : clubCalendarDate(instant);
+}
+
+/** Lo que el inicio dice de la membresía (D8). Sin membresía, el socio está
+ * como quien todavía no puso tarjeta, igual que en `membershipBlockOf`. */
+function summarizeMembership(
+  reading: MembershipReading,
+): ActiveMembershipSummary | RestrictedMembershipSummary {
+  if (reading.kind === "none") {
+    return { status: "restricted", block: "pending", endedOn: null };
+  }
+  const { membership } = reading;
+  const block = membershipBlockOfStatus(membership.status);
+  if (block !== null) {
+    return {
+      status: "restricted",
+      block,
+      endedOn: toClubDate(membership.currentPeriodEnd),
+    };
+  }
+  return {
+    status: "active",
+    plan: membership.plan,
+    renewsOn: toClubDate(nextChargeOf(membership)),
   };
 }
 
@@ -592,13 +798,13 @@ export async function readDashboard(
   }
   // Sin orUnavailable: si no se sabe si está al día, no se le sirve el
   // inicio de socio. La puerta se cierra hacia el lado seguro.
-  const block = membershipBlockOf(
+  const membership = summarizeMembership(
     await readMembership(gateways.membership, {
       userId: request.callerId,
       now: request.now,
     }),
   );
-  return block === null
-    ? readMemberDashboard(gateways, { ...request, caller })
-    : readRestrictedDashboard(gateways, { ...request, caller, block });
+  return membership.status === "active"
+    ? readMemberDashboard(gateways, { ...request, caller, membership })
+    : readRestrictedDashboard(gateways, { ...request, caller, membership });
 }
