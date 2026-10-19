@@ -443,6 +443,28 @@ export const englishMessages = {
     "Add how you're related, or leave all three empty.",
   "account.profile.issue.emergencyTextTooLong":
     "This can be at most {max} characters.",
+  // Las tarjetas de Sobre mí y Contacto del perfil y de la ficha (#772).
+  "profileCard.edit": "Edit",
+  "profileCard.editLabel": "Edit {title}",
+  "profileCard.cancel": "Cancel",
+  "profileCard.save": "Save",
+  "profileCard.saving": "Saving…",
+  "profileCard.discardQuestion":
+    "You have changes you haven't saved. Discard them?",
+  "profileCard.empty": "Not set",
+  "profileCard.onlyYou": "only you",
+  "profileCard.about.title": "About",
+  "profileCard.about.saved": "About saved",
+  "profileCard.about.fullName": "Full name",
+  "profileCard.about.country": "Country",
+  "profileCard.about.position": "Position",
+  "profileCard.about.experience": "Experience",
+  "profileCard.about.gender": "Gender",
+  "profileCard.contact.saved": "Contact saved",
+  "profileCard.contact.phone": "Phone",
+  "profileCard.contact.emergency": "Emergency contact",
+  "profileCard.contact.notAdded": "Not added yet",
+  "profileCard.contact.emergencySummary": "{name} · {relationship}",
   // La foto de perfil (#245): el círculo de la cabecera y sus controles.
   "account.photo.alt": "Your profile photo",
   "account.photo.add": "Add photo",

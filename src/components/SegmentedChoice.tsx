@@ -26,7 +26,8 @@ export function SegmentedChoice<Value extends string>({
 }: {
   readonly label: string;
   readonly options: readonly SegmentedOption<Value>[];
-  readonly selected: Value;
+  /** Null si todavía no se eligió ninguna. */
+  readonly selected: Value | null;
   readonly onChoose: (value: Value) => void;
 }): React.JSX.Element {
   const id = useId();

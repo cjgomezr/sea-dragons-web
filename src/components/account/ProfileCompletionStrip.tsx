@@ -10,8 +10,6 @@ import {
   PERCENT_MAX,
   type ProfileCompleteness,
 } from "@/lib/members/contact-reminder";
-import { EMERGENCY_NAME_ID, PHONE_ID } from "./OwnContactSection";
-import { COUNTRY_ID } from "./ProfileForm";
 
 /**
  * La franja de lo que le falta al perfil (#771, D8 del PRD de E30), que
@@ -19,31 +17,19 @@ import { COUNTRY_ID } from "./ProfileForm";
  * alerta: recuerda, no bloquea. Sale de la ficha guardada, así que se va en
  * cuanto el guardado refresca la página.
  *
- * Cada ficha lleva al primer campo de su dato. Mientras las tarjetas no
- * existan, ese campo es el del formulario de hoy. Es de cliente por el foco.
+ * Cada ficha abre la tarjeta de su dato con el foco en su primer campo
+ * (#772); qué tarjeta y qué campo lo decide quien la pinta. Es de cliente por
+ * el clic.
  */
-
-const FIRST_FIELD_IDS = {
-  emergency_contact: EMERGENCY_NAME_ID,
-  phone: PHONE_ID,
-  country: COUNTRY_ID,
-} as const satisfies Record<MissingProfileItem, string>;
-
-function focusFieldOf(item: MissingProfileItem): void {
-  const field = document.getElementById(FIRST_FIELD_IDS[item]);
-  if (field === null) {
-    throw new Error(`Falta el campo ${FIRST_FIELD_IDS[item]} del perfil.`);
-  }
-  // El foco ya lo trae a la vista.
-  field.focus();
-}
 
 export function ProfileCompletionStrip({
   locale,
   completeness,
+  onAdd,
 }: {
   readonly locale: Locale;
   readonly completeness: ProfileCompleteness;
+  readonly onAdd: (item: MissingProfileItem) => void;
 }): React.JSX.Element | null {
   const translate = createTranslator(locale);
   const titleId = useId();
@@ -79,7 +65,7 @@ export function ProfileCompletionStrip({
             key={item}
             type="button"
             className="profile-missing-chip"
-            onClick={() => focusFieldOf(item)}
+            onClick={() => onAdd(item)}
           >
             <Plus aria-hidden="true" weight="bold" />
             {translate(`profileCompletion.item.${item}`)}

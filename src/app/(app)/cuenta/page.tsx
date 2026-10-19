@@ -11,7 +11,7 @@ import {
   describeRoleRequestAccount,
 } from "@/lib/auth/role-request";
 import { SIGN_IN_PATH } from "@/lib/auth/routes";
-import { readAuthenticatedUserId } from "@/lib/auth/session-reader";
+import { readAuthenticatedCaller } from "@/lib/auth/session-reader";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import {
   type ProfileEvaluation,
@@ -68,6 +68,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 type CallerSession = {
   readonly userId: string;
+  /** Contacto lo enseña bajo el teléfono (#772). */
+  readonly email: string;
   readonly client: SupabaseClient;
 };
 
@@ -76,11 +78,11 @@ async function readCallerSession(): Promise<CallerSession> {
   if (session.kind === "unconfigured") {
     throw new Error(describeMissingAuthKeys(session.missingKeys));
   }
-  const userId = await readAuthenticatedUserId(session.client);
-  if (userId === null) {
+  const caller = await readAuthenticatedCaller(session.client);
+  if (caller === null) {
     redirect(SIGN_IN_PATH);
   }
-  return { userId, client: session.client };
+  return { userId: caller.userId, email: caller.email, client: session.client };
 }
 
 /** Con la sesión del socio y no con la llave de servicio: la RLS de
@@ -231,6 +233,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
     <ProfileScreen
       locale={locale}
       userId={caller.userId}
+      email={caller.email}
       account={account}
       profile={profile.profile}
       positionOptions={profile.positionOptions}
