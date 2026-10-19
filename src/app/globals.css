@@ -15177,11 +15177,6 @@ a.auth-brand-header:focus-visible {
   text-decoration: none;
 }
 
-.attendance-older-sessions:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 /* Los totales (#765): un panel con los tres números en línea, cuántos
    vinieron a la derecha y una barra apilada debajo. */
 .attendance-totals {
@@ -15291,11 +15286,11 @@ a.auth-brand-header:focus-visible {
   margin: 0;
   font-family: var(--font-family-mono);
   font-size: 11.5px;
-  font-weight: 700;
   letter-spacing: 0.08em;
 }
 
 .attendance-group-title {
+  font-weight: 700;
   text-transform: uppercase;
   color: var(--color-text-secondary);
 }
@@ -15303,7 +15298,6 @@ a.auth-brand-header:focus-visible {
 /* El número va más ligero que el nombre: el tono apagado del diseño no
    llega a AA sobre el fondo. */
 .attendance-group-count {
-  font-weight: 400;
   color: var(--color-text-secondary);
 }
 
