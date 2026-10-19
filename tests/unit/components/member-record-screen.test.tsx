@@ -284,7 +284,7 @@ describe("ficha en pantalla: carga", () => {
 
     expect(screen.getByLabelText("AUF number")).toHaveValue("AUF-1");
     expect(screen.getByLabelText("Expiry date")).toHaveValue("2027-03-31");
-    expect(screen.getByText(/Member since 6 March 2024/)).toBeInTheDocument();
+    expect(screen.getByText("Member since March 2024")).toBeInTheDocument();
     const groups = screen.getByRole("group", { name: "Groups" });
     expect(
       within(groups).getByRole("checkbox", { name: "Senior Squad" }),
@@ -333,9 +333,10 @@ describe("ficha en pantalla: carga", () => {
 
     await renderScreen();
 
-    expect(
-      screen.getByRole("link", { name: /back to the directory/i }),
-    ).toHaveAttribute("href", "/directorio");
+    expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
+      "href",
+      "/directorio",
+    );
   });
 
   it("dice que el miembro no existe cuando la API responde 404", async () => {
@@ -348,9 +349,7 @@ describe("ficha en pantalla: carga", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "That member isn't in the club.",
     );
-    expect(
-      screen.getByRole("link", { name: /back to the directory/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Directory" })).toBeInTheDocument();
   });
 
   it("dice que la ficha es sólo del Admin cuando la API responde 403", async () => {
@@ -370,15 +369,13 @@ describe("ficha en pantalla: carga", () => {
 
     expect(screen.getByLabelText("Número de AUF")).toHaveValue("AUF-1");
     expect(screen.getByLabelText("Vencimiento")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Miembro desde el 6 de marzo de 2024/),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Miembro desde marzo de 2024")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Grupos" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Guardar la ficha" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /volver al directorio/i }),
+      screen.getByRole("link", { name: "Directorio" }),
     ).toBeInTheDocument();
   });
 });
@@ -1203,7 +1200,7 @@ describe("ficha en pantalla: verificar el AUF (#274)", () => {
 
     await renderScreen();
 
-    expect(screen.getByText("AUF not verified")).toBeInTheDocument();
+    expect(screen.getByText("AUF pending")).toBeInTheDocument();
     expect(screen.queryByText("AUF verified")).not.toBeInTheDocument();
   });
 
@@ -1258,7 +1255,7 @@ describe("ficha en pantalla: verificar el AUF (#274)", () => {
       { aufNumber: "AUF-1", aufExpiry: "2027-03-31" },
     ]);
     expect(screen.getByText("AUF verified")).toBeInTheDocument();
-    expect(screen.queryByText("AUF not verified")).not.toBeInTheDocument();
+    expect(screen.queryByText("AUF pending")).not.toBeInTheDocument();
   });
 
   it("no ofrece verificar mientras el número está editado: guardar ya lo verifica", async () => {
@@ -1286,7 +1283,7 @@ describe("ficha en pantalla: verificar el AUF (#274)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "The member changed the AUF after you opened the record. Reload it before verifying.",
     );
-    expect(screen.getByText("AUF not verified")).toBeInTheDocument();
+    expect(screen.getByText("AUF pending")).toBeInTheDocument();
   });
 
   it("no manda una segunda verificación con un doble clic", async () => {
@@ -1314,7 +1311,7 @@ describe("ficha en pantalla: verificar el AUF (#274)", () => {
 
     await renderScreen("es");
 
-    expect(screen.getByText("AUF sin verificar")).toBeInTheDocument();
+    expect(screen.getByText("AUF pendiente")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Verificar AUF" }),
     ).toBeInTheDocument();
@@ -1748,5 +1745,140 @@ describe("ficha en pantalla: rol (#549)", () => {
     expect(
       within(role).getByRole("option", { name: "Jugador" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("ficha en pantalla: la cabecera (#771)", () => {
+  it("lleva el nombre en H1, la píldora del rol y posición · experiencia · país", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    const header = screen.getByRole("banner");
+    expect(within(header).getByText("Player")).toBeInTheDocument();
+    expect(
+      within(header).getByText("Goalkeeper · Intermediate · Australia"),
+    ).toBeInTheDocument();
+    expect(within(header).getByText("Membership active")).toBeInTheDocument();
+    expect(within(header).getByText("AUF verified")).toBeInTheDocument();
+    expect(
+      within(header).getByText("Member since March 2024"),
+    ).toBeInTheDocument();
+  });
+
+  it("la foto no lleva cámara: el Admin no cambia la foto de otro", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(
+      screen.queryByRole("button", { name: /photo/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("enseña el rol que el Admin acaba de cambiar", async () => {
+    stubApi({ record: { ...RECORD, role: "Coach" } });
+
+    await renderScreen();
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Coach"),
+    ).toBeInTheDocument();
+  });
+
+  it("se lee en español", async () => {
+    stubApi({ record: PENDING_RECORD });
+
+    await renderScreen("es");
+
+    const header = screen.getByRole("banner");
+    expect(
+      within(header).getByText("Portero · Intermedio · Australia"),
+    ).toBeInTheDocument();
+    expect(within(header).getByText("Membresía activa")).toBeInTheDocument();
+    expect(within(header).getByText("AUF pendiente")).toBeInTheDocument();
+    expect(
+      within(header).getByText("Miembro desde marzo de 2024"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("ficha en pantalla: la franja del AUF pendiente (#771)", () => {
+  function aufStrip(): HTMLElement {
+    return screen.getByRole("note", { name: /added AUF/ });
+  }
+
+  it("dice quién añadió qué AUF y cuándo vence, con Verificar AUF", async () => {
+    stubApi({ record: PENDING_RECORD });
+
+    await renderScreen();
+
+    const strip = aufStrip();
+    expect(strip).toHaveTextContent(
+      "Paula Player added AUF AUF-1 (expires 31 March 2027). Check it and verify.",
+    );
+    expect(within(strip).getByText("AUF-1").tagName).toBe("STRONG");
+    expect(
+      within(strip).getByRole("button", { name: "Verify AUF" }),
+    ).toBeInTheDocument();
+  });
+
+  it("sin vencimiento no dice cuándo vence", async () => {
+    stubApi({ record: { ...PENDING_RECORD, aufExpiry: null } });
+
+    await renderScreen();
+
+    expect(aufStrip()).toHaveTextContent(
+      "Paula Player added AUF AUF-1. Check it and verify.",
+    );
+  });
+
+  it("al verificar llama a la API, quita la franja y dice AUF verificado", async () => {
+    stubApi({ record: PENDING_RECORD });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(
+      within(aufStrip()).getByRole("button", { name: "Verify AUF" }),
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "AUF verified.",
+    );
+    expect(verifications).toEqual([
+      { aufNumber: "AUF-1", aufExpiry: "2027-03-31" },
+    ]);
+    expect(
+      screen.queryByRole("note", { name: /added AUF/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("no sale con el AUF verificado ni sin AUF", async () => {
+    stubApi({
+      record: {
+        ...RECORD,
+        aufNumber: null,
+        aufExpiry: null,
+        isAufVerified: false,
+      },
+    });
+
+    await renderScreen();
+
+    expect(
+      screen.queryByRole("note", { name: /added AUF/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("se lee en español", async () => {
+    stubApi({ record: PENDING_RECORD });
+
+    await renderScreen("es");
+
+    expect(
+      screen.getByRole("note", { name: /añadió el AUF/ }),
+    ).toHaveTextContent(
+      "Paula Player añadió el AUF AUF-1 (vence el 31 de marzo de 2027). Revísalo y verifícalo.",
+    );
   });
 });

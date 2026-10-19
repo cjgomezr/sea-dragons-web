@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MemberAttendanceSummary } from "@/components/attendance/MemberAttendanceSummary";
@@ -106,6 +107,7 @@ export function MemberRecordScreen({
   return (
     <div className="member-record">
       <Link href={DIRECTORY_PATH} className="member-record-back">
+        <ArrowLeft aria-hidden="true" weight="bold" />
         {translate("memberRecord.back")}
       </Link>
       {state.kind === "loading" ? (

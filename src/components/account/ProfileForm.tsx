@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import type { RequestFailure } from "@/components/auth/request-failure";
@@ -80,6 +81,8 @@ type Draft = AufDraft &
 
 const FULL_NAME_ID = "perfil-nombre";
 const FULL_NAME_ERROR_ID = "perfil-nombre-error";
+/** La franja de lo que falta (#771) pone aquí el foco cuando falta el país. */
+export const COUNTRY_ID = "perfil-pais";
 
 function toDraft(
   profile: OwnProfile,
@@ -275,7 +278,8 @@ function SaveOutcome({
   switch (status.kind) {
     case "saved":
       return (
-        <p className="auth-note" role="status">
+        <p className="profile-strip profile-strip-success" role="status">
+          <CheckCircle aria-hidden="true" weight="regular" />
           {translate("account.profile.saved")}
         </p>
       );
@@ -410,7 +414,7 @@ export function ProfileForm({
           onChange={(fullName) => update({ fullName })}
         />
         <SelectField
-          id="perfil-pais"
+          id={COUNTRY_ID}
           label={translate("account.profile.country")}
           value={draft.country}
           options={countries.map((country) => ({

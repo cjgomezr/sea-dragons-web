@@ -39,6 +39,7 @@ import { readServerCookies } from "@/lib/supabase/server-cookies";
 import { createSessionClient } from "@/lib/supabase/session-client";
 import {
   type MembershipPlan,
+  type MembershipStatus,
   readMembership,
 } from "@/lib/membership/membership";
 import { createMembershipGateway } from "@/lib/membership/supabase-membership-gateways";
@@ -112,17 +113,25 @@ async function readProfile({
   }
 }
 
-/** Con la sesión: `memberships_select_own` le deja leer su propia membresía.
- * Del perfil sólo sale el plan, que se cambia en Pagos (#456). */
-async function readMembershipPlan({
+/** Lo que el perfil enseña de la membresía: el plan, que se cambia en Pagos
+ * (#456), y el estado, que va en la cabecera (#771). Null sin membresía. */
+type MembershipSummary = {
+  readonly plan: MembershipPlan | null;
+  readonly status: MembershipStatus;
+};
+
+/** Con la sesión: `memberships_select_own` le deja leer su propia membresía. */
+async function readMembershipSummary({
   userId,
   client,
-}: CallerSession): Promise<MembershipPlan | null> {
+}: CallerSession): Promise<MembershipSummary | null> {
   const reading = await readMembership(createMembershipGateway(client), {
     userId,
     now: new Date(),
   });
-  return reading.kind === "found" ? reading.membership.plan : null;
+  return reading.kind === "found"
+    ? { plan: reading.membership.plan, status: reading.membership.status }
+    : null;
 }
 
 /** La foto se firma con la llave de servicio: el bucket es privado (#245). */
@@ -208,23 +217,16 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
     readRequestLocale(),
     readCallerSession(),
   ]);
-  const [
-    account,
-    profile,
-    photo,
-    groups,
-    evaluation,
-    attendance,
-    membershipPlan,
-  ] = await Promise.all([
-    readAccount(caller.userId),
-    readProfile(caller),
-    readPhoto(caller),
-    readGroups(caller),
-    readEvaluation(caller.userId),
-    readAttendance(caller.userId),
-    readMembershipPlan(caller),
-  ]);
+  const [account, profile, photo, groups, evaluation, attendance, membership] =
+    await Promise.all([
+      readAccount(caller.userId),
+      readProfile(caller),
+      readPhoto(caller),
+      readGroups(caller),
+      readEvaluation(caller.userId),
+      readAttendance(caller.userId),
+      readMembershipSummary(caller),
+    ]);
   return (
     <ProfileScreen
       locale={locale}
@@ -238,7 +240,9 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
       evaluation={evaluation}
       attendance={attendance}
       countries={listCountryOptions(locale)}
-      membershipPlan={membershipPlan}
+      membershipPlan={membership === null ? null : membership.plan}
+      membershipStatus={membership === null ? null : membership.status}
+      joinedOn={profile.joinedOn}
     />
   );
 }

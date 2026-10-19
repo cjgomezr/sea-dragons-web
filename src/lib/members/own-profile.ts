@@ -170,6 +170,9 @@ export type EmergencyContactProposal = { readonly guardianName: string };
  * club. Vacías si el club archivó todas y el miembro no tiene ninguna. */
 export type OwnProfileScreen = {
   readonly profile: OwnProfile;
+  /** YYYY-MM-DD, el día del club en que ingresó: la cabecera (#771) dice
+   * desde cuándo es socio. */
+  readonly joinedOn: string;
   readonly positionOptions: ClubPositions;
   readonly emergencyContactProposal: EmergencyContactProposal | null;
 };
@@ -389,6 +392,7 @@ export async function readOwnProfile(
   );
   return {
     profile,
+    joinedOn: stored.joinedOn,
     positionOptions: offeredPositions(positions, profile.positionId),
     emergencyContactProposal: emergencyContactProposalOf(stored),
   };
