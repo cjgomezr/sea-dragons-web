@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+body{margin:0;background:#070f16;color:#e8f0f7;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+a{color:#33a1e0}a:hover{color:#5ab4e8}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #33a1e0;outline-offset:2px}
+</style>
+</helmet>
+
+<section id="t1" style="padding:48px 56px 80px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:10px;max-width:960px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t1" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">1</a><span style="font-size:20px;font-weight:700">Asistencia — filas compactas, sin subrayado</span></div>
+<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14.5px;line-height:1.5;color:#cfdeea">
+<li><strong>Nombre sin subrayar</strong>: sigue abriendo la ficha (Admin), pero se avisa con una flechita ↗ al lado y el color de acento al pasar el mouse.</li>
+<li><strong>Cada persona en una línea</strong> de ~44px (hoy son ~80px en celular): foto, nombre, posición y los 3 botones juntos.</li>
+<li><strong>Contadores</strong> en una sola barra con proporción, en vez de 3 tarjetas grandes.</li>
+<li>Las sesiones como chips chicos; "Older sessions" sin subrayado.</li>
+</ul>
+<p style="margin:0;font-size:14px;color:#8aa1b5"><a href="#1a">1a</a> lista · <a href="#1b">1b</a> grilla de tarjetas chicas · <a href="#2a">2a</a> celular. Marcá gente y guardá; los tres comparten los datos.</p>
+</div>
+
+<div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+
+<div id="1a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1a</a><span style="font-size:13.5px;color:#8aa1b5">Escritorio — lista densa (recomendada)</span></div>
+<div style="width:880px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;padding:24px 28px 28px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">TAKE ATTENDANCE</span><h1 style="margin:0;font-size:26px;line-height:1.15;font-weight:700">{{ title }}</h1></div>
+<button onClick="{{ save }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center;height:40px;padding:0 18px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:14px;font-weight:700" style-hover="background:#5ab4e8"><i class="ph-bold ph-floppy-disk"></i>{{ saveLabel }}<sc-if value="{{ dirty }}"><span style="display:flex;gap:6px;align-items:center;padding-left:8px;margin-left:2px;border-left:1px solid rgba(12,26,38,.35);font-weight:600"><span style="width:7px;height:7px;border-radius:50%;background:#0c1a26"></span>{{ dirtyCount }}</span></sc-if></button>
+</div>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+<sc-for list="{{ sessions }}" as="s"><button onClick="{{ s.pick }}" aria-pressed="{{ s.on }}" style="all:unset;cursor:pointer;white-space:nowrap;height:30px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:{{ s.w }};border:1px solid {{ s.border }};background:{{ s.bg }};color:{{ s.color }}">{{ s.label }}</button></sc-for>
+<a href="#1a" style="display:flex;gap:4px;align-items:center;height:30px;padding:0 6px;font-size:13px;font-weight:600;color:#5ab4e8;text-decoration:none" style-hover="color:#e8f0f7">Older sessions<i class="ph ph-arrow-right"></i></a>
+</div>
+<sc-if value="{{ notice }}"><div style="display:flex;gap:8px;align-items:center;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px;color:#e8f0f7"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+<div aria-live="polite" style="display:flex;flex-direction:column;gap:8px;padding:12px 14px;border:1px solid #274055;border-radius:10px;background:#13283a">
+<div style="display:flex;gap:20px;align-items:baseline;flex-wrap:wrap">
+<sc-for list="{{ totals }}" as="t"><span style="display:flex;gap:7px;align-items:baseline"><span style="width:9px;height:9px;border-radius:50%;background:{{ t.c }};align-self:center"></span><span style="font:700 18px ui-monospace,Menlo,monospace">{{ t.n }}</span><span style="font-size:13px;color:#8aa1b5">{{ t.label }}</span></span></sc-for>
+<span style="margin-left:auto;font-size:13px;color:#8aa1b5">{{ totalLine }}</span>
+</div>
+<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;background:#0c1a26;gap:2px"><sc-for list="{{ totals }}" as="t"><span style="flex:{{ t.n }};background:{{ t.c }}"></span></sc-for></div>
+</div>
+<sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;gap:10px;align-items:center;padding:0 2px"><span style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">{{ g.label }}</span><span style="font:12px ui-monospace,Menlo,monospace;color:#5a7086">{{ g.n }}</span></div>
+<div style="border:1px solid #274055;border-radius:10px;background:#13283a;overflow:hidden">
+<sc-for list="{{ g.rows }}" as="m">
+<div style="display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:12px;align-items:center;min-height:44px;padding:4px 8px 4px 12px;border-top:{{ m.sep }}" style-hover="background:#16304a">
+<span style="width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:{{ m.av }};font:700 11px ui-monospace,Menlo,monospace;color:#e8f0f7">{{ m.ini }}</span>
+<span style="display:flex;gap:8px;align-items:center;min-width:0">
+<a href="#1a" onClick="{{ m.open }}" aria-label="{{ m.openLabel }}" style="display:flex;gap:4px;align-items:center;min-width:0;font-size:14.5px;font-weight:600;color:#e8f0f7;text-decoration:none" style-hover="color:#5ab4e8"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</span><i class="ph ph-arrow-up-right" style="font-size:12px;color:#5a7086"></i></a>
+<sc-if value="{{ m.pos }}"><span style="flex:none;padding:1px 7px;border-radius:5px;background:#0c1a26;font:11.5px ui-monospace,Menlo,monospace;color:#cfdeea">{{ m.pos }}</span></sc-if>
+<sc-if value="{{ m.inactive }}"><span style="flex:none;padding:0 6px;border-radius:5px;border:1px solid #f2887a;font-size:11.5px;color:#f2887a">Inactive</span></sc-if>
+<sc-if value="{{ m.changed }}"><span title="Not saved yet" style="flex:none;width:6px;height:6px;border-radius:50%;background:#f2ce78"></span></sc-if>
+</span>
+<span role="group" aria-label="{{ m.name }}" style="display:flex;gap:2px;padding:1px;border-radius:8px;background:#0c1a26;border:1px solid #274055">
+<sc-for list="{{ m.opts }}" as="o"><button onClick="{{ o.pick }}" aria-pressed="{{ o.on }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:5px;align-items:center;height:26px;padding:0 10px;border-radius:6px;font-size:12.5px;font-weight:{{ o.w }};background:{{ o.bg }};color:{{ o.color }}" style-hover="color:#e8f0f7"><i class="ph-bold {{ o.icon }}" style="font-size:13px;color:{{ o.ic }}"></i>{{ o.label }}</button></sc-for>
+</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div id="1b" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1b" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1b</a><span style="font-size:13.5px;color:#8aa1b5">Escritorio — grilla de tarjetas chicas</span></div>
+<div style="width:880px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;padding:24px 28px 28px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:16px">
+<h1 style="margin:0;font-size:22px;font-weight:700">{{ title }}</h1>
+<div style="display:flex;gap:16px;align-items:center"><sc-for list="{{ totals }}" as="t"><span style="display:flex;gap:6px;align-items:baseline"><span style="width:8px;height:8px;border-radius:50%;background:{{ t.c }};align-self:center"></span><span style="font:700 15px ui-monospace,Menlo,monospace">{{ t.n }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ t.label }}</span></span></sc-for></div>
+</div>
+<sc-for list="{{ groups }}" as="g">
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;gap:10px;align-items:center"><span style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">{{ g.label }}</span><span style="font:12px ui-monospace,Menlo,monospace;color:#5a7086">{{ g.n }}</span></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+<sc-for list="{{ g.rows }}" as="m">
+<div style="display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:10px;background:#13283a;border:1px solid {{ m.tileBorder }}">
+<span style="display:flex;gap:9px;align-items:center;min-width:0">
+<span style="position:relative;flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:{{ m.av }};font:700 11px ui-monospace,Menlo,monospace">{{ m.ini }}<span style="position:absolute;right:-2px;bottom:-2px;width:11px;height:11px;border-radius:50%;background:{{ m.dot }};border:2px solid #13283a"></span></span>
+<span style="display:flex;flex-direction:column;gap:1px;min-width:0"><a href="#1b" onClick="{{ m.open }}" style="font-size:13.5px;font-weight:600;color:#e8f0f7;text-decoration:none;overflow-wrap:anywhere" style-hover="color:#5ab4e8">{{ m.name }}</a><span style="font:11.5px ui-monospace,Menlo,monospace;color:#8aa1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.posOrDash }}</span></span>
+</span>
+<span role="group" aria-label="{{ m.name }}" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px;border-radius:7px;background:#0c1a26">
+<sc-for list="{{ m.opts }}" as="o"><button onClick="{{ o.pick }}" aria-pressed="{{ o.on }}" aria-label="{{ o.label }}" title="{{ o.label }}" style="all:unset;cursor:pointer;height:26px;border-radius:5px;display:grid;place-items:center;background:{{ o.bg }};color:{{ o.color }}"><i class="ph-bold {{ o.icon }}" style="font-size:14px;color:{{ o.ic }}"></i></button></sc-for>
+</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div id="2a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#2a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2a</a><span style="font-size:13.5px;color:#8aa1b5">Celular — la lista de 1a</span></div>
+<div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;display:flex;flex-direction:column">
+<div style="padding:16px 16px 10px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #274055">
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">TAKE ATTENDANCE</span><span style="font-size:21px;font-weight:700;line-height:1.2">{{ title }}</span></div>
+<div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px">
+<sc-for list="{{ sessions }}" as="s"><button onClick="{{ s.pick }}" aria-pressed="{{ s.on }}" style="all:unset;cursor:pointer;flex:none;white-space:nowrap;height:36px;padding:0 14px;border-radius:999px;font-size:13.5px;font-weight:{{ s.w }};border:1px solid {{ s.border }};background:{{ s.bg }};color:{{ s.color }}">{{ s.short }}</button></sc-for>
+<a href="#2a" style="flex:none;display:flex;gap:4px;align-items:center;height:36px;padding:0 8px;font-size:13.5px;font-weight:600;color:#5ab4e8;text-decoration:none">Older<i class="ph ph-arrow-right"></i></a>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;gap:14px;align-items:baseline"><sc-for list="{{ totals }}" as="t"><span style="display:flex;gap:5px;align-items:baseline"><span style="width:8px;height:8px;border-radius:50%;background:{{ t.c }};align-self:center"></span><span style="font:700 16px ui-monospace,Menlo,monospace">{{ t.n }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ t.label }}</span></span></sc-for></div>
+<div style="display:flex;height:5px;border-radius:3px;overflow:hidden;background:#13283a;gap:2px"><sc-for list="{{ totals }}" as="t"><span style="flex:{{ t.n }};background:{{ t.c }}"></span></sc-for></div>
+</div>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:12px 12px 20px;display:flex;flex-direction:column;gap:14px">
+<sc-if value="{{ notice }}"><div style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+<sc-for list="{{ groups }}" as="g">
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;gap:8px;align-items:center;padding:0 4px"><span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">{{ g.label }}</span><span style="font:11.5px ui-monospace,Menlo,monospace;color:#5a7086">{{ g.n }}</span></div>
+<div style="border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ g.rows }}" as="m">
+<div style="display:flex;gap:10px;align-items:center;min-height:56px;padding:6px 6px 6px 10px;border-top:{{ m.sep }}">
+<span style="flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:{{ m.av }};font:700 11px ui-monospace,Menlo,monospace">{{ m.ini }}</span>
+<a href="#2a" onClick="{{ m.open }}" aria-label="{{ m.openLabel }}" style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:1px;min-height:44px;text-decoration:none;color:#e8f0f7">
+<span style="display:flex;gap:4px;align-items:flex-start;min-width:0"><span style="font-size:15px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere">{{ m.name }}<i class="ph ph-arrow-up-right" style="font-size:11px;color:#5a7086;margin-left:4px"></i></span><sc-if value="{{ m.changed }}"><span style="flex:none;width:6px;height:6px;border-radius:50%;background:#f2ce78"></span></sc-if></span>
+<span style="font:11.5px ui-monospace,Menlo,monospace;color:#8aa1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.posLine }}</span>
+</a>
+<span role="group" aria-label="{{ m.name }}" style="flex:none;display:flex;padding:2px;gap:0;border-radius:9px;background:#0c1a26;border:1px solid #274055">
+<sc-for list="{{ m.opts }}" as="o"><button onClick="{{ o.pick }}" aria-pressed="{{ o.on }}" aria-label="{{ o.label }}" style="all:unset;cursor:pointer;width:34px;height:40px;box-sizing:border-box;border-radius:7px;display:grid;place-items:center;background:{{ o.bg }}"><i class="ph-bold {{ o.icon }}" style="font-size:16px;color:{{ o.mIc }}"></i></button></sc-for>
+</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{ dirty }}">
+<div style="display:flex;gap:10px;align-items:center;padding:10px 12px 16px;border-top:1px solid color-mix(in srgb,#f2ce78 40%,transparent);background:#13283a">
+<span style="flex:1;display:flex;gap:7px;align-items:center;font-size:13.5px;color:#cfdeea"><span style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span>{{ dirtyCount }}</span>
+<button onClick="{{ save }}" style="all:unset;cursor:pointer;height:48px;padding:0 22px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Save attendance</button>
+</div>
+</sc-if>
+</div>
+</div>
+
+</div>
+
+<ul style="margin:0;padding-left:18px;max-width:960px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+<li>Cada fila con cambios sin guardar lleva un puntito amarillo; el botón Guardar dice cuántos cambios hay. Salir con cambios sigue preguntando, como hoy.</li>
+<li>Celular: los 3 botones van juntos en un control de 106px (antes 140px), cada uno de 34×40. El nombre usa hasta 2 líneas antes de cortarse, así un nombre largo se lee completo (ver Maximiliano).</li>
+<li>Los botones elegidos son tinte del color del estado, no relleno sólido, para que la lista no se vea tan pesada.</li>
+</ul>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const M = [
+  ['u1','Liam Carter','Goalkeeper','yes','present'],['u2','Sofia Reyes','Full back','yes','present'],['u3','Noah Williams','Half back','yes','late'],
+  ['u4','Mia Thompson','Centre','yes','present'],['u5','Oliver Nguyen','Forward','yes','present'],['u6','Ava Martinez','Forward','yes','present'],
+  ['u7','Ethan Brown','Half back','yes','present'],['u8','Isla Patel',null,'yes','present'],['u16','Maximiliano Fernández-Gutiérrez','Centre','yes','present'],
+  ['u9','Lucas Kim','Full back','maybe','late'],['u10','Chloe Davis','Centre','maybe','absent'],
+  ['u11','Jack Wilson','Forward','none','absent'],['u12','Grace Lee','Half back','none','present'],['u13','Henry Clark','Utility','none','absent',true],
+  ['u14','Zoe Walker','Goalkeeper','no','absent'],['u15','Leo Harris','Full back','no','absent']
+].map(([id,name,pos,rsvp,status,inactive])=>({id,name,pos,rsvp,status,inactive:!!inactive}));
+const GROUPS = [['yes','GOING'],['maybe','MAYBE'],['none','NO REPLY'],['no',"CAN'T GO"]];
+const ST = {present:{label:'Present',icon:'ph-check',c:'#6fd6b4'}, late:{label:'Late',icon:'ph-clock',c:'#f2ce78'}, absent:{label:'Absent',icon:'ph-x',c:'#f2887a'}};
+const AV = ['#1d4869','#2a4a3f','#4a3a2a','#3a2f4f','#24465a'];
+const SESS = [['Training','Wed 14','Wed 14 Oct'],['Training','Mon 12','Mon 12 Oct'],['Island Cup','Sat 10','Sat 10 Oct'],['Training','Wed 7','Wed 7 Oct']];
+const base = () => Object.fromEntries(M.map(m=>[m.id,m.status]));
+
+class Component extends DCLogic {
+  state = { marks: base(), saved: base(), sess: 0, notice: null };
+  componentWillUnmount(){ clearTimeout(this._t); }
+  renderVals(){
+    const s = this.state;
+    const changedIds = M.filter(m=>s.marks[m.id]!==s.saved[m.id]).map(m=>m.id);
+    const dirty = changedIds.length>0;
+    const count = k => M.filter(m=>s.marks[m.id]===k).length;
+    const mark = (id,k)=>this.setState(st=>({marks:{...st.marks,[id]:k}, notice:null}));
+    const row = (m,i)=>{
+      const cur = s.marks[m.id];
+      return { name:m.name, ini:m.name.split(' ').map(w=>w[0]).join(''), av:AV[i%AV.length], pos:m.pos, posOrDash:m.pos||'No position',
+        posLine:[m.pos, m.inactive?'Inactive':null].filter(Boolean).join(' · ') || 'No position',
+        inactive:m.inactive, changed:changedIds.includes(m.id), sep: i===0?'none':'1px solid #22394d',
+        openLabel:`Open ${m.name}'s record`, open:e=>{ e.preventDefault(); if(dirty && !window.confirm('You have unsaved changes. Leave and discard them?')) return; },
+        dot:ST[cur].c, tileBorder: `color-mix(in srgb, ${ST[cur].c} 35%, #274055)`,
+        opts:Object.keys(ST).map(k=>{ const on = cur===k, st = ST[k];
+          return { label:st.label, icon:st.icon, on, pick:()=>mark(m.id,k), w:on?700:500,
+            bg: on ? `color-mix(in srgb, ${st.c} 22%, #13283a)` : 'transparent',
+            color: on ? '#e8f0f7' : '#8aa1b5', ic: on ? st.c : '#5a7086',
+            mBorder: on ? `color-mix(in srgb, ${st.c} 60%, transparent)` : '#274055', mIc: on ? st.c : '#8aa1b5' }; }) };
+    };
+    const [t, d, long] = SESS[s.sess];
+    return {
+      title:`${t} · ${long}`,
+      sessions: SESS.map(([tt,dd],i)=>{ const on = i===s.sess; return { label:`${dd} · ${tt}`, short:`${dd} · ${tt}`, on, w:on?700:500,
+        bg:on?'#1d4869':'transparent', border:on?'#33a1e0':'#274055', color:on?'#e8f0f7':'#cfdeea',
+        pick:()=>{ if(i===s.sess) return; if(dirty && !window.confirm('You have unsaved changes. Leave and discard them?')) return; this.setState({sess:i, marks:base(), saved:base(), notice:null}); } }; }),
+      totals: Object.keys(ST).map(k=>({label:ST[k].label, c:ST[k].c, n:count(k)})),
+      totalLine: `${count('present')+count('late')} of ${M.length} came`,
+      groups: GROUPS.map(([k,l])=>{ const ms = M.filter(m=>m.rsvp===k); return {label:l, n:ms.length, rows:ms.map(row)}; }).filter(g=>g.n),
+      dirty, dirtyCount: dirty ? `${changedIds.length} unsaved` : '',
+      saveLabel:'Save attendance',
+      notice:s.notice,
+      save:()=>{ if(!dirty) return; clearTimeout(this._t); this.setState(st=>({saved:{...st.marks}, notice:`Saved · ${count('present')} present, ${count('late')} late, ${count('absent')} absent`})); this._t = setTimeout(()=>this.setState({notice:null}), 3500); }
+    };
+  }
+}
+</script>
+</body>
+</html>
