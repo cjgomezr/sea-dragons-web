@@ -17,6 +17,7 @@ import {
 import {
   type SheetMarks,
   hasUnsavedChanges,
+  isMemberUnsaved,
   statusOf,
   totalsOf,
 } from "./attendance-marks";
@@ -241,6 +242,7 @@ function MemberGroup({
             member={member}
             viewer={viewer}
             status={statusOf(marks, member.userId)}
+            isUnsaved={isMemberUnsaved(marks, member.userId)}
             onMark={(status) => onMark(member.userId, status)}
           />
         ))}

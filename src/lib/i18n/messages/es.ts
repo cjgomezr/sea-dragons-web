@@ -2359,6 +2359,7 @@ export const spanishMessages: MessageCatalog = {
   "attendance.inactive": "Desactivada",
   "attendance.save": "Guardar asistencia",
   "attendance.unsaved": "Cambios sin guardar",
+  "attendance.rowUnsaved": "Sin guardar todavía",
   "attendance.saving": "Guardando…",
   "attendance.saved":
     "Asistencia guardada. Presentes: {present}; tarde: {late}; ausentes: {absent}.",

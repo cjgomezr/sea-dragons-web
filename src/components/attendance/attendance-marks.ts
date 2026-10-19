@@ -44,10 +44,24 @@ export function settleMarks(
   return { ...marks, saved: sent };
 }
 
+/** Un socio sin marca guardada cuenta como cambiado (#764, D2 de E29). */
+export function isMarkUnsaved(
+  saved: AttendanceStatus | undefined,
+  current: AttendanceStatus,
+): boolean {
+  return saved !== current;
+}
+
 export function hasUnsavedChanges(marks: SheetMarks): boolean {
-  return marks.current.some(
-    (mark, index) => mark.status !== marks.saved[index]?.status,
+  return marks.current.some((mark, index) =>
+    isMarkUnsaved(marks.saved[index]?.status, mark.status),
   );
+}
+
+/** Lleva el punto de "sin guardar" en su fila. */
+export function isMemberUnsaved(marks: SheetMarks, userId: string): boolean {
+  const saved = marks.saved.find((candidate) => candidate.userId === userId);
+  return isMarkUnsaved(saved?.status, statusOf(marks, userId));
 }
 
 export function statusOf(marks: SheetMarks, userId: string): AttendanceStatus {

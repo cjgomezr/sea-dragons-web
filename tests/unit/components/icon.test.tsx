@@ -46,4 +46,11 @@ describe("Icon", () => {
 
     expect(filled).not.toBe(regular);
   });
+
+  it("draws a different shape for the bold weight", () => {
+    const regular = renderIcon().innerHTML;
+    const bold = renderIcon({ weight: "bold" }).innerHTML;
+
+    expect(bold).not.toBe(regular);
+  });
 });

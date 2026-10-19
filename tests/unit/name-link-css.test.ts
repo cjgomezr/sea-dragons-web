@@ -3,8 +3,8 @@
  * directorio ni en su panel lateral: en una columna de nombres el subrayado
  * de cada fila sólo añade ruido. La línea aparece al pasar el ratón y con el
  * foco del teclado. Se queda en la lista de solicitudes, donde hay nombres que
- * no se pulsan, y en la hoja de asistencia, en gris, porque ahí avisa de que
- * el nombre saca de la hoja en vez de marcar la presencia.
+ * no se pulsan. En la hoja de asistencia tampoco va subrayado desde E29
+ * (#764): lo dicen la flecha de detrás y el acento al pasar el ratón.
  */
 import { describe, expect, it } from "vitest";
 import { cssBlock, readGlobalsCss } from "./helpers/css-tokens";
@@ -57,22 +57,16 @@ describe("nombre que abre la ficha en la lista de solicitudes", () => {
   });
 });
 
-describe("nombre que abre la ficha en la hoja de asistencia", () => {
-  const restBlock = cssBlock(globalsCss, ".attendance-record-link");
-
-  it("sigue subrayado en reposo", () => {
-    expect(restBlock).toMatch(/text-decoration:\s*underline;/);
-  });
-
-  it("pinta el subrayado en el gris de lo secundario", () => {
-    expect(restBlock).toMatch(
-      /text-decoration-color:\s*var\(--color-text-secondary\);/,
+describe("nombre que abre la ficha en la hoja de asistencia (#764)", () => {
+  it("no va subrayado", () => {
+    expect(cssBlock(globalsCss, ".attendance-record-link")).toMatch(
+      /text-decoration:\s*none;/,
     );
   });
 
-  it("pinta el subrayado del color del texto al pasar el ratón", () => {
-    expect(ruleIncluding(".attendance-record-link:hover")).toMatch(
-      /text-decoration-color:\s*currentColor;/,
-    );
+  it("toma el color del texto de acento al pasar el ratón", () => {
+    expect(
+      ruleIncluding(".attendance-record-link:hover .attendance-name"),
+    ).toMatch(/color:\s*var\(--color-accent-text\);/);
   });
 });

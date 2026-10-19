@@ -1,4 +1,10 @@
+import { ArrowUpRight } from "@phosphor-icons/react/dist/ssr/ArrowUpRight";
+import { Check } from "@phosphor-icons/react/dist/ssr/Check";
+import { Clock } from "@phosphor-icons/react/dist/ssr/Clock";
+import { X } from "@phosphor-icons/react/dist/ssr/X";
+import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types";
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import { MemberAvatar } from "@/components/MemberAvatar";
 import type { SheetViewer } from "@/lib/attendance/attendance-sheet";
 import {
@@ -21,10 +27,19 @@ import type { SheetMember } from "./attendance-client";
  *
  * La foto y el nombre se comportan como en el directorio (#414): la foto se
  * abre en grande para quien pasa lista, y al Admin el nombre le abre la ficha.
+ *
+ * En escritorio la fila es una sola línea (#764, E29), y un punto avisa de
+ * que lo marcado en ella difiere de lo guardado.
  */
 
 /** En píxeles, como `.attendance-avatar`. */
-const AVATAR_SIZE = 36;
+const AVATAR_SIZE = 30;
+
+const STATUS_GLYPHS: Readonly<Record<AttendanceStatus, PhosphorGlyph>> = {
+  present: Check,
+  late: Clock,
+  absent: X,
+};
 
 /** Quién mira la hoja y si puede salir de ella sin perder lo marcado. */
 export type RowViewer = {
@@ -64,7 +79,7 @@ function MemberName({
   return (
     <Link
       href={memberRecordHref(member.userId)}
-      className="attendance-name attendance-record-link"
+      className="attendance-record-link"
       aria-label={translate("memberRecord.openLabel", {
         name: member.fullName,
       })}
@@ -74,8 +89,83 @@ function MemberName({
         }
       }}
     >
-      {member.fullName}
+      <span className="attendance-name">{member.fullName}</span>
+      <span className="attendance-record-icon">
+        <Icon glyph={ArrowUpRight} />
+      </span>
     </Link>
+  );
+}
+
+/** El `title` no lo lee todo lector de pantalla (D3 de E29): el aviso va
+ * también como texto oculto. */
+function UnsavedDot({
+  translate,
+}: {
+  readonly translate: Translator;
+}): React.JSX.Element {
+  const label = translate("attendance.rowUnsaved");
+  return (
+    <span className="attendance-unsaved-dot" title={label}>
+      <span className="visually-hidden">{label}</span>
+    </span>
+  );
+}
+
+function MemberHints({
+  translate,
+  member,
+  isUnsaved,
+}: {
+  readonly translate: Translator;
+  readonly member: SheetMember;
+  readonly isUnsaved: boolean;
+}): React.JSX.Element {
+  return (
+    <>
+      {member.position === null ? null : (
+        <span className="attendance-position">
+          {positionName(member.position.names, translate.locale)}
+        </span>
+      )}
+      {member.isInactive ? (
+        <span className="attendance-inactive">
+          {translate("attendance.inactive")}
+        </span>
+      ) : null}
+      {isUnsaved ? <UnsavedDot translate={translate} /> : null}
+    </>
+  );
+}
+
+function StatusSegment({
+  translate,
+  fullName,
+  status,
+  onMark,
+}: {
+  readonly translate: Translator;
+  readonly fullName: string;
+  readonly status: AttendanceStatus;
+  readonly onMark: (status: AttendanceStatus) => void;
+}): React.JSX.Element {
+  return (
+    <div className="attendance-segment" role="group" aria-label={fullName}>
+      {ATTENDANCE_STATUSES.map((choice) => (
+        <button
+          key={choice}
+          type="button"
+          className={`attendance-choice attendance-choice-${choice}`}
+          aria-pressed={choice === status}
+          onClick={() => onMark(choice)}
+        >
+          <span className="attendance-choice-icon">
+            <Icon glyph={STATUS_GLYPHS[choice]} weight="bold" />
+          </span>
+          {translate(`attendance.status.${choice}`)}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -84,17 +174,20 @@ export function AttendanceRow({
   member,
   viewer,
   status,
+  isUnsaved,
   onMark,
 }: {
   readonly translate: Translator;
   readonly member: SheetMember;
   readonly viewer: RowViewer;
   readonly status: AttendanceStatus;
+  /** Lo marcado difiere de lo guardado (D2 de E29). */
+  readonly isUnsaved: boolean;
   readonly onMark: (status: AttendanceStatus) => void;
 }): React.JSX.Element {
   return (
     <li className="attendance-row">
-      <div className="attendance-member">
+      <div className="attendance-avatar-cell">
         <MemberAvatar
           fullName={member.fullName}
           photoUrl={member.photoUrl}
@@ -106,39 +199,21 @@ export function AttendanceRow({
               : undefined
           }
         />
-        <div className="attendance-member-text">
-          <MemberName translate={translate} member={member} viewer={viewer} />
-          <span className="attendance-hints">
-            {member.position === null ? null : (
-              <span className="attendance-position">
-                {positionName(member.position.names, translate.locale)}
-              </span>
-            )}
-            {member.isInactive ? (
-              <span className="attendance-inactive">
-                {translate("attendance.inactive")}
-              </span>
-            ) : null}
-          </span>
-        </div>
       </div>
-      <div
-        className="attendance-segment"
-        role="group"
-        aria-label={member.fullName}
-      >
-        {ATTENDANCE_STATUSES.map((choice) => (
-          <button
-            key={choice}
-            type="button"
-            className={`attendance-choice attendance-choice-${choice}`}
-            aria-pressed={choice === status}
-            onClick={() => onMark(choice)}
-          >
-            {translate(`attendance.status.${choice}`)}
-          </button>
-        ))}
+      <div className="attendance-member-text">
+        <MemberName translate={translate} member={member} viewer={viewer} />
+        <MemberHints
+          translate={translate}
+          member={member}
+          isUnsaved={isUnsaved}
+        />
       </div>
+      <StatusSegment
+        translate={translate}
+        fullName={member.fullName}
+        status={status}
+        onMark={onMark}
+      />
     </li>
   );
 }

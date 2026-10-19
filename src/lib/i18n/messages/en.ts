@@ -2335,6 +2335,7 @@ export const englishMessages = {
   "attendance.inactive": "Deactivated",
   "attendance.save": "Save attendance",
   "attendance.unsaved": "Unsaved changes",
+  "attendance.rowUnsaved": "Not saved yet",
   "attendance.saving": "Saving…",
   "attendance.saved":
     "Attendance saved: {present} present, {late} late, {absent} absent.",
