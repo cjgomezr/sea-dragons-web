@@ -4,7 +4,10 @@ import { MapPin } from "@phosphor-icons/react/dist/ssr/MapPin";
 import { NavigationArrow } from "@phosphor-icons/react/dist/ssr/NavigationArrow";
 import Link from "next/link";
 import { useId } from "react";
-import { describeRsvpFailure } from "@/components/calendar/agenda-client";
+import {
+  type EventTally,
+  describeRsvpFailure,
+} from "@/components/calendar/agenda-client";
 import { describeAudience } from "@/components/calendar/EventDetailPanel";
 import { EventCover } from "@/components/calendar/EventCover";
 import { EventRsvp } from "@/components/calendar/EventRsvp";
@@ -12,9 +15,8 @@ import { EventTypeTag } from "@/components/calendar/EventTypeTag";
 import { describeEventWhen } from "@/components/calendar/event-panel-text";
 import { useEventRsvp } from "@/components/calendar/use-event-rsvp";
 import { PAYMENTS_PATH } from "@/lib/auth/routes";
-import type { DashboardNextUpEvent, NextUp } from "@/lib/dashboard/dashboard";
+import type { NextUp } from "@/lib/dashboard/dashboard";
 import { nextUpDistance } from "@/lib/dashboard/dashboard-view";
-import type { EventTally } from "@/components/calendar/agenda-client";
 import { buildMapsUrl } from "@/lib/events/event-place";
 import { formatDashboardDay } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
@@ -128,7 +130,7 @@ function NextUpRsvp({
   event,
 }: {
   readonly translate: Translator;
-  readonly event: DashboardNextUpEvent;
+  readonly event: NextUpEvent;
 }): React.JSX.Element {
   const { state, respond } = useEventRsvp(event, ignoreOpenedDetail);
   return (

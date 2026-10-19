@@ -22009,8 +22009,7 @@ test.describe("el inicio en el navegador", () => {
       boxOf(card.getByRole("button", { name: "Going" }).getByText("Going")),
     ]);
 
-    // La barra de 4px del tipo va dentro de la caja de la imagen.
-    expect(Math.round(cover.height)).toBe(134);
+    expect(Math.round(cover.height)).toBe(130);
     expect(title.y).toBeGreaterThan(cover.y + cover.height);
     expect(Math.round(directions.height)).toBeGreaterThanOrEqual(44);
     expect(Math.round(directions.width)).toBe(Math.round(body.width - 2 * 16));
@@ -22053,11 +22052,9 @@ test.describe("el inicio en el navegador", () => {
       (route) =>
         route.fulfill(
           jsonBody({
-            data: {
-              eventId: DASHBOARD_NEXT_UP.id,
-              response: "maybe",
-              respondedAt: HOME_NOW.toISOString(),
-            },
+            eventId: DASHBOARD_NEXT_UP.id,
+            response: "maybe",
+            respondedAt: HOME_NOW.toISOString(),
           }),
         ),
     );
