@@ -7718,6 +7718,17 @@ const STUBBED_CLUB_GROUPS = [
   },
 ] as const;
 
+/** Lo que la ficha del Admin trae desde #770 y las capturas no enseñan
+ * todavía: la vista y los datos de la cabecera de E30. */
+const STUBBED_RECORD_ADMIN_VIEW = {
+  view: "admin",
+  positionName: null,
+  experienceLevel: null,
+  country: null,
+  email: "socia.de.prueba@example.test",
+  membershipPlan: null,
+} as const;
+
 type StubbedMemberRecord = {
   readonly userId: string;
   readonly fullName: string;
@@ -7894,7 +7905,9 @@ async function stubMemberRecordReads(
         : route.fulfill({
             status: 200,
             contentType: "application/json",
-            body: JSON.stringify({ data: record }),
+            body: JSON.stringify({
+              data: { ...STUBBED_RECORD_ADMIN_VIEW, ...record },
+            }),
           }),
   );
 }
