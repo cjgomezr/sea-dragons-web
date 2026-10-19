@@ -66,7 +66,6 @@ export type TeamBuilderControls = {
   readonly state: BuilderState;
   readonly move: (userId: string, destination: Destination) => void;
   readonly swap: (fromA: string, fromB: string) => void;
-  readonly chooseManual: () => void;
   readonly balance: () => Promise<void>;
   readonly save: () => Promise<void>;
   readonly askToPublish: () => void;
@@ -175,13 +174,6 @@ export function useTeamBuilder(eventId: string): TeamBuilderControls {
     }));
   }
 
-  function chooseManual(): void {
-    update((ready) => ({
-      ...ready,
-      draft: { ...ready.draft, mode: "manual" },
-    }));
-  }
-
   const balance = (): Promise<void> =>
     exclusively(async () => {
       setAction({ kind: "balancing" });
@@ -259,7 +251,6 @@ export function useTeamBuilder(eventId: string): TeamBuilderControls {
     state,
     move,
     swap,
-    chooseManual,
     balance,
     save,
     askToPublish,

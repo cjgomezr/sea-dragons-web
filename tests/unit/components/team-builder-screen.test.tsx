@@ -224,10 +224,25 @@ function totals(): HTMLElement {
   return screen.getByRole("group", { name: "Totals" });
 }
 
-function modeButton(name: string): HTMLElement {
-  return within(screen.getByRole("group", { name: "Mode" })).getByRole(
-    "button",
-    { name },
+function balanceButton(): HTMLElement {
+  return screen.getByRole("button", { name: "Auto-balance" });
+}
+
+function publishButton(): HTMLElement {
+  return screen.getByRole("button", { name: "Publish" });
+}
+
+const PUBLISH_QUESTION =
+  "Publish teams? 3 players will be notified which team they're on.";
+
+function publishConfirmation(): HTMLElement {
+  return screen.getByRole("group", { name: /^Publish teams\?/ });
+}
+
+/** El Publicar de la confirmación, no el de la cabecera. */
+async function confirmPublish(): Promise<void> {
+  await userEvent.click(
+    within(publishConfirmation()).getByRole("button", { name: "Publish" }),
   );
 }
 
@@ -311,18 +326,15 @@ describe("la escuadra", () => {
     expect(playerNames(region("Maybe"))).toEqual(["Ruby Tan"]);
   });
 
-  it("enseña las dos columnas con sus nombres y el control de modo", async () => {
+  it("enseña las dos columnas con sus nombres, el estado del modo y Auto-balance", async () => {
     stubClub();
 
     await openScreen();
 
     expect(region("Team Kelp")).toHaveTextContent("No one on this team yet.");
     expect(region("Team Tide")).toBeInTheDocument();
-    expect(modeButton("Manual")).toHaveAttribute("aria-pressed", "true");
-    expect(modeButton("Auto-balance")).toHaveAttribute("aria-pressed", "false");
-    expect(
-      screen.getByRole("button", { name: "Balance teams" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Edited by hand")).toBeInTheDocument();
+    expect(balanceButton()).toBeInTheDocument();
   });
 
   it("pinta el reparto guardado en sus columnas y los totales", async () => {
@@ -336,9 +348,9 @@ describe("la escuadra", () => {
     ]);
     expect(region("Team Tide")).toHaveTextContent("Ethan Brown");
     expect(region("Available")).not.toHaveTextContent("Mateo Restrepo");
-    expect(totals()).toHaveTextContent("Team Kelp · 17.0 pts");
-    expect(totals()).toHaveTextContent("Team Tide · 5.0 pts");
-    expect(totals()).toHaveTextContent("Difference 12.0");
+    expect(totals()).toHaveTextContent("Team Kelp 17.0");
+    expect(totals()).toHaveTextContent("5.0 Team Tide");
+    expect(totals()).toHaveTextContent("12.0 apart");
   });
 
   it("marca ya no viene al asignado que salió de la escuadra y deja quitarlo", async () => {
@@ -546,10 +558,10 @@ describe("mover a mano", () => {
 
     expect(region("Team Kelp")).toHaveTextContent("Mateo Restrepo");
     expect(region("Available")).not.toHaveTextContent("Mateo Restrepo");
-    expect(totals()).toHaveTextContent("Team Kelp · 9.0 pts");
-    expect(totals()).toHaveTextContent("Difference 9.0");
+    expect(totals()).toHaveTextContent("Team Kelp 9.0");
+    expect(totals()).toHaveTextContent("9.0 apart");
     expect(writes()).toEqual([]);
-    expect(saveButton()).toHaveAccessibleName("Save · Unsaved changes");
+    expect(saveButton()).toHaveAccessibleName("Save · Unsaved");
   });
 
   it("anuncia a qué lista fue y los nuevos totales", async () => {
@@ -578,7 +590,7 @@ describe("mover a mano", () => {
     );
 
     expect(region("Team Tide")).toHaveTextContent("Mateo Restrepo");
-    expect(totals()).toHaveTextContent("Difference 6.0");
+    expect(totals()).toHaveTextContent("6.0 apart");
   });
 
   it("devuelve a un asignado a su lista con Quitar", async () => {
@@ -592,7 +604,7 @@ describe("mover a mano", () => {
     );
 
     expect(region("Available")).toHaveTextContent("Daniela Vargas");
-    expect(totals()).toHaveTextContent("Team Kelp · 9.0 pts");
+    expect(totals()).toHaveTextContent("Team Kelp 9.0");
     expect(
       screen.getByText(/^Daniela Vargas moved to Available\./),
     ).toBeInTheDocument();
@@ -657,16 +669,14 @@ describe("balancear", () => {
     });
   }
 
-  it("pide el auto-balance, llena las columnas, marca a los no evaluados y pasa a Auto-balance", async () => {
+  it("pide el auto-balance, llena las columnas, marca a los no evaluados y pasa a Auto-equilibrado", async () => {
     stubBalancing();
     await openScreen();
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Balance teams" }),
-    );
+    await userEvent.click(balanceButton());
 
     expect(await screen.findByRole("status")).toHaveTextContent(
-      "Teams balanced and saved as a draft.",
+      "Teams balanced and saved",
     );
     expect(writes()).toEqual([
       {
@@ -680,7 +690,7 @@ describe("balancear", () => {
     expect(
       within(playerRow(tide, "Ethan Brown")).getByText("Unrated"),
     ).toBeInTheDocument();
-    expect(modeButton("Auto-balance")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Auto-balanced")).toBeInTheDocument();
     expect(saveButton()).toHaveAccessibleName("Save");
   });
 
@@ -690,11 +700,9 @@ describe("balancear", () => {
     );
     await openScreen();
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Balance teams" }),
-    );
+    await userEvent.click(balanceButton());
 
-    await screen.findByText("Teams balanced and saved as a draft.");
+    await screen.findByText("Teams balanced and saved");
     expect(region("Team Tide")).toHaveTextContent(LIAM.fullName);
     await userEvent.click(
       screen.getByRole("button", {
@@ -707,16 +715,14 @@ describe("balancear", () => {
   it("vuelve a Manual si luego se toca algo a mano", async () => {
     stubBalancing();
     await openScreen();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Balance teams" }),
-    );
-    await screen.findByText("Teams balanced and saved as a draft.");
+    await userEvent.click(balanceButton());
+    await screen.findByText("Teams balanced and saved");
 
     await userEvent.click(
       screen.getByRole("button", { name: "Move Ruby Tan to Team Kelp" }),
     );
 
-    expect(modeButton("Manual")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Edited by hand")).toBeInTheDocument();
   });
 
   it("traduce el 422 de la escuadra vacía y conserva lo que hay", async () => {
@@ -726,15 +732,13 @@ describe("balancear", () => {
       screen.getByRole("button", { name: "Move Ruby Tan to Team Kelp" }),
     );
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Balance teams" }),
-    );
+    await userEvent.click(balanceButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Nobody has said Yes to this event: there is no one to balance.",
     );
     expect(region("Team Kelp")).toHaveTextContent("Ruby Tan");
-    expect(modeButton("Manual")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Edited by hand")).toBeInTheDocument();
   });
 });
 
@@ -759,7 +763,7 @@ describe("sugerencia", () => {
 
     expect(region("Team Kelp")).toHaveTextContent("Ethan Brown");
     expect(region("Team Tide")).toHaveTextContent("Mateo Restrepo");
-    expect(totals()).toHaveTextContent("Difference 4.0");
+    expect(totals()).toHaveTextContent("4.0 apart");
     expect(writes()).toEqual([]);
   });
 
@@ -804,7 +808,7 @@ describe("guardar y publicar", () => {
     await userEvent.click(saveButton());
 
     expect(await screen.findByRole("status")).toHaveTextContent(
-      "Teams saved as a draft. Nobody has been notified yet.",
+      "Saved · not published yet",
     );
     expect(writes()).toEqual([
       {
@@ -823,14 +827,10 @@ describe("guardar y publicar", () => {
     stubClub({ builders: [DRAFTED] });
     await openScreen();
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Publish teams" }),
-    );
+    await userEvent.click(publishButton());
 
     expect(
-      screen.getByRole("group", {
-        name: "Publish the teams? 3 players will get a notification with their team.",
-      }),
+      screen.getByRole("group", { name: PUBLISH_QUESTION }),
     ).toBeInTheDocument();
     expect(writes()).toEqual([]);
   });
@@ -839,16 +839,12 @@ describe("guardar y publicar", () => {
     stubClub();
     await openScreen();
     await moveMateoToKelp();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Publish teams" }),
-    );
+    await userEvent.click(publishButton());
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Publish and notify" }),
-    );
+    await confirmPublish();
 
     expect(await screen.findByRole("status")).toHaveTextContent(
-      "Teams published. 3 players notified.",
+      "Published · 3 players notified",
     );
     expect(writes().map(({ method, path }) => [method, path])).toEqual([
       ["PUT", builderPath(SCRIMMAGE.id)],
@@ -859,15 +855,11 @@ describe("guardar y publicar", () => {
   it("sin cambios publica sin volver a guardar", async () => {
     stubClub({ builders: [DRAFTED] });
     await openScreen();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Publish teams" }),
-    );
+    await userEvent.click(publishButton());
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Publish and notify" }),
-    );
+    await confirmPublish();
 
-    await screen.findByText("Teams published. 3 players notified.");
+    await screen.findByText("Published · 3 players notified");
     expect(writes().map(({ method }) => method)).toEqual(["POST"]);
   });
 
@@ -884,15 +876,15 @@ describe("guardar y publicar", () => {
       },
     });
     await openScreen();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Publish teams" }),
-    );
-    const confirm = screen.getByRole("button", { name: "Publish and notify" });
+    await userEvent.click(publishButton());
+    const confirm = within(publishConfirmation()).getByRole("button", {
+      name: "Publish",
+    });
 
     await userEvent.dblClick(confirm);
     release();
 
-    await screen.findByText("Teams published. 3 players notified.");
+    await screen.findByText("Published · 3 players notified");
     expect(writes()).toHaveLength(1);
   });
 
@@ -913,9 +905,7 @@ describe("guardar y publicar", () => {
     await userEvent.dblClick(saveButton());
     release();
 
-    await screen.findByText(
-      "Teams saved as a draft. Nobody has been notified yet.",
-    );
+    await screen.findByText("Saved · not published yet");
     expect(writes()).toHaveLength(1);
   });
 
@@ -935,7 +925,7 @@ describe("guardar y publicar", () => {
     );
     expect(screen.getByRole("status")).toHaveTextContent("");
     expect(region("Team Kelp")).toHaveTextContent("Mateo Restrepo");
-    expect(saveButton()).toHaveAccessibleName("Save · Unsaved changes");
+    expect(saveButton()).toHaveAccessibleName("Save · Unsaved");
   });
 
   it.each([
@@ -951,17 +941,13 @@ describe("guardar y publicar", () => {
     stubClub({ onWrite: () => businessRule(reason) });
     await openScreen();
     await moveMateoToKelp();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Publish teams" }),
-    );
+    await userEvent.click(publishButton());
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Publish and notify" }),
-    );
+    await confirmPublish();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(message);
     expect(writes()).toHaveLength(1);
-    expect(saveButton()).toHaveAccessibleName("Save · Unsaved changes");
+    expect(saveButton()).toHaveAccessibleName("Save · Unsaved");
   });
 
   it("no deja publicar un reparto sin nadie asignado", async () => {
@@ -969,9 +955,7 @@ describe("guardar y publicar", () => {
 
     await openScreen();
 
-    expect(
-      screen.getByRole("button", { name: "Publish teams" }),
-    ).toBeDisabled();
+    expect(publishButton()).toBeDisabled();
   });
 });
 
@@ -1007,6 +991,178 @@ describe("sin eventos", () => {
   });
 });
 
+describe("la cabecera, la barra y los totales (#758)", () => {
+  /** Daniela (8,0) contra Mateo (9,0): justo un punto de diferencia. */
+  const ONE_APART = builderFor(SCRIMMAGE, {
+    split: {
+      mode: "manual",
+      publishedAt: null,
+      assignments: [assigned(DANIELA, "a"), assigned(MATEO, "b")],
+    },
+  });
+
+  /** La barra es decoración, sin rol: sus dos tramos van en el `aria-hidden`
+   * del grupo de totales. */
+  function barSegments(): HTMLElement[] {
+    const bar = totals().querySelector(':scope > [aria-hidden="true"]');
+    if (bar === null) {
+      throw new Error("Los totales no tienen barra.");
+    }
+    return Array.from(bar.children) as HTMLElement[];
+  }
+
+  it("lleva en la cabecera el rótulo Teams, el evento como H1, Guardar y Publicar", async () => {
+    stubClub({ builders: [DRAFTED] });
+
+    await openScreen();
+
+    const heading = screen.getByRole("heading", {
+      level: 1,
+      name: "Sat 19 Jun · Scrimmage",
+    });
+    const header = heading.closest("header");
+    if (header === null) {
+      throw new Error("El H1 no está en la cabecera.");
+    }
+    expect(within(header).getByText("Teams")).toBeInTheDocument();
+    expect(
+      within(header).getByRole("button", { name: "Save" }),
+    ).toBeInTheDocument();
+    expect(
+      within(header).getByRole("button", { name: "Publish" }),
+    ).toBeEnabled();
+  });
+
+  it("marca Guardar con Sin guardar cuando hay cambios", async () => {
+    stubClub();
+    await openScreen();
+    expect(saveButton()).toHaveAccessibleName("Save");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Move Ruby Tan to Team Kelp" }),
+    );
+
+    expect(saveButton()).toHaveAccessibleName("Save · Unsaved");
+    expect(within(saveButton()).getByText("Unsaved")).toBeVisible();
+  });
+
+  it("ya no tiene el segmento Manual y Auto", async () => {
+    stubClub();
+
+    await openScreen();
+
+    expect(
+      screen.queryByRole("group", { name: "Mode" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Manual" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /balance/i })).toEqual([
+      balanceButton(),
+    ]);
+  });
+
+  it("dice Auto-equilibrado al abrir un reparto guardado en automático", async () => {
+    stubClub({
+      builders: [
+        builderFor(SCRIMMAGE, {
+          split: { ...ONE_APART.split!, mode: "auto" },
+        }),
+      ],
+    });
+
+    await openScreen();
+
+    expect(screen.getByText("Auto-balanced")).toBeInTheDocument();
+    expect(screen.queryByText("Edited by hand")).not.toBeInTheDocument();
+  });
+
+  it("pone cada equipo con su suma a un lado y la diferencia en medio", async () => {
+    stubClub({ builders: [DRAFTED] });
+
+    await openScreen();
+
+    expect(totals()).toHaveTextContent(
+      /^Team Kelp 17\.0.*12\.0 apart.*5\.0 Team Tide$/,
+    );
+    expect(totals()).not.toHaveTextContent("Even");
+  });
+
+  it("dice Parejos cuando la diferencia es de un punto o menos", async () => {
+    stubClub({ builders: [ONE_APART] });
+
+    await openScreen();
+
+    expect(totals()).toHaveTextContent("Even");
+    expect(totals()).not.toHaveTextContent("apart");
+  });
+
+  it("parte la barra según la suma de cada equipo, en su color", async () => {
+    stubClub({ builders: [DRAFTED] });
+
+    await openScreen();
+
+    const [kelp, tide] = barSegments();
+    expect(kelp).toHaveStyle({
+      flexGrow: "17",
+      backgroundColor: DEFAULT_TEAM_LABELS.a.color,
+    });
+    expect(tide).toHaveStyle({
+      flexGrow: "5",
+      backgroundColor: DEFAULT_TEAM_LABELS.b.color,
+    });
+  });
+
+  it("parte la barra a medias cuando nadie suma", async () => {
+    stubClub();
+
+    await openScreen();
+
+    const [kelp, tide] = barSegments();
+    expect(kelp).toHaveStyle({ flexGrow: "1" });
+    expect(tide).toHaveStyle({ flexGrow: "1" });
+  });
+
+  it("pregunta antes de publicar con Cancelar y Publicar, y Cancelar la cierra", async () => {
+    stubClub({ builders: [DRAFTED] });
+    await openScreen();
+    await userEvent.click(publishButton());
+
+    const confirmation = publishConfirmation();
+    expect(
+      within(confirmation)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Cancel", "Publish"]);
+
+    await userEvent.click(
+      within(confirmation).getByRole("button", { name: "Cancel" }),
+    );
+
+    expect(
+      screen.queryByRole("group", { name: PUBLISH_QUESTION }),
+    ).not.toBeInTheDocument();
+    expect(writes()).toEqual([]);
+  });
+
+  it("escribe en español la pregunta y los avisos", async () => {
+    stubClub({ builders: [DRAFTED] });
+    await openScreen("es");
+    await userEvent.click(screen.getByRole("button", { name: "Publicar" }));
+
+    const confirmation = screen.getByRole("group", {
+      name: "¿Publicar equipos? Se avisará a 3 jugadores de su equipo.",
+    });
+    await userEvent.click(
+      within(confirmation).getByRole("button", { name: "Publicar" }),
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Publicado · 3 jugadores avisados",
+    );
+  });
+});
+
 describe("en español", () => {
   it("escribe la pantalla en español", async () => {
     stubClub({ builders: [DRAFTED] });
@@ -1017,10 +1173,11 @@ describe("en español", () => {
       screen.getByRole("heading", { level: 1, name: "sáb 19 jun · Scrimmage" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Balancear equipos" }),
+      screen.getByRole("button", { name: "Auto-balance" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Editado a mano")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Totales" })).toHaveTextContent(
-      "Diferencia 12,0",
+      "12,0 de diferencia",
     );
     expect(
       screen.getByRole("button", { name: "Mover a Ruby Tan a Team Kelp" }),
@@ -1029,7 +1186,7 @@ describe("en español", () => {
       "Ruby Tan",
     );
     expect(
-      screen.getByRole("button", { name: "Publicar equipos" }),
+      screen.getByRole("button", { name: "Publicar" }),
     ).toBeInTheDocument();
   });
 

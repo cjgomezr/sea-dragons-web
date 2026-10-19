@@ -15659,12 +15659,6 @@ a.agenda-take-attendance {
   color: var(--color-text-secondary);
 }
 
-.team-lead {
-  margin: var(--space-2) 0 0;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-}
-
 /* En el móvil los dos botones reparten el ancho, y "Cambios sin guardar"
    parte la línea en vez de empujar la pantalla hacia un lado. */
 .team-actions {
@@ -15678,6 +15672,30 @@ a.agenda-take-attendance {
   flex: 1 1 auto;
   min-height: var(--touch-target-min);
   padding: var(--space-2) var(--space-4);
+}
+
+.team-publish,
+.team-balance,
+.team-unsaved,
+.team-mode-status,
+.team-totals-gap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+/* "Sin guardar" va en el tono de aviso, y el punto lo dice sin leerlo. */
+.team-unsaved {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-warning) 50%, var(--color-text));
+}
+
+.team-unsaved-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--color-warning);
+  border-radius: 999px;
 }
 
 .team-publish:disabled {
@@ -15717,39 +15735,32 @@ a.agenda-take-attendance {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-2) var(--space-4);
 }
 
-.team-mode {
-  display: inline-flex;
-  padding: 2px;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-}
-
-.team-mode button {
-  min-height: var(--touch-target-min);
-  padding: 0 var(--space-3);
-  font-family: inherit;
+.team-mode-status {
+  margin: 0;
   font-size: 13px;
   color: var(--color-text-secondary);
+}
+
+/* Auto-balance (D8 del PRD de E28): contorno de acento, para que no compita
+   con Publicar, que es la acción principal. */
+.team-balance {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-accent-text);
   background: transparent;
-  border: none;
+  border: 1px solid var(--color-accent);
   border-radius: var(--radius);
   cursor: pointer;
 }
 
-.team-mode button[aria-pressed="true"] {
-  font-weight: 700;
-  color: var(--color-text);
-  background: var(--color-panel);
-  box-shadow: var(--shadow-sm);
-}
-
-.team-balance {
-  min-height: var(--touch-target-min);
-  padding: 0 var(--space-4);
+.team-balance:hover {
+  background: var(--color-hover);
 }
 
 .team-totals,
@@ -15766,23 +15777,37 @@ a.agenda-take-attendance {
 .team-totals-text {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-1) var(--space-3);
   margin-bottom: var(--space-2);
   font-size: 13px;
-  color: var(--color-text-secondary);
 }
 
-.team-totals-difference {
-  font-family: var(--font-family-mono);
+.team-totals-team {
   font-weight: 700;
   color: var(--color-text);
 }
 
-/* La barra es decoración: lo que dice va escrito encima. */
+.team-totals-points {
+  font-family: var(--font-family-mono);
+  font-size: 14px;
+}
+
+.team-totals-even {
+  color: color-mix(in srgb, var(--color-success) 50%, var(--color-text));
+}
+
+.team-totals-apart {
+  color: color-mix(in srgb, var(--color-warning) 50%, var(--color-text));
+}
+
+/* La barra es decoración: lo que dice va escrito encima. Cada tramo crece
+   según la suma de su equipo (`flex-grow` en línea). */
 .team-totals-bar {
   display: flex;
-  height: 10px;
+  gap: 2px;
+  height: 8px;
   overflow: hidden;
   background: var(--color-border);
   border-radius: 999px;
@@ -15790,7 +15815,19 @@ a.agenda-take-attendance {
 
 .team-totals-bar span {
   display: block;
+  flex-basis: 0;
   height: 100%;
+}
+
+/* La pregunta de publicar lleva el borde de acento y el avión de Publicar. */
+.team-confirm {
+  border-color: var(--color-accent);
+}
+
+.team-confirm-icon {
+  display: none;
+  font-size: 18px;
+  color: var(--color-accent-text);
 }
 
 .team-columns,
@@ -15963,13 +16000,22 @@ a.agenda-take-attendance {
 /* Como `.attendance-notice`: vacía no ocupa sitio, pero sigue en el DOM para
    que la confirmación se anuncie al llegar. */
 .team-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  font-size: 14px;
   color: var(--color-text);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 14%, var(--color-panel));
+  border: 1px solid
+    color-mix(in srgb, var(--color-success) 40%, var(--color-border));
   border-radius: var(--radius);
+}
+
+.team-notice svg {
+  flex: none;
+  color: color-mix(in srgb, var(--color-success) 50%, var(--color-text));
 }
 
 .team-notice:empty {
@@ -16008,11 +16054,31 @@ a.agenda-take-attendance {
     flex: 1 1 16rem;
   }
 
-  .team-mode button,
+  .team-header h1 {
+    font-size: 26px;
+  }
+
   .team-balance,
-  .team-actions button,
   .team-event-picker select {
     min-height: 36px;
+  }
+
+  .team-actions button {
+    min-height: 40px;
+  }
+
+  .team-confirm {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .team-confirm-icon {
+    display: inline-flex;
+  }
+
+  .team-confirm .groups-question {
+    flex: 1 1 20rem;
   }
 
   .team-columns,

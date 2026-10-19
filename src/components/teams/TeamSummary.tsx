@@ -1,25 +1,66 @@
+import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
+import { Warning } from "@phosphor-icons/react/dist/ssr/Warning";
 import { useId } from "react";
+import { Icon } from "@/components/Icon";
 import { formatOverallRating } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
-import type { TeamLabels } from "@/lib/teams/team-ids";
+import type { TeamLabel, TeamLabels } from "@/lib/teams/team-ids";
 import type { SplitTotals } from "@/lib/teams/team-totals";
 import type { DraftSuggestion } from "./team-draft";
 
 /**
- * La barra de totales y la sugerencia de intercambio del mockup (#402,
- * FR-045 y FR-047). La barra reparte su ancho según el puntaje combinado de
- * cada equipo, con sus colores; lo que dice va en texto al lado.
+ * La barra de totales y la sugerencia de intercambio (#402, FR-045 y
+ * FR-047), con la forma del handoff de E28 (#758): la suma de cada equipo a
+ * su lado, en medio si están parejos, y debajo una barra partida por suma en
+ * el color de cada equipo. Lo que dice la barra va escrito encima.
  */
 
-const FULL_WIDTH_PERCENT = 100;
-const EVEN_SHARE_PERCENT = 50;
+/** Hasta un punto de diferencia los equipos cuentan como parejos (RF-4). */
+const EVEN_GAP_MAX = 1;
 
-/** Qué parte de la barra es del primer equipo. Sin puntos, mitad y mitad. */
-function shareOfFirstTeam(totals: SplitTotals): number {
-  const combined = totals.a.combinedRating + totals.b.combinedRating;
-  return combined === 0
-    ? EVEN_SHARE_PERCENT
-    : (totals.a.combinedRating / combined) * FULL_WIDTH_PERCENT;
+/** Sin puntos en ningún equipo, la barra se parte a medias. */
+const EMPTY_SHARE = 1;
+
+function barShares(totals: SplitTotals): readonly [number, number] {
+  const { a, b } = totals;
+  return a.combinedRating + b.combinedRating === 0
+    ? [EMPTY_SHARE, EMPTY_SHARE]
+    : [a.combinedRating, b.combinedRating];
+}
+
+function GapStatus({
+  translate,
+  difference,
+}: {
+  readonly translate: Translator;
+  readonly difference: number;
+}): React.JSX.Element {
+  if (difference <= EVEN_GAP_MAX) {
+    return (
+      <span className="team-totals-gap team-totals-even">
+        <Icon glyph={CheckCircle} />
+        {translate("teams.totals.even")}
+      </span>
+    );
+  }
+  return (
+    <span className="team-totals-gap team-totals-apart">
+      <Icon glyph={Warning} />
+      {translate("teams.totals.apart", {
+        difference: formatOverallRating(translate.locale, difference),
+      })}
+    </span>
+  );
+}
+
+function BarSegment({
+  team,
+  share,
+}: {
+  readonly team: TeamLabel;
+  readonly share: number;
+}): React.JSX.Element {
+  return <span style={{ flexGrow: share, backgroundColor: team.color }} />;
 }
 
 export function TotalsBar({
@@ -33,7 +74,7 @@ export function TotalsBar({
 }): React.JSX.Element {
   const points = (value: number) =>
     formatOverallRating(translate.locale, value);
-  const share = shareOfFirstTeam(totals);
+  const [shareA, shareB] = barShares(totals);
   return (
     <div
       className="team-totals"
@@ -41,32 +82,23 @@ export function TotalsBar({
       aria-label={translate("teams.totals.label")}
     >
       <div className="team-totals-text">
-        <span>
-          {translate("teams.totals.team", {
-            team: teams.a.name,
-            points: points(totals.a.combinedRating),
-          })}
-        </span>
-        <span className="team-totals-difference">
-          {translate("teams.totals.difference", {
-            difference: points(totals.ratingDifference),
-          })}
-        </span>
-        <span>
-          {translate("teams.totals.team", {
-            team: teams.b.name,
-            points: points(totals.b.combinedRating),
-          })}
+        <span className="team-totals-team">
+          <span className="team-totals-name">{teams.a.name}</span>{" "}
+          <span className="team-totals-points">
+            {points(totals.a.combinedRating)}
+          </span>
+        </span>{" "}
+        <GapStatus translate={translate} difference={totals.ratingDifference} />{" "}
+        <span className="team-totals-team">
+          <span className="team-totals-points">
+            {points(totals.b.combinedRating)}
+          </span>{" "}
+          <span className="team-totals-name">{teams.b.name}</span>
         </span>
       </div>
       <div className="team-totals-bar" aria-hidden="true">
-        <span style={{ width: `${share}%`, backgroundColor: teams.a.color }} />
-        <span
-          style={{
-            width: `${FULL_WIDTH_PERCENT - share}%`,
-            backgroundColor: teams.b.color,
-          }}
-        />
+        <BarSegment team={teams.a} share={shareA} />
+        <BarSegment team={teams.b} share={shareB} />
       </div>
     </div>
   );

@@ -1,6 +1,9 @@
 "use client";
 
+import { Hand } from "@phosphor-icons/react/dist/ssr/Hand";
+import { Scales } from "@phosphor-icons/react/dist/ssr/Scales";
 import { useEffect, useId } from "react";
+import { Icon } from "@/components/Icon";
 import {
   formatCalendarDayParts,
   formatClockTime,
@@ -33,10 +36,10 @@ import {
 } from "./use-team-builder";
 
 /**
- * El reparto de un evento (#402), siguiendo docs/mockups/team-light.png: el
- * título, guardar y publicar, el selector de evento, el control de modo y
- * "Balancear equipos", la barra de totales, las dos columnas, la sugerencia
- * y las listas de disponibles y "Quizás".
+ * El reparto de un evento (#402), con la cabecera, la barra y los totales
+ * del handoff de E28 (#758): el título, guardar y publicar, el selector de
+ * evento, el estado del modo y Auto-balance, la barra de totales, las dos
+ * columnas, la sugerencia y las listas de disponibles y "Quizás".
  *
  * Se monta de nuevo con cada evento (la pantalla le pone su id como clave),
  * así lo movido en uno no se cuela en otro. Por eso el selector vive aquí:
@@ -88,9 +91,10 @@ function EventPicker({
   );
 }
 
-/** "Auto-balance" en el control hace lo mismo que "Balancear equipos": el
- * modo automático es el resultado de balancear, no un ajuste aparte. */
-function ModeControl({
+/** Un solo botón reparte y deja el modo en automático (D8 del PRD de E28);
+ * a su lado se lee en qué modo está el reparto. Mover a alguien a mano lo
+ * devuelve a manual (RF-5 de E10). */
+function BalanceControl({
   translate,
   controls,
   state,
@@ -100,34 +104,20 @@ function ModeControl({
   readonly state: ReadyState;
 }): React.JSX.Element {
   const isBalancing = state.action.kind === "balancing";
+  const isAuto = state.draft.mode === "auto";
   return (
     <div className="team-mode-row">
-      <div
-        className="team-mode"
-        role="group"
-        aria-label={translate("teams.mode.label")}
-      >
-        <button
-          type="button"
-          aria-pressed={state.draft.mode === "manual"}
-          onClick={controls.chooseManual}
-        >
-          {translate("teams.mode.manual")}
-        </button>
-        <button
-          type="button"
-          aria-pressed={state.draft.mode === "auto"}
-          onClick={() => void controls.balance()}
-        >
-          {translate("teams.mode.auto")}
-        </button>
-      </div>
+      <p className="team-mode-status">
+        <Icon glyph={isAuto ? Scales : Hand} />
+        {translate(isAuto ? "teams.status.auto" : "teams.status.manual")}
+      </p>
       <button
         type="button"
-        className="auth-submit team-balance"
+        className="team-balance"
         aria-busy={isBalancing}
         onClick={() => void controls.balance()}
       >
+        <Icon glyph={Scales} />
         {translate(isBalancing ? "teams.balancing" : "teams.balance")}
       </button>
     </div>
@@ -321,7 +311,6 @@ function Heading({
             title: event.title,
           })}
         </h1>
-        <p className="team-lead">{translate("teams.lead")}</p>
       </div>
       {children}
     </header>
@@ -343,7 +332,11 @@ function ReadyBuilder({
     <>
       <div className="team-toolbar">
         {picker}
-        <ModeControl translate={translate} controls={controls} state={state} />
+        <BalanceControl
+          translate={translate}
+          controls={controls}
+          state={state}
+        />
       </div>
       <Publishing translate={translate} controls={controls} state={state} />
       <ActionNotices translate={translate} action={state.action} />

@@ -1,4 +1,7 @@
+import { Check } from "@phosphor-icons/react/dist/ssr/Check";
+import { PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr/PaperPlaneTilt";
 import { useEffect, useId, useRef } from "react";
+import { Icon } from "@/components/Icon";
 import type { Translator } from "@/lib/i18n/translator";
 import { describeTeamsFailure } from "./team-builder-client";
 import type { BuilderAction } from "./use-team-builder";
@@ -6,7 +9,9 @@ import type { BuilderAction } from "./use-team-builder";
 /**
  * Guardar y publicar el reparto (#402, RF-4 y RF-7), y lo que la pantalla
  * dice cuando terminan. Publicar pide confirmación en la misma página, como
- * cancelar un evento en el calendario, diciendo a cuántos se avisará.
+ * cancelar un evento en el calendario, diciendo a cuántos se avisará. La
+ * forma es la del handoff de E28 (#758): Guardar marca con un punto lo que
+ * falta por guardar y los avisos son una línea con un check.
  */
 
 export function SaveAndPublish({
@@ -35,9 +40,14 @@ export function SaveAndPublish({
       >
         {translate(isSaving ? "teams.saving" : "teams.save")}
         {hasChanges && !isSaving ? (
+          // El punto se ve; el separador sólo se oye.
           <>
-            {" · "}
-            <span className="team-unsaved">{translate("teams.unsaved")}</span>
+            {" "}
+            <span className="visually-hidden">·</span>{" "}
+            <span className="team-unsaved">
+              <span className="team-unsaved-dot" aria-hidden="true" />
+              {translate("teams.unsaved")}
+            </span>
           </>
         ) : null}
       </button>
@@ -47,6 +57,7 @@ export function SaveAndPublish({
         disabled={assignedCount === 0}
         onClick={onAskToPublish}
       >
+        <Icon glyph={PaperPlaneTilt} />
         {translate("teams.publish")}
       </button>
     </div>
@@ -82,6 +93,9 @@ export function PublishConfirmation({
       role="group"
       aria-labelledby={questionId}
     >
+      <span className="team-confirm-icon">
+        <Icon glyph={PaperPlaneTilt} />
+      </span>
       <p
         id={questionId}
         ref={questionRef}
@@ -94,6 +108,9 @@ export function PublishConfirmation({
         )}
       </p>
       <div className="groups-actions">
+        <button type="button" className="admin-secondary" onClick={onCancel}>
+          {translate("teams.publishCancel")}
+        </button>
         <button
           type="button"
           className="auth-submit"
@@ -103,9 +120,6 @@ export function PublishConfirmation({
           {translate(
             isPublishing ? "teams.publishing" : "teams.publishConfirm",
           )}
-        </button>
-        <button type="button" className="admin-secondary" onClick={onCancel}>
-          {translate("teams.publishCancel")}
         </button>
       </div>
     </div>
@@ -134,10 +148,16 @@ export function ActionNotices({
   readonly translate: Translator;
   readonly action: BuilderAction;
 }): React.JSX.Element {
+  const notice = statusText(translate, action);
   return (
     <>
       <p className="team-notice" role="status">
-        {statusText(translate, action)}
+        {notice === "" ? null : (
+          <>
+            <Icon glyph={Check} weight="bold" />
+            {notice}
+          </>
+        )}
       </p>
       {action.kind === "failed" ? (
         <p className="auth-error" role="alert">
