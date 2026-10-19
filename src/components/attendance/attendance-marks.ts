@@ -59,10 +59,11 @@ function savedStatusOf(
   return marks.saved.find((candidate) => candidate.userId === userId)?.status;
 }
 
-export function hasUnsavedChanges(marks: SheetMarks): boolean {
-  return marks.current.some((mark) =>
+/** Cuántos socios llevan el punto: el número de Guardar (#765, D2 de E29). */
+export function countUnsaved(marks: SheetMarks): number {
+  return marks.current.filter((mark) =>
     isMarkUnsaved(savedStatusOf(marks, mark.userId), mark.status),
-  );
+  ).length;
 }
 
 /** Lleva el punto de "sin guardar" en su fila. */

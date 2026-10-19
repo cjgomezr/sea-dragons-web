@@ -310,7 +310,7 @@ describe("la hoja", () => {
     expect(within(mateo).queryByText(/RSVP/)).not.toBeInTheDocument();
   });
 
-  it("agrupa las filas en Confirmed, Maybe, No response y Said no, cada grupo una región con sus filas", async () => {
+  it("agrupa las filas en Going, Maybe, No reply y Can't go, cada grupo una región con sus filas", async () => {
     stubClub(
       [POOL_TRAINING],
       [sheetFor(POOL_TRAINING, [MATEO, CHLOE, VALENTINA, RUBY, NOAH])],
@@ -320,10 +320,10 @@ describe("la hoja", () => {
 
     await findRow(MATEO.fullName);
     expect(groupedRows()).toEqual([
-      ["Confirmed", [MATEO.fullName, CHLOE.fullName]],
+      ["Going", [MATEO.fullName, CHLOE.fullName]],
       ["Maybe", [VALENTINA.fullName]],
-      ["No response", [RUBY.fullName]],
-      ["Said no", [NOAH.fullName]],
+      ["No reply", [RUBY.fullName]],
+      ["Can't go", [NOAH.fullName]],
     ]);
   });
 
@@ -334,12 +334,12 @@ describe("la hoja", () => {
 
     await findRow(MATEO.fullName);
     expect(groupedRows().map(([name]) => name)).toEqual([
-      "Confirmed",
+      "Going",
       "Maybe",
-      "No response",
+      "No reply",
     ]);
     expect(
-      screen.queryByRole("heading", { name: "Said no" }),
+      screen.queryByRole("heading", { name: "Can't go" }),
     ).not.toBeInTheDocument();
   });
 
@@ -349,7 +349,7 @@ describe("la hoja", () => {
     render(<AttendanceScreen locale="en" initialSessionId={null} />);
 
     await findRow(RUBY.fullName);
-    expect(groupedRows()).toEqual([["No response", [RUBY.fullName]]]);
+    expect(groupedRows()).toEqual([["No reply", [RUBY.fullName]]]);
   });
 
   it("marca con aria-pressed el estado de cada fila", async () => {
@@ -393,9 +393,7 @@ describe("la hoja", () => {
         .map((item) => item.textContent),
     ).toEqual(["1Present", "1Late", "1Absent"]);
     expect(saveRequests()).toEqual([]);
-    expect(saveButton()).toHaveAccessibleName(
-      "Save attendance · Unsaved changes",
-    );
+    expect(saveButton()).toHaveAccessibleName("Save attendance 1 unsaved");
   });
 
   it("guarda la hoja entera y confirma con los totales guardados", async () => {
@@ -406,7 +404,7 @@ describe("la hoja", () => {
     await userEvent.click(saveButton());
 
     expect(await screen.findByRole("status")).toHaveTextContent(
-      "Attendance saved: 1 present, 1 late, 1 absent.",
+      "Saved · 1 present, 1 late, 1 absent",
     );
     expect(saveRequests()).toEqual([
       {
@@ -444,9 +442,7 @@ describe("la hoja", () => {
     await userEvent.dblClick(saveButton());
     finishSave();
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Attendance saved",
-    );
+    expect(await screen.findByRole("status")).toHaveTextContent("Saved · ");
     expect(saveRequests()).toHaveLength(1);
   });
 
@@ -470,9 +466,7 @@ describe("la hoja", () => {
     );
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(choice(mateo, "Late")).toHaveAttribute("aria-pressed", "true");
-    expect(saveButton()).toHaveAccessibleName(
-      "Save attendance · Unsaved changes",
-    );
+    expect(saveButton()).toHaveAccessibleName("Save attendance 1 unsaved");
   });
 
   it("traduce el 422 de una sesión cancelada entretanto", async () => {
@@ -719,10 +713,10 @@ describe("la hoja", () => {
 
     await findRow(MATEO.fullName);
     expect(groupedRows().map(([name]) => name)).toEqual([
-      "Confirmaron",
+      "Van",
       "Quizás",
       "Sin respuesta",
-      "Dijeron que no",
+      "No van",
     ]);
   });
 
@@ -963,7 +957,7 @@ describe("guardar tras reintentar", () => {
 
     await waitFor(() =>
       expect(screen.getByRole("status")).toHaveTextContent(
-        "Attendance saved: 2 present, 0 late, 1 absent.",
+        "Saved · 2 present, 0 late, 1 absent",
       ),
     );
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -1100,5 +1094,233 @@ describe("la fila compacta (#764)", () => {
     expect(within(mateo).getByTitle("Sin guardar todavía")).toHaveTextContent(
       "Sin guardar todavía",
     );
+  });
+});
+
+/** Los tramos de la barra apilada, en orden, con lo que ocupa cada uno. La
+ * barra es decoración (los números van escritos al lado), así que no tiene
+ * rol por el que buscarla. */
+function barSegments(): [string, string][] {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(".attendance-totals-segment"),
+  ).map((segment) => [segment.dataset.status ?? "", segment.style.flexGrow]);
+}
+
+describe("la cabecera, las sesiones, el aviso y los totales (#765)", () => {
+  it("encabeza la hoja con Take attendance sobre el título", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(screen.getByText("Take attendance")).toBeInTheDocument();
+  });
+
+  it("en español encabeza la hoja con Pasar lista", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(screen.getByText("Pasar lista")).toBeInTheDocument();
+  });
+
+  it("sin sesiones recientes también encabeza con Take attendance", async () => {
+    stubClub([], []);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    expect(
+      await screen.findByRole("link", { name: "Go to the calendar" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Take attendance")).toBeInTheDocument();
+  });
+
+  it("Guardar lleva el icono del disquete, sin nombrarlo", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(saveButton()).toHaveAccessibleName("Save attendance");
+    expect(saveButton().querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+  });
+
+  it("Guardar cuenta los socios cambiados y baja al deshacer uno", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+    const ruby = await findRow(RUBY.fullName);
+    await userEvent.click(choice(mateo, "Late"));
+    await userEvent.click(choice(ruby, "Late"));
+    expect(saveButton()).toHaveAccessibleName("Save attendance 2 unsaved");
+
+    await userEvent.click(choice(ruby, "Absent"));
+
+    expect(saveButton()).toHaveAccessibleName("Save attendance 1 unsaved");
+  });
+
+  it("cambiar dos veces al mismo socio cuenta uno", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+
+    await userEvent.click(choice(mateo, "Late"));
+    await userEvent.click(choice(mateo, "Absent"));
+
+    expect(saveButton()).toHaveAccessibleName("Save attendance 1 unsaved");
+  });
+
+  it("al deshacer todos los cambios Guardar pierde el número", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+    await userEvent.click(choice(mateo, "Late"));
+
+    await userEvent.click(choice(mateo, "Present"));
+
+    expect(saveButton()).toHaveAccessibleName("Save attendance");
+    expect(screen.queryByText(/unsaved/)).not.toBeInTheDocument();
+  });
+
+  it("en español Guardar dice cuántos faltan por guardar", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+
+    await userEvent.click(choice(mateo, "Tarde"));
+
+    expect(
+      screen.getByRole("button", { name: /^Guardar asistencia/ }),
+    ).toHaveAccessibleName("Guardar asistencia 1 sin guardar");
+  });
+
+  it("cada ficha de sesión dice su día y su tipo", async () => {
+    stubClub([POOL_TRAINING, SKILLS], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(sessionChip("Tue 23 · Pool Training")).toHaveTextContent(
+      "Tue 23 · Pool Training",
+    );
+  });
+
+  it("el enlace a las sesiones anteriores lleva la flecha, sin nombrarla", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    const older = screen.getByRole("link", {
+      name: "Older sessions: open the calendar",
+    });
+    expect(older).toHaveTextContent("Older sessions");
+    expect(older.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("al guardar confirma con los tres números y el icono de hecho", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await userEvent.click(choice(await findRow(VALENTINA.fullName), "Late"));
+
+    await userEvent.click(saveButton());
+
+    const notice = await screen.findByRole("status");
+    await waitFor(() =>
+      expect(notice).toHaveTextContent("Saved · 1 present, 1 late, 1 absent"),
+    );
+    expect(notice.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("en español confirma con Guardado y los tres números", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+    await userEvent.click(choice(await findRow(VALENTINA.fullName), "Tarde"));
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /^Guardar asistencia/ }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Guardado · 1 presentes, 1 tarde, 1 ausentes",
+      ),
+    );
+  });
+
+  it("antes de guardar el aviso está vacío y sin icono", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
+  it("dice cuántos vinieron de los que hay en la hoja, contando a los que llegaron tarde", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const ruby = await findRow(RUBY.fullName);
+    expect(screen.getByText("2 of 3 came")).toBeInTheDocument();
+
+    await userEvent.click(choice(ruby, "Late"));
+
+    expect(screen.getByText("3 of 3 came")).toBeInTheDocument();
+  });
+
+  it("en español dice Vinieron n de total", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(screen.getByText("Vinieron 2 de 3")).toBeInTheDocument();
+  });
+
+  it("la barra lleva un tramo por estado, del tamaño de su número, y ninguno para el que está a 0", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(barSegments()).toEqual([
+      ["present", "2"],
+      ["absent", "1"],
+    ]);
+  });
+
+  it("la barra cambia al marcar", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+
+    await userEvent.click(choice(mateo, "Late"));
+
+    expect(barSegments()).toEqual([
+      ["present", "1"],
+      ["late", "1"],
+      ["absent", "1"],
+    ]);
+  });
+
+  it("cada grupo dice cuántos socios tiene junto a su nombre", async () => {
+    stubClub(
+      [POOL_TRAINING],
+      [sheetFor(POOL_TRAINING, [MATEO, CHLOE, VALENTINA, RUBY])],
+    );
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(
+      within(screen.getByRole("region", { name: "Going" })).getByText("2"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Maybe" })).getByText("1"),
+    ).toBeInTheDocument();
   });
 });

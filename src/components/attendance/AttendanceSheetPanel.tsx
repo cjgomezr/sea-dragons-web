@@ -1,6 +1,10 @@
 "use client";
 
+import { ArrowRight } from "@phosphor-icons/react/dist/ssr/ArrowRight";
+import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
+import { FloppyDisk } from "@phosphor-icons/react/dist/ssr/FloppyDisk";
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import {
   ATTENDANCE_STATUSES,
   type AttendanceTotals,
@@ -16,7 +20,7 @@ import {
 } from "./attendance-client";
 import {
   type SheetMarks,
-  hasUnsavedChanges,
+  countUnsaved,
   isMemberUnsaved,
   statusOf,
   totalsOf,
@@ -34,6 +38,10 @@ import {
  * el título con la fecha y el botón de guardar, las fichas de las sesiones
  * recientes, los tres contadores y la lista, agrupada por la respuesta al
  * RSVP (#412, D6) para que el Coach vea a quién le toca revisar.
+ *
+ * Desde E29 (#765) Guardar dice cuántos socios faltan por guardar, el aviso
+ * de guardado es una franja teñida y los totales son un solo panel con una
+ * barra apilada.
  *
  * Se monta de nuevo con cada sesión (la pantalla le pone su id como clave),
  * así lo marcado en una no se cuela en otra. Por eso las fichas viven aquí:
@@ -120,11 +128,45 @@ function OlderSessionsLink({
       }}
     >
       {translate("attendance.olderSessions")}
+      <Icon glyph={ArrowRight} />
     </Link>
   );
 }
 
-/** Se anuncian al cambiar: es lo que el Coach comprueba mientras marca. */
+/** Los que vinieron: también cuenta quien llegó tarde. */
+function cameCount(totals: AttendanceTotals): number {
+  return totals.present + totals.late;
+}
+
+function totalCount(totals: AttendanceTotals): number {
+  return totals.present + totals.late + totals.absent;
+}
+
+/** Decoración: los números ya van escritos en la lista. Un estado sin nadie
+ * no lleva tramo, para que no quede un hueco de 2px suelto. */
+function TotalsBar({
+  totals,
+}: {
+  readonly totals: AttendanceTotals;
+}): React.JSX.Element {
+  return (
+    <div className="attendance-totals-bar" aria-hidden="true">
+      {ATTENDANCE_STATUSES.filter((status) => totals[status] > 0).map(
+        (status) => (
+          <span
+            key={status}
+            className={`attendance-totals-segment attendance-${status}`}
+            data-status={status}
+            style={{ flexGrow: totals[status] }}
+          />
+        ),
+      )}
+    </div>
+  );
+}
+
+/** La lista se anuncia al cambiar: es lo que el Coach comprueba mientras
+ * marca. */
 function Totals({
   translate,
   totals,
@@ -133,33 +175,49 @@ function Totals({
   readonly totals: AttendanceTotals;
 }): React.JSX.Element {
   return (
-    <ul
-      className="attendance-totals"
-      aria-label={translate("attendance.totals.label")}
-      aria-live="polite"
-    >
-      {ATTENDANCE_STATUSES.map((status) => (
-        <li key={status} className={`attendance-total attendance-${status}`}>
-          <span className="attendance-total-count">{totals[status]}</span>
-          <span className="attendance-total-label">
-            {translate(`attendance.status.${status}`)}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="attendance-totals">
+      <div className="attendance-totals-line">
+        <ul
+          className="attendance-totals-list"
+          aria-label={translate("attendance.totals.label")}
+          aria-live="polite"
+        >
+          {ATTENDANCE_STATUSES.map((status) => (
+            <li
+              key={status}
+              className={`attendance-total attendance-${status}`}
+            >
+              <span className="attendance-total-count">{totals[status]}</span>
+              <span className="attendance-total-label">
+                {translate(`attendance.status.${status}`)}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="attendance-totals-came">
+          {translate("attendance.totals.came", {
+            came: cameCount(totals),
+            total: totalCount(totals),
+          })}
+        </p>
+      </div>
+      <TotalsBar totals={totals} />
+    </div>
   );
 }
 
+/** El separador y el punto son decoración; el espacio entre ellos separa
+ * las dos partes del nombre accesible ("Save attendance 2 unsaved"). */
 function SaveButton({
   translate,
   save,
-  hasChanges,
+  unsavedCount,
   isEmpty,
   onSave,
 }: {
   readonly translate: Translator;
   readonly save: SaveState;
-  readonly hasChanges: boolean;
+  readonly unsavedCount: number;
   readonly isEmpty: boolean;
   readonly onSave: () => void;
 }): React.JSX.Element {
@@ -172,12 +230,14 @@ function SaveButton({
       aria-busy={isSaving}
       onClick={onSave}
     >
+      <Icon glyph={FloppyDisk} weight="bold" />
       {translate(isSaving ? "attendance.saving" : "attendance.save")}
-      {hasChanges && !isSaving ? (
+      {unsavedCount > 0 && !isSaving ? (
         <>
-          {" · "}
+          <span className="attendance-save-divider" aria-hidden="true" />{" "}
           <span className="attendance-unsaved">
-            {translate("attendance.unsaved")}
+            <span className="attendance-save-dot" aria-hidden="true" />
+            {translate("attendance.unsaved", { count: unsavedCount })}
           </span>
         </>
       ) : null}
@@ -197,9 +257,12 @@ function SaveNotices({
   return (
     <>
       <p className="attendance-notice" role="status">
-        {save.kind === "saved"
-          ? translate("attendance.saved", { ...save.totals })
-          : null}
+        {save.kind === "saved" ? (
+          <>
+            <Icon glyph={CheckCircle} weight="fill" />
+            {translate("attendance.saved", { ...save.totals })}
+          </>
+        ) : null}
       </p>
       {save.kind === "failed" ? (
         <p className="auth-error" role="alert">
@@ -231,9 +294,15 @@ function MemberGroup({
   const headingId = `asistencia-grupo-${group}`;
   return (
     <section className="attendance-group" aria-labelledby={headingId}>
-      <h2 id={headingId} className="attendance-group-title">
-        {translate(`attendance.group.${group}`)}
-      </h2>
+      {/* La lista ya anuncia cuántas filas tiene: el número es para la vista. */}
+      <div className="attendance-group-header">
+        <h2 id={headingId} className="attendance-group-title">
+          {translate(`attendance.group.${group}`)}
+        </h2>
+        <span className="attendance-group-count" aria-hidden="true">
+          {members.length}
+        </span>
+      </div>
       <ul className="attendance-list" aria-labelledby={headingId}>
         {members.map((member) => (
           <AttendanceRow
@@ -343,7 +412,8 @@ export function AttendanceSheetPanel({
 }): React.JSX.Element {
   const controls = useAttendanceSheet(eventId);
   const { state } = controls;
-  const hasChanges = state.kind === "ready" && hasUnsavedChanges(state.marks);
+  const unsavedCount = state.kind === "ready" ? countUnsaved(state.marks) : 0;
+  const hasChanges = unsavedCount > 0;
 
   // Lo preguntan las fichas de sesión y el nombre que abre la ficha (#414).
   // El diálogo nativo basta: es una pregunta de sí o no, el navegador la
@@ -378,7 +448,7 @@ export function AttendanceSheetPanel({
           <SaveButton
             translate={translate}
             save={state.save}
-            hasChanges={hasChanges}
+            unsavedCount={unsavedCount}
             isEmpty={state.sheet.members.length === 0}
             onSave={() => void controls.save()}
           />
