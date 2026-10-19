@@ -5,6 +5,7 @@ import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { FloppyDisk } from "@phosphor-icons/react/dist/ssr/FloppyDisk";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
+import { useIsPhone } from "@/components/use-is-phone";
 import {
   ATTENDANCE_STATUSES,
   type AttendanceTotals,
@@ -42,6 +43,9 @@ import {
  * Desde E29 (#765) Guardar dice cuántos socios faltan por guardar, el aviso
  * de guardado es una franja teñida y los totales son un solo panel con una
  * barra apilada.
+ *
+ * En el móvil (#766) la cabecera no lleva Guardar: baja a una barra fija que
+ * sólo sale mientras hay cambios (D5 de E29).
  *
  * Se monta de nuevo con cada sesión (la pantalla le pone su id como clave),
  * así lo marcado en una no se cuela en otra. Por eso las fichas viven aquí:
@@ -108,7 +112,8 @@ function SessionChips({
 }
 
 /** Las fichas sólo llegan a 30 días atrás (#580): una sesión más vieja se
- * abre desde el calendario, con "Pasar lista". */
+ * abre desde el calendario, con "Pasar lista". En el móvil dice sólo
+ * "Anteriores", que sigue dentro de su nombre accesible. */
 function OlderSessionsLink({
   translate,
   canLeaveSheet,
@@ -116,6 +121,7 @@ function OlderSessionsLink({
   readonly translate: Translator;
   readonly canLeaveSheet: () => boolean;
 }): React.JSX.Element {
+  const isPhone = useIsPhone();
   return (
     <Link
       href={CALENDAR_PATH}
@@ -127,7 +133,9 @@ function OlderSessionsLink({
         }
       }}
     >
-      {translate("attendance.olderSessions")}
+      {translate(
+        isPhone ? "attendance.olderSessions.short" : "attendance.olderSessions",
+      )}
       <Icon glyph={ArrowRight} />
     </Link>
   );
@@ -242,6 +250,38 @@ function SaveButton({
         </>
       ) : null}
     </button>
+  );
+}
+
+/** En el móvil Guardar vive aquí, fija abajo sobre las pestañas, y sólo
+ * mientras hay algo que guardar. */
+function PhoneSaveBar({
+  translate,
+  save,
+  unsavedCount,
+  onSave,
+}: {
+  readonly translate: Translator;
+  readonly save: SaveState;
+  readonly unsavedCount: number;
+  readonly onSave: () => void;
+}): React.JSX.Element {
+  const isSaving = save.kind === "saving";
+  return (
+    <div className="attendance-save-bar">
+      <p className="attendance-save-bar-count">
+        <span className="attendance-unsaved-dot" aria-hidden="true" />
+        {translate("attendance.unsaved", { count: unsavedCount })}
+      </p>
+      <button
+        type="button"
+        className="auth-submit attendance-save-bar-button"
+        aria-busy={isSaving}
+        onClick={onSave}
+      >
+        {translate(isSaving ? "attendance.saving" : "attendance.save")}
+      </button>
+    </div>
   );
 }
 
@@ -412,6 +452,7 @@ export function AttendanceSheetPanel({
 }): React.JSX.Element {
   const controls = useAttendanceSheet(eventId);
   const { state } = controls;
+  const isPhone = useIsPhone();
   const unsavedCount = state.kind === "ready" ? countUnsaved(state.marks) : 0;
   const hasChanges = unsavedCount > 0;
 
@@ -444,7 +485,7 @@ export function AttendanceSheetPanel({
               : translate("nav.label.attendance")}
           </h1>
         </div>
-        {state.kind === "ready" ? (
+        {state.kind === "ready" && !isPhone ? (
           <SaveButton
             translate={translate}
             save={state.save}
@@ -471,6 +512,14 @@ export function AttendanceSheetPanel({
         controls={controls}
         canLeaveSheet={canLeaveSheet}
       />
+      {state.kind === "ready" && isPhone && hasChanges ? (
+        <PhoneSaveBar
+          translate={translate}
+          save={state.save}
+          unsavedCount={unsavedCount}
+          onSave={() => void controls.save()}
+        />
+      ) : null}
     </>
   );
 }

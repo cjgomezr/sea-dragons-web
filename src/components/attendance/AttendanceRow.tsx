@@ -6,6 +6,7 @@ import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { MemberAvatar } from "@/components/MemberAvatar";
+import { useIsPhone } from "@/components/use-is-phone";
 import type { SheetViewer } from "@/lib/attendance/attendance-sheet";
 import {
   ATTENDANCE_STATUSES,
@@ -29,11 +30,14 @@ import type { SheetMember } from "./attendance-client";
  * abre en grande para quien pasa lista, y al Admin el nombre le abre la ficha.
  *
  * En escritorio la fila es una sola línea (#764, E29), y un punto avisa de
- * que lo marcado en ella difiere de lo guardado.
+ * que lo marcado en ella difiere de lo guardado. En el móvil (#766) también
+ * es una fila: el nombre en hasta dos líneas con "{posición} · Inactivo"
+ * debajo, y el segmento sólo con los iconos.
  */
 
-/** En píxeles, como `.attendance-avatar`. */
-const AVATAR_SIZE = 30;
+/** En píxeles, como `.attendance-avatar` en cada tamaño. */
+const DESKTOP_AVATAR_SIZE = 30;
+const PHONE_AVATAR_SIZE = 32;
 
 const STATUS_GLYPHS: Readonly<Record<AttendanceStatus, PhosphorGlyph>> = {
   present: Check,
@@ -112,6 +116,45 @@ function UnsavedDot({
   );
 }
 
+/** La línea bajo el nombre en el móvil: la posición y si está desactivado,
+ * en texto, porque ahí no caben las fichas de escritorio. */
+function memberDetail(translate: Translator, member: SheetMember): string {
+  const position =
+    member.position === null
+      ? translate("attendance.noPosition")
+      : positionName(member.position.names, translate.locale);
+  return member.isInactive
+    ? `${position} · ${translate("attendance.inactive")}`
+    : position;
+}
+
+/** En el móvil todo el bloque abre la ficha al Admin: el enlace lo cubre
+ * desde la hoja de estilos. El punto queda fuera del enlace para que su
+ * texto oculto se lea, porque el nombre accesible del enlace lo taparía. */
+function PhoneMemberText({
+  translate,
+  member,
+  viewer,
+  isUnsaved,
+}: {
+  readonly translate: Translator;
+  readonly member: SheetMember;
+  readonly viewer: RowViewer;
+  readonly isUnsaved: boolean;
+}): React.JSX.Element {
+  return (
+    <div className="attendance-member-text">
+      <span className="attendance-name-line">
+        <MemberName translate={translate} member={member} viewer={viewer} />
+        {isUnsaved ? <UnsavedDot translate={translate} /> : null}
+      </span>
+      <span className="attendance-member-detail">
+        {memberDetail(translate, member)}
+      </span>
+    </div>
+  );
+}
+
 function MemberHints({
   translate,
   member,
@@ -138,35 +181,42 @@ function MemberHints({
   );
 }
 
+/** En el móvil los botones son sólo el icono, y el estado los nombra. */
 function StatusSegment({
   translate,
   fullName,
   status,
+  isPhone,
   onMark,
 }: {
   readonly translate: Translator;
   readonly fullName: string;
   readonly status: AttendanceStatus;
+  readonly isPhone: boolean;
   readonly onMark: (status: AttendanceStatus) => void;
 }): React.JSX.Element {
   return (
     <div className="attendance-segment" role="group" aria-label={fullName}>
-      {ATTENDANCE_STATUSES.map((choice) => (
-        <button
-          key={choice}
-          type="button"
-          className={`attendance-choice attendance-choice-${choice}`}
-          aria-pressed={choice === status}
-          onClick={() => onMark(choice)}
-        >
-          <span className="attendance-choice-icon">
-            <Icon glyph={STATUS_GLYPHS[choice]} weight="bold" />
-          </span>
-          <span className="attendance-choice-label">
-            {translate(`attendance.status.${choice}`)}
-          </span>
-        </button>
-      ))}
+      {ATTENDANCE_STATUSES.map((choice) => {
+        const label = translate(`attendance.status.${choice}`);
+        return (
+          <button
+            key={choice}
+            type="button"
+            className={`attendance-choice attendance-choice-${choice}`}
+            aria-label={isPhone ? label : undefined}
+            aria-pressed={choice === status}
+            onClick={() => onMark(choice)}
+          >
+            <span className="attendance-choice-icon">
+              <Icon glyph={STATUS_GLYPHS[choice]} weight="bold" />
+            </span>
+            {isPhone ? null : (
+              <span className="attendance-choice-label">{label}</span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -187,13 +237,14 @@ export function AttendanceRow({
   readonly isUnsaved: boolean;
   readonly onMark: (status: AttendanceStatus) => void;
 }): React.JSX.Element {
+  const isPhone = useIsPhone();
   return (
     <li className="attendance-row">
       <div className="attendance-avatar-cell">
         <MemberAvatar
           fullName={member.fullName}
           photoUrl={member.photoUrl}
-          size={AVATAR_SIZE}
+          size={isPhone ? PHONE_AVATAR_SIZE : DESKTOP_AVATAR_SIZE}
           className="attendance-avatar"
           viewer={
             canOpenPhoto(member, viewer)
@@ -202,18 +253,28 @@ export function AttendanceRow({
           }
         />
       </div>
-      <div className="attendance-member-text">
-        <MemberName translate={translate} member={member} viewer={viewer} />
-        <MemberHints
+      {isPhone ? (
+        <PhoneMemberText
           translate={translate}
           member={member}
+          viewer={viewer}
           isUnsaved={isUnsaved}
         />
-      </div>
+      ) : (
+        <div className="attendance-member-text">
+          <MemberName translate={translate} member={member} viewer={viewer} />
+          <MemberHints
+            translate={translate}
+            member={member}
+            isUnsaved={isUnsaved}
+          />
+        </div>
+      )}
       <StatusSegment
         translate={translate}
         fullName={member.fullName}
         status={status}
+        isPhone={isPhone}
         onMark={onMark}
       />
     </li>
