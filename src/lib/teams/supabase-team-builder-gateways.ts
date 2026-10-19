@@ -117,21 +117,17 @@ const assignmentRowSchema = z.object({
   team: z.enum(TEAM_IDS),
 });
 
-const splitRowSchema = z.object({
-  team_a_name: z.string(),
-  team_a_color: z.string(),
-  team_b_name: z.string(),
-  team_b_color: z.string(),
-  mode: z.enum(TEAM_SPLIT_MODES),
-  published_at: z.string().nullable(),
-  team_split_members: z.array(assignmentRowSchema),
-});
-
 const teamLabelRowSchema = z.object({
   team_a_name: z.string(),
   team_a_color: z.string(),
   team_b_name: z.string(),
   team_b_color: z.string(),
+});
+
+const splitRowSchema = teamLabelRowSchema.extend({
+  mode: z.enum(TEAM_SPLIT_MODES),
+  published_at: z.string().nullable(),
+  team_split_members: z.array(assignmentRowSchema),
 });
 
 function toTeamLabels(row: z.infer<typeof teamLabelRowSchema>): TeamLabels {
