@@ -15960,6 +15960,7 @@ a.agenda-take-attendance {
   flex-direction: column;
   gap: var(--space-6);
   max-width: 1100px;
+  container: dashboard / inline-size;
 }
 
 .dashboard h1 {
@@ -16446,6 +16447,13 @@ a.dashboard-tile:hover {
   overflow-wrap: anywhere;
 }
 
+/* La hora no parte: el texto se ajusta al lado del reloj en vez de bajar
+   entero debajo. El lugar sí parte, para que "Cómo llegar" baje. */
+p.dashboard-next-up-line {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
 .dashboard-next-up-directions {
   display: inline-flex;
   flex: 1 1 100%;
@@ -16661,7 +16669,13 @@ a.dashboard-tile:hover {
     flex: none;
     min-height: var(--touch-target-min);
   }
+}
 
+/* La imagen va a la izquierda cuando la tarjeta tiene sitio, no según la
+   ventana: a 768px la barra lateral deja al inicio unos 500px, y con la
+   columna de 280px el texto se partía en tres líneas (#747). Por debajo,
+   la tarjeta sigue como en el móvil. */
+@container dashboard (min-width: 720px) {
   .dashboard-next-up {
     grid-template-columns: 280px minmax(0, 1fr);
   }
