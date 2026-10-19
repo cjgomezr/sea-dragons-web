@@ -9481,7 +9481,11 @@ const STUBBED_CLUB_SETTINGS = {
   initials: "AD",
   accentColor: "#1c6ea4",
   logoUrl: null,
+  seasonStartsOn: null,
 } as const;
+
+/** Un inicio de temporada elegido en General (#744). */
+const CHOSEN_SEASON_START = "2026-03-02";
 
 /** Guardar cambios, en la barra de cambios sin guardar (#719). */
 const ENGLISH_SAVE_SETTINGS = "Save changes";
@@ -9581,6 +9585,16 @@ function chooseSuggestedAccent(saveLabel: string) {
     const swatch = page.getByRole("radio", { name: CHOSEN_SUGGESTED_ACCENT });
     await swatch.check();
     await expect(clubAccentField(page)).toHaveValue(CHOSEN_SUGGESTED_ACCENT);
+    await expect(page.getByRole("button", { name: saveLabel })).toBeEnabled();
+  };
+}
+
+/** Elige el inicio de la temporada (#744): sale la barra para guardarlo. */
+function chooseSeasonStart(saveLabel: string) {
+  return async (page: Page): Promise<void> => {
+    const field = page.getByLabel(/^(Season start|Inicio de temporada)$/);
+    await field.fill(CHOSEN_SEASON_START);
+    await expect(field).toHaveValue(CHOSEN_SEASON_START);
     await expect(page.getByRole("button", { name: saveLabel })).toBeEnabled();
   };
 }
@@ -10069,6 +10083,18 @@ const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
     beforeCapture: fitViewportToPage,
   },
   { name: "club-general-sin-logo" },
+  // #744: General con un inicio de temporada elegido, en los dos idiomas.
+  {
+    name: "club-general-temporada",
+    prepare: chooseSeasonStart(ENGLISH_SAVE_SETTINGS),
+    beforeCapture: fitViewportToPage,
+  },
+  {
+    name: "club-general-temporada-es",
+    beforeVisit: chooseSpanish,
+    prepare: chooseSeasonStart(SPANISH_SAVE_SETTINGS),
+    beforeCapture: fitViewportToPage,
+  },
   {
     name: "club-general-color-rechazado",
     prepare: typeUnreadableAccent(
@@ -11537,12 +11563,18 @@ test.describe("un Admin frente a la configuración de verdad", () => {
     const read = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
     expect(read.status()).toBe(200);
     const { data } = (await read.json()) as {
-      data: { name: string; initials: string | null; accentColor: string };
+      data: {
+        name: string;
+        initials: string | null;
+        accentColor: string;
+        seasonStartsOn: string | null;
+      };
     };
     const identity = {
       name: data.name,
       initials: data.initials,
       accentColor: data.accentColor,
+      seasonStartsOn: data.seasonStartsOn,
     };
 
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
@@ -11606,13 +11638,21 @@ test.describe("un Admin frente a la configuración de verdad", () => {
   });
 
   test("el endpoint rechaza un nombre vacío con 400", async ({ request }) => {
-    const empty = { name: "", initials: null, accentColor: "#1c6ea4" };
+    const empty = {
+      name: "",
+      initials: null,
+      accentColor: "#1c6ea4",
+      seasonStartsOn: null,
+    };
 
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
       data: { ...empty, expected: empty },
     });
 
     expect(write.status()).toBe(400);
+    await expect(write.json()).resolves.toMatchObject({
+      error: { code: "validation_error", reason: "name_required" },
+    });
   });
 
   // #294 (RF-3): un color que no es hexadecimal no llega a la base.
@@ -11621,12 +11661,18 @@ test.describe("un Admin frente a la configuración de verdad", () => {
   }) => {
     const before = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
     const { data } = (await before.json()) as {
-      data: { name: string; initials: string | null; accentColor: string };
+      data: {
+        name: string;
+        initials: string | null;
+        accentColor: string;
+        seasonStartsOn: string | null;
+      };
     };
     const expected = {
       name: data.name,
       initials: data.initials,
       accentColor: data.accentColor,
+      seasonStartsOn: data.seasonStartsOn,
     };
 
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
@@ -11669,6 +11715,7 @@ test.describe("un Player frente a la configuración del club", () => {
       name: "Otro club",
       initials: null,
       accentColor: "#7b3fa0",
+      seasonStartsOn: null,
     };
 
     const read = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
