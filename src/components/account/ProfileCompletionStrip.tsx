@@ -5,9 +5,10 @@ import { useId } from "react";
 import { formatPercent } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
-import type {
-  MissingProfileItem,
-  ProfileCompleteness,
+import {
+  type MissingProfileItem,
+  PERCENT_MAX,
+  type ProfileCompleteness,
 } from "@/lib/members/contact-reminder";
 import { EMERGENCY_NAME_ID, PHONE_ID } from "./OwnContactSection";
 import { COUNTRY_ID } from "./ProfileForm";
@@ -27,8 +28,6 @@ const FIRST_FIELD_IDS = {
   phone: PHONE_ID,
   country: COUNTRY_ID,
 } as const satisfies Record<MissingProfileItem, string>;
-
-const PERCENT_MAX = 100;
 
 function focusFieldOf(item: MissingProfileItem): void {
   const field = document.getElementById(FIRST_FIELD_IDS[item]);

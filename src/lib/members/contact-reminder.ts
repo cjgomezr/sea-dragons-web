@@ -42,6 +42,9 @@ export type ProfileCompleteness = {
 /** El nombre y el correo: sin ellos no hay cuenta, así que siempre están y
  * cuentan como hechos. Por eso a quien le falta todo no le sale un 0. */
 const ALWAYS_PRESENT_ITEMS = 2;
+/** El porcentaje va de 0 a esto. */
+export const PERCENT_MAX = 100;
+
 const COUNTED_ITEMS = ALWAYS_PRESENT_ITEMS + MISSING_PROFILE_ITEMS.length;
 
 const MISSING_CONTACT: Readonly<
@@ -65,7 +68,7 @@ export function profileCompletenessOf(
   return {
     missing,
     percent: Math.round(
-      ((COUNTED_ITEMS - missing.length) / COUNTED_ITEMS) * 100,
+      ((COUNTED_ITEMS - missing.length) / COUNTED_ITEMS) * PERCENT_MAX,
     ),
   };
 }
