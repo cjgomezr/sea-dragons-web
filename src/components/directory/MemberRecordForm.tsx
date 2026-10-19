@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { MemberAvatar } from "@/components/MemberAvatar";
+import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
+import { type HeroMember, ProfileHero } from "@/components/account/ProfileHero";
 import type { ContactDraft } from "@/components/account/OwnContactSection";
 import type { Group } from "@/lib/groups/groups";
-import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import {
@@ -16,9 +16,7 @@ import {
   isAufNumberTooLong,
 } from "@/lib/members/member-record";
 import { contactIssuesOf } from "@/lib/members/profile-contact";
-import type { MembershipStatus } from "@/lib/membership/membership";
-import { aufMarksOf } from "./auf-marks";
-import { membershipMarkOf } from "./membership-mark";
+import { AufPendingStrip, type PendingAuf } from "./AufPendingStrip";
 import {
   MemberRecordContact,
   recordContactDraftOf,
@@ -45,9 +43,9 @@ import {
  * borró, el vencimiento también desaparece.
  *
  * Un AUF que escribió el miembro llega sin verificar (#274). El Admin lo
- * verifica con su botón, que manda el AUF guardado y no el de los controles;
- * por eso el botón desaparece en cuanto el número o el vencimiento se editan:
- * entonces guardar ya lo deja verificado.
+ * verifica desde la franja de debajo de la cabecera (#771), que manda el AUF
+ * guardado y no el de los controles; por eso su botón desaparece en cuanto el
+ * número o el vencimiento se editan: entonces guardar ya lo deja verificado.
  *
  * El teléfono y el contacto de emergencia (#499) siguen la misma regla que el
  * AUF: sólo se mandan si el Admin los tocó.
@@ -59,7 +57,11 @@ type Status =
   | { readonly kind: "verifying" }
   | { readonly kind: "saved" }
   | { readonly kind: "aufVerified" }
-  | MemberRecordFailure;
+  | (MemberRecordFailure & { readonly during: Request });
+
+/** Lo que se manda: guardar el formulario o verificar el AUF de la franja.
+ * Cada desenlace se enseña junto a lo que lo pidió. */
+type Request = "sending" | "verifying";
 
 /** Lo que hay en los controles. Una cadena vacía es "sin valor", y se manda
  * como null. */
@@ -79,13 +81,9 @@ type FieldIssue = {
 const AUF_NUMBER_ID = "ficha-auf-numero";
 const AUF_EXPIRY_ID = "ficha-auf-vencimiento";
 const AUF_HINT_ID = "ficha-auf-ayuda";
-const AUF_PENDING_ID = "ficha-auf-pendiente";
 const BIRTH_ID = "ficha-nacimiento";
 const BIRTH_HINT_ID = "ficha-nacimiento-ayuda";
 const GUARDIAN_NOTICE_ID = "ficha-nacimiento-tutor";
-/** El mismo círculo, y la misma clase, que la cabecera del perfil propio
- * (#354). */
-const RECORD_AVATAR_SIZE = 64;
 
 function toDraft(record: MemberRecord): Draft {
   return {
@@ -162,19 +160,20 @@ function SaveOutcome({
   translate: Translator;
   status: Status;
 }): React.JSX.Element | null {
-  if (status.kind === "saved" || status.kind === "aufVerified") {
+  if (status.kind === "saved") {
     return (
-      <p className="auth-note" role="status">
-        {translate(
-          status.kind === "saved"
-            ? "memberRecord.saved"
-            : "memberRecord.auf.verified",
-        )}
+      <p className="profile-strip profile-strip-success" role="status">
+        <CheckCircle aria-hidden="true" weight="regular" />
+        {translate("memberRecord.saved")}
       </p>
     );
   }
   // Un 400 de un campo ya se enseña junto a ese campo.
-  if (status.kind === "failed" && readIssueCode(status) === null) {
+  if (
+    status.kind === "failed" &&
+    status.during === "sending" &&
+    readIssueCode(status) === null
+  ) {
     return (
       <p className="auth-error" role="alert">
         {describeMemberRecordFailure(translate, status)}
@@ -184,52 +183,56 @@ function SaveOutcome({
   return null;
 }
 
-function RecordHeader({
+/** Lo que pasó al verificar desde la franja, debajo de la cabecera. */
+function VerifyOutcome({
   translate,
-  locale,
-  record,
-  membershipStatus,
+  status,
 }: {
   translate: Translator;
-  locale: Locale;
-  record: MemberRecord;
-  membershipStatus: MembershipStatus | null;
-}): React.JSX.Element {
-  const marks = [
-    ...aufMarksOf(translate, record),
-    membershipMarkOf(translate, membershipStatus),
-  ];
-  return (
-    <header className="member-record-header">
-      <div className="member-record-identity">
-        <MemberAvatar
-          className="account-avatar"
-          fullName={record.fullName}
-          photoUrl={record.photoUrl}
-          size={RECORD_AVATAR_SIZE}
-          alt={translate("memberRecord.photoAlt", { name: record.fullName })}
-          viewer={{ userId: record.userId, translate }}
-        />
-        <h1>{record.fullName}</h1>
-      </div>
-      <p className="app-lead">{translate("memberRecord.lead")}</p>
-      <p className="member-record-joined">
-        {translate("memberRecord.joinedOn", {
-          date: formatCalendarDay(locale, record.joinedOn),
-        })}
+  status: Status;
+}): React.JSX.Element | null {
+  if (status.kind === "aufVerified") {
+    return (
+      <p className="profile-strip profile-strip-success" role="status">
+        <CheckCircle aria-hidden="true" weight="regular" />
+        {translate("memberRecord.auf.verified")}
       </p>
-      <span className="directory-marks">
-        {marks.map((mark) => (
-          <span
-            key={mark.text}
-            className={`directory-mark directory-mark-${mark.tone}`}
-          >
-            {mark.text}
-          </span>
-        ))}
-      </span>
-    </header>
-  );
+    );
+  }
+  if (status.kind === "failed" && status.during === "verifying") {
+    return (
+      <p className="auth-error" role="alert">
+        {describeMemberRecordFailure(translate, status)}
+      </p>
+    );
+  }
+  return null;
+}
+
+/** La cabecera compartida (#771) con lo que la ficha sabe. El rol y la
+ * membresía los cambia la pantalla (#549, #457) y llegan de ella. */
+function heroMemberOf(
+  record: MemberRecord,
+  screenRecord: MemberRecord,
+): HeroMember {
+  return {
+    userId: record.userId,
+    fullName: record.fullName,
+    role: screenRecord.role,
+    positionNames: record.positionName,
+    experienceLevel: record.experienceLevel,
+    country: record.country,
+    membershipStatus: screenRecord.membershipStatus,
+    auf:
+      record.aufNumber === null
+        ? null
+        : {
+            isVerified: record.isAufVerified,
+            isExpired: record.isAufExpired,
+          },
+    joinedOn: record.joinedOn,
+    photoUrl: record.photoUrl,
+  };
 }
 
 /** Si guardar la fecha que hay en el control dejaría al miembro pidiendo el
@@ -291,43 +294,16 @@ function DateOfBirthSection({
   );
 }
 
-function isAufPending(record: MemberRecord): boolean {
-  return record.aufNumber !== null && !record.isAufVerified;
-}
-
-function AufVerification({
-  translate,
-  isVerifying,
-  canVerify,
-  onVerify,
-}: {
-  translate: Translator;
-  isVerifying: boolean;
-  /** Sólo el AUF guardado se verifica: con los controles editados, no. */
-  canVerify: boolean;
-  onVerify: () => void;
-}): React.JSX.Element {
-  return (
-    <>
-      <p className="member-record-warning" id={AUF_PENDING_ID}>
-        {translate("memberRecord.auf.pending")}
-      </p>
-      {canVerify ? (
-        <button
-          type="button"
-          className="auth-secondary"
-          aria-describedby={AUF_PENDING_ID}
-          onClick={onVerify}
-        >
-          {translate(
-            isVerifying
-              ? "memberRecord.auf.verifying"
-              : "memberRecord.auf.verify",
-          )}
-        </button>
-      ) : null}
-    </>
-  );
+/** El AUF que escribió el miembro y nadie ha verificado, o null. */
+function pendingAufOf(record: MemberRecord): PendingAuf | null {
+  if (record.aufNumber === null || record.isAufVerified) {
+    return null;
+  }
+  return {
+    fullName: record.fullName,
+    aufNumber: record.aufNumber,
+    aufExpiry: record.aufExpiry,
+  };
 }
 
 /** El aviso de campo que trajo el último envío, si el servidor rechazó uno. */
@@ -408,7 +384,7 @@ export function MemberRecordForm({
   /** Guardar y verificar comparten el candado y el desenlace: los dos
    * devuelven la ficha tal como quedó. */
   async function send(
-    kind: "sending" | "verifying",
+    kind: Request,
     request: () => Promise<MemberRecordSave>,
   ): Promise<void> {
     isSendingRef.current = true;
@@ -416,7 +392,7 @@ export function MemberRecordForm({
     const result = await request();
     isSendingRef.current = false;
     if (result.kind === "failed") {
-      setStatus(result);
+      setStatus({ ...result, during: kind });
       return;
     }
     setRecord(result.record);
@@ -444,17 +420,25 @@ export function MemberRecordForm({
         });
   };
   const isSending = status.kind === "sending" || status.kind === "verifying";
+  const pendingAuf = pendingAufOf(record);
 
   return (
     <>
-      {/* La membresía no la guarda este formulario sino la exención (#457):
-          el chip lee la de la pantalla, que es la que ésta cambia. */}
-      <RecordHeader
-        translate={translate}
+      <ProfileHero
         locale={locale}
-        record={record}
-        membershipStatus={initialRecord.membershipStatus}
+        isOwnProfile={false}
+        member={heroMemberOf(record, initialRecord)}
       />
+      {pendingAuf === null ? null : (
+        <AufPendingStrip
+          translate={translate}
+          auf={pendingAuf}
+          isVerifying={status.kind === "verifying"}
+          canVerify={isAufUntouched(record, draft)}
+          onVerify={handleVerify}
+        />
+      )}
+      <VerifyOutcome translate={translate} status={status} />
       <form
         className="auth-pending member-record-form"
         onSubmit={handleSubmit}
@@ -485,14 +469,6 @@ export function MemberRecordForm({
             <p className="auth-hint" id={AUF_HINT_ID}>
               {translate("memberRecord.auf.hint")}
             </p>
-            {isAufPending(record) ? (
-              <AufVerification
-                translate={translate}
-                isVerifying={status.kind === "verifying"}
-                canVerify={isAufUntouched(record, draft)}
-                onVerify={handleVerify}
-              />
-            ) : null}
           </section>
           <DateOfBirthSection
             translate={translate}

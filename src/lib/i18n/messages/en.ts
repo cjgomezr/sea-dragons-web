@@ -296,7 +296,6 @@ export const englishMessages = {
   "account.metaTitle": "Profile · {club}",
   "account.metaDescription":
     "Your details, your role in the club and your groups, plus a request to become a Coach or join the Committee.",
-  "account.roleLine": "Role: {role}",
   "role.Admin": "Admin",
   "role.Coach": "Coach",
   "role.Committee": "Committee",
@@ -429,6 +428,13 @@ export const englishMessages = {
   "account.photo.saved": "Photo updated.",
   "account.photo.removed": "Photo removed.",
   "account.photo.retry": "Try again",
+  "profileHero.auf.pending": "AUF pending",
+  "profileHero.memberSince": "Member since {date}",
+  "profileCompletion.title": "Your profile is almost complete. Missing:",
+  "profileCompletion.progress": "Profile completeness",
+  "profileCompletion.item.emergency_contact": "Emergency contact",
+  "profileCompletion.item.phone": "Phone",
+  "profileCompletion.item.country": "Country",
   "account.photo.issue.photoTooLarge":
     "This photo is larger than {max} MB. Choose a smaller one.",
   "account.photo.issue.photoTypeUnsupported":
@@ -770,15 +776,12 @@ export const englishMessages = {
   "memberRecord.metaTitle": "Member record · {club}",
   "memberRecord.metaDescription":
     "A member's AUF registration and groups, which only an Admin edits.",
-  "memberRecord.back": "← Back to the directory",
+  "memberRecord.back": "Directory",
   "memberRecord.openLabel": "Open {name}'s record",
   "memberRecord.loading": "Loading the member's record…",
   "memberRecord.evaluation.title": "Evaluation",
   "memberRecord.evaluation.loading": "Loading the evaluation…",
   "memberRecord.evaluation.open": "Open in Evaluations",
-  "memberRecord.lead":
-    "What only an Admin edits: the AUF registration, the date of birth and the groups.",
-  "memberRecord.joinedOn": "Member since {date}",
   "memberRecord.photoAlt": "Photo of {name}",
   "photoViewer.open": "Open the photo of {name}",
   "photoViewer.close": "Close the photo",
@@ -789,11 +792,13 @@ export const englishMessages = {
   "memberRecord.auf.number": "AUF number",
   "memberRecord.auf.expiry": "Expiry date",
   "memberRecord.auf.hint": "Clearing the number also clears its expiry date.",
-  "memberRecord.auf.pending":
-    "The member wrote this AUF. Check it and verify it, or correct it and save: what you write is verified.",
   "memberRecord.auf.verify": "Verify AUF",
   "memberRecord.auf.verifying": "Verifying…",
   "memberRecord.auf.verified": "AUF verified.",
+  "memberRecord.aufStrip.withExpiry":
+    "{name} added AUF {number} (expires {date}). Check it and verify.",
+  "memberRecord.aufStrip.withoutExpiry":
+    "{name} added AUF {number}. Check it and verify.",
   "memberRecord.birth.title": "Personal details",
   "memberRecord.birth.label": "Date of birth",
   "memberRecord.birth.hint":

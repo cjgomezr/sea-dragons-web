@@ -87,6 +87,8 @@ function renderScreen(
       evaluation={{ visibility: "staff_only" }}
       attendance={{ kind: "no_data" }}
       membershipPlan="Full"
+      membershipStatus="active"
+      joinedOn="2024-03-06"
       countries={listCountryOptions(locale)}
     />,
   );

@@ -18,7 +18,10 @@ import {
 
 /** El título de la sección: el aviso del contacto (#498) lleva aquí. */
 export const CONTACT_SECTION_ID = "perfil-contacto";
-const PHONE_ID = "perfil-telefono";
+/** Los primeros campos de cada dato: la franja de lo que falta (#771) pone
+ * ahí el foco. */
+export const PHONE_ID = "perfil-telefono";
+export const EMERGENCY_NAME_ID = "perfil-emergencia-nombre";
 const EMERGENCY_HINT_ID = "perfil-emergencia-pista";
 const GUARDIAN_PROPOSED_ID = "perfil-emergencia-tutor";
 const SAME_PHONE_ID = "perfil-emergencia-mismo-telefono";
@@ -134,7 +137,7 @@ export function OwnContactSection({
           </p>
         ) : null}
         <TextField
-          id="perfil-emergencia-nombre"
+          id={EMERGENCY_NAME_ID}
           label={translate("account.profile.contact.emergencyName")}
           type="text"
           value={draft.emergencyContactName}

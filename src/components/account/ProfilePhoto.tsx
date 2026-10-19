@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Camera } from "@phosphor-icons/react/dist/ssr/Camera";
+import { useId, useRef, useState } from "react";
 import { MemberAvatar } from "@/components/MemberAvatar";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import type { Locale } from "@/lib/i18n/locale";
@@ -20,9 +21,9 @@ import {
 } from "./profile-photo-client";
 
 /**
- * La foto del perfil propio (#245, FR-084): el círculo de la cabecera de
- * docs/mockups/mobile-profile-light.png y, bajo el nombre, los controles para
- * subirla, cambiarla o quitarla.
+ * La foto del perfil propio (#245, FR-084): el círculo de la cabecera (#771)
+ * con el botón de cámara que la sube o la cambia y, bajo el nombre, el de
+ * quitarla y el aviso de cómo fue.
  *
  * Es de cliente por el estado del envío. Avisa antes de subir lo que no vale
  * (el servidor lo vuelve a comprobar), y sólo cambia la foto que enseña
@@ -33,8 +34,9 @@ import {
  * de servidor y esto sólo envuelva lo que cambia.
  */
 
-/** El círculo de la cabecera, en píxeles; `.account-avatar` dice lo mismo. */
-const HEADER_AVATAR_SIZE = 64;
+/** El círculo de la cabecera (#771), en píxeles; `.profile-hero-avatar` dice
+ * lo mismo. */
+export const HERO_AVATAR_SIZE = 96;
 
 const ACCEPTED_TYPES = PROFILE_PHOTO_TYPES.join(",");
 
@@ -74,6 +76,7 @@ export function ProfilePhoto({
   const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const input = useRef<HTMLInputElement>(null);
+  const hintId = useId();
 
   /** Un fallo que no es del fichero se puede reintentar tal cual; uno del
    * fichero, no, porque el servidor lo volvería a rechazar. */
@@ -125,59 +128,69 @@ export function ProfilePhoto({
   const busy = isBusy(status);
   return (
     <>
-      <MemberAvatar
-        className="account-avatar"
-        fullName={fullName}
-        photoUrl={photoUrl}
-        size={HEADER_AVATAR_SIZE}
-        alt={translate("account.photo.alt")}
-        viewer={{ userId, translate }}
-      />
-      <div className="account-identity">
+      <span className="profile-hero-photo">
+        <MemberAvatar
+          className="profile-hero-avatar"
+          fullName={fullName}
+          photoUrl={photoUrl}
+          size={HERO_AVATAR_SIZE}
+          alt={translate("account.photo.alt")}
+          viewer={{ userId, translate }}
+        />
+        <button
+          type="button"
+          className="profile-hero-camera"
+          aria-label={cameraLabelOf(translate, status, photoUrl)}
+          aria-describedby={hintId}
+          disabled={busy}
+          onClick={() => input.current?.click()}
+        >
+          <Camera aria-hidden="true" weight="bold" />
+        </button>
+      </span>
+      <div className="profile-hero-identity">
         {children}
-        <div className="account-photo-actions">
-          <input
-            ref={input}
-            type="file"
-            accept={ACCEPTED_TYPES}
-            aria-label={translate("account.photo.choose")}
-            className="account-photo-input"
-            tabIndex={-1}
-            onChange={choose}
-          />
-          <button
-            type="button"
-            className="auth-secondary"
-            disabled={busy}
-            onClick={() => input.current?.click()}
-          >
-            {status.kind === "uploading"
-              ? translate("account.photo.uploading")
-              : translate(
-                  photoUrl === null
-                    ? "account.photo.add"
-                    : "account.photo.change",
-                )}
-          </button>
-          {photoUrl === null ? null : (
-            <button
-              type="button"
-              className="auth-secondary"
-              disabled={busy}
-              onClick={() => void remove()}
-            >
-              {status.kind === "removing"
-                ? translate("account.photo.removing")
-                : translate("account.photo.remove")}
-            </button>
-          )}
-        </div>
-        <p className="auth-hint account-photo-hint">
+        <input
+          ref={input}
+          type="file"
+          accept={ACCEPTED_TYPES}
+          aria-label={translate("account.photo.choose")}
+          className="account-photo-input"
+          tabIndex={-1}
+          onChange={choose}
+        />
+        <p className="visually-hidden" id={hintId}>
           {describePhotoHint(translate)}
         </p>
+        {photoUrl === null ? null : (
+          <button
+            type="button"
+            className="profile-hero-photo-remove"
+            disabled={busy}
+            onClick={() => void remove()}
+          >
+            {status.kind === "removing"
+              ? translate("account.photo.removing")
+              : translate("account.photo.remove")}
+          </button>
+        )}
         <PhotoStatus translate={translate} status={status} />
       </div>
     </>
+  );
+}
+
+/** El botón de cámara no tiene texto: su nombre dice lo que hace. */
+function cameraLabelOf(
+  translate: Translator,
+  status: Status,
+  photoUrl: string | null,
+): string {
+  if (status.kind === "uploading") {
+    return translate("account.photo.uploading");
+  }
+  return translate(
+    photoUrl === null ? "account.photo.add" : "account.photo.change",
   );
 }
 

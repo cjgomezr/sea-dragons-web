@@ -11,7 +11,10 @@ import type {
   OwnAuf,
   OwnProfile,
 } from "@/lib/members/own-profile";
-import type { MembershipPlan } from "@/lib/membership/membership";
+import type {
+  MembershipPlan,
+  MembershipStatus,
+} from "@/lib/membership/membership";
 import type { ClubPosition, ClubPositions } from "@/lib/club/club-positions";
 import {
   DEFENDER,
@@ -118,6 +121,7 @@ function renderScreen(
     readonly positionOptions?: ClubPositions;
     readonly attendance?: MemberAttendance;
     readonly membershipPlan?: MembershipPlan | null;
+    readonly membershipStatus?: MembershipStatus | null;
     readonly emergencyContactProposal?: EmergencyContactProposal | null;
   } = {},
 ): ReturnType<typeof render> {
@@ -144,6 +148,12 @@ function profileScreen(
       membershipPlan={
         options.membershipPlan === undefined ? "Full" : options.membershipPlan
       }
+      membershipStatus={
+        options.membershipStatus === undefined
+          ? "active"
+          : options.membershipStatus
+      }
+      joinedOn="2024-03-06"
     />
   );
 }
@@ -253,7 +263,9 @@ describe("pantalla de perfil", () => {
   it("sigue mostrando el rol, la solicitud de rol y los grupos propios", () => {
     renderScreen();
 
-    expect(screen.getByText("Role: Player")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).getByText("Player"),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Request a role" }),
     ).toBeInTheDocument();
@@ -1026,58 +1038,169 @@ const SISTER = {
   relationship: "Sister",
 } as const;
 
-describe("pantalla de perfil: el aviso del contacto (#498)", () => {
-  it("sin contacto de emergencia explica para qué es, lleva a Contacto y no se puede cerrar", () => {
+describe("pantalla de perfil: la cabecera (#771)", () => {
+  it("lleva el nombre en H1, la píldora del rol y posición · experiencia · país", () => {
+    renderScreen();
+
+    const header = screen.getByRole("banner");
+    expect(
+      within(header).getByRole("heading", { level: 1, name: "Nerea Ruiz" }),
+    ).toBeInTheDocument();
+    expect(within(header).getByText("Player")).toBeInTheDocument();
+    expect(
+      within(header).getByText("Defender · Intermediate · Australia"),
+    ).toBeInTheDocument();
+  });
+
+  it("deja fuera de la línea lo que no tiene", () => {
+    renderScreen({ profile: EMPTY_PROFILE });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Australia"),
+    ).toBeInTheDocument();
+  });
+
+  it("enseña la membresía activa, el AUF pendiente y desde cuándo es socio", () => {
+    renderScreen({ profile: { ...PROFILE, auf: PENDING_AUF } });
+
+    const header = screen.getByRole("banner");
+    expect(within(header).getByText("Membership active")).toBeInTheDocument();
+    expect(within(header).getByText("AUF pending")).toBeInTheDocument();
+    expect(
+      within(header).getByText("Member since March 2024"),
+    ).toBeInTheDocument();
+  });
+
+  it("marca el AUF verificado", () => {
+    renderScreen({ profile: { ...PROFILE, auf: VERIFIED_AUF } });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("AUF verified"),
+    ).toBeInTheDocument();
+  });
+
+  it("sin AUF no lleva ficha del AUF", () => {
+    renderScreen();
+
+    expect(
+      within(screen.getByRole("banner")).queryByText(/^AUF/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("dice el estado de una membresía que no está al día", () => {
+    renderScreen({ membershipStatus: "past_due" });
+
+    const header = screen.getByRole("banner");
+    expect(within(header).getByText("Payment overdue")).toBeInTheDocument();
+    expect(
+      within(header).queryByText("Membership active"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("la foto lleva el botón de cámara que abre el selector de foto", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    const input = screen.getByLabelText<HTMLInputElement>("Choose a photo");
+    const opened = vi.fn();
+    input.addEventListener("click", opened);
+
+    await user.click(
+      within(screen.getByRole("banner")).getByRole("button", {
+        name: "Add photo",
+      }),
+    );
+
+    expect(opened).toHaveBeenCalledTimes(1);
+  });
+
+  it("se lee en español", () => {
+    renderScreen({ locale: "es", profile: { ...PROFILE, auf: PENDING_AUF } });
+
+    const header = screen.getByRole("banner");
+    expect(within(header).getByText("Jugador")).toBeInTheDocument();
+    expect(
+      within(header).getByText("Defensa · Intermedio · Australia"),
+    ).toBeInTheDocument();
+    expect(within(header).getByText("Membresía activa")).toBeInTheDocument();
+    expect(within(header).getByText("AUF pendiente")).toBeInTheDocument();
+    expect(
+      within(header).getByText("Miembro desde marzo de 2024"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("pantalla de perfil: la franja de lo que falta (#771)", () => {
+  function completionStrip(): HTMLElement {
+    return screen.getByRole("note", {
+      name: "Your profile is almost complete. Missing:",
+    });
+  }
+
+  it("sin contacto de emergencia pide ese dato con el 80 %", () => {
     renderScreen({
       profile: { ...PROFILE, phone: "0412 345 678", emergencyContact: null },
     });
 
-    const note = screen.getByRole("note", {
-      name: "Add your emergency contact",
-    });
+    const strip = completionStrip();
     expect(
-      within(note).getByText(
-        "So the club knows who to call if something happens to you at the pool.",
-      ),
-    ).toBeInTheDocument();
+      within(strip).getByRole("progressbar", { name: "Profile completeness" }),
+    ).toHaveAttribute("aria-valuenow", "80");
+    expect(within(strip).getByText("80%")).toBeInTheDocument();
     expect(
-      within(note).getByRole("link", {
-        name: "Complete it in Contact, on your profile",
-      }),
-    ).toHaveAttribute("href", "/cuenta#perfil-contacto");
-    expect(within(note).queryByRole("button")).not.toBeInTheDocument();
+      within(strip)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Emergency contact"]);
   });
 
-  it("el enlace lleva a la sección Contacto del formulario", () => {
-    renderScreen({ profile: { ...PROFILE, emergencyContact: null } });
-
-    expect(screen.getByRole("heading", { name: "Contact" })).toHaveAttribute(
-      "id",
-      "perfil-contacto",
-    );
-  });
-
-  it("sin teléfono avisa con un aviso que se cierra y no vuelve", async () => {
-    const user = userEvent.setup();
-    const view = renderScreen({
-      profile: { ...PROFILE, phone: null, emergencyContact: SISTER },
-    });
-
-    await user.click(
-      within(
-        await screen.findByRole("note", { name: "Add your phone number" }),
-      ).getByRole("button", { name: "Dismiss phone reminder" }),
-    );
-
-    expect(screen.queryByRole("note")).not.toBeInTheDocument();
-    view.unmount();
+  it("pide cada dato que falta, con el 40 % si faltan los tres", () => {
     renderScreen({
-      profile: { ...PROFILE, phone: null, emergencyContact: SISTER },
+      profile: {
+        ...PROFILE,
+        country: null,
+        phone: null,
+        emergencyContact: null,
+      },
     });
-    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+
+    const strip = completionStrip();
+    expect(within(strip).getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "40",
+    );
+    expect(
+      within(strip)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Emergency contact", "Phone", "Country"]);
   });
 
-  it("con los dos datos no pinta ningún aviso", () => {
+  it.each([
+    ["Emergency contact", "Contact name"],
+    ["Phone", "Your phone (optional)"],
+    ["Country", "Country"],
+  ])(
+    "la ficha %s pone el foco en su campo del formulario",
+    async (item, field) => {
+      const user = userEvent.setup();
+      renderScreen({
+        profile: {
+          ...PROFILE,
+          country: null,
+          phone: null,
+          emergencyContact: null,
+        },
+      });
+
+      await user.click(
+        within(completionStrip()).getByRole("button", { name: item }),
+      );
+
+      expect(screen.getByLabelText(field)).toHaveFocus();
+    },
+  );
+
+  it("con el perfil completo no sale, ni el aviso de contacto de antes", () => {
     renderScreen({
       profile: { ...PROFILE, phone: "0412 345 678", emergencyContact: SISTER },
     });
@@ -1085,26 +1208,7 @@ describe("pantalla de perfil: el aviso del contacto (#498)", () => {
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 
-  it("cuando faltan los dos pinta un solo aviso que pide los dos", () => {
-    renderScreen({
-      profile: { ...PROFILE, phone: null, emergencyContact: null },
-    });
-
-    expect(screen.getAllByRole("note")).toHaveLength(1);
-    expect(
-      screen.getByRole("note", {
-        name: "Add your phone number and emergency contact",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("no impide guardar la ficha", () => {
-    renderScreen({ profile: { ...PROFILE, emergencyContact: null } });
-
-    expect(saveButton()).toBeEnabled();
-  });
-
-  it("desaparece cuando la página vuelve con el contacto guardado", () => {
+  it("desaparece cuando la página vuelve con el dato guardado", () => {
     const view = renderScreen({
       profile: { ...PROFILE, phone: "0412 345 678", emergencyContact: null },
     });
@@ -1122,19 +1226,28 @@ describe("pantalla de perfil: el aviso del contacto (#498)", () => {
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 
+  it("no impide guardar la ficha", () => {
+    renderScreen({ profile: { ...PROFILE, emergencyContact: null } });
+
+    expect(saveButton()).toBeEnabled();
+  });
+
   it("se lee en español", () => {
     renderScreen({
       locale: "es",
       profile: { ...PROFILE, phone: null, emergencyContact: null },
     });
 
-    const note = screen.getByRole("note", {
-      name: "Añade tu teléfono y tu contacto de emergencia",
+    const strip = screen.getByRole("note", {
+      name: "Tu perfil está casi completo. Falta:",
     });
     expect(
-      within(note).getByRole("link", {
-        name: "Complétalo en Contacto, en tu perfil",
-      }),
+      within(strip).getByRole("progressbar", { name: "Perfil completado" }),
     ).toBeInTheDocument();
+    expect(
+      within(strip)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Contacto de emergencia", "Teléfono"]);
   });
 });

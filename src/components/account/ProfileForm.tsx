@@ -80,6 +80,8 @@ type Draft = AufDraft &
 
 const FULL_NAME_ID = "perfil-nombre";
 const FULL_NAME_ERROR_ID = "perfil-nombre-error";
+/** La franja de lo que falta (#771) pone aquí el foco cuando falta el país. */
+export const COUNTRY_ID = "perfil-pais";
 
 function toDraft(
   profile: OwnProfile,
@@ -410,7 +412,7 @@ export function ProfileForm({
           onChange={(fullName) => update({ fullName })}
         />
         <SelectField
-          id="perfil-pais"
+          id={COUNTRY_ID}
           label={translate("account.profile.country")}
           value={draft.country}
           options={countries.map((country) => ({

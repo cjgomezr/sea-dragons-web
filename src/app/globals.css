@@ -65,6 +65,12 @@
   /* El color del equipo de quien mira en el evento desplegado (#403): la
      tarjeta lo pone en línea con el del reparto. */
   --team-color: var(--color-accent);
+  /* El principio del degradado de la cabecera del perfil (#771); acaba en
+     --color-panel. */
+  --color-hero-gradient-start: #dceaf5;
+  /* Lo hecho del anillo de la franja de lo que falta (#771): la franja lo
+     pone en línea con el porcentaje de cada perfil. */
+  --profile-progress: 0%;
   --shadow: 0 1px 2px rgba(13, 36, 54, 0.06), 0 6px 18px rgba(13, 36, 54, 0.06);
   --shadow-sm: 0 1px 2px rgba(13, 36, 54, 0.07);
 
@@ -140,6 +146,7 @@
     --color-segment-selected: #1d4869;
     --color-border-dashed: #3a5670;
     --color-type-meeting: #b7c7d6;
+    --color-hero-gradient-start: #163a55;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   }
@@ -170,6 +177,7 @@
   --color-segment-selected: #1d4869;
   --color-border-dashed: #3a5670;
   --color-type-meeting: #b7c7d6;
+  --color-hero-gradient-start: #163a55;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
@@ -1991,14 +1999,6 @@ a.auth-brand-header:focus-visible {
   max-width: 560px;
 }
 
-.account-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  text-align: center;
-}
-
 .account-avatar {
   display: flex;
   flex: none;
@@ -2015,25 +2015,305 @@ a.auth-brand-header:focus-visible {
   border-radius: 50%;
 }
 
-.app-main .account-identity h1 {
-  margin: 0;
-  font-size: 24px;
-  overflow-wrap: anywhere;
-}
-
 .account-role {
   margin: 0;
   color: var(--color-text-secondary);
 }
 
-@media (min-width: 768px) {
-  .account-header {
-    flex-direction: row;
-    /* Arriba y no al centro: bajo el nombre van los controles de la foto
-       (#245), y centrado el círculo quedaba a media altura de todo eso. */
-    align-items: flex-start;
-    text-align: left;
-  }
+/* La cabecera que comparten el perfil y la ficha de un socio (#771, RF-2 del
+   PRD de E30), de docs/design/design_handoff_profile/screenshots/01 y 03: la
+   foto de 96px con el anillo del fondo y el del acento, el nombre, la píldora
+   del rol, la línea de posición y las fichas de estado. El móvil es otro
+   ticket: aquí sólo se deja que todo se parta sin desbordar. */
+.profile-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--space-4) + var(--space-1));
+  padding: calc(var(--space-4) + 2px) calc(var(--space-4) + var(--space-1));
+  background: linear-gradient(
+    135deg,
+    var(--color-hero-gradient-start),
+    var(--color-panel) 70%
+  );
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.profile-hero-photo {
+  position: relative;
+  flex: none;
+  width: 96px;
+  height: 96px;
+}
+
+.profile-hero-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  font-family: var(--font-family-heading);
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3px var(--color-background),
+    0 0 0 5px var(--color-accent);
+}
+
+.profile-hero-camera {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 15px;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--color-panel);
+  cursor: pointer;
+}
+
+.profile-hero-camera:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.profile-hero-camera:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 3px;
+}
+
+.profile-hero-camera:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+/* `min-width: 0` deja que un nombre largo se parta en vez de empujar la foto
+   fuera de la tarjeta. */
+.profile-hero-identity {
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.profile-hero-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-main .profile-hero-title h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.profile-hero-role {
+  padding: 3px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-segment-selected);
+  border-radius: 999px;
+}
+
+.profile-hero-details {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--color-text-soft);
+}
+
+.profile-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--color-text);
+  border-radius: 999px;
+}
+
+.profile-chip-success {
+  background: color-mix(in srgb, var(--color-success) 18%, var(--color-panel));
+}
+
+.profile-chip-success svg {
+  color: var(--color-success);
+}
+
+.profile-chip-warning {
+  background: color-mix(in srgb, var(--color-warning) 16%, var(--color-panel));
+}
+
+.profile-chip-warning svg {
+  color: var(--color-warning);
+}
+
+.profile-chip-danger {
+  background: color-mix(in srgb, var(--color-danger) 18%, var(--color-panel));
+}
+
+.profile-chip-danger svg {
+  color: var(--color-danger);
+}
+
+.profile-hero-since {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+/* Quitar la foto no sale en el diseño: va como enlace discreto bajo las
+   fichas, sólo cuando hay foto. */
+.profile-hero-photo-remove {
+  align-self: flex-start;
+  min-height: var(--touch-target-min);
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.profile-hero-photo-remove:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+/* Las franjas bajo la cabecera (#771): lo que falta y el AUF pendiente en
+   aviso, el guardado en éxito. */
+.profile-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+.profile-strip-warning {
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--color-panel));
+  border: 1px solid color-mix(in srgb, var(--color-warning) 40%, transparent);
+}
+
+.profile-strip-success {
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: 13.5px;
+  background: color-mix(in srgb, var(--color-success) 12%, var(--color-panel));
+  border-radius: var(--radius);
+}
+
+.profile-strip-success svg {
+  flex: none;
+  font-size: 17px;
+  color: var(--color-success);
+}
+
+.profile-strip-text {
+  flex: 1 1 240px;
+  min-width: 0;
+  margin: 0;
+}
+
+.profile-strip-icon {
+  flex: none;
+  font-size: 22px;
+  color: var(--color-warning);
+}
+
+.profile-strip-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 13.5px;
+}
+
+/* El anillo de lo hecho: un degradado cónico hasta el porcentaje, con el
+   número dentro sobre el panel. */
+.profile-progress {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  background: conic-gradient(
+    var(--color-warning) var(--profile-progress),
+    var(--color-border) 0
+  );
+  border-radius: 50%;
+}
+
+.profile-progress-value {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--color-panel);
+  border-radius: 50%;
+}
+
+.profile-strip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.profile-missing-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.profile-missing-chip:hover {
+  border-color: var(--color-accent);
+}
+
+.profile-missing-chip:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
 }
 
 /* La foto de perfil (#245). La imagen ocupa el mismo círculo que las
@@ -2186,18 +2466,6 @@ a.auth-brand-header:focus-visible {
   }
 }
 
-.account-photo-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  justify-content: center;
-  margin-top: var(--space-3);
-}
-
-.account-photo-hint {
-  margin-top: var(--space-2);
-}
-
 .account-photo-error {
   margin-top: var(--space-3);
   text-align: left;
@@ -2213,12 +2481,6 @@ a.auth-brand-header:focus-visible {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-
-@media (min-width: 768px) {
-  .account-photo-actions {
-    justify-content: flex-start;
-  }
 }
 
 /* Mis grupos (#229): la tarjeta de "Skill ratings" del mismo mockup, con la
@@ -3930,12 +4192,6 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text-secondary);
 }
 
-.directory-marks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
 /* A 375px la columna del nombre es más estrecha que "Deactivated" o
    "Desactivada": sin guion, el navegador parte la palabra donde caiga. Con
    `hyphens` la parte por sílabas según el `lang` de la página (#273). Safari
@@ -5518,6 +5774,7 @@ a.auth-brand-header:focus-visible {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
+  gap: 6px;
   min-height: var(--touch-target-min);
   color: var(--color-accent-text);
 }
@@ -5532,27 +5789,6 @@ a.auth-brand-header:focus-visible {
 .member-record-header h1,
 .member-record-header .app-lead {
   margin: 0;
-}
-
-/* La foto junto al nombre (#354). `min-width: 0` deja que un nombre largo
-   se parta entre palabras en vez de empujar la foto fuera de la pantalla. */
-.member-record-identity {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  max-width: 100%;
-}
-
-.member-record-identity h1 {
-  min-width: 0;
-  overflow-wrap: break-word;
-}
-
-.member-record-joined {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-text-secondary);
 }
 
 .member-record-form {

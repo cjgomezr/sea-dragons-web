@@ -328,11 +328,12 @@ describe("editar el perfil propio", () => {
 });
 
 describe("leer el perfil propio", () => {
-  it("devuelve la ficha de quien llama, con las posiciones que se le ofrecen", async () => {
+  it("devuelve la ficha de quien llama, su ingreso y las posiciones que se le ofrecen", async () => {
     const { gateways } = fakeProfiles();
 
     await expect(readOwnProfile(gateways, USER_ID)).resolves.toEqual({
       profile: STORED,
+      joinedOn: JOINED_ON,
       positionOptions: [GOALKEEPER, DEFENDER, FORWARD],
       emergencyContactProposal: null,
     });

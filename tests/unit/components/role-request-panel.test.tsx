@@ -1,7 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AccountHeader } from "@/components/account/AccountHeader";
 import { RoleRequestPanel } from "@/components/account/RoleRequestPanel";
 import {
   JUSTIFICATION_MAX_LENGTH,
@@ -63,38 +62,6 @@ afterEach(() => {
 });
 
 describe("página Mi cuenta", () => {
-  it("muestra el nombre, sus iniciales y el rol actual", () => {
-    render(
-      <AccountHeader
-        locale="en"
-        userId="cccccccc-0000-4000-8000-00000000000c"
-        fullName="Nerea Ruiz"
-        role="Coach"
-        photoUrl={null}
-      />,
-    );
-
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Nerea Ruiz" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("NR")).toBeInTheDocument();
-    expect(screen.getByText("Role: Coach")).toBeInTheDocument();
-  });
-
-  it("nombra el rol en el idioma de la visita", () => {
-    render(
-      <AccountHeader
-        locale="es"
-        userId="cccccccc-0000-4000-8000-00000000000c"
-        fullName="Nerea Ruiz"
-        role="Player"
-        photoUrl={null}
-      />,
-    );
-
-    expect(screen.getByText("Rol: Jugador")).toBeInTheDocument();
-  });
-
   it("sin solicitud, un Player ve el formulario con Coach y Committee", () => {
     render(<RoleRequestPanel locale="en" role="Player" latestRequest={null} />);
 

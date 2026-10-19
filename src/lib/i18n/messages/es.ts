@@ -292,7 +292,6 @@ export const spanishMessages: MessageCatalog = {
   "account.metaTitle": "Perfil · {club}",
   "account.metaDescription":
     "Tus datos, tu rol en el club y tus grupos, y la solicitud para ser Coach o entrar al Comité.",
-  "account.roleLine": "Rol: {role}",
   "role.Admin": "Admin",
   "role.Coach": "Coach",
   "role.Committee": "Comité",
@@ -426,6 +425,13 @@ export const spanishMessages: MessageCatalog = {
   "account.photo.saved": "Foto actualizada.",
   "account.photo.removed": "Foto quitada.",
   "account.photo.retry": "Reintentar",
+  "profileHero.auf.pending": "AUF pendiente",
+  "profileHero.memberSince": "Miembro desde {date}",
+  "profileCompletion.title": "Tu perfil está casi completo. Falta:",
+  "profileCompletion.progress": "Perfil completado",
+  "profileCompletion.item.emergency_contact": "Contacto de emergencia",
+  "profileCompletion.item.phone": "Teléfono",
+  "profileCompletion.item.country": "País",
   "account.photo.issue.photoTooLarge":
     "Esta foto pesa más de {max} MB. Elige una más pequeña.",
   "account.photo.issue.photoTypeUnsupported":
@@ -766,15 +772,12 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.metaTitle": "Ficha del miembro · {club}",
   "memberRecord.metaDescription":
     "El registro AUF y los grupos de un miembro, que sólo edita un Admin.",
-  "memberRecord.back": "← Volver al directorio",
+  "memberRecord.back": "Directorio",
   "memberRecord.openLabel": "Abrir la ficha de {name}",
   "memberRecord.loading": "Cargando la ficha del miembro…",
   "memberRecord.evaluation.title": "Evaluación",
   "memberRecord.evaluation.loading": "Cargando la evaluación…",
   "memberRecord.evaluation.open": "Abrir en Evaluaciones",
-  "memberRecord.lead":
-    "Lo que sólo edita un Admin: el registro AUF, la fecha de nacimiento y los grupos.",
-  "memberRecord.joinedOn": "Miembro desde el {date}",
   "memberRecord.photoAlt": "Foto de {name}",
   "photoViewer.open": "Abrir la foto de {name}",
   "photoViewer.close": "Cerrar la foto",
@@ -786,11 +789,13 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.auf.expiry": "Vencimiento",
   "memberRecord.auf.hint":
     "Si borras el número, se borra también su vencimiento.",
-  "memberRecord.auf.pending":
-    "Este AUF lo escribió el miembro. Revísalo y verifícalo, o corrígelo y guarda: lo que escribes tú queda verificado.",
   "memberRecord.auf.verify": "Verificar AUF",
   "memberRecord.auf.verifying": "Verificando…",
   "memberRecord.auf.verified": "AUF verificado.",
+  "memberRecord.aufStrip.withExpiry":
+    "{name} añadió el AUF {number} (vence el {date}). Revísalo y verifícalo.",
+  "memberRecord.aufStrip.withoutExpiry":
+    "{name} añadió el AUF {number}. Revísalo y verifícalo.",
   "memberRecord.birth.title": "Datos personales",
   "memberRecord.birth.label": "Fecha de nacimiento",
   "memberRecord.birth.hint":

@@ -177,6 +177,15 @@ text ≥ 24px).
 > evento es una excepción a la regla de arriba: ahí no significan aviso ni
 > éxito, y el nombre del tipo va siempre escrito.
 
+> **Decisión del 2026-10-19 (issue #771).** La cabecera del perfil y de la
+> ficha (E30, D13) trae un degradado; su principio es un token.
+> `Hero gradient start` (`--color-hero-gradient-start`) va a 135° hasta
+> `Panel` al 70 %. El oscuro, `#163A55`, es el del handoff
+> (`docs/design/design_handoff_profile/README.md`); el claro, `#DCEAF5`, es un
+> azul apenas más oscuro que el panel blanco, con `Text` encima a más de 10:1.
+> La selección del handoff (`#1d4869`) es `Segment selected` y el hover
+> (`#1a3349`) es `Hover`; la línea de fila (`#22394d`) no la usa este ticket.
+
 #### Sidebar (no cambia con el tema)
 
 El prototipo fija estos valores en `:root`, iguales en claro y oscuro. Los va
