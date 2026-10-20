@@ -6,6 +6,7 @@ import { positionName } from "@/lib/club/club-positions";
 import { formatOverallRating } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import { TEAM_IDS, type TeamId, type TeamLabels } from "@/lib/teams/team-ids";
+import { shortTeamName } from "@/lib/teams/team-short-name";
 import type { Destination, RosterPlayer } from "./team-draft";
 
 /**
@@ -16,7 +17,9 @@ import type { Destination, RosterPlayer } from "./team-draft";
  *
  * Los botones van en un grupo con el nombre del jugador, como el segmento de
  * Asistencia, y cada uno dice además a quién mueve y a dónde. En un equipo
- * son de icono (#759): Cambiar y Quitar sólo tienen nombre accesible.
+ * son de icono (#759): Cambiar y Quitar sólo tienen nombre accesible. En el
+ * banco hay un Añadir por equipo con su punto de color y su nombre corto
+ * (#761).
  */
 
 /** En píxeles, como `.team-avatar` y `.team-avatar-ringed`: en un equipo el
@@ -56,14 +59,19 @@ function MoveButtons({
           <button
             key={target}
             type="button"
-            className="team-move"
-            aria-label={translate("teams.move.toNamed", {
+            className="team-add"
+            aria-label={translate("teams.move.addNamed", {
               ...named,
               team: teams[target].name,
             })}
             onClick={() => onMove(target)}
           >
-            {translate("teams.move.to", { team: teams[target].name })}
+            <span
+              className="team-add-dot"
+              aria-hidden="true"
+              style={{ backgroundColor: teams[target].color }}
+            />
+            {shortTeamName(teams[target].name)}
           </button>
         ))}
       </>
@@ -97,18 +105,15 @@ function MoveButtons({
   );
 }
 
-/** En un equipo el no evaluado lleva una raya (#759) y el lector oye "Sin
- * evaluar"; en el banco, la marca con la palabra. */
+/** El no evaluado lleva una raya, en un equipo (#759) y en el banco (#761),
+ * y el lector oye "Sin evaluar". */
 function PlayerRating({
   translate,
   player,
-  isInTeam,
 }: {
   readonly translate: Translator;
   readonly player: RosterPlayer;
-  readonly isInTeam: boolean;
 }): React.JSX.Element {
-  const unrated = translate("teams.player.unrated");
   if (!player.isUnrated) {
     return (
       <span className="team-rating">
@@ -116,13 +121,12 @@ function PlayerRating({
       </span>
     );
   }
-  if (!isInTeam) {
-    return <span className="team-unrated">{unrated}</span>;
-  }
   return (
     <span className="team-rating team-rating-missing">
       <span aria-hidden="true">{UNRATED_MARK}</span>
-      <span className="visually-hidden">{unrated}</span>
+      <span className="visually-hidden">
+        {translate("teams.player.unrated")}
+      </span>
     </span>
   );
 }
@@ -144,7 +148,9 @@ export function TeamPlayerRow({
   return (
     <li
       className={
-        ringColor === null ? "team-player" : "team-player team-player-assigned"
+        ringColor === null
+          ? "team-player team-player-benched"
+          : "team-player team-player-assigned"
       }
       draggable
       onDragStart={(event) => {
@@ -176,11 +182,7 @@ export function TeamPlayerRow({
           ) : null}
         </span>
       </div>
-      <PlayerRating
-        translate={translate}
-        player={player}
-        isInTeam={ringColor !== null}
-      />
+      <PlayerRating translate={translate} player={player} />
       <div className="team-moves" role="group" aria-label={player.fullName}>
         <MoveButtons
           translate={translate}

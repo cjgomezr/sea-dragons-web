@@ -216,7 +216,7 @@ function region(name: string): HTMLElement {
 async function openScreen(locale: "en" | "es" = "en"): Promise<void> {
   render(<TeamBuilderScreen locale={locale} />);
   await screen.findByRole("region", {
-    name: locale === "en" ? "Available" : "Disponibles",
+    name: locale === "en" ? "Available · Going" : "Disponibles · Van",
   });
 }
 
@@ -341,7 +341,7 @@ describe("la escuadra", () => {
 
     await openScreen();
 
-    const available = region("Available");
+    const available = region("Available · Going");
     expect(playerNames(available)).toEqual([
       "Daniela Vargas",
       "Ethan Brown",
@@ -380,7 +380,7 @@ describe("la escuadra", () => {
       "Daniela Vargas",
     ]);
     expect(region("Team Tide")).toHaveTextContent("Ethan Brown");
-    expect(region("Available")).not.toHaveTextContent("Mateo Restrepo");
+    expect(region("Available · Going")).not.toHaveTextContent("Mateo Restrepo");
     expect(totals()).toHaveTextContent("Team Kelp 17.0");
     expect(totals()).toHaveTextContent("5.0 Team Tide");
     expect(totals()).toHaveTextContent("12.0 apart");
@@ -409,7 +409,7 @@ describe("la escuadra", () => {
     );
 
     expect(region("Team Tide")).not.toHaveTextContent(LIAM.fullName);
-    expect(region("Available")).not.toHaveTextContent(LIAM.fullName);
+    expect(region("Available · Going")).not.toHaveTextContent(LIAM.fullName);
   });
 
   it("cambia de evento sin preguntar cuando no hay cambios", async () => {
@@ -436,7 +436,7 @@ describe("la escuadra", () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     await openScreen();
     await userEvent.click(
-      screen.getByRole("button", { name: "Move Mateo Restrepo to Team Kelp" }),
+      screen.getByRole("button", { name: "Add Mateo Restrepo to Team Kelp" }),
     );
 
     await userEvent.selectOptions(
@@ -461,7 +461,7 @@ describe("la escuadra", () => {
     expect(untouched.defaultPrevented).toBe(false);
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Move Mateo Restrepo to Team Kelp" }),
+      screen.getByRole("button", { name: "Add Mateo Restrepo to Team Kelp" }),
     );
     const leaving = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(leaving);
@@ -488,9 +488,9 @@ describe("la escuadra", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
 
-    expect(await screen.findByRole("region", { name: "Available" })).toBe(
-      region("Available"),
-    );
+    expect(
+      await screen.findByRole("region", { name: "Available · Going" }),
+    ).toBe(region("Available · Going"));
   });
 });
 
@@ -516,9 +516,9 @@ describe("las fotos (#757)", () => {
     await openScreen();
 
     expect(
-      within(playerRow(region("Available"), DANIELA.fullName)).getByRole(
-        "presentation",
-      ),
+      within(
+        playerRow(region("Available · Going"), DANIELA.fullName),
+      ).getByRole("presentation"),
     ).toHaveAttribute("src", DANIELA_PHOTO);
   });
 
@@ -527,7 +527,7 @@ describe("las fotos (#757)", () => {
 
     await openScreen();
 
-    const row = playerRow(region("Available"), ETHAN.fullName);
+    const row = playerRow(region("Available · Going"), ETHAN.fullName);
     expect(within(row).queryByRole("presentation")).not.toBeInTheDocument();
     expect(within(row).getByText("EB")).toBeInTheDocument();
   });
@@ -535,7 +535,7 @@ describe("las fotos (#757)", () => {
   it("cae a las iniciales si la foto no carga", async () => {
     stubClub({ builders: [WITH_PHOTOS] });
     await openScreen();
-    const row = playerRow(region("Available"), DANIELA.fullName);
+    const row = playerRow(region("Available · Going"), DANIELA.fullName);
 
     fireEvent.error(within(row).getByRole("presentation"));
 
@@ -573,7 +573,7 @@ describe("las fotos (#757)", () => {
     await openScreen();
 
     const photo = within(
-      playerRow(region("Available"), DANIELA.fullName),
+      playerRow(region("Available · Going"), DANIELA.fullName),
     ).getByRole("presentation");
     expect(photo).toHaveAttribute("width", "32");
     expect(photo.style.borderColor).toBe("");
@@ -586,11 +586,11 @@ describe("mover a mano", () => {
     await openScreen();
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Move Mateo Restrepo to Team Kelp" }),
+      screen.getByRole("button", { name: "Add Mateo Restrepo to Team Kelp" }),
     );
 
     expect(region("Team Kelp")).toHaveTextContent("Mateo Restrepo");
-    expect(region("Available")).not.toHaveTextContent("Mateo Restrepo");
+    expect(region("Available · Going")).not.toHaveTextContent("Mateo Restrepo");
     expect(totals()).toHaveTextContent("Team Kelp 9.0");
     expect(totals()).toHaveTextContent("9.0 apart");
     expect(writes()).toEqual([]);
@@ -602,7 +602,7 @@ describe("mover a mano", () => {
     await openScreen();
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Move Ethan Brown to Team Tide" }),
+      screen.getByRole("button", { name: "Add Ethan Brown to Team Tide" }),
     );
 
     expect(
@@ -636,10 +636,10 @@ describe("mover a mano", () => {
       }),
     );
 
-    expect(region("Available")).toHaveTextContent("Daniela Vargas");
+    expect(region("Available · Going")).toHaveTextContent("Daniela Vargas");
     expect(totals()).toHaveTextContent("Team Kelp 9.0");
     expect(
-      screen.getByText(/^Daniela Vargas moved to Available\./),
+      screen.getByText(/^Daniela Vargas moved to Available · Going\./),
     ).toBeInTheDocument();
   });
 
@@ -648,7 +648,7 @@ describe("mover a mano", () => {
     await openScreen();
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Move Ruby Tan to Team Tide" }),
+      screen.getByRole("button", { name: "Add Ruby Tan to Team Tide" }),
     );
 
     expect(region("Team Tide")).toHaveTextContent("Ruby Tan");
@@ -658,7 +658,7 @@ describe("mover a mano", () => {
   it("mueve también arrastrando entre listas", async () => {
     stubClub();
     await openScreen();
-    const mateo = playerRow(region("Available"), "Mateo Restrepo");
+    const mateo = playerRow(region("Available · Going"), "Mateo Restrepo");
     const data = new Map<string, string>();
     const dataTransfer = {
       setData: (type: string, value: string) => data.set(type, value),
@@ -742,7 +742,7 @@ describe("balancear", () => {
         name: "Remove Liam O'Connor from Team Tide",
       }),
     );
-    expect(region("Available")).toHaveTextContent(LIAM.fullName);
+    expect(region("Available · Going")).toHaveTextContent(LIAM.fullName);
   });
 
   it("vuelve a Manual si luego se toca algo a mano", async () => {
@@ -752,7 +752,7 @@ describe("balancear", () => {
     await screen.findByText("Teams balanced and saved");
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Move Ruby Tan to Team Kelp" }),
+      screen.getByRole("button", { name: "Add Ruby Tan to Team Kelp" }),
     );
 
     expect(screen.getByText("Edited by hand")).toBeInTheDocument();
@@ -762,7 +762,7 @@ describe("balancear", () => {
     stubBalancing(businessRule("team_squad_empty"));
     await openScreen();
     await userEvent.click(
-      screen.getByRole("button", { name: "Move Ruby Tan to Team Kelp" }),
+      screen.getByRole("button", { name: "Add Ruby Tan to Team Kelp" }),
     );
 
     await userEvent.click(balanceButton());
@@ -776,22 +776,37 @@ describe("balancear", () => {
 });
 
 describe("sugerencia", () => {
-  it("enseña el mejor intercambio con los dos nombres y qué mejora", async () => {
+  it("enseña el mejor intercambio con los dos nombres, sus equipos y qué mejora", async () => {
     stubClub({ builders: [DRAFTED] });
 
     await openScreen();
 
-    expect(region("Suggested swap")).toHaveTextContent(
-      "Mateo Restrepo ↔ Ethan Brown, to bring the difference down to 4.0.",
+    expect(region("Suggestion")).toHaveTextContent(
+      "Suggestion: swap Mateo Restrepo (Team Kelp) with Ethan Brown (Team Tide) to bring the gap down to 4.0.",
     );
   });
 
-  it("al aplicarla intercambia a los dos y recalcula", async () => {
+  it("lleva la bombilla y el botón Intercambiar", async () => {
+    stubClub({ builders: [DRAFTED] });
+
+    await openScreen();
+
+    const suggestion = region("Suggestion");
+    expect(suggestion.querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(
+      within(suggestion).getByRole("button", { name: "Swap" }),
+    ).toHaveClass("admin-secondary");
+  });
+
+  it("al pulsar Intercambiar cambia a los dos y recalcula", async () => {
     stubClub({ builders: [DRAFTED] });
     await openScreen();
 
     await userEvent.click(
-      within(region("Suggested swap")).getByRole("button", { name: "Apply" }),
+      within(region("Suggestion")).getByRole("button", { name: "Swap" }),
     );
 
     expect(region("Team Kelp")).toHaveTextContent("Ethan Brown");
@@ -805,7 +820,7 @@ describe("sugerencia", () => {
     await openScreen();
 
     await userEvent.click(
-      within(region("Suggested swap")).getByRole("button", { name: "Apply" }),
+      within(region("Suggestion")).getByRole("button", { name: "Swap" }),
     );
 
     expect(
@@ -821,15 +836,155 @@ describe("sugerencia", () => {
     await openScreen();
 
     expect(
-      screen.queryByRole("region", { name: "Suggested swap" }),
+      screen.queryByRole("region", { name: "Suggestion" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("escribe la sugerencia en español", async () => {
+    stubClub({ builders: [DRAFTED] });
+
+    await openScreen("es");
+
+    const suggestion = screen.getByRole("region", { name: "Sugerencia" });
+    expect(suggestion).toHaveTextContent(
+      "Sugerencia: intercambia a Mateo Restrepo (Team Kelp) con Ethan Brown (Team Tide) para bajar la diferencia a 4,0.",
+    );
+    expect(
+      within(suggestion).getByRole("button", { name: "Intercambiar" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("el banco (#761)", () => {
+  /** Todos los que van ya están en un equipo y nadie dijo quizás. */
+  const ALL_PLACED = builderFor(SCRIMMAGE, {
+    maybe: [],
+    split: {
+      mode: "manual",
+      publishedAt: null,
+      assignments: [
+        assigned(DANIELA, "a"),
+        assigned(ETHAN, "b"),
+        assigned(MATEO, "a"),
+      ],
+    },
+  });
+
+  it("titula las dos columnas con cuántos hay en cada una", async () => {
+    stubClub();
+
+    await openScreen();
+
+    expect(
+      within(region("Available · Going")).getByRole("heading", { level: 2 }),
+    ).toHaveTextContent("Available · Going 3");
+    expect(
+      within(region("Maybe")).getByRole("heading", { level: 2 }),
+    ).toHaveTextContent("Maybe 1");
+  });
+
+  it("cuenta sólo a los que siguen en el banco", async () => {
+    stubClub({ builders: [DRAFTED] });
+
+    await openScreen();
+
+    expect(
+      within(region("Available · Going")).getByRole("heading", { level: 2 }),
+    ).toHaveTextContent("Available · Going 0");
+  });
+
+  it("pone en cada fila un Añadir por equipo, con su punto y su nombre corto", async () => {
+    stubClub();
+
+    await openScreen();
+
+    const row = playerRow(region("Available · Going"), MATEO.fullName);
+    const buttons = within(row).getAllByRole("button");
+    expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Add Mateo Restrepo to Team Kelp",
+      "Add Mateo Restrepo to Team Tide",
+    ]);
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      "Kelp",
+      "Tide",
+    ]);
+    const dot = buttons[0]?.querySelector(".team-add-dot");
+    expect(dot).toHaveAttribute("aria-hidden", "true");
+    expect(dot).toHaveStyle({ backgroundColor: DEFAULT_TEAM_LABELS.a.color });
+  });
+
+  it("pinta una raya en vez del OVR del no evaluado, y dice Sin evaluar al lector", async () => {
+    stubClub();
+
+    await openScreen();
+
+    const row = playerRow(region("Available · Going"), ETHAN.fullName);
+    expect(within(row).getByText("—")).toHaveAttribute("aria-hidden", "true");
+    expect(within(row).getByText("Unrated")).toHaveClass("visually-hidden");
+  });
+
+  it("con Añadir lleva al jugador a ese equipo y lo anuncia", async () => {
+    stubClub();
+    await openScreen();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Add Daniela Vargas to Team Tide" }),
+    );
+
+    expect(region("Team Tide")).toHaveTextContent("Daniela Vargas");
+    expect(region("Available · Going")).not.toHaveTextContent("Daniela Vargas");
+    expect(
+      screen.getByText(/^Daniela Vargas moved to Team Tide\./),
+    ).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("dice que todos tienen equipo y que nadie dijo quizás con las listas vacías", async () => {
+    stubClub({ builders: [ALL_PLACED] });
+
+    await openScreen();
+
+    expect(region("Available · Going")).toHaveTextContent(
+      "Everyone who said yes is on a team.",
+    );
+    expect(region("Maybe")).toHaveTextContent("No maybes.");
+  });
+
+  it("escribe el banco en español", async () => {
+    stubClub();
+
+    await openScreen("es");
+
+    const available = screen.getByRole("region", {
+      name: "Disponibles · Van",
+    });
+    expect(
+      within(available).getByRole("heading", { level: 2 }),
+    ).toHaveTextContent("Disponibles · Van 3");
+    expect(
+      within(available).getByRole("button", {
+        name: "Añadir a Mateo Restrepo a Team Kelp",
+      }),
+    ).toHaveTextContent("Kelp");
+  });
+
+  it("dice en español las listas vacías", async () => {
+    stubClub({ builders: [ALL_PLACED] });
+
+    await openScreen("es");
+
+    expect(
+      screen.getByRole("region", { name: "Disponibles · Van" }),
+    ).toHaveTextContent("Todos los que van ya tienen equipo.");
+    expect(screen.getByRole("region", { name: "Quizás" })).toHaveTextContent(
+      "Nadie dijo quizás.",
+    );
   });
 });
 
 describe("guardar y publicar", () => {
   async function moveMateoToKelp(): Promise<void> {
     await userEvent.click(
-      screen.getByRole("button", { name: "Move Mateo Restrepo to Team Kelp" }),
+      screen.getByRole("button", { name: "Add Mateo Restrepo to Team Kelp" }),
     );
   }
 
@@ -1072,7 +1227,7 @@ describe("la cabecera, la barra y los totales (#758)", () => {
     expect(saveButton()).toHaveAccessibleName("Save");
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Move Ruby Tan to Team Kelp" }),
+      screen.getByRole("button", { name: "Add Ruby Tan to Team Kelp" }),
     );
 
     expect(saveButton()).toHaveAccessibleName("Save · Unsaved");
@@ -1408,7 +1563,7 @@ describe("en español", () => {
       "12,0 de diferencia",
     );
     expect(
-      screen.getByRole("button", { name: "Mover a Ruby Tan a Team Kelp" }),
+      screen.getByRole("button", { name: "Añadir a Ruby Tan a Team Kelp" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Quizás" })).toHaveTextContent(
       "Ruby Tan",

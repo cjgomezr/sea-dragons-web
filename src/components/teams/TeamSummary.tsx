@@ -1,4 +1,6 @@
+import { ArrowsLeftRight } from "@phosphor-icons/react/dist/ssr/ArrowsLeftRight";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
+import { Lightbulb } from "@phosphor-icons/react/dist/ssr/Lightbulb";
 import { Warning } from "@phosphor-icons/react/dist/ssr/Warning";
 import { useId } from "react";
 import { Icon } from "@/components/Icon";
@@ -104,24 +106,37 @@ export function TotalsBar({
   );
 }
 
+/** La sugerencia de intercambio con la forma del handoff (#761): la bombilla,
+ * "Sugerencia:" en negrita, a quién cambiar por quién con sus equipos, y el
+ * botón que lo hace. La región se llama sólo "Sugerencia", sin los dos
+ * puntos. */
 export function SwapSuggestion({
   translate,
+  teams,
   suggestion,
   onApply,
 }: {
   readonly translate: Translator;
+  readonly teams: TeamLabels;
   readonly suggestion: DraftSuggestion;
   readonly onApply: () => void;
 }): React.JSX.Element {
   const titleId = useId();
   const names = {
     first: suggestion.fromA.fullName,
+    firstTeam: teams.a.name,
     second: suggestion.fromB.fullName,
+    secondTeam: teams.b.name,
   };
   return (
     <section className="team-suggestion" aria-labelledby={titleId}>
+      <span className="team-suggestion-icon">
+        <Icon glyph={Lightbulb} />
+      </span>
       <p className="team-suggestion-text">
-        <strong id={titleId}>{translate("teams.suggestion.title")}</strong>{" "}
+        <strong>
+          <span id={titleId}>{translate("teams.suggestion.title")}</span>:
+        </strong>{" "}
         {suggestion.improvement === "coverage"
           ? translate("teams.suggestion.coverage", names)
           : translate("teams.suggestion.rating", {
@@ -132,7 +147,12 @@ export function SwapSuggestion({
               ),
             })}
       </p>
-      <button type="button" className="admin-secondary" onClick={onApply}>
+      <button
+        type="button"
+        className="admin-secondary team-suggestion-apply"
+        onClick={onApply}
+      >
+        <Icon glyph={ArrowsLeftRight} />
         {translate("teams.suggestion.apply")}
       </button>
     </section>

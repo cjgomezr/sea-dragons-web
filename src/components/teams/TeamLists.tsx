@@ -17,8 +17,10 @@ import { PLAYER_DRAG_TYPE, TeamPlayerRow } from "./TeamPlayerRow";
 /**
  * Las dos tarjetas de equipo del handoff de E28
  * (`docs/design/design_handoff_teams/screenshots/01-desktop-builder.png`,
- * #759) y las dos listas del banco: los disponibles y los "Quizás" (#402).
- * Cada una es una región con su título y admite que le suelten un jugador.
+ * #759) y las dos listas del banco: los disponibles y los "Quizás" (#402),
+ * con cuántos quedan en cada una (#761). Cada una es una región con su
+ * título y admite que le suelten un jugador. La región se llama sólo por el
+ * título, sin el número, para que no cambie de nombre al mover a alguien.
  */
 
 export type MovePlayer = (userId: string, destination: Destination) => void;
@@ -209,6 +211,7 @@ function BenchList({
   readonly onMove: MovePlayer;
 }): React.JSX.Element {
   const titleId = useId();
+  const players = benchPlayers(draft, origin);
   return (
     <DropZone
       className="team-bench-list"
@@ -217,13 +220,14 @@ function BenchList({
       onMove={onMove}
       canMove={isInRoster(draft)}
     >
-      <h2 id={titleId} className="team-list-title">
-        {translate(`teams.${origin}.title`)}
+      <h2 className="team-bench-title">
+        <span id={titleId}>{translate(`teams.${origin}.title`)}</span>{" "}
+        <span className="team-bench-count">{players.length}</span>
       </h2>
       <PlayerList
         translate={translate}
         draft={draft}
-        players={benchPlayers(draft, origin)}
+        players={players}
         team={null}
         emptyText={translate(`teams.${origin}.empty`)}
         onMove={onMove}
