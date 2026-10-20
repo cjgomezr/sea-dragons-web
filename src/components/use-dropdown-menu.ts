@@ -72,7 +72,7 @@ export function useDropdownMenu(
     isOpen,
     containerRef,
     open: useCallback(() => setIsOpen(true), []),
-    toggle: () => setIsOpen((wasOpen) => !wasOpen),
+    toggle: useCallback(() => setIsOpen((wasOpen) => !wasOpen), []),
     close,
     closeAndReturnFocus,
   };

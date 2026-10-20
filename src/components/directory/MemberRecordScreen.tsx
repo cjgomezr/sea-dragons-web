@@ -143,7 +143,9 @@ function LoadedMemberRecord({
 
   function chooseAction(action: AdminAction): void {
     setChoice((current) => ({ panel: action, key: current.key + 1 }));
-    if (action === "deactivate" || action === "reactivate") {
+    // Un cambio en curso no se olvida: su respuesta todavía tiene que verse.
+    const isSaving = statusChange.state.kind === "saving";
+    if ((action === "deactivate" || action === "reactivate") && !isSaving) {
       statusChange.reset();
     }
     if (action === "reactivate") {

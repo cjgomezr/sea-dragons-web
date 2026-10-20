@@ -15,7 +15,9 @@ import {
 /**
  * La baja y la reactivación de un miembro desde su ficha (#244, RF-6 del PRD
  * de E5). Desde #775 se piden en el ⋯ de la cabecera: la baja se confirma en
- * una franja en peligro, y la reactivación sale al elegirla, como antes.
+ * una franja en peligro, y la reactivación sale al elegirla, como antes. El
+ * control de un solo botón que vivía aquí se partió en tres piezas: el hook
+ * que pide el cambio, el aviso de cómo fue y la franja de confirmar.
  *
  * El estado que enseña es el que la ficha tiene de verdad: sólo cambia cuando
  * el servidor confirma, y un rechazo (el último Admin, la baja propia) deja
