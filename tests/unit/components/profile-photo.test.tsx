@@ -69,6 +69,7 @@ function renderScreen(
     <ProfileScreen
       locale={locale}
       userId={OWN_USER_ID}
+      email="nerea@example.com"
       account={{ fullName: "Nerea Ruiz", role: "Player", latestRequest: null }}
       profile={{
         fullName: "Nerea Ruiz",

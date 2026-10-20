@@ -2614,20 +2614,40 @@ async function writeTooLongJustification(page: Page): Promise<void> {
 const ACCOUNT_PROFILE_ENDPOINT = "/api/v1/account/profile";
 const FULL_PROFILE_STORAGE_STATE =
   roleRequestStorageStatePath("perfil-completo");
-/** El botón de guardar en los dos idiomas: las capturas en español preparan
- * la pantalla con la misma función. */
-const SAVE_PROFILE_BUTTON = /^(Save changes|Guardar cambios)$/;
-const PROFILE_SAVED_MESSAGE = /^(Changes saved\.|Cambios guardados\.)$/;
-/** Un campo de la ficha: React la hidrata entera, botón de guardar incluido.
- * Pulsado antes, el botón envía el formulario a la antigua y recarga. */
-const PROFILE_FORM_SELECTOR = "#perfil-nombre";
+/** Las tarjetas del perfil (#772) y sus botones en los dos idiomas: las
+ * capturas en español preparan la pantalla con la misma función. */
+const ABOUT_CARD = /^(About|Sobre mí)$/;
+const CONTACT_CARD = /^(Contact|Contacto)$/;
+const EDIT_CARD_BUTTON = /^(Edit|Editar) /;
+const SAVE_CARD_BUTTON = /^(Save|Guardar)$/;
+const ABOUT_SAVED_MESSAGE = /^(About saved|Sobre mí guardado)$/;
+/** El Editar de una tarjeta: React lo hidrata con la pantalla entera.
+ * Pulsado antes, no abre nada. */
+const PROFILE_EDIT_SELECTOR = "button.profile-card-edit";
 
-/** Guarda la ficha tal como está. Escribe lo que ya había, así que las
+/** Abre una tarjeta del perfil y espera a que salgan sus campos. */
+async function openProfileCard(page: Page, name: RegExp): Promise<Locator> {
+  await waitForHydration(page, PROFILE_EDIT_SELECTOR);
+  const card = page.getByRole("region", { name });
+  await card.getByRole("button", { name: EDIT_CARD_BUTTON }).click();
+  await expect(card.locator("form")).toBeVisible();
+  return card;
+}
+
+async function openAboutCard(page: Page): Promise<void> {
+  await openProfileCard(page, ABOUT_CARD);
+}
+
+async function openContactCard(page: Page): Promise<void> {
+  await openProfileCard(page, CONTACT_CARD);
+}
+
+/** Guarda Sobre mí tal como está. Escribe lo que ya había, así que las
  * capturas de varios tamaños pueden hacerlo a la vez sobre el mismo socio. */
 async function saveProfileUnchanged(page: Page): Promise<void> {
-  await waitForHydration(page, PROFILE_FORM_SELECTOR);
-  await page.getByRole("button", { name: SAVE_PROFILE_BUTTON }).click();
-  await expect(page.getByRole("status")).toHaveText(PROFILE_SAVED_MESSAGE, {
+  const card = await openProfileCard(page, ABOUT_CARD);
+  await card.getByRole("button", { name: SAVE_CARD_BUTTON }).click();
+  await expect(card.getByRole("status")).toHaveText(ABOUT_SAVED_MESSAGE, {
     timeout: ACCOUNT_CHANGE_TIMEOUT_MS,
   });
 }
@@ -2667,12 +2687,12 @@ async function chooseTooLargePhoto(page: Page): Promise<void> {
  * formulario lo para y avisa junto a los dos datos que faltan (#496). No
  * llega al servidor, así que no cambia al socio compartido. */
 async function saveHalfEmergencyContact(page: Page): Promise<void> {
-  await waitForHydration(page, PROFILE_FORM_SELECTOR);
-  await page
+  const card = await openProfileCard(page, CONTACT_CARD);
+  await card
     .getByLabel(/^(Contact name|Nombre del contacto)$/)
     .fill("Lucía Ruiz");
-  await page.getByRole("button", { name: SAVE_PROFILE_BUTTON }).click();
-  await expect(page.getByLabel(/^(Relationship|Relación)$/)).toHaveAttribute(
+  await card.getByRole("button", { name: SAVE_CARD_BUTTON }).click();
+  await expect(card.getByLabel(/^(Relationship|Relación)$/)).toHaveAttribute(
     "aria-invalid",
     "true",
   );
@@ -2682,10 +2702,11 @@ async function failProfileSaveOnNetwork(page: Page): Promise<void> {
   await page.route(`**${ACCOUNT_PROFILE_ENDPOINT}`, (route) =>
     route.abort("internetdisconnected"),
   );
-  await waitForHydration(page, PROFILE_FORM_SELECTOR);
-  await page.getByRole("button", { name: SAVE_PROFILE_BUTTON }).click();
-  // Con texto: el anunciador de rutas de Next también es un `alert`, vacío.
-  await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toBeVisible();
+  const card = await openProfileCard(page, ABOUT_CARD);
+  await card.getByRole("button", { name: SAVE_CARD_BUTTON }).click();
+  // Dentro de la tarjeta: el anunciador de rutas de Next también es un
+  // `alert`, vacío.
+  await expect(card.getByRole("alert")).toBeVisible();
 }
 
 const ACCOUNT_STATES: readonly AccountState[] = [
@@ -2725,6 +2746,19 @@ const ACCOUNT_STATES: readonly AccountState[] = [
     name: "perfil-completo-es",
     storageState: FULL_PROFILE_STORAGE_STATE,
     beforeVisit: chooseSpanish,
+  },
+  // Sobre mí abierto (#772): los campos en dos columnas y la experiencia en
+  // su segmento.
+  {
+    name: "perfil-editando-sobre-mi",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    prepare: openAboutCard,
+  },
+  {
+    name: "perfil-editando-sobre-mi-es",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    beforeVisit: chooseSpanish,
+    prepare: openAboutCard,
   },
   {
     name: "perfil-guardado",
@@ -2804,9 +2838,10 @@ const ACCOUNT_STATES: readonly AccountState[] = [
     beforeVisit: chooseSpanish,
   },
   // El teléfono y el contacto de emergencia (#496). Vacío es ya
-  // `perfil-completo`, que no tiene ninguno; éstos son el contacto guardado
-  // (con el aviso de que el teléfono es el propio), el contacto a medias que
-  // el formulario no deja enviar, y la menor a la que se le propone su tutor.
+  // `perfil-completo`, que no tiene ninguno; éstos son el contacto guardado,
+  // en lectura y abierto con el aviso de que el teléfono es el propio (#772),
+  // el contacto a medias que la tarjeta no deja enviar, y la menor a la que
+  // Contacto le propone su tutor.
   {
     name: "perfil-contacto-completo",
     storageState: roleRequestStorageStatePath("perfil-contacto-completo"),
@@ -2815,6 +2850,17 @@ const ACCOUNT_STATES: readonly AccountState[] = [
     name: "perfil-contacto-completo-es",
     storageState: roleRequestStorageStatePath("perfil-contacto-completo"),
     beforeVisit: chooseSpanish,
+  },
+  {
+    name: "perfil-editando-contacto",
+    storageState: roleRequestStorageStatePath("perfil-contacto-completo"),
+    prepare: openContactCard,
+  },
+  {
+    name: "perfil-editando-contacto-es",
+    storageState: roleRequestStorageStatePath("perfil-contacto-completo"),
+    beforeVisit: chooseSpanish,
+    prepare: openContactCard,
   },
   {
     name: "perfil-contacto-errores",
@@ -2841,11 +2887,13 @@ const ACCOUNT_STATES: readonly AccountState[] = [
   {
     name: "perfil-contacto-menor",
     storageState: roleRequestStorageStatePath("perfil-contacto-menor"),
+    prepare: openContactCard,
   },
   {
     name: "perfil-contacto-menor-es",
     storageState: roleRequestStorageStatePath("perfil-contacto-menor"),
     beforeVisit: chooseSpanish,
+    prepare: openContactCard,
   },
 ];
 
@@ -3245,10 +3293,11 @@ test.describe("un socio que edita su perfil", () => {
   }) => {
     const newName = `Perfil Editado ${Date.now()}`;
     await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
-    await page.getByLabel("Full name").fill(newName);
-    await page.getByLabel("Position").selectOption({ label: "Forward" });
-    await page.getByLabel("Experience level").selectOption("Advanced");
-    await page.getByLabel("Gender").selectOption("non_binary");
+    const about = await openProfileCard(page, ABOUT_CARD);
+    await about.getByLabel("Full name").fill(newName);
+    await about.getByLabel("Position").selectOption({ label: "Forward" });
+    await about.getByRole("radio", { name: "Advanced" }).check();
+    await about.getByLabel("Gender").selectOption("non_binary");
 
     const saved = page.waitForResponse(
       (response) =>
@@ -3256,16 +3305,14 @@ test.describe("un socio que edita su perfil", () => {
         response.request().method() === "PATCH",
       { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
     );
-    await page.getByRole("button", { name: "Save changes" }).click();
+    await about.getByRole("button", { name: "Save" }).click();
     expect((await saved).status()).toBe(200);
-    await expect(page.getByRole("status")).toHaveText("Changes saved.");
+    await expect(about.getByRole("status")).toHaveText("About saved");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(newName);
 
     await page.reload();
-    await expect(page.getByLabel("Full name")).toHaveValue(newName);
-    await expect(
-      page.getByLabel("Position").locator("option:checked"),
-    ).toHaveText("Forward");
+    await expect(about.locator("dd").first()).toHaveText(newName);
+    await expect(about).toContainText("Forward");
 
     const directory = await page.request.get(
       `${APP_URL}/api/v1/directory?q=${encodeURIComponent(newName)}`,
@@ -3283,9 +3330,10 @@ test.describe("un socio que edita su perfil", () => {
       },
     });
 
-    await page.getByLabel("Position").selectOption("");
-    await page.getByRole("button", { name: "Save changes" }).click();
-    await expect(page.getByRole("status")).toHaveText("Changes saved.");
+    await openProfileCard(page, ABOUT_CARD);
+    await about.getByLabel("Position").selectOption("");
+    await about.getByRole("button", { name: "Save" }).click();
+    await expect(about.getByRole("status")).toHaveText("About saved");
     const afterClearing = await page.request.get(
       `${APP_URL}/api/v1/directory?q=${encodeURIComponent(newName)}`,
     );
@@ -7985,10 +8033,15 @@ function typeMinorBirth(noticeText: RegExp) {
   };
 }
 
-/** Pone en el contacto de emergencia el teléfono del propio socio, sin
- * guardar: la ficha avisa de que debería ser otra persona (#499). */
+/** Abre Contacto (#772) y pone en el contacto de emergencia el teléfono del
+ * propio socio, sin guardar: la ficha avisa de que debería ser otra persona
+ * (#499). */
 function typeOwnPhoneAsEmergency(warning: RegExp) {
   return async (page: Page): Promise<void> => {
+    await page
+      .getByRole("region", { name: CONTACT_CARD })
+      .getByRole("button", { name: EDIT_CARD_BUTTON })
+      .click();
     await page.locator("#ficha-emergencia-telefono").fill("0412-345-678");
     await expect(page.getByText(warning)).toBeVisible();
   };

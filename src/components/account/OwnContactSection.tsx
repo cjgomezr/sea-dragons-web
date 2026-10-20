@@ -1,22 +1,43 @@
+"use client";
+
+import { useState } from "react";
 import { TextField } from "@/components/directory/record-fields";
 import type { Translator } from "@/lib/i18n/translator";
+import type {
+  OwnProfile,
+  OwnProfileSubmission,
+} from "@/lib/members/own-profile";
 import {
   type ContactField,
+  type ContactIssue,
   type EmergencyContact,
   type ProfileContact,
   type ProfileContactSubmission,
+  contactIssuesOf,
   isSamePhone,
 } from "@/lib/members/profile-contact";
+import { ContactSummary } from "./ContactSummary";
+import { CardForm, EditableCard } from "./EditableCard";
+import {
+  type ProfileSaveResult,
+  describeProfileFailure,
+  describeProfileIssue,
+  saveOwnProfile,
+} from "./profile-client";
+import { useCardSubmission } from "./use-card-submission";
 
 /**
- * El teléfono y el contacto de emergencia dentro del perfil propio (#496).
- * Los dos son opcionales; el contacto va entero o no va, y el aviso de cada
- * dato que falta va junto a él. Que el contacto tenga el teléfono propio no
- * se impide: se avisa, porque quien llame en una emergencia necesita a otra
- * persona.
+ * El teléfono y el contacto de emergencia del perfil propio (#496), en su
+ * tarjeta de Contacto (#772): se leen primero y se editan aparte. Los dos son
+ * opcionales; el contacto va entero o no va, y el aviso de cada dato que falta
+ * va junto a él. Que el contacto tenga el teléfono propio no se impide: se
+ * avisa, porque quien llame en una emergencia necesita a otra persona.
+ *
+ * Guardar manda lo suyo con Sobre mí tal como está guardado y sin el AUF, que
+ * es no tocarlo: la API pide los campos del perfil siempre.
  */
 
-/** El título de la sección: el aviso del contacto (#498) lleva aquí. */
+/** El título de la tarjeta: el aviso del contacto (#498) lleva aquí. */
 export const CONTACT_SECTION_ID = "perfil-contacto";
 /** Los primeros campos de cada dato: la franja de lo que falta (#771) pone
  * ahí el foco. */
@@ -52,6 +73,18 @@ export function contactDraftOf(
   };
 }
 
+export function isSameContactDraft(
+  left: ContactDraft,
+  right: ContactDraft,
+): boolean {
+  return (
+    left.phone === right.phone &&
+    left.emergencyContactName === right.emergencyContactName &&
+    left.emergencyContactPhone === right.emergencyContactPhone &&
+    left.emergencyContactRelationship === right.emergencyContactRelationship
+  );
+}
+
 /** La propuesta del tutor tal como se rellenó, sin que el socio la tocara. */
 function isUntouchedProposal(
   draft: ContactDraft,
@@ -68,7 +101,7 @@ function isUntouchedProposal(
 /** Un teléfono vacío va como null, y un contacto con los tres datos vacíos
  * también. A medias va tal cual, para que el dominio diga qué falta. La
  * propuesta del tutor sin tocar va como null: es nuestra, no del socio, y no
- * debe impedirle guardar el resto del perfil. */
+ * debe impedirle guardar su teléfono. */
 export function toContactSubmission(
   draft: ContactDraft,
   proposal: GuardianProposal | null,
@@ -90,7 +123,22 @@ export function toContactSubmission(
   };
 }
 
-export function OwnContactSection({
+function toOwnContactSubmission(
+  contact: ProfileContactSubmission,
+  profile: OwnProfile,
+): OwnProfileSubmission {
+  return {
+    fullName: profile.fullName,
+    country: profile.country ?? "",
+    positionId: profile.positionId,
+    experienceLevel: profile.experienceLevel,
+    gender: profile.gender,
+    ...contact,
+    auf: null,
+  };
+}
+
+function OwnContactFields({
   translate,
   draft,
   issueTextOf,
@@ -110,10 +158,7 @@ export function OwnContactSection({
     ? [EMERGENCY_HINT_ID, GUARDIAN_PROPOSED_ID]
     : [EMERGENCY_HINT_ID];
   return (
-    <section className="auth-fields" aria-labelledby={CONTACT_SECTION_ID}>
-      <h3 id={CONTACT_SECTION_ID}>
-        {translate("account.profile.contact.title")}
-      </h3>
+    <>
       <TextField
         id={PHONE_ID}
         label={translate("account.profile.contact.phone")}
@@ -136,16 +181,28 @@ export function OwnContactSection({
             {translate("account.profile.contact.guardianProposed")}
           </p>
         ) : null}
-        <TextField
-          id={EMERGENCY_NAME_ID}
-          label={translate("account.profile.contact.emergencyName")}
-          type="text"
-          value={draft.emergencyContactName}
-          issueText={issueTextOf("emergencyContactName")}
-          onChange={(emergencyContactName) =>
-            onChange({ emergencyContactName })
-          }
-        />
+        <div className="profile-card-pair">
+          <TextField
+            id={EMERGENCY_NAME_ID}
+            label={translate("account.profile.contact.emergencyName")}
+            type="text"
+            value={draft.emergencyContactName}
+            issueText={issueTextOf("emergencyContactName")}
+            onChange={(emergencyContactName) =>
+              onChange({ emergencyContactName })
+            }
+          />
+          <TextField
+            id="perfil-emergencia-relacion"
+            label={translate("account.profile.contact.emergencyRelationship")}
+            type="text"
+            value={draft.emergencyContactRelationship}
+            issueText={issueTextOf("emergencyContactRelationship")}
+            onChange={(emergencyContactRelationship) =>
+              onChange({ emergencyContactRelationship })
+            }
+          />
+        </div>
         <TextField
           id="perfil-emergencia-telefono"
           label={translate("account.profile.contact.emergencyPhone")}
@@ -162,17 +219,121 @@ export function OwnContactSection({
             {translate("account.profile.contact.samePhone")}
           </p>
         ) : null}
-        <TextField
-          id="perfil-emergencia-relacion"
-          label={translate("account.profile.contact.emergencyRelationship")}
-          type="text"
-          value={draft.emergencyContactRelationship}
-          issueText={issueTextOf("emergencyContactRelationship")}
-          onChange={(emergencyContactRelationship) =>
-            onChange({ emergencyContactRelationship })
-          }
-        />
       </fieldset>
-    </section>
+    </>
+  );
+}
+
+type OwnContactEditorProps = {
+  readonly translate: Translator;
+  readonly profile: OwnProfile;
+  /** El tutor que se propone mientras el socio no haya guardado su contacto. */
+  readonly guardian: GuardianProposal | null;
+  readonly onSaved: (profile: OwnProfile) => void;
+  readonly onCancel: () => void;
+  readonly onChanges: (hasChanges: boolean) => void;
+};
+
+function OwnContactEditor({
+  translate,
+  profile,
+  guardian,
+  onSaved,
+  onCancel,
+  onChanges,
+}: OwnContactEditorProps): React.JSX.Element {
+  const [draft, setDraft] = useState(() => contactDraftOf(profile, guardian));
+  const [issues, setIssues] = useState<readonly ContactIssue[]>([]);
+  const submission = useCardSubmission<ProfileSaveResult>();
+
+  function update(change: Partial<ContactDraft>): void {
+    const next = { ...draft, ...change };
+    setDraft(next);
+    // Editar un campo borra su aviso y deja los demás.
+    setIssues((current) => current.filter(({ field }) => !(field in change)));
+    submission.clearFailure();
+    onChanges(!isSameContactDraft(next, contactDraftOf(profile, guardian)));
+  }
+
+  function handleSubmit(): void {
+    const contact = toContactSubmission(draft, guardian);
+    const localIssues = contactIssuesOf(contact);
+    if (localIssues.length > 0) {
+      setIssues(localIssues);
+      return;
+    }
+    void submission.submit(
+      () => saveOwnProfile(toOwnContactSubmission(contact, profile)),
+      (result) => onSaved(result.profile),
+    );
+  }
+
+  function issueTextOf(field: ContactField): string | null {
+    const issue = issues.find((candidate) => candidate.field === field);
+    return issue === undefined
+      ? null
+      : describeProfileIssue(translate, issue.code);
+  }
+
+  const { status } = submission;
+  return (
+    <CardForm
+      translate={translate}
+      isSending={submission.isSending}
+      failureText={
+        status.kind === "failed"
+          ? describeProfileFailure(translate, status.failure, status.reason)
+          : null
+      }
+      onSubmit={handleSubmit}
+      onCancel={onCancel}
+    >
+      <OwnContactFields
+        translate={translate}
+        draft={draft}
+        issueTextOf={issueTextOf}
+        isGuardianProposed={guardian !== null}
+        onChange={update}
+      />
+    </CardForm>
+  );
+}
+
+export function OwnContactCard({
+  email,
+  isEditing,
+  focusFieldId,
+  savedText,
+  onEdit,
+  ...editor
+}: OwnContactEditorProps & {
+  readonly email: string;
+  readonly isEditing: boolean;
+  readonly focusFieldId: string;
+  readonly savedText: string | null;
+  readonly onEdit: () => void;
+}): React.JSX.Element {
+  const { translate, profile } = editor;
+  return (
+    <EditableCard
+      translate={translate}
+      headingId={CONTACT_SECTION_ID}
+      title={translate("account.profile.contact.title")}
+      isEditing={isEditing}
+      focusFieldId={focusFieldId}
+      savedText={savedText}
+      onEdit={onEdit}
+    >
+      {isEditing ? (
+        <OwnContactEditor {...editor} />
+      ) : (
+        <ContactSummary
+          translate={translate}
+          phone={profile.phone}
+          email={email}
+          emergencyContact={profile.emergencyContact}
+        />
+      )}
+    </EditableCard>
   );
 }

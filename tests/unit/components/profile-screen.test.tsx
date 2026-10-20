@@ -34,7 +34,9 @@ import {
  * que ya enseñaba (rol, solicitud de rol y grupos) y suma el formulario de la
  * ficha editable. Lo que se prueba es que sólo da un cambio por hecho cuando
  * el servidor lo confirmó. Desde #274 la ficha lleva también el AUF, que el
- * miembro escribe y queda pendiente hasta que un Admin lo verifique.
+ * miembro escribe y queda pendiente hasta que un Admin lo verifique. Desde
+ * #772, Sobre mí y Contacto son tarjetas que se leen primero y se editan
+ * aparte, cada una con su Guardar.
  */
 
 const refresh = vi.fn();
@@ -160,6 +162,7 @@ function profileScreen(
     <ProfileScreen
       locale={locale}
       userId="cccccccc-0000-4000-8000-00000000000c"
+      email="nerea@example.com"
       account={{
         fullName: "Nerea Ruiz",
         role: "Player",
@@ -195,9 +198,57 @@ function profileScreen(
   );
 }
 
+/** El Guardar del AUF, que sigue siendo un formulario (otro ticket de E30). */
 function saveButton(): HTMLElement {
   return screen.getByRole("button", { name: "Save changes" });
 }
+
+type User = ReturnType<typeof userEvent.setup>;
+
+function aboutCard(name = "About"): HTMLElement {
+  return screen.getByRole("region", { name });
+}
+
+function contactCard(name = "Contact"): HTMLElement {
+  return screen.getByRole("region", { name });
+}
+
+/** La etiqueta de la lista de lectura, sin lo que la acompaña (el candado
+ * del género). */
+function termOf(card: HTMLElement, label: string): HTMLElement {
+  return within(card).getByText(
+    (_, element) =>
+      element?.tagName === "DT" && element.firstChild?.textContent === label,
+  );
+}
+
+/** El valor que la lista de lectura enseña junto a una etiqueta. */
+function readValueOf(card: HTMLElement, label: string): string {
+  const term = termOf(card, label);
+  return term.nextElementSibling?.textContent ?? "";
+}
+
+async function openAbout(user: User): Promise<HTMLElement> {
+  const card = aboutCard();
+  await user.click(within(card).getByRole("button", { name: "Edit About" }));
+  return card;
+}
+
+async function openContact(user: User): Promise<HTMLElement> {
+  const card = contactCard();
+  await user.click(within(card).getByRole("button", { name: "Edit Contact" }));
+  return card;
+}
+
+function saveIn(card: HTMLElement): HTMLElement {
+  return within(card).getByRole("button", { name: /^(Save|Saving…)$/ });
+}
+
+const EMERGENCY_CONTACT = {
+  name: "Lucía Ruiz",
+  phone: "0412 345 678",
+  relationship: "Sister",
+} as const;
 
 beforeEach(() => {
   calls.length = 0;
@@ -269,12 +320,13 @@ describe("pantalla de perfil: la membresía (#456, #774)", () => {
     ).toHaveAttribute("href", "/pagos");
   });
 
-  it("no manda el tipo de membresía al guardar la ficha", async () => {
+  it("no manda el tipo de membresía al guardar Sobre mí", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen();
+    const card = await openAbout(user);
 
-    await user.click(saveButton());
+    await user.click(saveIn(card));
 
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]?.body).not.toHaveProperty("membershipType");
@@ -282,28 +334,6 @@ describe("pantalla de perfil: la membresía (#456, #774)", () => {
 });
 
 describe("pantalla de perfil", () => {
-  it("carga la ficha con sus valores actuales", () => {
-    renderScreen();
-
-    expect(screen.getByLabelText("Full name")).toHaveValue("Nerea Ruiz");
-    expect(screen.getByLabelText("Country")).toHaveValue("AU");
-    expect(screen.getByLabelText("Position")).toHaveDisplayValue("Defender");
-    expect(screen.getByLabelText("Experience level")).toHaveValue(
-      "Intermediate",
-    );
-    expect(screen.getByLabelText("Gender")).toHaveValue("female");
-  });
-
-  it("carga los campos vacíos como sin indicar", () => {
-    renderScreen({ profile: EMPTY_PROFILE });
-
-    const position = screen.getByLabelText("Position");
-    expect(position).toHaveValue("");
-    expect(
-      within(position).getByRole("option", { name: "Not set" }),
-    ).toBeInTheDocument();
-  });
-
   it("no ofrece cambiar la fecha de nacimiento, que sólo corrige un Admin", () => {
     renderScreen();
 
@@ -317,84 +347,222 @@ describe("pantalla de perfil", () => {
       within(screen.getByRole("banner")).getByText("Player"),
     ).toBeInTheDocument();
   });
+});
 
-  it("guarda los cinco campos, lo confirma y refresca la cabecera", async () => {
-    echoSavedProfile();
+describe("perfil propio: Sobre mí en lectura (#772)", () => {
+  it("lista el nombre, el país, la posición, la experiencia y el género", () => {
+    renderScreen();
+
+    const card = aboutCard();
+    expect(readValueOf(card, "Full name")).toBe("Nerea Ruiz");
+    expect(readValueOf(card, "Country")).toBe("Australia");
+    expect(readValueOf(card, "Position")).toBe("Defender");
+    expect(readValueOf(card, "Experience")).toBe("Intermediate");
+    expect(readValueOf(card, "Gender")).toBe("Female");
+  });
+
+  it("marca el género como algo que sólo ve el socio", () => {
+    renderScreen();
+
+    const term = termOf(aboutCard(), "Gender");
+    expect(term).toHaveTextContent("Gender only you");
+  });
+
+  it("pinta un guion en los datos vacíos", () => {
+    renderScreen({ profile: EMPTY_PROFILE });
+
+    const card = aboutCard();
+    expect(readValueOf(card, "Position")).toContain("—");
+    expect(readValueOf(card, "Experience")).toContain("—");
+    expect(readValueOf(card, "Gender")).toContain("—");
+  });
+
+  it("no pinta ningún campo hasta que se pulsa Editar", () => {
+    renderScreen();
+
+    expect(screen.queryByLabelText("Full name")).not.toBeInTheDocument();
+  });
+
+  it("se lee en español", () => {
+    renderScreen({ locale: "es" });
+
+    const card = aboutCard("Sobre mí");
+    expect(readValueOf(card, "País")).toBe("Australia");
+    expect(readValueOf(card, "Posición")).toBe("Defensa");
+    expect(
+      within(card).getByRole("button", { name: "Editar Sobre mí" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("perfil propio: editar Sobre mí (#772)", () => {
+  it("abre los campos con sus valores y pone el foco en el nombre", async () => {
     const user = userEvent.setup();
     renderScreen();
 
-    await user.clear(screen.getByLabelText("Full name"));
-    await user.type(screen.getByLabelText("Full name"), "Nerea Ruiz Soto");
-    await user.selectOptions(screen.getByLabelText("Position"), "Forward");
-    await user.selectOptions(screen.getByLabelText("Gender"), "undisclosed");
-    await user.click(saveButton());
+    const card = await openAbout(user);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Changes saved.",
+    expect(within(card).getByLabelText("Full name")).toHaveFocus();
+    expect(within(card).getByLabelText("Full name")).toHaveValue("Nerea Ruiz");
+    expect(within(card).getByLabelText("Country")).toHaveValue("AU");
+    expect(within(card).getByLabelText("Position")).toHaveDisplayValue(
+      "Defender",
     );
+    expect(
+      within(card).getByRole("radio", { name: "Intermediate" }),
+    ).toBeChecked();
+    expect(within(card).getByLabelText("Gender")).toHaveValue("female");
+  });
+
+  it("la experiencia es un segmento de tres niveles", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    const card = await openAbout(user);
+
+    const levels = within(card).getByRole("radiogroup", { name: "Experience" });
+    expect(
+      within(levels)
+        .getAllByRole("radio")
+        .map((radio) => radio.closest("label")?.textContent),
+    ).toEqual(["Beginner", "Intermediate", "Advanced"]);
+  });
+
+  it("dice junto al género que sólo lo ve el socio", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    const card = await openAbout(user);
+
+    expect(within(card).getByLabelText("Gender")).toHaveAccessibleDescription(
+      "only you",
+    );
+  });
+
+  it("carga vacíos como sin indicar", async () => {
+    const user = userEvent.setup();
+    renderScreen({ profile: EMPTY_PROFILE });
+
+    const card = await openAbout(user);
+
+    const position = within(card).getByLabelText("Position");
+    expect(position).toHaveValue("");
+    expect(
+      within(position).getByRole("option", { name: "Not set" }),
+    ).toBeInTheDocument();
+    expect(within(card).queryByRole("radio", { checked: true })).toBeNull();
+  });
+
+  it("guarda, vuelve a lectura con lo nuevo, lo dice y devuelve el foco a Editar", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+    const card = await openAbout(user);
+
+    await user.clear(within(card).getByLabelText("Full name"));
+    await user.type(within(card).getByLabelText("Full name"), "Nerea Soto");
+    await user.click(within(card).getByRole("radio", { name: "Advanced" }));
+    await user.click(saveIn(card));
+
+    expect(await within(card).findByRole("status")).toHaveTextContent(
+      "About saved",
+    );
+    expect(within(card).queryByLabelText("Full name")).not.toBeInTheDocument();
+    expect(readValueOf(card, "Full name")).toBe("Nerea Soto");
+    expect(readValueOf(card, "Experience")).toBe("Advanced");
+    expect(
+      within(card).getByRole("button", { name: "Edit About" }),
+    ).toHaveFocus();
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("manda lo suyo y el contacto guardado, sin el AUF", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({
+      profile: {
+        ...PROFILE,
+        phone: "0412 999 000",
+        emergencyContact: EMERGENCY_CONTACT,
+        auf: PENDING_AUF,
+      },
+    });
+    const card = await openAbout(user);
+
+    await user.selectOptions(
+      within(card).getByLabelText("Position"),
+      "Forward",
+    );
+    await user.selectOptions(
+      within(card).getByLabelText("Gender"),
+      "undisclosed",
+    );
+    await user.click(saveIn(card));
+
+    await within(card).findByRole("status");
     expect(calls).toEqual([
       {
         url: ACCOUNT_PROFILE_API_PATH,
         body: {
-          fullName: "Nerea Ruiz Soto",
+          fullName: "Nerea Ruiz",
           country: "AU",
           positionId: FORWARD.id,
           experienceLevel: "Intermediate",
           gender: "undisclosed",
-          phone: null,
-          emergencyContact: null,
+          phone: "0412 999 000",
+          emergencyContact: EMERGENCY_CONTACT,
         },
       },
     ]);
-    expect(refresh).toHaveBeenCalled();
   });
 
   it("manda null por un campo vaciado a propósito", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen();
+    const card = await openAbout(user);
 
-    await user.selectOptions(screen.getByLabelText("Position"), "");
-    await user.click(saveButton());
+    await user.selectOptions(within(card).getByLabelText("Position"), "");
+    await user.click(saveIn(card));
 
-    await screen.findByRole("status");
+    await within(card).findByRole("status");
     expect(calls[0]?.body).toMatchObject({ positionId: null });
   });
 
-  it("no envía un nombre vacío y dice por qué", async () => {
+  it("con un nombre vacío sigue abierta, con el aviso en su campo, y no manda nada", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen();
+    const card = await openAbout(user);
 
-    await user.clear(screen.getByLabelText("Full name"));
-    await user.type(screen.getByLabelText("Full name"), "   ");
-    await user.click(saveButton());
+    await user.clear(within(card).getByLabelText("Full name"));
+    await user.type(within(card).getByLabelText("Full name"), "   ");
+    await user.click(saveIn(card));
 
-    expect(screen.getByLabelText("Full name")).toHaveAttribute(
-      "aria-invalid",
-      "true",
-    );
-    expect(screen.getByText("Write your name.")).toBeInTheDocument();
+    const name = within(card).getByLabelText("Full name");
+    expect(name).toHaveAttribute("aria-invalid", "true");
+    expect(name).toHaveAccessibleDescription("Write your name.");
     expect(calls).toEqual([]);
   });
 
-  it("no envía un nombre de más de 120 caracteres y dice el límite", async () => {
+  it("no manda un nombre de más de 120 caracteres y dice el límite", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen();
+    const card = await openAbout(user);
 
-    await user.clear(screen.getByLabelText("Full name"));
-    await user.click(screen.getByLabelText("Full name"));
+    await user.clear(within(card).getByLabelText("Full name"));
+    await user.click(within(card).getByLabelText("Full name"));
     await user.paste("a".repeat(121));
-    await user.click(saveButton());
+    await user.click(saveIn(card));
 
     expect(
-      screen.getByText("Your name can be at most 120 characters."),
+      within(card).getByText("Your name can be at most 120 characters."),
     ).toBeInTheDocument();
     expect(calls).toEqual([]);
   });
 
-  it("desactiva el botón mientras guarda y un doble clic manda una sola petición", async () => {
+  it("desactiva Guardar mientras guarda y un doble clic manda una sola petición", async () => {
     let answer: (response: Response) => void = () => undefined;
     stubFetch(
       () =>
@@ -404,17 +572,19 @@ describe("pantalla de perfil", () => {
     );
     const user = userEvent.setup();
     renderScreen();
+    const card = await openAbout(user);
 
-    await user.dblClick(saveButton());
+    await user.dblClick(saveIn(card));
 
-    const sending = screen.getByRole("button", { name: "Saving…" });
-    expect(sending).toBeDisabled();
+    expect(
+      within(card).getByRole("button", { name: "Saving…" }),
+    ).toBeDisabled();
     expect(calls).toHaveLength(1);
     answer(jsonResponse(200, { data: PROFILE }));
-    await screen.findByRole("status");
+    await within(card).findByRole("status");
   });
 
-  it("dice que falló la red, no da el cambio por hecho y deja reintentar", async () => {
+  it("si falla la red sigue abierta con el aviso y lo escrito, y deja reintentar", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -423,20 +593,24 @@ describe("pantalla de perfil", () => {
     );
     const user = userEvent.setup();
     renderScreen();
+    const card = await openAbout(user);
+    await user.type(within(card).getByLabelText("Full name"), " Soto");
 
-    await user.click(saveButton());
+    await user.click(saveIn(card));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect(await within(card).findByRole("alert")).toHaveTextContent(
       "We couldn't save your changes. Check your connection and try again.",
     );
-    expect(screen.queryByText("Changes saved.")).not.toBeInTheDocument();
+    expect(within(card).getByLabelText("Full name")).toHaveValue(
+      "Nerea Ruiz Soto",
+    );
     expect(refresh).not.toHaveBeenCalled();
 
     echoSavedProfile();
-    await user.click(saveButton());
+    await user.click(saveIn(card));
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Changes saved.",
+    expect(await within(card).findByRole("status")).toHaveTextContent(
+      "About saved",
     );
   });
 
@@ -452,24 +626,41 @@ describe("pantalla de perfil", () => {
     );
     const user = userEvent.setup();
     renderScreen();
+    const card = await openAbout(user);
 
-    await user.click(saveButton());
+    await user.click(saveIn(card));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect(await within(card).findByRole("alert")).toHaveTextContent(
       "Choose a position from the list.",
     );
   });
 
-  it("borra el aviso de guardado en cuanto se edita otra vez", async () => {
+  it("Cancelar vuelve a lectura sin cambios, sin mandar nada, con el foco en Editar", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen();
+    const card = await openAbout(user);
+    await user.type(within(card).getByLabelText("Full name"), " Soto");
 
-    await user.click(saveButton());
-    await screen.findByRole("status");
-    await user.type(screen.getByLabelText("Full name"), "x");
+    await user.click(within(card).getByRole("button", { name: "Cancel" }));
 
-    expect(screen.queryByText("Changes saved.")).not.toBeInTheDocument();
+    expect(readValueOf(card, "Full name")).toBe("Nerea Ruiz");
+    expect(
+      within(card).getByRole("button", { name: "Edit About" }),
+    ).toHaveFocus();
+    expect(calls).toEqual([]);
+  });
+
+  it("al volver a abrir tras cancelar, enseña lo guardado", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    const card = await openAbout(user);
+    await user.type(within(card).getByLabelText("Full name"), " Soto");
+    await user.click(within(card).getByRole("button", { name: "Cancel" }));
+
+    await openAbout(user);
+
+    expect(within(card).getByLabelText("Full name")).toHaveValue("Nerea Ruiz");
   });
 
   it("en español, los textos, las opciones y los errores salen en español", async () => {
@@ -481,23 +672,44 @@ describe("pantalla de perfil", () => {
     );
     const user = userEvent.setup();
     renderScreen({ locale: "es" });
+    const card = aboutCard("Sobre mí");
 
-    expect(screen.getByLabelText("Nombre completo")).toBeInTheDocument();
-    expect(screen.getByLabelText("País")).toHaveDisplayValue("Australia");
-    const position = screen.getByLabelText("Posición");
+    await user.click(
+      within(card).getByRole("button", { name: "Editar Sobre mí" }),
+    );
+
+    expect(within(card).getByLabelText("Nombre completo")).toHaveFocus();
+    expect(within(card).getByLabelText("País")).toHaveDisplayValue("Australia");
     expect(
-      within(position).getByRole("option", { name: "Defensa" }),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByLabelText("Género")).getByRole("option", {
-        name: "Prefiero no decirlo",
-      }),
-    ).toBeInTheDocument();
+      within(card).getByRole("radio", { name: "Intermedio" }),
+    ).toBeChecked();
+    expect(within(card).getByLabelText("Género")).toHaveAccessibleDescription(
+      "solo tú",
+    );
+    await user.click(within(card).getByRole("button", { name: "Guardar" }));
 
-    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect(await within(card).findByRole("alert")).toHaveTextContent(
       "No pudimos guardar tus cambios. Revisa tu conexión y vuelve a intentarlo.",
+    );
+    await user.click(within(card).getByRole("button", { name: "Cancelar" }));
+    expect(
+      within(card).getByRole("button", { name: "Editar Sobre mí" }),
+    ).toHaveFocus();
+  });
+
+  it("dice Sobre mí guardado en español", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({ locale: "es" });
+    const card = aboutCard("Sobre mí");
+    await user.click(
+      within(card).getByRole("button", { name: "Editar Sobre mí" }),
+    );
+
+    await user.click(within(card).getByRole("button", { name: "Guardar" }));
+
+    expect(await within(card).findByRole("status")).toHaveTextContent(
+      "Sobre mí guardado",
     );
   });
 });
@@ -674,14 +886,17 @@ describe("el AUF en el perfil propio", () => {
 });
 
 function positionOptionNames(): readonly string[] {
-  return within(screen.getByLabelText("Position"))
+  return within(screen.getByLabelText(/^(Position|Posición)$/))
     .getAllByRole("option")
     .map((option) => option.textContent ?? "");
 }
 
 describe("perfil propio: las posiciones del club (#299)", () => {
-  it("el desplegable ofrece las posiciones del club, en su orden", () => {
+  it("el desplegable ofrece las posiciones del club, en su orden", async () => {
+    const user = userEvent.setup();
     renderScreen({ positionOptions: [FORWARD, GOALKEEPER, DEFENDER] });
+
+    await openAbout(user);
 
     expect(positionOptionNames()).toEqual([
       "Not set",
@@ -691,12 +906,15 @@ describe("perfil propio: las posiciones del club (#299)", () => {
     ]);
   });
 
-  it("quien tiene una posición retirada la sigue viendo, marcada", () => {
+  it("quien tiene una posición retirada la sigue viendo, marcada", async () => {
+    const user = userEvent.setup();
     renderScreen({
       profile: { ...PROFILE, positionId: UTILITY.id },
       positionOptions: [GOALKEEPER, UTILITY, DEFENDER, FORWARD],
     });
 
+    expect(readValueOf(aboutCard(), "Position")).toBe("Utility (retired)");
+    await openAbout(user);
     expect(screen.getByLabelText("Position")).toHaveDisplayValue(
       "Utility (retired)",
     );
@@ -709,39 +927,49 @@ describe("perfil propio: las posiciones del club (#299)", () => {
       profile: { ...PROFILE, positionId: UTILITY.id },
       positionOptions: [GOALKEEPER, UTILITY, DEFENDER, FORWARD],
     });
+    const card = await openAbout(user);
 
     await user.selectOptions(screen.getByLabelText("Position"), "Forward");
-    await user.click(saveButton());
+    await user.click(saveIn(card));
+    await within(card).findByRole("status");
+    await openAbout(user);
 
-    await screen.findByRole("status");
     expect(positionOptionNames()).not.toContain("Utility (retired)");
   });
 
-  it("el campo no se muestra si el club no ofrece ninguna posición", () => {
+  it("el campo no se muestra si el club no ofrece ninguna posición", async () => {
+    const user = userEvent.setup();
     renderScreen({
       profile: { ...PROFILE, positionId: null },
       positionOptions: [],
     });
 
+    expect(within(aboutCard()).queryByText("Position")).toBeNull();
+    await openAbout(user);
     expect(screen.queryByLabelText("Position")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Experience level")).toBeInTheDocument();
+    expect(
+      screen.getByRole("radiogroup", { name: "Experience" }),
+    ).toBeInTheDocument();
   });
 
-  it("en español, una posición sin nombre en español sale en inglés y marcada", () => {
+  it("en español, una posición sin nombre en español sale en inglés y marcada", async () => {
+    const user = userEvent.setup();
     renderScreen({
       locale: "es",
       profile: { ...PROFILE, positionId: UTILITY.id },
       positionOptions: [GOALKEEPER, UTILITY],
     });
 
+    await user.click(
+      within(aboutCard("Sobre mí")).getByRole("button", {
+        name: "Editar Sobre mí",
+      }),
+    );
+
     expect(screen.getByLabelText("Posición")).toHaveDisplayValue(
       "Utility (retirada)",
     );
-    expect(
-      within(screen.getByLabelText("Posición")).getByRole("option", {
-        name: "Portería",
-      }),
-    ).toBeInTheDocument();
+    expect(positionOptionNames()).toContain("Portería");
   });
 });
 
@@ -974,33 +1202,21 @@ describe("perfil propio: el rol (#774, D12)", () => {
     ).toBeVisible();
   });
 });
-const EMERGENCY_CONTACT = {
-  name: "Lucía Ruiz",
-  phone: "0412 345 678",
-  relationship: "Sister",
-} as const;
 
 const OWN_PHONE_LABEL = "Your phone (optional)";
 
-function contactRegion(name = "Contact"): HTMLElement {
-  return screen.getByRole("region", { name });
+/** La mitad de la lectura con el teléfono o con el contacto de emergencia. */
+function contactHalf(card: HTMLElement, title: string): HTMLElement {
+  const heading = within(card).getByText(title, { selector: "dt" });
+  const half = heading.closest("div");
+  if (half === null) {
+    throw new Error(`Falta la mitad ${title}.`);
+  }
+  return half;
 }
 
-describe("perfil propio: el contacto (#496)", () => {
-  it("enseña la sección Contacto con el teléfono y el contacto de emergencia", () => {
-    renderScreen();
-
-    const contact = contactRegion();
-    expect(within(contact).getByLabelText(OWN_PHONE_LABEL)).toHaveValue("");
-    const emergency = within(contact).getByRole("group", {
-      name: "Emergency contact",
-    });
-    expect(within(emergency).getByLabelText("Contact name")).toHaveValue("");
-    expect(within(emergency).getByLabelText("Contact phone")).toHaveValue("");
-    expect(within(emergency).getByLabelText("Relationship")).toHaveValue("");
-  });
-
-  it("carga el teléfono y el contacto guardados", () => {
+describe("perfil propio: Contacto en lectura (#772)", () => {
+  it("enseña el teléfono con el correo debajo y el contacto de emergencia", () => {
     renderScreen({
       profile: {
         ...PROFILE,
@@ -1009,44 +1225,151 @@ describe("perfil propio: el contacto (#496)", () => {
       },
     });
 
-    expect(screen.getByLabelText(OWN_PHONE_LABEL)).toHaveValue(
+    const card = contactCard();
+    const phone = contactHalf(card, "Phone");
+    expect(within(phone).getByText("+61 3 9876 5432")).toBeInTheDocument();
+    expect(within(phone).getByText("nerea@example.com")).toBeInTheDocument();
+    const emergency = contactHalf(card, "Emergency contact");
+    expect(
+      within(emergency).getByText("Lucía Ruiz · Sister"),
+    ).toBeInTheDocument();
+    expect(within(emergency).getByText("0412 345 678")).toBeInTheDocument();
+  });
+
+  it("sin contacto de emergencia dice que aún no se añadió", () => {
+    renderScreen();
+
+    const emergency = contactHalf(contactCard(), "Emergency contact");
+    expect(within(emergency).getByText("Not added yet")).toBeInTheDocument();
+  });
+
+  it("sin teléfono pinta un guion", () => {
+    renderScreen();
+
+    const phone = contactHalf(contactCard(), "Phone");
+    expect(phone).toHaveTextContent("—");
+  });
+
+  it("no pinta ningún campo hasta que se pulsa Editar", () => {
+    renderScreen();
+
+    expect(screen.queryByLabelText(OWN_PHONE_LABEL)).not.toBeInTheDocument();
+  });
+
+  it("se lee en español", () => {
+    renderScreen({ locale: "es" });
+
+    const card = contactCard("Contacto");
+    expect(
+      within(contactHalf(card, "Contacto de emergencia")).getByText(
+        "Aún no añadido",
+      ),
+    ).toBeInTheDocument();
+    expect(contactHalf(card, "Teléfono")).toBeInTheDocument();
+  });
+});
+
+describe("perfil propio: editar Contacto (#772)", () => {
+  it("abre el teléfono y el contacto de emergencia con lo guardado, con el foco en el teléfono", async () => {
+    const user = userEvent.setup();
+    renderScreen({
+      profile: {
+        ...PROFILE,
+        phone: "+61 3 9876 5432",
+        emergencyContact: EMERGENCY_CONTACT,
+      },
+    });
+
+    const card = await openContact(user);
+
+    expect(within(card).getByLabelText(OWN_PHONE_LABEL)).toHaveFocus();
+    expect(within(card).getByLabelText(OWN_PHONE_LABEL)).toHaveValue(
       "+61 3 9876 5432",
     );
-    expect(screen.getByLabelText("Contact name")).toHaveValue("Lucía Ruiz");
-    expect(screen.getByLabelText("Contact phone")).toHaveValue("0412 345 678");
-    expect(screen.getByLabelText("Relationship")).toHaveValue("Sister");
-  });
-
-  it("manda el teléfono y el contacto escritos y los enseña guardados", async () => {
-    echoSavedProfile();
-    const user = userEvent.setup();
-    renderScreen();
-
-    await user.type(screen.getByLabelText(OWN_PHONE_LABEL), "+61 3 9876 5432");
-    await user.type(screen.getByLabelText("Contact name"), "Lucía Ruiz");
-    await user.type(screen.getByLabelText("Contact phone"), "0412 345 678");
-    await user.type(screen.getByLabelText("Relationship"), "Sister");
-    await user.click(saveButton());
-
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Changes saved.",
-    );
-    expect(calls[0]?.body).toMatchObject({
-      phone: "+61 3 9876 5432",
-      emergencyContact: EMERGENCY_CONTACT,
+    const emergency = within(card).getByRole("group", {
+      name: "Emergency contact",
     });
-    expect(screen.getByLabelText("Contact name")).toHaveValue("Lucía Ruiz");
+    expect(within(emergency).getByLabelText("Contact name")).toHaveValue(
+      "Lucía Ruiz",
+    );
+    expect(within(emergency).getByLabelText("Relationship")).toHaveValue(
+      "Sister",
+    );
+    expect(within(emergency).getByLabelText("Contact phone")).toHaveValue(
+      "0412 345 678",
+    );
   });
 
-  it("no envía un teléfono con letras y lo dice junto al campo", async () => {
+  it("guarda, vuelve a lectura con lo nuevo, lo dice y devuelve el foco a Editar", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen();
+    const card = await openContact(user);
 
-    await user.type(screen.getByLabelText(OWN_PHONE_LABEL), "0412 ABC");
-    await user.click(saveButton());
+    await user.type(
+      within(card).getByLabelText(OWN_PHONE_LABEL),
+      "+61 3 9876 5432",
+    );
+    await user.type(within(card).getByLabelText("Contact name"), "Lucía Ruiz");
+    await user.type(
+      within(card).getByLabelText("Contact phone"),
+      "0412 345 678",
+    );
+    await user.type(within(card).getByLabelText("Relationship"), "Sister");
+    await user.click(saveIn(card));
 
-    const phone = screen.getByLabelText(OWN_PHONE_LABEL);
+    expect(await within(card).findByRole("status")).toHaveTextContent(
+      "Contact saved",
+    );
+    expect(
+      within(card).queryByLabelText(OWN_PHONE_LABEL),
+    ).not.toBeInTheDocument();
+    expect(within(card).getByText("Lucía Ruiz · Sister")).toBeInTheDocument();
+    expect(
+      within(card).getByRole("button", { name: "Edit Contact" }),
+    ).toHaveFocus();
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("manda lo suyo y el Sobre mí guardado, sin el AUF", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({ profile: { ...PROFILE, auf: PENDING_AUF } });
+    const card = await openContact(user);
+
+    await user.type(
+      within(card).getByLabelText(OWN_PHONE_LABEL),
+      "0412 999 000",
+    );
+    await user.click(saveIn(card));
+
+    await within(card).findByRole("status");
+    expect(calls).toEqual([
+      {
+        url: ACCOUNT_PROFILE_API_PATH,
+        body: {
+          fullName: "Nerea Ruiz",
+          country: "AU",
+          positionId: DEFENDER.id,
+          experienceLevel: "Intermediate",
+          gender: "female",
+          phone: "0412 999 000",
+          emergencyContact: null,
+        },
+      },
+    ]);
+  });
+
+  it("con un teléfono con letras sigue abierta con el aviso junto al campo", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+    const card = await openContact(user);
+
+    await user.type(within(card).getByLabelText(OWN_PHONE_LABEL), "0412 ABC");
+    await user.click(saveIn(card));
+
+    const phone = within(card).getByLabelText(OWN_PHONE_LABEL);
     expect(phone).toHaveAttribute("aria-invalid", "true");
     expect(phone).toHaveAccessibleDescription(
       "Use only digits, spaces, hyphens, brackets and a + at the start.",
@@ -1054,39 +1377,45 @@ describe("perfil propio: el contacto (#496)", () => {
     expect(calls).toEqual([]);
   });
 
-  it("no envía un teléfono de 7 dígitos y dice cuántos hacen falta", async () => {
+  it("no manda un teléfono de 7 dígitos y dice cuántos hacen falta", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen();
+    const card = await openContact(user);
 
-    await user.type(screen.getByLabelText(OWN_PHONE_LABEL), "4123456");
-    await user.click(saveButton());
+    await user.type(within(card).getByLabelText(OWN_PHONE_LABEL), "4123456");
+    await user.click(saveIn(card));
 
-    expect(screen.getByLabelText(OWN_PHONE_LABEL)).toHaveAccessibleDescription(
-      "A phone number needs at least 8 digits.",
-    );
+    expect(
+      within(card).getByLabelText(OWN_PHONE_LABEL),
+    ).toHaveAccessibleDescription("A phone number needs at least 8 digits.");
     expect(calls).toEqual([]);
   });
 
-  it("no envía un contacto a medias y avisa junto a cada dato que falta", async () => {
+  it("no manda un contacto a medias y avisa junto a cada dato que falta", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen();
+    const card = await openContact(user);
 
-    await user.type(screen.getByLabelText("Contact name"), "Lucía Ruiz");
-    await user.click(saveButton());
+    await user.type(within(card).getByLabelText("Contact name"), "Lucía Ruiz");
+    await user.click(saveIn(card));
 
-    expect(screen.getByLabelText("Contact phone")).toHaveAccessibleDescription(
+    expect(
+      within(card).getByLabelText("Contact phone"),
+    ).toHaveAccessibleDescription(
       expect.stringContaining(
         "Add the contact's phone, or leave all three empty.",
       ),
     );
-    expect(screen.getByLabelText("Relationship")).toHaveAccessibleDescription(
+    expect(
+      within(card).getByLabelText("Relationship"),
+    ).toHaveAccessibleDescription(
       expect.stringContaining(
         "Add how you're related, or leave all three empty.",
       ),
     );
-    expect(screen.getByLabelText("Contact name")).toHaveAttribute(
+    expect(within(card).getByLabelText("Contact name")).toHaveAttribute(
       "aria-invalid",
       "false",
     );
@@ -1097,22 +1426,23 @@ describe("perfil propio: el contacto (#496)", () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen();
-    await user.type(screen.getByLabelText("Contact name"), "Lucía Ruiz");
-    await user.click(saveButton());
+    const card = await openContact(user);
+    await user.type(within(card).getByLabelText("Contact name"), "Lucía Ruiz");
+    await user.click(saveIn(card));
 
-    await user.type(screen.getByLabelText("Contact phone"), "0");
+    await user.type(within(card).getByLabelText("Contact phone"), "0");
 
-    expect(screen.getByLabelText("Contact phone")).toHaveAttribute(
+    expect(within(card).getByLabelText("Contact phone")).toHaveAttribute(
       "aria-invalid",
       "false",
     );
-    expect(screen.getByLabelText("Relationship")).toHaveAttribute(
+    expect(within(card).getByLabelText("Relationship")).toHaveAttribute(
       "aria-invalid",
       "true",
     );
   });
 
-  it("no envía un nombre de contacto de más de 100 caracteres", async () => {
+  it("no manda un nombre de contacto de más de 100 caracteres", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen({
@@ -1121,10 +1451,13 @@ describe("perfil propio: el contacto (#496)", () => {
         emergencyContact: { ...EMERGENCY_CONTACT, name: "a".repeat(101) },
       },
     });
+    const card = await openContact(user);
 
-    await user.click(saveButton());
+    await user.click(saveIn(card));
 
-    expect(screen.getByLabelText("Contact name")).toHaveAccessibleDescription(
+    expect(
+      within(card).getByLabelText("Contact name"),
+    ).toHaveAccessibleDescription(
       expect.stringContaining("This can be at most 100 characters."),
     );
     expect(calls).toEqual([]);
@@ -1140,63 +1473,46 @@ describe("perfil propio: el contacto (#496)", () => {
         emergencyContact: { ...EMERGENCY_CONTACT, phone: "0412-345-678" },
       },
     });
+    const card = await openContact(user);
 
-    expect(screen.getByLabelText("Contact phone")).toHaveAccessibleDescription(
+    expect(
+      within(card).getByLabelText("Contact phone"),
+    ).toHaveAccessibleDescription(
       expect.stringContaining(
         "This is your own phone. Your emergency contact should be someone else.",
       ),
     );
 
-    await user.click(saveButton());
+    await user.click(saveIn(card));
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Changes saved.",
+    expect(await within(card).findByRole("status")).toHaveTextContent(
+      "Contact saved",
     );
   });
 
-  it("a un menor sin contacto le propone a su tutor, sin teléfono", () => {
-    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
-
-    expect(screen.getByLabelText("Contact name")).toHaveValue("Marta Soto");
-    expect(screen.getByLabelText("Relationship")).toHaveValue("Guardian");
-    expect(screen.getByLabelText("Contact phone")).toHaveValue("");
-    expect(
-      screen.getByText(
-        "We've suggested your guardian. Add their phone number to save it.",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("guarda el resto del perfil sin contacto si el menor no tocó la propuesta", async () => {
-    echoSavedProfile();
+  it("si falla la red sigue abierta con el aviso y lo escrito", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
     const user = userEvent.setup();
-    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
-
-    await user.selectOptions(screen.getByLabelText("Gender"), "undisclosed");
-    await user.click(saveButton());
-
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Changes saved.",
+    renderScreen();
+    const card = await openContact(user);
+    await user.type(
+      within(card).getByLabelText(OWN_PHONE_LABEL),
+      "0412 999 000",
     );
-    expect(calls[0]?.body).toMatchObject({
-      gender: "undisclosed",
-      emergencyContact: null,
-    });
-  });
 
-  it("pide el teléfono si el menor editó la propuesta y no lo escribió", async () => {
-    echoSavedProfile();
-    const user = userEvent.setup();
-    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
+    await user.click(saveIn(card));
 
-    await user.type(screen.getByLabelText("Contact name"), " Pérez");
-    await user.click(saveButton());
-
-    expect(screen.getByLabelText("Contact phone")).toHaveAttribute(
-      "aria-invalid",
-      "true",
+    expect(await within(card).findByRole("alert")).toHaveTextContent(
+      "We couldn't save your changes. Check your connection and try again.",
     );
-    expect(calls).toEqual([]);
+    expect(within(card).getByLabelText(OWN_PHONE_LABEL)).toHaveValue(
+      "0412 999 000",
+    );
   });
 
   it("traduce el motivo de un 400 del servidor sobre el contacto", async () => {
@@ -1211,41 +1527,285 @@ describe("perfil propio: el contacto (#496)", () => {
     );
     const user = userEvent.setup();
     renderScreen();
+    const card = await openContact(user);
 
-    await user.click(saveButton());
+    await user.click(saveIn(card));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect(await within(card).findByRole("alert")).toHaveTextContent(
       "A phone number can have at most 15 digits.",
     );
   });
 
-  it("en español, la sección, la propuesta del tutor y los avisos salen en español", async () => {
+  it("Cancelar vuelve a lectura sin cambios y con el foco en Editar", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    const card = await openContact(user);
+    await user.type(
+      within(card).getByLabelText(OWN_PHONE_LABEL),
+      "0412 999 000",
+    );
+
+    await user.click(within(card).getByRole("button", { name: "Cancel" }));
+
+    expect(contactHalf(card, "Phone")).toHaveTextContent("—");
+    expect(
+      within(card).getByRole("button", { name: "Edit Contact" }),
+    ).toHaveFocus();
+    expect(calls).toEqual([]);
+  });
+
+  it("en español, la sección y los avisos salen en español", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
-    renderScreen({
-      locale: "es",
-      emergencyContactProposal: { guardianName: "Marta Soto" },
-    });
+    renderScreen({ locale: "es" });
+    const card = contactCard("Contacto");
+    await user.click(
+      within(card).getByRole("button", { name: "Editar Contacto" }),
+    );
 
-    const contact = contactRegion("Contacto");
     expect(
-      within(contact).getByRole("group", { name: "Contacto de emergencia" }),
+      within(card).getByRole("group", { name: "Contacto de emergencia" }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Relación")).toHaveValue("Tutor");
-    await user.type(screen.getByLabelText("Tu teléfono (opcional)"), "12");
-    await user.type(screen.getByLabelText("Nombre del contacto"), " Pérez");
-    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+    await user.type(
+      within(card).getByLabelText("Tu teléfono (opcional)"),
+      "12",
+    );
+    await user.type(within(card).getByLabelText("Nombre del contacto"), "Ana");
+    await user.click(within(card).getByRole("button", { name: "Guardar" }));
 
     expect(
-      screen.getByLabelText("Tu teléfono (opcional)"),
+      within(card).getByLabelText("Tu teléfono (opcional)"),
     ).toHaveAccessibleDescription("Un teléfono necesita al menos 8 dígitos.");
     expect(
-      screen.getByLabelText("Teléfono del contacto"),
+      within(card).getByLabelText("Teléfono del contacto"),
     ).toHaveAccessibleDescription(
       expect.stringContaining(
         "Escribe el teléfono del contacto o deja los tres datos vacíos.",
       ),
     );
+  });
+});
+
+describe("perfil propio: la propuesta del tutor (#496, #772)", () => {
+  it("a un menor sin contacto le propone a su tutor, sin teléfono", async () => {
+    const user = userEvent.setup();
+    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
+
+    const card = await openContact(user);
+
+    expect(within(card).getByLabelText("Contact name")).toHaveValue(
+      "Marta Soto",
+    );
+    expect(within(card).getByLabelText("Relationship")).toHaveValue("Guardian");
+    expect(within(card).getByLabelText("Contact phone")).toHaveValue("");
+    expect(
+      within(card).getByText(
+        "We've suggested your guardian. Add their phone number to save it.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("en lectura la propuesta no cuenta como contacto", () => {
+    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
+
+    expect(
+      within(contactHalf(contactCard(), "Emergency contact")).getByText(
+        "Not added yet",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("guarda el teléfono sin contacto si el menor no tocó la propuesta", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
+    const card = await openContact(user);
+
+    await user.type(
+      within(card).getByLabelText(OWN_PHONE_LABEL),
+      "0412 999 000",
+    );
+    await user.click(saveIn(card));
+
+    expect(await within(card).findByRole("status")).toHaveTextContent(
+      "Contact saved",
+    );
+    expect(calls[0]?.body).toMatchObject({
+      phone: "0412 999 000",
+      emergencyContact: null,
+    });
+  });
+
+  it("pide el teléfono si el menor editó la propuesta y no lo escribió", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
+    const card = await openContact(user);
+
+    await user.type(within(card).getByLabelText("Contact name"), " Pérez");
+    await user.click(saveIn(card));
+
+    expect(within(card).getByLabelText("Contact phone")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it("guardar Sobre mí no gasta la propuesta", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
+    const about = await openAbout(user);
+    await user.click(saveIn(about));
+    await within(about).findByRole("status");
+
+    const card = await openContact(user);
+
+    expect(within(card).getByLabelText("Contact name")).toHaveValue(
+      "Marta Soto",
+    );
+  });
+
+  it("en español, la relación del tutor sale en español", async () => {
+    const user = userEvent.setup();
+    renderScreen({
+      locale: "es",
+      emergencyContactProposal: { guardianName: "Marta Soto" },
+    });
+    const card = contactCard("Contacto");
+
+    await user.click(
+      within(card).getByRole("button", { name: "Editar Contacto" }),
+    );
+
+    expect(within(card).getByLabelText("Relación")).toHaveValue("Tutor");
+  });
+});
+
+describe("perfil propio: una tarjeta abierta a la vez (#772)", () => {
+  it("sin cambios, abrir otra cierra la primera sin preguntar", async () => {
+    const confirm = vi.spyOn(window, "confirm");
+    const user = userEvent.setup();
+    renderScreen();
+    await openAbout(user);
+
+    const card = await openContact(user);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(within(aboutCard()).queryByLabelText("Full name")).toBeNull();
+    expect(within(card).getByLabelText(OWN_PHONE_LABEL)).toHaveFocus();
+    confirm.mockRestore();
+  });
+
+  it("con cambios, pregunta; si se descartan, abre la otra", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+    renderScreen();
+    const about = await openAbout(user);
+    await user.type(within(about).getByLabelText("Full name"), " Soto");
+
+    const card = await openContact(user);
+
+    expect(confirm).toHaveBeenCalledWith(
+      "You have changes you haven't saved. Discard them?",
+    );
+    expect(readValueOf(about, "Full name")).toBe("Nerea Ruiz");
+    expect(within(card).getByLabelText(OWN_PHONE_LABEL)).toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it("con cambios, si no se descartan, la primera sigue abierta con lo escrito", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const user = userEvent.setup();
+    renderScreen();
+    const about = await openAbout(user);
+    await user.type(within(about).getByLabelText("Full name"), " Soto");
+
+    await openContact(user);
+
+    expect(within(about).getByLabelText("Full name")).toHaveValue(
+      "Nerea Ruiz Soto",
+    );
+    expect(
+      within(contactCard()).queryByLabelText(OWN_PHONE_LABEL),
+    ).not.toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it("abrir otra mientras la primera guarda no la cierra al volver la respuesta", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    let answer: (response: Response) => void = () => undefined;
+    stubFetch(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    renderScreen();
+    const about = await openAbout(user);
+    await user.type(within(about).getByLabelText("Full name"), " Soto");
+    await user.click(saveIn(about));
+    const card = await openContact(user);
+    await user.type(within(card).getByLabelText(OWN_PHONE_LABEL), "0412");
+
+    answer(
+      jsonResponse(200, { data: { ...PROFILE, fullName: "Nerea Ruiz Soto" } }),
+    );
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(within(card).getByLabelText(OWN_PHONE_LABEL)).toHaveValue("0412");
+    expect(within(about).queryByRole("status")).not.toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it("escribir y deshacer lo escrito no cuenta como cambio", async () => {
+    const confirm = vi.spyOn(window, "confirm");
+    const user = userEvent.setup();
+    renderScreen();
+    const about = await openAbout(user);
+    await user.type(within(about).getByLabelText("Full name"), "x");
+    await user.type(within(about).getByLabelText("Full name"), "{Backspace}");
+
+    await openContact(user);
+
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it("la propuesta del tutor sin tocar no cuenta como cambio", async () => {
+    const confirm = vi.spyOn(window, "confirm");
+    const user = userEvent.setup();
+    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
+    await openContact(user);
+
+    await openAbout(user);
+
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it("pregunta en español", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const user = userEvent.setup();
+    renderScreen({ locale: "es" });
+    const about = aboutCard("Sobre mí");
+    await user.click(
+      within(about).getByRole("button", { name: "Editar Sobre mí" }),
+    );
+    await user.type(within(about).getByLabelText("Nombre completo"), " Soto");
+
+    await user.click(
+      within(contactCard("Contacto")).getByRole("button", {
+        name: "Editar Contacto",
+      }),
+    );
+
+    expect(confirm).toHaveBeenCalledWith(
+      "Tienes cambios sin guardar. ¿Los descartas?",
+    );
+    confirm.mockRestore();
   });
 });
 
@@ -1397,7 +1957,7 @@ describe("pantalla de perfil: la franja de lo que falta (#771)", () => {
     ["Phone", "Your phone (optional)"],
     ["Country", "Country"],
   ])(
-    "la ficha %s pone el foco en su campo del formulario",
+    "la ficha %s abre su tarjeta y pone el foco en su campo",
     async (item, field) => {
       const user = userEvent.setup();
       renderScreen({
@@ -1443,10 +2003,37 @@ describe("pantalla de perfil: la franja de lo que falta (#771)", () => {
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 
-  it("no impide guardar la ficha", () => {
+  it("con la tarjeta ya abierta, pone el foco en el campo", async () => {
+    const user = userEvent.setup();
     renderScreen({ profile: { ...PROFILE, emergencyContact: null } });
+    await openContact(user);
 
-    expect(saveButton()).toBeEnabled();
+    await user.click(
+      within(completionStrip()).getByRole("button", {
+        name: "Emergency contact",
+      }),
+    );
+
+    expect(screen.getByLabelText("Contact name")).toHaveFocus();
+  });
+
+  it("con otra tarjeta abierta y con cambios, pregunta antes de abrir", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const user = userEvent.setup();
+    renderScreen({ profile: { ...PROFILE, emergencyContact: null } });
+    const about = await openAbout(user);
+    await user.type(within(about).getByLabelText("Full name"), " Soto");
+
+    await user.click(
+      within(completionStrip()).getByRole("button", {
+        name: "Emergency contact",
+      }),
+    );
+
+    expect(confirm).toHaveBeenCalled();
+    expect(within(about).getByLabelText("Full name")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Contact name")).not.toBeInTheDocument();
+    confirm.mockRestore();
   });
 
   it("se lee en español", () => {
