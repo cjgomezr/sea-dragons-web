@@ -16,6 +16,7 @@ import {
 } from "@/lib/members/member-record";
 import { AufPendingStrip, type PendingAuf } from "./AufPendingStrip";
 import { MemberRecordAbout } from "./MemberRecordAbout";
+import { MemberRecordActions } from "./MemberRecordActions";
 import {
   FIELD_OF_CONTACT_ISSUE,
   MemberRecordContact,
@@ -314,10 +315,16 @@ export function MemberRecordForm({
   locale,
   record: initialRecord,
   clubGroups,
+  adminMenu,
+  adminPanel,
 }: {
   locale: Locale;
   record: MemberRecord;
   clubGroups: readonly Group[];
+  /** El ⋯ de la cabecera (#775). */
+  adminMenu: React.ReactNode;
+  /** Lo que abrió la última opción del ⋯, justo bajo la cabecera. */
+  adminPanel: React.ReactNode;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [record, setRecord] = useState(initialRecord);
@@ -411,7 +418,17 @@ export function MemberRecordForm({
         locale={locale}
         isOwnProfile={false}
         member={heroMemberOf(record, initialRecord)}
+        actions={
+          // Los botones de contacto leen la ficha guardada aquí: si el Admin
+          // acaba de corregir el teléfono, llaman al nuevo.
+          <MemberRecordActions
+            translate={translate}
+            reading={record}
+            adminMenu={adminMenu}
+          />
+        }
       />
+      {adminPanel}
       {pendingAuf === null ? null : (
         <AufPendingStrip
           translate={translate}

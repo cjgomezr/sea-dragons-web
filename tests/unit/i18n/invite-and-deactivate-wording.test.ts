@@ -57,8 +57,8 @@ describe("textos de invitar y desactivar", () => {
     ],
     ["newMember.submit", "Invitar miembro", "Invite member"],
     ["newMember.addAnother", "Invitar a otro miembro", "Invite another member"],
-    ["memberStatus.deactivate", "Desactivar cuenta", "Deactivate account"],
-    ["memberStatus.reactivate", "Reactivar cuenta", "Reactivate account"],
+    ["memberRecord.menu.deactivate", "Desactivar miembro", "Deactivate member"],
+    ["memberRecord.menu.reactivate", "Reactivar miembro", "Reactivate member"],
     ["directory.mark.inactive", "Desactivada", "Deactivated"],
   ])("%s dice «%s» y «%s»", (key, spanish, english) => {
     expect(messageCatalogs.es[key]).toBe(spanish);

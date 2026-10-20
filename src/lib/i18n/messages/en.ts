@@ -1110,14 +1110,22 @@ export const englishMessages = {
   "memberRecord.invitation.lead":
     "{name} hasn't activated their account yet. The invitation link expires after an hour, so you can send a new one.",
   "memberRecord.invitation.resent": "We sent {name} a new invitation.",
-  // Desactivar y reactivar la cuenta desde la ficha (#244, RF-6 del PRD de E5).
-  "memberStatus.title": "Membership",
-  "memberStatus.lead.active":
-    "{name} is a member of the club. Deactivating their account keeps their history, but they can no longer sign in or appear in the directory.",
-  "memberStatus.lead.inactive":
-    "{name}'s account is deactivated. Their history is kept, and reactivating it lets them sign in and appear in the directory again.",
-  "memberStatus.deactivate": "Deactivate account",
-  "memberStatus.reactivate": "Reactivate account",
+  // Las acciones de la cabecera de la ficha (#775, RF-2 y RF-6 del PRD de E30).
+  "memberRecord.contactActions": "Contact {name}",
+  "memberRecord.contactMissing": "{action} (none)",
+  "memberRecord.menu.open": "More actions",
+  "memberRecord.menu.changeRole": "Change role",
+  "memberRecord.menu.waive": "Waive membership fee",
+  "memberRecord.menu.removeWaiver": "Remove waiver",
+  "memberRecord.menu.resendInvitation": "Resend invitation",
+  "memberRecord.menu.deactivate": "Deactivate member",
+  "memberRecord.menu.reactivate": "Reactivate member",
+  "memberRecord.deactivation.prompt":
+    "Deactivate {name}? They won't be able to sign in. Their history stays and you can reactivate them later.",
+  "memberRecord.deactivation.cancel": "Cancel",
+  "memberRecord.deactivation.confirm": "Deactivate",
+  // Los avisos de desactivar y reactivar la cuenta desde la ficha (#244, RF-6
+  // del PRD de E5).
   "memberStatus.saving": "Saving…",
   "memberStatus.deactivated": "{name}'s account was deactivated.",
   "memberStatus.reactivated": "{name}'s account was reactivated.",

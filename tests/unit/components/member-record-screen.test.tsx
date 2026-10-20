@@ -263,6 +263,19 @@ function saveButton(): HTMLElement {
   return screen.getByRole("button", { name: /save the record|saving/i });
 }
 
+type User = ReturnType<typeof userEvent.setup>;
+
+/** Las acciones del Admin viven en el menú ⋯ de la cabecera (#775): se abre
+ * y se elige una. */
+async function chooseAdminAction(
+  user: User,
+  action: string,
+  menuLabel = "More actions",
+): Promise<void> {
+  await user.click(screen.getByRole("button", { name: menuLabel }));
+  await user.click(screen.getByRole("button", { name: action }));
+}
+
 beforeEach(() => {
   patches.length = 0;
   resends.length = 0;
@@ -655,8 +668,11 @@ describe("ficha en pantalla: invitación (#243)", () => {
 
   it("no ofrece reenviar la invitación a quien ya activó su cuenta", async () => {
     stubApi();
-
     await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "More actions" }));
 
     expect(
       screen.queryByRole("button", { name: "Resend invitation" }),
@@ -666,10 +682,10 @@ describe("ficha en pantalla: invitación (#243)", () => {
   it("reenvía la invitación a quien todavía no activó su cuenta", async () => {
     stubApi({ record: PENDING });
     await renderScreen();
+    const user = userEvent.setup();
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Resend invitation" }));
+    await chooseAdminAction(user, "Resend invitation");
+    await user.click(screen.getByRole("button", { name: "Resend invitation" }));
 
     expect(
       await screen.findByText("We sent Paula Player a new invitation."),
@@ -683,10 +699,10 @@ describe("ficha en pantalla: invitación (#243)", () => {
       resend: () => errorResponse(409, "conflict", "invitation_not_pending"),
     });
     await renderScreen();
+    const user = userEvent.setup();
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Resend invitation" }));
+    await chooseAdminAction(user, "Resend invitation");
+    await user.click(screen.getByRole("button", { name: "Resend invitation" }));
 
     expect(
       await screen.findByText(
@@ -699,37 +715,43 @@ describe("ficha en pantalla: invitación (#243)", () => {
 describe("ficha en pantalla: baja y reactivación (#244)", () => {
   const INACTIVE = { ...RECORD, accountStatus: "inactive" as const };
 
+  /** Elige Desactivar socio en el menú y confirma en la franja (#775). */
+  async function deactivate(user: User): Promise<void> {
+    await chooseAdminAction(user, "Deactivate member");
+    await user.click(screen.getByRole("button", { name: "Deactivate" }));
+  }
+
   it("da de baja a quien está activo y pasa a ofrecer reactivarle", async () => {
     stubApi();
     await renderScreen();
+    const user = userEvent.setup();
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Deactivate account" }));
+    await deactivate(user);
 
     expect(
       await screen.findByText("Paula Player's account was deactivated."),
     ).toBeVisible();
     expect(statusChanges).toEqual([{ status: "inactive" }]);
+    await user.click(screen.getByRole("button", { name: "More actions" }));
     expect(
-      screen.getByRole("button", { name: "Reactivate account" }),
+      screen.getByRole("button", { name: "Reactivate member" }),
     ).toBeInTheDocument();
   });
 
   it("reactiva a quien está de baja y vuelve a ofrecer la baja", async () => {
     stubApi({ record: INACTIVE });
     await renderScreen();
+    const user = userEvent.setup();
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Reactivate account" }));
+    await chooseAdminAction(user, "Reactivate member");
 
     expect(
       await screen.findByText("Paula Player's account was reactivated."),
     ).toBeVisible();
     expect(statusChanges).toEqual([{ status: "active" }]);
+    await user.click(screen.getByRole("button", { name: "More actions" }));
     expect(
-      screen.getByRole("button", { name: "Deactivate account" }),
+      screen.getByRole("button", { name: "Deactivate member" }),
     ).toBeInTheDocument();
   });
 
@@ -738,16 +760,16 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
       changeStatus: () => errorResponse(422, "business_rule", "last_admin"),
     });
     await renderScreen();
+    const user = userEvent.setup();
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Deactivate account" }));
+    await deactivate(user);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "This is the club's last Admin, so their account can't be deactivated. Name another Admin first.",
     );
+    await user.click(screen.getByRole("button", { name: "More actions" }));
     expect(
-      screen.getByRole("button", { name: "Deactivate account" }),
+      screen.getByRole("button", { name: "Deactivate member" }),
     ).toBeEnabled();
   });
 
@@ -758,9 +780,7 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     });
     await renderScreen();
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Deactivate account" }));
+    await deactivate(userEvent.setup());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "You can't deactivate your own account. Another Admin has to do it.",
@@ -771,9 +791,7 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     stubApi({ changeStatus: () => errorResponse(404, "not_found") });
     await renderScreen();
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Deactivate account" }));
+    await deactivate(userEvent.setup());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "That member isn't in the club.",
@@ -787,9 +805,7 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     });
     await renderScreen();
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Deactivate account" }));
+    await deactivate(userEvent.setup());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "The membership changed, but it couldn't be logged.",
@@ -806,9 +822,9 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     });
     await renderScreen();
     const user = userEvent.setup();
-    const button = screen.getByRole("button", { name: "Deactivate account" });
+    await chooseAdminAction(user, "Deactivate member");
 
-    await user.dblClick(button);
+    await user.dblClick(screen.getByRole("button", { name: "Deactivate" }));
 
     expect(statusChanges).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
@@ -821,19 +837,17 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
   it("sale en español", async () => {
     stubApi();
     await renderScreen("es");
+    const user = userEvent.setup();
 
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Membresía" }),
-    ).toBeInTheDocument();
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Desactivar cuenta" }));
+    await chooseAdminAction(user, "Desactivar miembro", "Más acciones");
+    await user.click(screen.getByRole("button", { name: "Desactivar" }));
 
     expect(
       await screen.findByText("La cuenta de Paula Player quedó desactivada."),
     ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Más acciones" }));
     expect(
-      screen.getByRole("button", { name: "Reactivar cuenta" }),
+      screen.getByRole("button", { name: "Reactivar miembro" }),
     ).toBeInTheDocument();
   });
 });
@@ -851,9 +865,7 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
   async function openWaiverDialog(
     user: ReturnType<typeof userEvent.setup>,
   ): Promise<HTMLElement> {
-    await user.click(
-      screen.getByRole("button", { name: "Waive membership fee" }),
-    );
+    await chooseAdminAction(user, "Waive membership fee");
     return screen.getByRole("dialog", {
       name: "Waive Paula Player's membership fee",
     });
@@ -960,8 +972,9 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
 
   it("enseña el motivo y la fecha de fin de un socio exento", async () => {
     stubApi({ record: WAIVED });
-
     await renderScreen();
+
+    await chooseAdminAction(userEvent.setup(), "Remove waiver");
 
     expect(screen.getByText("Reason: Head coach")).toBeInTheDocument();
     expect(screen.getByText("Ends on 1 March 2027")).toBeInTheDocument();
@@ -975,7 +988,7 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
     await renderScreen();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "Remove waiver" }));
+    await chooseAdminAction(user, "Remove waiver");
     const dialog = screen.getByRole("dialog", {
       name: "Remove Paula Player's waiver?",
     });
@@ -999,7 +1012,7 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
     await renderScreen();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "Remove waiver" }));
+    await chooseAdminAction(user, "Remove waiver");
     await user.click(
       within(screen.getByRole("dialog")).getByRole("button", {
         name: "Cancel",
@@ -1018,7 +1031,7 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
     await renderScreen();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "Remove waiver" }));
+    await chooseAdminAction(user, "Remove waiver");
     const dialog = screen.getByRole("dialog");
     await user.click(
       within(dialog).getByRole("button", { name: "Remove waiver" }),
@@ -1034,7 +1047,7 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
     await screen.findByRole("heading", { level: 1, name: "Paula Player" });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "Eximir de cuota" }));
+    await chooseAdminAction(user, "Eximir de la cuota", "Más acciones");
     const dialog = screen.getByRole("dialog", {
       name: "Eximir de cuota a Paula Player",
     });
@@ -1062,9 +1075,7 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
     await screen.findByRole("heading", { level: 1, name: "Paula Player" });
     const user = userEvent.setup();
 
-    await user.click(
-      screen.getByRole("button", { name: "Retirar la exención" }),
-    );
+    await chooseAdminAction(user, "Retirar la exención", "Más acciones");
 
     expect(
       screen.getByRole("dialog", {
@@ -1810,6 +1821,14 @@ describe("ficha en pantalla: rol (#549)", () => {
     });
   }
 
+  /** El control del rol sale al elegir Cambiar rol en el menú ⋯ (#775). */
+  async function renderRolePanel(locale: "en" | "es" = "en"): Promise<void> {
+    await renderScreen(locale);
+    await (locale === "en"
+      ? chooseAdminAction(userEvent.setup(), "Change role")
+      : chooseAdminAction(userEvent.setup(), "Cambiar rol", "Más acciones"));
+  }
+
   async function chooseRole(role: string): Promise<void> {
     const user = userEvent.setup();
     await user.selectOptions(roleControl(), role);
@@ -1819,7 +1838,7 @@ describe("ficha en pantalla: rol (#549)", () => {
   it("enseña un control con el rol del miembro", async () => {
     stubApi();
 
-    await renderScreen();
+    await renderRolePanel();
 
     expect(roleControl()).toHaveValue("Player");
     expect(saveRoleButton()).toBeDisabled();
@@ -1827,7 +1846,7 @@ describe("ficha en pantalla: rol (#549)", () => {
 
   it("al confirmar otro rol, lo guarda y lo dice", async () => {
     stubApi();
-    await renderScreen();
+    await renderRolePanel();
 
     await chooseRole("Committee");
 
@@ -1843,7 +1862,7 @@ describe("ficha en pantalla: rol (#549)", () => {
       record: { ...RECORD, role: "Admin" },
       changeRole: () => errorResponse(422, "business_rule", "last_admin"),
     });
-    await renderScreen();
+    await renderRolePanel();
 
     await chooseRole("Player");
 
@@ -1864,7 +1883,7 @@ describe("ficha en pantalla: rol (#549)", () => {
         return changedRole(body);
       },
     });
-    await renderScreen();
+    await renderRolePanel();
 
     await chooseRole("Coach");
 
@@ -1886,7 +1905,7 @@ describe("ficha en pantalla: rol (#549)", () => {
           answer = resolve;
         }),
     });
-    await renderScreen();
+    await renderRolePanel();
 
     await chooseRole("Coach");
 
@@ -1900,7 +1919,7 @@ describe("ficha en pantalla: rol (#549)", () => {
   it("un doble clic manda un solo cambio", async () => {
     const user = userEvent.setup();
     stubApi();
-    await renderScreen();
+    await renderRolePanel();
 
     await user.selectOptions(roleControl(), "Committee");
     await user.dblClick(saveRoleButton());
@@ -1911,7 +1930,7 @@ describe("ficha en pantalla: rol (#549)", () => {
 
   it("con un miembro que ya no está en el club lo dice del miembro", async () => {
     stubApi({ changeRole: () => errorResponse(404, "not_found") });
-    await renderScreen();
+    await renderRolePanel();
 
     await chooseRole("Coach");
 
@@ -1925,7 +1944,7 @@ describe("ficha en pantalla: rol (#549)", () => {
       changeRole: () =>
         errorResponse(422, "business_rule", "regla_desconocida"),
     });
-    await renderScreen();
+    await renderRolePanel();
 
     await chooseRole("Coach");
 
@@ -1938,8 +1957,7 @@ describe("ficha en pantalla: rol (#549)", () => {
   it("sale en español", async () => {
     stubApi();
 
-    render(<MemberRecordScreen locale="es" userId={MEMBER_ID} />);
-    await screen.findByRole("heading", { level: 1, name: "Paula Player" });
+    await renderRolePanel("es");
 
     expect(screen.getByRole("heading", { name: "Rol" })).toBeVisible();
     const role = roleControl("Rol de Paula Player");
@@ -2082,5 +2100,301 @@ describe("ficha en pantalla: la franja del AUF pendiente (#771)", () => {
     ).toHaveTextContent(
       "Paula Player añadió el AUF AUF-1 (vence el 31 de marzo de 2027). Revísalo y verifícalo.",
     );
+  });
+});
+
+describe("ficha en pantalla: los botones de contacto (#775)", () => {
+  function header(): HTMLElement {
+    return screen.getByRole("banner");
+  }
+
+  it("escribe, llama y llama al contacto de emergencia desde la cabecera", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(
+      within(header()).getByRole("link", { name: "Email Paula Player" }),
+    ).toHaveAttribute("href", "mailto:paula@example.com");
+    expect(
+      within(header()).getByRole("link", { name: "Call Paula Player" }),
+    ).toHaveAttribute("href", "tel:0412345678");
+    expect(
+      within(header()).getByRole("link", {
+        name: "Call Paula Player's emergency contact",
+      }),
+    ).toHaveAttribute("href", "tel:0499111222");
+  });
+
+  it("desactiva la llamada de quien no tiene teléfono y dice que no hay", async () => {
+    stubApi({ record: { ...RECORD, phone: null } });
+
+    await renderScreen();
+
+    expect(
+      within(header()).getByRole("button", {
+        name: "Call Paula Player (none)",
+      }),
+    ).toBeDisabled();
+  });
+
+  it("desactiva el contacto de emergencia de quien no lo tiene", async () => {
+    stubApi({ record: { ...RECORD, emergencyContact: null } });
+
+    await renderScreen();
+
+    expect(
+      within(header()).getByRole("button", {
+        name: "Call Paula Player's emergency contact (none)",
+      }),
+    ).toBeDisabled();
+  });
+
+  it("dice en español que no hay", async () => {
+    stubApi({ record: { ...RECORD, phone: null, emergencyContact: null } });
+
+    await renderScreen("es");
+
+    expect(
+      within(header()).getByRole("link", { name: "Escribir a Paula Player" }),
+    ).toBeInTheDocument();
+    expect(
+      within(header()).getByRole("button", {
+        name: "Llamar a Paula Player (no hay)",
+      }),
+    ).toBeDisabled();
+    expect(
+      within(header()).getByRole("button", {
+        name: "Llamar al contacto de emergencia de Paula Player (no hay)",
+      }),
+    ).toBeDisabled();
+  });
+});
+
+describe("ficha en pantalla: el menú ⋯ del Admin (#775)", () => {
+  const INCOMPLETE: MemberRecord = { ...RECORD, accountStatus: "incomplete" };
+
+  function moreButton(name = "More actions"): HTMLElement {
+    return within(screen.getByRole("banner")).getByRole("button", { name });
+  }
+
+  /** Las opciones del menú abierto, en orden, por su texto. */
+  function menuItemTexts(): string[] {
+    const menuId = moreButton().getAttribute("aria-controls");
+    const menu = document.getElementById(String(menuId));
+    if (menu === null) {
+      throw new Error("El menú no está abierto");
+    }
+    return within(menu)
+      .getAllByRole("button")
+      .map((item) => item.textContent ?? "");
+  }
+
+  it("abre con Cambiar rol (con el rol actual), Eximir y, tras una línea, Desactivar", async () => {
+    stubApi();
+    await renderScreen();
+
+    await userEvent.setup().click(moreButton());
+
+    expect(moreButton()).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("button", {
+        name: "Change role",
+        description: "Player",
+      }),
+    ).toBeInTheDocument();
+    expect(menuItemTexts()).toEqual([
+      "Change rolePlayer",
+      "Waive membership fee",
+      "Deactivate member",
+    ]);
+    expect(screen.getByRole("separator")).toBeInTheDocument();
+  });
+
+  it("ofrece reenviar la invitación sólo con la cuenta sin activar", async () => {
+    stubApi({ record: INCOMPLETE });
+    await renderScreen();
+
+    await userEvent.setup().click(moreButton());
+
+    expect(menuItemTexts()).toEqual([
+      "Change rolePlayer",
+      "Waive membership fee",
+      "Resend invitation",
+      "Deactivate member",
+    ]);
+  });
+
+  it("ofrece retirar la exención a quien está exento", async () => {
+    stubApi({
+      record: {
+        ...RECORD,
+        membershipStatus: "waived",
+        membershipWaiver: { reason: "Coach", until: null },
+      },
+    });
+    await renderScreen();
+
+    await userEvent.setup().click(moreButton());
+
+    expect(
+      screen.getByRole("button", { name: "Remove waiver" }),
+    ).toBeInTheDocument();
+  });
+
+  it("con un socio desactivado, la última opción es Reactivar socio", async () => {
+    stubApi({ record: { ...RECORD, accountStatus: "inactive" } });
+    await renderScreen();
+
+    await userEvent.setup().click(moreButton());
+
+    expect(menuItemTexts().at(-1)).toBe("Reactivate member");
+    expect(
+      screen.queryByRole("button", { name: "Deactivate member" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("se cierra con Escape y devuelve el foco a ⋯", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.click(moreButton());
+
+    await user.keyboard("{Escape}");
+
+    expect(moreButton()).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("button", { name: "Deactivate member" }),
+    ).not.toBeInTheDocument();
+    expect(moreButton()).toHaveFocus();
+  });
+
+  it("se cierra con un clic fuera y devuelve el foco a ⋯", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.click(moreButton());
+
+    await user.click(screen.getByRole("heading", { level: 1 }));
+
+    expect(moreButton()).toHaveAttribute("aria-expanded", "false");
+    expect(moreButton()).toHaveFocus();
+  });
+
+  it("se cierra al elegir, devuelve el foco a ⋯ y abre el control del rol", async () => {
+    stubApi();
+    await renderScreen();
+
+    await chooseAdminAction(userEvent.setup(), "Change role");
+
+    expect(moreButton()).toHaveAttribute("aria-expanded", "false");
+    expect(moreButton()).toHaveFocus();
+    expect(
+      screen.getByRole("combobox", { name: "Role for Paula Player" }),
+    ).toHaveValue("Player");
+  });
+
+  it("Eximir de la cuota abre su confirmación de hoy", async () => {
+    stubApi();
+    await renderScreen();
+
+    await chooseAdminAction(userEvent.setup(), "Waive membership fee");
+
+    expect(
+      screen.getByRole("dialog", {
+        name: "Waive Paula Player's membership fee",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("Desactivar socio pide confirmación en una franja", async () => {
+    stubApi();
+    await renderScreen();
+
+    await chooseAdminAction(userEvent.setup(), "Deactivate member");
+
+    expect(
+      screen.getByText(
+        "Deactivate Paula Player? They won't be able to sign in. Their history stays and you can reactivate them later.",
+      ),
+    ).toBeVisible();
+    expect(statusChanges).toEqual([]);
+  });
+
+  it("cancelar la franja no desactiva a nadie y la quita", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await chooseAdminAction(user, "Deactivate member");
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(statusChanges).toEqual([]);
+    expect(
+      screen.queryByText(/Deactivate Paula Player\?/),
+    ).not.toBeInTheDocument();
+    expect(moreButton()).toHaveFocus();
+  });
+
+  it("pide la confirmación en español", async () => {
+    stubApi();
+    await renderScreen("es");
+
+    await chooseAdminAction(
+      userEvent.setup(),
+      "Desactivar miembro",
+      "Más acciones",
+    );
+
+    expect(
+      screen.getByText(
+        "¿Desactivar a Paula Player? No podrá entrar. Su historial se queda y puedes reactivarlo después.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeVisible();
+  });
+
+  it("nombra en español las opciones del menú", async () => {
+    stubApi({ record: INCOMPLETE });
+    await renderScreen("es");
+
+    await userEvent.setup().click(moreButton("Más acciones"));
+
+    expect(
+      screen.getByRole("button", {
+        name: "Cambiar rol",
+        description: "Jugador",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Eximir de la cuota" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Reenviar invitación" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Desactivar miembro" }),
+    ).toBeInTheDocument();
+  });
+
+  it("los controles del Admin ya no salen sueltos fuera del menú", async () => {
+    stubApi({ record: INCOMPLETE });
+
+    await renderScreen();
+
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    for (const name of [
+      "Waive membership fee",
+      "Resend invitation",
+      "Deactivate account",
+      "Deactivate member",
+    ]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    for (const name of ["Role", "Membership fee", "Membership", "Invitation"]) {
+      expect(
+        screen.queryByRole("heading", { level: 2, name }),
+      ).not.toBeInTheDocument();
+    }
   });
 });
