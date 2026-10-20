@@ -3232,6 +3232,22 @@ describe("ficha en pantalla: en el móvil (#777)", () => {
     );
   });
 
+  it("Tab desde la última fila no saca el foco de la hoja", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.click(barMoreButton());
+    within(adminSheet())
+      .getByRole("button", { name: "Deactivate member" })
+      .focus();
+
+    await user.tab();
+
+    expect(adminSheet()).toContainElement(
+      document.activeElement as HTMLElement,
+    );
+  });
+
   it("se cierra con su asa y devuelve el foco al ⋯", async () => {
     stubApi();
     await renderScreen();

@@ -102,6 +102,7 @@ export function SeasonAttendanceCard({
   return (
     <SideCard
       headingId={headingId}
+      isSummary
       title={translate("memberAttendance.title")}
       action={
         <span className="profile-side-card-note">

@@ -3650,24 +3650,27 @@ a.auth-brand-header:focus-visible {
     gap: var(--space-2);
   }
 
-  .profile-aside > :nth-child(n + 3) {
+  .profile-aside > :not(.profile-side-card-summary) {
     grid-column: 1 / -1;
   }
 
-  .profile-aside > :nth-child(-n + 2) {
+  .profile-aside > .profile-side-card-summary {
     gap: var(--space-1);
     padding: 12px;
     border-radius: 12px;
   }
 
-  .profile-aside > :nth-child(-n + 2) .profile-side-card-note,
-  .profile-aside > :nth-child(-n + 2) .profile-membership-tile,
-  .profile-aside > :nth-child(-n + 2) .season-attendance-legend,
-  .profile-aside > :nth-child(-n + 2) .season-attendance-figures > :last-child {
+  .profile-aside > .profile-side-card-summary .profile-side-card-note,
+  .profile-aside > .profile-side-card-summary .profile-membership-tile,
+  .profile-aside > .profile-side-card-summary .season-attendance-legend,
+  .profile-aside
+    > .profile-side-card-summary
+    .season-attendance-figures
+    > :last-child {
     display: none;
   }
 
-  .app-main .profile-aside > :nth-child(-n + 2) h2 {
+  .app-main .profile-aside > .profile-side-card-summary h2 {
     font-size: 12.5px;
     font-weight: 400;
     color: var(--color-text-secondary);

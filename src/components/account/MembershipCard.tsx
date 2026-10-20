@@ -73,6 +73,7 @@ export function MembershipCard({
   return (
     <SideCard
       headingId={headingId}
+      isSummary
       title={translate("account.membership.title")}
       action={
         hasPaymentsLink ? (
