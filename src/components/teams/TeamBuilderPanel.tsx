@@ -4,6 +4,7 @@ import { Hand } from "@phosphor-icons/react/dist/ssr/Hand";
 import { Scales } from "@phosphor-icons/react/dist/ssr/Scales";
 import { useEffect, useId } from "react";
 import { Icon } from "@/components/Icon";
+import { useIsPhone } from "@/components/use-is-phone";
 import {
   formatCalendarDayParts,
   formatClockTime,
@@ -13,6 +14,7 @@ import type { Translator } from "@/lib/i18n/translator";
 import {
   ActionNotices,
   PublishConfirmation,
+  PublishSheet,
   SaveAndPublish,
 } from "./TeamActions";
 import {
@@ -27,6 +29,7 @@ import {
   hasUnsavedChanges,
 } from "./team-draft";
 import { BenchLists, TeamColumns } from "./TeamLists";
+import { PhoneBoard, PhoneSaveBar } from "./TeamPhoneBoard";
 import { SwapSuggestion, TotalsBar } from "./TeamSummary";
 import {
   type BuilderState,
@@ -44,6 +47,10 @@ import {
  * Se monta de nuevo con cada evento (la pantalla le pone su id como clave),
  * así lo movido en uno no se cuela en otro. Por eso el selector vive aquí:
  * es el que sabe si hay cambios que descartar antes de irse.
+ *
+ * En el móvil (#762) el reparto va en pestañas, Auto-balance es un botón de
+ * icono junto al título, los totales van en la cabecera y Guardar y
+ * Publicar quedan fijos abajo.
  */
 
 type ReadyState = Extract<BuilderState, { kind: "ready" }>;
@@ -124,6 +131,30 @@ function BalanceControl({
   );
 }
 
+/** Auto-balance en la cabecera del móvil: sólo el icono, con su nombre. */
+function BalanceIconButton({
+  translate,
+  controls,
+  state,
+}: {
+  readonly translate: Translator;
+  readonly controls: TeamBuilderControls;
+  readonly state: ReadyState;
+}): React.JSX.Element {
+  const isBalancing = state.action.kind === "balancing";
+  return (
+    <button
+      type="button"
+      className="team-balance-icon"
+      aria-label={translate(isBalancing ? "teams.balancing" : "teams.balance")}
+      aria-busy={isBalancing}
+      onClick={() => void controls.balance()}
+    >
+      <Icon glyph={Scales} />
+    </button>
+  );
+}
+
 /** A dónde fue un jugador, o null si salió de los equipos sin volver a
  * ninguna lista (un asignado que ya no estaba en la escuadra). */
 function destinationName(
@@ -194,21 +225,26 @@ function assignedCount(draft: TeamDraft): number {
   return draft.assignments.length;
 }
 
+/** La pregunta antes de publicar: en la página o, en el móvil, en una hoja
+ * inferior. */
 function Publishing({
   translate,
   controls,
   state,
+  isPhone,
 }: {
   readonly translate: Translator;
   readonly controls: TeamBuilderControls;
   readonly state: ReadyState;
+  readonly isPhone: boolean;
 }): React.JSX.Element | null {
   const { kind } = state.action;
   if (kind !== "confirmingPublish" && kind !== "publishing") {
     return null;
   }
+  const Question = isPhone ? PublishSheet : PublishConfirmation;
   return (
-    <PublishConfirmation
+    <Question
       translate={translate}
       assignedCount={assignedCount(state.draft)}
       wasPublished={state.draft.publishedAt !== null}
@@ -236,6 +272,31 @@ function MoveAnnouncer({
   );
 }
 
+function SuggestionFor({
+  translate,
+  controls,
+  draft,
+}: {
+  readonly translate: Translator;
+  readonly controls: TeamBuilderControls;
+  readonly draft: TeamDraft;
+}): React.JSX.Element | null {
+  const suggestion = draftSuggestion(draft);
+  if (suggestion === null) {
+    return null;
+  }
+  return (
+    <SwapSuggestion
+      translate={translate}
+      teams={draft.teams}
+      suggestion={suggestion}
+      onApply={() =>
+        controls.swap(suggestion.fromA.userId, suggestion.fromB.userId)
+      }
+    />
+  );
+}
+
 function SplitBoard({
   translate,
   controls,
@@ -247,7 +308,6 @@ function SplitBoard({
 }): React.JSX.Element {
   const { draft } = state;
   const totals = draftTotals(draft);
-  const suggestion = draftSuggestion(draft);
   return (
     <>
       <TotalsBar translate={translate} teams={draft.teams} totals={totals} />
@@ -258,16 +318,7 @@ function SplitBoard({
         onMove={controls.move}
         onChangeTeams={controls.changeTeams}
       />
-      {suggestion === null ? null : (
-        <SwapSuggestion
-          translate={translate}
-          teams={draft.teams}
-          suggestion={suggestion}
-          onApply={() =>
-            controls.swap(suggestion.fromA.userId, suggestion.fromB.userId)
-          }
-        />
-      )}
+      <SuggestionFor translate={translate} controls={controls} draft={draft} />
       <BenchLists translate={translate} draft={draft} onMove={controls.move} />
     </>
   );
@@ -340,10 +391,72 @@ function ReadyBuilder({
           state={state}
         />
       </div>
-      <Publishing translate={translate} controls={controls} state={state} />
+      <Publishing
+        translate={translate}
+        controls={controls}
+        state={state}
+        isPhone={false}
+      />
       <ActionNotices translate={translate} action={state.action} />
       <MoveAnnouncer translate={translate} state={state} />
       <SplitBoard translate={translate} controls={controls} state={state} />
+    </>
+  );
+}
+
+function PhoneReadyBuilder({
+  translate,
+  controls,
+  state,
+  event,
+  picker,
+  saveAndPublish,
+}: {
+  readonly translate: Translator;
+  readonly controls: TeamBuilderControls;
+  readonly state: ReadyState;
+  readonly event: BuildableEvent;
+  readonly picker: React.ReactNode;
+  readonly saveAndPublish: React.ReactNode;
+}): React.JSX.Element {
+  const { draft } = state;
+  const totals = draftTotals(draft);
+  return (
+    <>
+      <Heading translate={translate} event={event}>
+        <BalanceIconButton
+          translate={translate}
+          controls={controls}
+          state={state}
+        />
+        <TotalsBar translate={translate} teams={draft.teams} totals={totals} />
+      </Heading>
+      {picker}
+      <Publishing
+        translate={translate}
+        controls={controls}
+        state={state}
+        isPhone
+      />
+      <ActionNotices translate={translate} action={state.action} />
+      <MoveAnnouncer translate={translate} state={state} />
+      <PhoneBoard
+        translate={translate}
+        draft={draft}
+        totals={totals}
+        suggestion={
+          <SuggestionFor
+            translate={translate}
+            controls={controls}
+            draft={draft}
+          />
+        }
+        onMove={controls.move}
+        onChangeTeams={controls.changeTeams}
+      />
+      <PhoneSaveBar hasChanges={hasUnsavedChanges(draft)}>
+        {saveAndPublish}
+      </PhoneSaveBar>
     </>
   );
 }
@@ -360,6 +473,7 @@ export function TeamBuilderPanel({
   readonly onChooseEvent: (eventId: string) => void;
 }): React.JSX.Element {
   const controls = useTeamBuilder(event.id);
+  const isPhone = useIsPhone();
   const { state } = controls;
   const hasChanges = state.kind === "ready" && hasUnsavedChanges(state.draft);
   useWarnBeforeLeaving(hasChanges);
@@ -384,19 +498,33 @@ export function TeamBuilderPanel({
       onChoose={chooseEvent}
     />
   );
+  const saveAndPublish =
+    state.kind === "ready" ? (
+      <SaveAndPublish
+        translate={translate}
+        action={state.action}
+        hasChanges={hasChanges}
+        assignedCount={assignedCount(state.draft)}
+        onSave={() => void controls.save()}
+        onAskToPublish={controls.askToPublish}
+      />
+    ) : null;
+  if (isPhone && state.kind === "ready") {
+    return (
+      <PhoneReadyBuilder
+        translate={translate}
+        controls={controls}
+        state={state}
+        event={event}
+        picker={picker}
+        saveAndPublish={saveAndPublish}
+      />
+    );
+  }
   return (
     <>
       <Heading translate={translate} event={event}>
-        {state.kind === "ready" ? (
-          <SaveAndPublish
-            translate={translate}
-            action={state.action}
-            hasChanges={hasChanges}
-            assignedCount={assignedCount(state.draft)}
-            onSave={() => void controls.save()}
-            onAskToPublish={controls.askToPublish}
-          />
-        ) : null}
+        {saveAndPublish}
       </Heading>
       {state.kind === "loading" ? (
         <p className="admin-empty">{translate("teams.loadingSquad")}</p>

@@ -1641,9 +1641,13 @@ describe("editar un equipo (#760)", () => {
     return within(editor()).getByRole("button", { name: "Apply" });
   }
 
+  /** En el móvil el banco va en su pestaña (#762): se espera al lápiz, que
+   * está en la pestaña del equipo A, la que abre. */
   async function openEditor(): Promise<void> {
-    await openScreen();
-    await userEvent.click(editButton());
+    render(<TeamBuilderScreen locale="en" />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: EDIT_KELP }),
+    );
     await within(editor()).findByRole("textbox", { name: "Name" });
   }
 
@@ -1987,5 +1991,298 @@ describe("editar un equipo (#760)", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(
       "Equipo actualizado · se usa en todos los eventos desde ahora",
     );
+  });
+});
+
+describe("en el móvil (#762)", () => {
+  /** Kelp con Mateo (Ataque, 9) y Daniela (8), Tide con Ethan (Ataque, sin
+   * evaluar) y Ruby en "Quizás". */
+  const ETHAN_FORWARD = { ...ETHAN, position: FORWARD };
+  const PHONE_BUILDER = builderFor(SCRIMMAGE, {
+    available: [DANIELA, ETHAN_FORWARD, MATEO],
+    split: {
+      mode: "manual",
+      publishedAt: null,
+      assignments: [
+        assigned(DANIELA, "a"),
+        assigned(ETHAN_FORWARD, "b"),
+        assigned(MATEO, "a"),
+      ],
+    },
+  });
+
+  async function openPhoneScreen(locale: "en" | "es" = "en"): Promise<void> {
+    stubScreenWidth(true);
+    stubClub({ builders: [PHONE_BUILDER, builderFor(COMPETITION)] });
+    render(<TeamBuilderScreen locale={locale} />);
+    await screen.findByRole("tablist");
+  }
+
+  function tab(name: RegExp): HTMLElement {
+    return screen.getByRole("tab", { name });
+  }
+
+  function phoneBar(): HTMLElement {
+    const bar = saveButton().closest(".team-phone-bar");
+    if (!(bar instanceof HTMLElement)) {
+      throw new Error("Guardar no está en la barra fija del móvil.");
+    }
+    return bar;
+  }
+
+  function phoneRow(name: string): HTMLElement {
+    return playerRow(screen.getByRole("tabpanel"), name);
+  }
+
+  it("lleva en la cabecera el título, Auto-balance como botón de icono y los totales", async () => {
+    await openPhoneScreen();
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveTextContent("Sat 19 Jun · Scrimmage");
+    const header = heading.closest("header");
+    if (header === null) {
+      throw new Error("El título no está en la cabecera.");
+    }
+    expect(header).toHaveTextContent("Teams");
+    expect(
+      within(header).getByRole("button", { name: "Auto-balance" }),
+    ).toHaveTextContent("");
+    expect(
+      within(header).getByRole("group", { name: "Totals" }),
+    ).toHaveTextContent("Team Kelp 17.0 12.0 apart 5.0 Team Tide");
+  });
+
+  it("pone tres pestañas con el nombre corto, el banco y cuántos hay en cada una", async () => {
+    await openPhoneScreen();
+
+    const tabs = within(
+      screen.getByRole("tablist", { name: "Teams and bench" }),
+    ).getAllByRole("tab");
+
+    expect(tabs[0]).toHaveAccessibleName("Kelp 2 players");
+    expect(tabs[1]).toHaveAccessibleName("Tide 1 player");
+    expect(tabs[2]).toHaveAccessibleName("Bench 1 player");
+    expect(tabs.map((each) => each.getAttribute("aria-selected"))).toEqual([
+      "true",
+      "false",
+      "false",
+    ]);
+  });
+
+  it("enseña sólo el contenido de la pestaña elegida", async () => {
+    await openPhoneScreen();
+    expect(region("Team Kelp")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Team Tide" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Maybe" })).toBeNull();
+
+    await userEvent.click(tab(/^Bench/));
+
+    expect(tab(/^Bench/)).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: /^Bench/ })).toBeVisible();
+    expect(region("Available · Going")).toBeInTheDocument();
+    expect(region("Maybe")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Team Kelp" })).toBeNull();
+  });
+
+  it("mueve entre pestañas con las flechas, Inicio y Fin", async () => {
+    await openPhoneScreen();
+    tab(/^Kelp/).focus();
+
+    await userEvent.keyboard("{ArrowRight}");
+    expect(tab(/^Tide/)).toHaveFocus();
+    expect(tab(/^Tide/)).toHaveAttribute("aria-selected", "true");
+    expect(region("Team Tide")).toBeInTheDocument();
+
+    await userEvent.keyboard("{End}");
+    expect(tab(/^Bench/)).toHaveFocus();
+
+    await userEvent.keyboard("{ArrowRight}");
+    expect(tab(/^Kelp/)).toHaveFocus();
+
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(tab(/^Bench/)).toHaveFocus();
+
+    await userEvent.keyboard("{Home}");
+    expect(tab(/^Kelp/)).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("lleva en la pestaña del equipo su tarjeta con el resumen, editar y la cobertura", async () => {
+    await openPhoneScreen();
+
+    const card = region("Team Kelp");
+    expect(card).toHaveTextContent("2 players · avg 8.5");
+    expect(
+      within(card).getByRole("button", {
+        name: "Edit name and colour of Team Kelp",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByRole("list", { name: "Position coverage" }),
+    ).toBeInTheDocument();
+  });
+
+  it("escribe en cada fila la posición y el OVR, o Sin evaluar, y Cambiar y Quitar", async () => {
+    await openPhoneScreen();
+
+    const mateo = phoneRow("Mateo Restrepo");
+    expect(mateo).toHaveTextContent("Forward · OVR 9.0");
+    expect(phoneRow("Daniela Vargas")).toHaveTextContent("OVR 8.0");
+    expect(
+      within(mateo).getByRole("button", {
+        name: "Move Mateo Restrepo to Team Tide",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(mateo).getByRole("button", {
+        name: "Remove Mateo Restrepo from Team Kelp",
+      }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(tab(/^Tide/));
+
+    expect(phoneRow("Ethan Brown")).toHaveTextContent("Forward · Unrated");
+  });
+
+  it("da en el banco un botón por equipo con su punto y +, que dice a quién añade", async () => {
+    await openPhoneScreen();
+    await userEvent.click(tab(/^Bench/));
+
+    const ruby = phoneRow("Ruby Tan");
+    for (const team of ["Team Kelp", "Team Tide"]) {
+      const add = within(ruby).getByRole("button", {
+        name: `Add Ruby Tan to ${team}`,
+      });
+      expect(add).toHaveTextContent("");
+      expect(add.querySelector("svg")).not.toBeNull();
+    }
+  });
+
+  it("añade desde el banco sin salir de la pestaña y cambia los números", async () => {
+    await openPhoneScreen();
+    await userEvent.click(tab(/^Bench/));
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Add Ruby Tan to Team Kelp" }),
+    );
+
+    expect(tab(/^Bench/)).toHaveAttribute("aria-selected", "true");
+    expect(tab(/^Kelp/)).toHaveAccessibleName("Kelp 3 players");
+    expect(tab(/^Bench/)).toHaveAccessibleName("Bench 0 players");
+  });
+
+  it("deja Guardar y Publicar en la barra fija, sin aviso mientras no hay cambios", async () => {
+    await openPhoneScreen();
+
+    expect(
+      within(phoneBar()).getByRole("button", { name: "Save" }),
+    ).toBeInTheDocument();
+    expect(
+      within(phoneBar()).getByRole("button", { name: "Publish" }),
+    ).toBeInTheDocument();
+    expect(phoneBar()).not.toHaveClass("team-phone-bar-unsaved");
+  });
+
+  it("marca la barra y Guardar en cuanto hay cambios sin guardar", async () => {
+    await openPhoneScreen();
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Remove Mateo Restrepo from Team Kelp",
+      }),
+    );
+
+    expect(phoneBar()).toHaveClass("team-phone-bar-unsaved");
+    expect(saveButton()).toHaveTextContent("Save · Unsaved");
+  });
+
+  it("pregunta en una hoja inferior antes de publicar, con el texto del escritorio", async () => {
+    await openPhoneScreen();
+
+    await userEvent.click(publishButton());
+
+    const sheet = screen.getByRole("dialog", { name: PUBLISH_QUESTION });
+    expect(sheet.tagName).toBe("DIALOG");
+    expect(sheet).toHaveClass("directory-sheet");
+    expect(sheet).toContainElement(document.activeElement as HTMLElement);
+    expect(
+      within(sheet).getByRole("button", { name: "Cancel" }),
+    ).toBeInTheDocument();
+  });
+
+  it("no deja salir el foco de la hoja con el tabulador", async () => {
+    await openPhoneScreen();
+    await userEvent.click(publishButton());
+    const sheet = screen.getByRole("dialog", { name: PUBLISH_QUESTION });
+    within(sheet).getByRole("button", { name: "Publish" }).focus();
+
+    await userEvent.tab();
+
+    expect(sheet).toContainElement(document.activeElement as HTMLElement);
+  });
+
+  it("publica desde la hoja y la cierra", async () => {
+    await openPhoneScreen();
+    await userEvent.click(publishButton());
+
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Publish",
+      }),
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Published · 3 players notified",
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(writes().map((write) => write.path)).toEqual([
+      `${builderPath(SCRIMMAGE.id)}/publication`,
+    ]);
+  });
+
+  it("devuelve el foco a Publicar al publicar desde la hoja", async () => {
+    await openPhoneScreen();
+    await userEvent.click(publishButton());
+
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Publish",
+      }),
+    );
+
+    await screen.findByText("Published · 3 players notified");
+    expect(publishButton()).toHaveFocus();
+  });
+
+  it("cierra la hoja con Cancelar sin publicar", async () => {
+    await openPhoneScreen();
+    await userEvent.click(publishButton());
+
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Cancel",
+      }),
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(writes()).toEqual([]);
+  });
+
+  it("nombra las pestañas en español", async () => {
+    await openPhoneScreen("es");
+
+    expect(
+      screen.getByRole("tablist", { name: "Equipos y banco" }),
+    ).toBeInTheDocument();
+    expect(tab(/^Banco/)).toHaveAccessibleName("Banco 1 jugador");
+    expect(phoneRow("Mateo Restrepo")).toHaveTextContent("Ataque · OVR 9,0");
+  });
+
+  it("en el escritorio no hay pestañas ni barra fija", async () => {
+    stubClub();
+
+    await openScreen();
+
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(saveButton().closest(".team-phone-bar")).toBeNull();
   });
 });
