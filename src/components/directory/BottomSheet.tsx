@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { cycleFocus, focusableIn } from "@/components/focus-cycle";
+import { wasLastInputPointer } from "@/components/input-modality";
 import { useDismissal } from "@/components/use-dismissal";
 import { useSheetDrag } from "./use-sheet-drag";
 
@@ -28,9 +29,14 @@ import { useSheetDrag } from "./use-sheet-drag";
  */
 
 /** Quien abre la hoja con el teclado deja el foco con su contorno en el
- * botón o la fila que la abre; un toque no. */
+ * botón o la fila que la abre; un toque no. El contorno solo no basta: tras
+ * un toque, Safari también lo pinta en la fila a la que se devolvió el foco
+ * al cerrar la hoja anterior, y la siguiente se abría como con el teclado. */
 function isOpenedFromKeyboard(): boolean {
-  return document.activeElement?.matches(":focus-visible") === true;
+  return (
+    !wasLastInputPointer() &&
+    document.activeElement?.matches(":focus-visible") === true
+  );
 }
 
 /** El asa de arriba: se toca o se arrastra hacia abajo para cerrar, como en

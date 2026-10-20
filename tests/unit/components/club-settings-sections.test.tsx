@@ -1,7 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OPEN_ACCOUNT_MENU_EVENT } from "@/components/AccountMenu";
 import { ClubSettingsScreen } from "@/components/club/ClubSettingsScreen";
 import type { ClubSettings } from "@/lib/club/club-settings";
 import type { Locale } from "@/lib/i18n/locale";
@@ -16,10 +15,14 @@ import { stubScreenWidth } from "../../support/screen-width";
  * Playwright.
  */
 
-const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
+const { refresh, back, push } = vi.hoisted(() => ({
+  refresh: vi.fn(),
+  back: vi.fn(),
+  push: vi.fn(),
+}));
 vi.mock("next/navigation", async () => ({
   ...(await import("../../support/location-search-params")),
-  useRouter: () => ({ refresh }),
+  useRouter: () => ({ refresh, back, push }),
 }));
 
 const SETTINGS_PATH = "/api/v1/club/settings";
@@ -361,9 +364,7 @@ describe("la lista de un Admin en el móvil", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Club settings" }),
     ).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: "Back to My account" }),
-    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Back" })).toBeVisible();
     expect(screen.getByText(CLUB.name)).toBeVisible();
     expect(screen.getByText("Only Admins see this.")).toBeVisible();
     for (const name of TAB_NAMES) {
@@ -456,16 +457,61 @@ describe("la lista de un Admin en el móvil", () => {
     expect(sectionRow("General")).toBeVisible();
   });
 
-  it("volver a la cuenta abre el menú de la cuenta", async () => {
-    const openMenu = vi.fn();
-    window.addEventListener(OPEN_ACCOUNT_MENU_EVENT, openMenu);
-    renderScreen();
+  // Volver reabría el menú de la cuenta, y desde él sólo se iba al perfil
+  // o aquí otra vez: no había camino al inicio.
+  describe("volver", () => {
+    beforeEach(() => {
+      back.mockReset();
+      push.mockReset();
+    });
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Back to My account" }),
-    );
+    // Volver a la lista dejaba otra entrada de /club en la historia, y el
+    // atrás de la lista caía en la sección que se acababa de dejar.
+    it("tras abrir una sección y volver a la lista, sale del club sin pasar por la sección", async () => {
+      window.history.pushState(null, "", "/dashboard");
+      window.history.pushState(null, "", "/club");
+      vi.stubGlobal("navigation", { canGoBack: true });
+      back.mockImplementation(() => window.history.back());
+      renderScreen();
+      await userEvent.click(sectionRow("General"));
+      await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+      await screen.findByRole("heading", { level: 1, name: "Club settings" });
 
-    expect(openMenu).toHaveBeenCalledOnce();
-    window.removeEventListener(OPEN_ACCOUNT_MENU_EVENT, openMenu);
+      await userEvent.click(screen.getByRole("button", { name: "Back" }));
+
+      await waitFor(() => expect(window.location.pathname).toBe("/dashboard"));
+    });
+
+    it("con la sección en la dirección, volver a la lista no deja otra entrada en la historia", async () => {
+      visit("/club?tab=general");
+      const pushState = vi.spyOn(window.history, "pushState");
+      renderScreen();
+
+      await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+      expect(window.location.search).toBe("");
+      expect(pushState).not.toHaveBeenCalled();
+      pushState.mockRestore();
+    });
+
+    it("vuelve a la pantalla de la que se vino", async () => {
+      vi.stubGlobal("navigation", { canGoBack: true });
+      renderScreen();
+
+      await userEvent.click(screen.getByRole("button", { name: "Back" }));
+
+      expect(back).toHaveBeenCalledOnce();
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("sin pantalla anterior lleva al inicio", async () => {
+      vi.stubGlobal("navigation", { canGoBack: false });
+      renderScreen();
+
+      await userEvent.click(screen.getByRole("button", { name: "Back" }));
+
+      expect(push).toHaveBeenCalledWith("/dashboard");
+      expect(back).not.toHaveBeenCalled();
+    });
   });
 });
