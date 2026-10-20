@@ -17017,11 +17017,91 @@ a.agenda-take-attendance {
   border-radius: 3px;
 }
 
+/* La tarjeta de un equipo (#759): la tira de 4 px de su color arriba y, por
+   dentro, la cabecera, la cobertura y las filas a todo el ancho. El color
+   llega en línea como `--team-color`, igual que en `.event-teams`. */
+.team-column {
+  padding: 0;
+  overflow: hidden;
+  border-top: 4px solid var(--team-color);
+  border-radius: 12px;
+}
+
+.team-column-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+}
+
+.team-column-swatch {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  background: var(--team-color);
+  border-radius: 6px;
+}
+
+.team-column-heading {
+  min-width: 0;
+}
+
+.team-column-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
 .team-column-summary {
-  margin: var(--space-1) 0 var(--space-2);
-  font-family: var(--font-family-mono);
-  font-size: 12px;
+  margin: 2px 0 0;
+  font-size: 12.5px;
   color: var(--color-text-secondary);
+}
+
+.team-coverage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
+  list-style: none;
+}
+
+.team-coverage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 24px;
+  padding: 0 var(--space-2);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+/* El amarillo del tema claro no llega a AA como texto sobre el panel (ver
+   `.directory-mark-warning`): el texto se mezcla con el del tema, como
+   `.team-totals-apart`, y el aviso puro va en el fondo y el borde. */
+.team-coverage-missing {
+  color: color-mix(in srgb, var(--color-warning) 50%, var(--color-text));
+  background: color-mix(in srgb, var(--color-warning) 18%, var(--color-panel));
+  border-color: var(--color-warning);
+}
+
+.team-column .team-list {
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.team-column .team-list-empty {
+  margin: 0;
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
 }
 
 .team-list {
@@ -17145,6 +17225,82 @@ a.agenda-take-attendance {
   border-color: var(--color-accent);
 }
 
+/* La fila de un jugador dentro de un equipo (#759): avatar, nombre y
+   posición, OVR y los dos botones de icono. Por debajo de 1200px la tarjeta
+   es estrecha y los botones bajan a su línea, a la derecha, para que el
+   nombre no se quede en tres letras; a 1200px va todo en una sola. Lleva
+   las dos clases para ganarle a la rejilla de `.team-player`. */
+.team-player.team-player-assigned {
+  grid-template-columns: 36px minmax(0, 1fr) 40px;
+  gap: 2px 10px;
+  min-height: 48px;
+  padding: 6px var(--space-2) 6px var(--space-4);
+}
+
+.team-player-assigned:hover {
+  background: var(--color-hover);
+}
+
+.team-player-assigned .team-avatar {
+  justify-self: center;
+}
+
+.team-player-assigned .team-player-name {
+  overflow: hidden;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-player-assigned .team-position {
+  padding: 0;
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+  background: none;
+}
+
+.team-player-assigned .team-rating {
+  font-size: 14px;
+  text-align: right;
+}
+
+.team-rating-missing {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.team-player-assigned .team-moves {
+  grid-column: 2 / -1;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.team-icon-move {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.team-icon-move:hover {
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.team-icon-remove:hover {
+  color: var(--color-danger);
+}
+
 .team-suggestion {
   display: flex;
   flex-wrap: wrap;
@@ -17265,6 +17421,11 @@ a.agenda-take-attendance {
   .team-move {
     min-height: 32px;
   }
+
+  .team-icon-move {
+    width: 32px;
+    height: 32px;
+  }
 }
 
 /* Con las columnas anchas, los botones caben en la fila del jugador. */
@@ -17276,6 +17437,15 @@ a.agenda-take-attendance {
   .team-moves {
     grid-column: auto;
     flex-wrap: nowrap;
+  }
+
+  .team-player.team-player-assigned {
+    grid-template-columns: 36px minmax(0, 1fr) 40px auto;
+    gap: 0 10px;
+  }
+
+  .team-player-assigned .team-moves {
+    grid-column: auto;
   }
 }
 
@@ -17392,11 +17562,6 @@ a.dashboard-tile:hover {
   min-width: 0;
 }
 
-.dashboard-panels {
-  display: grid;
-  gap: var(--space-4);
-}
-
 .dashboard-panel {
   display: flex;
   flex-direction: column;
@@ -17435,8 +17600,7 @@ a.dashboard-tile:hover {
   text-decoration: underline;
 }
 
-.dashboard-event-list,
-.dashboard-news-list {
+.dashboard-event-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -17485,31 +17649,6 @@ a.dashboard-tile:hover {
   flex: 0 0 auto;
 }
 
-.dashboard-news {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-1);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.dashboard-news-link {
-  font-weight: 700;
-  color: var(--color-text);
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-
-.dashboard-news-link:hover {
-  text-decoration: underline;
-}
-
-.dashboard-news-when {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
 @media (min-width: 768px) {
   .dashboard-training-card {
     display: none;
@@ -17540,11 +17679,6 @@ a.dashboard-tile:hover {
 @media (min-width: 1024px) {
   .dashboard-tile-list {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .dashboard-panels {
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-    align-items: start;
   }
 }
 
@@ -18857,7 +18991,8 @@ a.dashboard-club-cell-body:focus-visible {
   color: var(--color-text-secondary);
 }
 
-.dashboard-week-unavailable {
+.dashboard-week-unavailable,
+.dashboard-news-unavailable {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -18865,7 +19000,8 @@ a.dashboard-club-cell-body:focus-visible {
   gap: var(--space-3);
 }
 
-.dashboard-week-unavailable p {
+.dashboard-week-unavailable p,
+.dashboard-news-unavailable p {
   margin: 0;
   color: var(--color-text-secondary);
 }
@@ -18907,5 +19043,245 @@ a.dashboard-club-cell-body:focus-visible {
 
   .dashboard-week-end-place {
     display: none;
+  }
+}
+
+/* Las noticias del inicio (#751, RF-7 del PRD de E27; handoff de E27,
+   sección News). La destacada y las pequeñas van lado a lado, `1.35fr | 1fr`,
+   sólo cuando la sección mide lo que mide en escritorio: más estrecha, la
+   destacada se queda sin sitio para el texto al lado de su portada de 240px.
+   En el móvil la portada va encima, de 120px, y las miniaturas bajan de 64px
+   a 56px. Como en el feed, el título cubre la tarjeta con su ::after. */
+.dashboard-news {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  container: dashboard-news / inline-size;
+}
+
+.dashboard-news-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.dashboard-news-featured,
+.dashboard-news-mini {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-news-featured:has(.dashboard-news-link:focus-visible),
+.dashboard-news-mini:has(.dashboard-news-link:focus-visible),
+.dashboard-news-title-row:has(.dashboard-news-link:focus-visible) {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.dashboard-news-featured {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dashboard-news-featured-cover {
+  display: flex;
+  height: 120px;
+}
+
+.dashboard-news-featured-cover > *,
+.dashboard-news-thumbnail > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-news-featured-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+}
+
+.dashboard-news-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* En la línea de la categoría el nombre va como texto, como en el handoff,
+   no en la etiqueta con fondo del feed. */
+.dashboard-news-meta .news-category {
+  padding: 0;
+  font-size: inherit;
+  font-weight: 400;
+  color: inherit;
+  background: none;
+}
+
+/* La chincheta va en el aviso; la palabra, en el color del texto, que el
+   aviso del tema claro no llega a AA con 11px. */
+.dashboard-news-pinned {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-right: var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  vertical-align: middle;
+}
+
+.dashboard-news-pinned svg {
+  flex: none;
+  color: var(--color-warning);
+}
+
+.dashboard-news-featured-title,
+.dashboard-news-mini-title {
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-news-featured-title {
+  font-size: 17px;
+}
+
+.dashboard-news-mini-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 14px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.dashboard-news-excerpt {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.dashboard-news-link {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.dashboard-news-link:hover {
+  text-decoration: underline;
+}
+
+.dashboard-news-link:focus-visible {
+  outline: none;
+}
+
+.dashboard-news-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.dashboard-news-minis,
+.dashboard-news-titles {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard-news-minis {
+  gap: var(--space-3);
+}
+
+.dashboard-news-mini {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+}
+
+.dashboard-news-thumbnail {
+  display: flex;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.dashboard-news-mini-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dashboard-news-unread {
+  display: flex;
+  flex: none;
+}
+
+.dashboard-news-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.dashboard-news-title-row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dashboard-news-title-row .dashboard-news-link {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-news-empty {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+@container dashboard-news (min-width: 560px) {
+  .dashboard-news-featured {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .dashboard-news-featured-cover {
+    height: auto;
+    min-height: 168px;
+  }
+
+  .dashboard-news-thumbnail {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+@container dashboard-news (min-width: 900px) {
+  .dashboard-news-grid:has(.dashboard-news-minis) {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
   }
 }

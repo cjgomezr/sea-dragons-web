@@ -376,51 +376,25 @@ describe("próximos y noticias", () => {
     ).toHaveAttribute("href", "/calendario");
   });
 
-  it("pinta los que haya cuando son menos de tres", async () => {
+  it("pinta los próximos que haya cuando son menos de tres", async () => {
     stubDashboard({
       ...ADMIN_DASHBOARD,
       upcomingEvents: { kind: "events", events: UPCOMING.slice(0, 1) },
-      latestNews: { kind: "news", posts: LATEST_NEWS.slice(0, 2) },
     });
 
     await renderScreen();
 
     const upcoming = screen.getByRole("region", { name: "Upcoming" });
-    const news = screen.getByRole("region", { name: "Latest news" });
     expect(within(upcoming).getAllByRole("listitem")).toHaveLength(1);
-    expect(within(news).getAllByRole("listitem")).toHaveLength(2);
   });
 
-  it("pinta las tres últimas noticias con su chip, su enlace y hace cuánto", async () => {
-    stubDashboard(ADMIN_DASHBOARD);
-
-    await renderScreen();
-
-    const news = screen.getByRole("region", { name: "Latest news" });
-    const rows = within(news).getAllByRole("listitem");
-    expect(rows).toHaveLength(3);
-    expect(
-      within(rowAt(rows, 0)).getByRole("link", {
-        name: "Nationals squad shortlist announced",
-      }),
-    ).toHaveAttribute("href", `/noticias/${LATEST_NEWS[0].id}`);
-    expect(
-      within(rowAt(rows, 0)).getByText("Announcement"),
-    ).toBeInTheDocument();
-    expect(within(rowAt(rows, 0)).getByText("2 days ago")).toBeInTheDocument();
-    expect(within(news).getByRole("link", { name: "All" })).toHaveAttribute(
-      "href",
-      "/noticias",
-    );
-  });
-
-  it("sin eventos ni noticias dice una frase y deja el enlace", async () => {
+  it("sin eventos ni noticias dice una frase y deja los enlaces", async () => {
     stubDashboard(EMPTY_DASHBOARD);
 
     await renderScreen();
 
     const upcoming = screen.getByRole("region", { name: "Upcoming" });
-    const news = screen.getByRole("region", { name: "Latest news" });
+    const news = screen.getByRole("region", { name: "News" });
     expect(
       within(upcoming).getByText("No upcoming events."),
     ).toBeInTheDocument();
@@ -428,10 +402,27 @@ describe("próximos y noticias", () => {
       within(upcoming).getByRole("link", { name: "Calendar" }),
     ).toBeInTheDocument();
     expect(within(news).getByText("No news yet.")).toBeInTheDocument();
-    expect(within(news).getByRole("link", { name: "All" })).toBeInTheDocument();
+    expect(
+      within(news).getByRole("link", { name: "All news" }),
+    ).toBeInTheDocument();
   });
 
-  it("dice no disponible en la lista que cayó", async () => {
+  it("pinta las noticias debajo, con la destacada y las otras en pequeño (#751)", async () => {
+    stubDashboard(ADMIN_DASHBOARD);
+
+    await renderScreen();
+
+    const news = screen.getByRole("region", { name: "News" });
+    expect(
+      within(news).getByRole("article", { name: LATEST_NEWS[0].title }),
+    ).toBeInTheDocument();
+    expect(within(news).getAllByRole("listitem")).toHaveLength(2);
+    expect(
+      within(news).getByRole("link", { name: "All news" }),
+    ).toHaveAttribute("href", "/noticias");
+  });
+
+  it("dice no disponible en las noticias que cayeron, sin tirar el resto", async () => {
     stubDashboard({
       ...ADMIN_DASHBOARD,
       latestNews: { kind: "unavailable" },
@@ -439,8 +430,10 @@ describe("próximos y noticias", () => {
 
     await renderScreen();
 
-    const news = screen.getByRole("region", { name: "Latest news" });
-    expect(within(news).getByText("Unavailable")).toBeInTheDocument();
+    const news = screen.getByRole("region", { name: "News" });
+    expect(
+      within(news).getByText("We couldn't load the news."),
+    ).toBeInTheDocument();
     expect(
       within(screen.getByRole("region", { name: "Upcoming" })).getAllByRole(
         "listitem",
@@ -464,7 +457,7 @@ describe("próximos y noticias", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Buenas tardes, Alba" }),
     ).toBeInTheDocument();
-    const news = screen.getByRole("region", { name: "Últimas noticias" });
+    const news = screen.getByRole("region", { name: "Noticias" });
     expect(within(news).getByText("hace 4 días")).toBeInTheDocument();
     expect(
       screen.getByRole("region", { name: "Próximos" }),
@@ -750,9 +743,7 @@ describe("la tarjeta Próximo (#747)", () => {
     expect(
       within(card).getByText("We couldn't load the next event."),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("region", { name: "Latest news" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "News" })).toBeInTheDocument();
     await userEvent.click(
       within(card).getByRole("button", { name: "Try again" }),
     );
@@ -1173,12 +1164,31 @@ describe("el inicio de quien no tiene la membresía al día (#453, #747)", () =>
     ).not.toBeInTheDocument();
   });
 
-  it("no pinta noticias", async () => {
-    stubDashboard(RESTRICTED_DASHBOARD);
+  it("pinta sólo los títulos de las noticias, con el candado y a Pagos (#751)", async () => {
+    stubDashboard({
+      ...RESTRICTED_DASHBOARD,
+      latestNews: {
+        kind: "news",
+        posts: [
+          {
+            id: LATEST_NEWS[0].id,
+            category: LATEST_NEWS[0].category,
+            title: LATEST_NEWS[0].title,
+            publishedAt: LATEST_NEWS[0].publishedAt,
+          },
+        ],
+      },
+    });
 
     await renderScreen();
 
-    expect(screen.queryByText(/Latest news/i)).not.toBeInTheDocument();
+    const news = screen.getByRole("region", { name: "News" });
+    expect(
+      within(news).getByText("News is for current members."),
+    ).toBeInTheDocument();
+    expect(
+      within(news).getByRole("link", { name: LATEST_NEWS[0].title }),
+    ).toHaveAttribute("href", "/pagos");
   });
 });
 
@@ -1323,9 +1333,7 @@ describe("el aviso del contacto (#498)", () => {
     await renderScreen();
 
     expect(rsvpButton("Going")).toBeEnabled();
-    expect(
-      screen.getByRole("region", { name: "Latest news" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "News" })).toBeInTheDocument();
   });
 
   it("al volver al inicio con el contacto ya guardado el aviso no está", async () => {
