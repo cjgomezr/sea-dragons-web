@@ -22611,7 +22611,7 @@ test.describe("la columna de gestión en el navegador (#750)", () => {
       .click();
 
     await expect(page).toHaveURL(
-      new RegExp(`/asistencia\?sesion=${TODO_ATTENDANCE_MISSING.eventId}$`),
+      `${APP_URL}/asistencia?sesion=${TODO_ATTENDANCE_MISSING.eventId}`,
     );
   });
 });
