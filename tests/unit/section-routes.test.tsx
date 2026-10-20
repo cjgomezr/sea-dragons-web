@@ -17,6 +17,10 @@ vi.mock("@/lib/club/supabase-club-brand", () => ({
 }));
 vi.mock("@/lib/auth/caller-role", () => ({
   readCallerRole: async () => callerRole.current,
+  readCallerAccess: async () => ({
+    role: callerRole.current,
+    membershipCurrent: true,
+  }),
   readCallerId: async () => "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d",
 }));
 const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");

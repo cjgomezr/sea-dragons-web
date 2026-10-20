@@ -366,7 +366,7 @@ export const spanishMessages: MessageCatalog = {
   "dashboard.club.attendance": "Asistencia del club",
   "dashboard.club.attendance.up": "↑ {points} pts vs el mes pasado",
   "dashboard.club.attendance.down": "↓ {points} pts vs el mes pasado",
-  "dashboard.club.members": "Socios",
+  "dashboard.club.members": "Miembros",
   "dashboard.club.members.caption": "+{count} este mes",
   "dashboard.club.unreadNews": "Noticias sin leer",
   "dashboard.club.unreadNews.caption": {
