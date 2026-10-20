@@ -296,6 +296,19 @@ export const spanishMessages: MessageCatalog = {
   "dashboard.nextUp.draft.emphasis": "sin publicar",
   "dashboard.nextUp.draft.end": ".",
   "dashboard.nextUp.openTeams": "Abrir equipos",
+  // "Esta semana" (#748, RF-4 del PRD de E27).
+  "dashboard.week.title": "Esta semana",
+  "dashboard.week.calendar": "Calendario",
+  "dashboard.week.days": "Días",
+  "dashboard.week.day": {
+    one: "{day} · {count} evento",
+    other: "{day} · {count} eventos",
+  },
+  "dashboard.week.dayEmpty": "{day} · sin eventos",
+  "dashboard.week.events": "Eventos del {day}",
+  "dashboard.week.empty": "Nada el {day}.",
+  "dashboard.week.rsvp": "Responder",
+  "dashboard.week.unavailable": "No se pudo cargar la semana.",
   "dashboard.membership.expiredOn": "Tu membresía venció el {date}",
   "dashboard.membership.expired": "Tu membresía venció",
   "dashboard.membership.body":

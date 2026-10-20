@@ -17,6 +17,7 @@ import {
   clubCalendarDate,
   clubMoment,
 } from "@/lib/time/club-calendar";
+import { DASHBOARD_WEEK_DAYS } from "./dashboard-week";
 
 /**
  * El próximo evento y la semana del inicio (#745, RF-2, D4, D5, D6 y D14 del
@@ -27,9 +28,6 @@ import {
  * así que la agenda de próximos no basta: un evento de varios días que
  * empezó antes de hoy sólo sale en la de pasados.
  */
-
-/** La franja de la semana: hoy y los seis días siguientes (D14). */
-export const DASHBOARD_WEEK_DAYS = 7;
 
 /** El equipo de quien mira en el reparto publicado (D6). */
 export type NextUpTeam = {

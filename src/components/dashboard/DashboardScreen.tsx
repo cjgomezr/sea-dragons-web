@@ -5,6 +5,7 @@ import { ContactReminderNotice } from "@/components/account/ContactReminderNotic
 import type {
   Dashboard,
   MemberDashboard,
+  NextUp,
   RestrictedDashboard,
 } from "@/lib/dashboard/dashboard";
 import { greetingPeriodAt } from "@/lib/dashboard/dashboard-view";
@@ -18,6 +19,7 @@ import {
   loadDashboard,
 } from "./dashboard-client";
 import { DashboardMembershipNotice } from "./DashboardMembershipNotice";
+import { DashboardWeek } from "./DashboardWeek";
 import { LatestNewsPanel, UpcomingPanel } from "./DashboardLists";
 import { NewEventLink } from "./NewEventLink";
 import { NextUpCard } from "./NextUpCard";
@@ -26,7 +28,8 @@ import { NextUpCard } from "./NextUpCard";
  * La pantalla de inicio (#426, RF-1 a RF-4 del PRD de E14), que E27 rehace
  * por partes. De arriba abajo: la cabecera con el día y el saludo, los avisos
  * y la tarjeta "Próximo" con el RSVP y el equipo (#747, RF-3 y RF-8 del PRD
- * de E27); debajo, de momento, los próximos eventos y las últimas noticias.
+ * de E27); "Esta semana" (#748, RF-4), y debajo, de momento, los próximos
+ * eventos y las últimas noticias.
  *
  * Es de cliente porque responde al RSVP sin recargar y porque la hora del
  * saludo y de "hace N" es la del momento en que se pintó. Lo lee todo de
@@ -35,11 +38,11 @@ import { NextUpCard } from "./NextUpCard";
  * pintar lo que ya llegó, sin pedirlo otra vez.
  *
  * A quien no tiene la membresía al día el endpoint le sirve el inicio
- * reducido (#453): la cabecera, el aviso que lleva a Pagos y la tarjeta
- * "Próximo" sin RSVP. El aviso del contacto que falta (#498) sólo sale en el
- * inicio de un socio al día, para no competir con el de la membresía. Se pide
- * al montar, así que al volver del perfil con el contacto guardado el aviso
- * ya no está.
+ * reducido (#453): la cabecera, el aviso que lleva a Pagos, la tarjeta
+ * "Próximo" sin RSVP y la semana sin "Responder". El aviso del contacto que
+ * falta (#498) sólo sale en el inicio de un socio al día, para no competir
+ * con el de la membresía. Se pide al montar, así que al volver del perfil con
+ * el contacto guardado el aviso ya no está.
  */
 
 type DashboardState =
@@ -111,6 +114,11 @@ function LoadFailure({
   );
 }
 
+/** El día del Próximo marca la semana cuando cae en ella (D14). */
+function nextUpStartsOn(nextUp: NextUp): string | null {
+  return nextUp.kind === "event" ? nextUp.startsOn : null;
+}
+
 type ContentProps<Shown extends Dashboard> = {
   readonly translate: Translator;
   readonly userId: string;
@@ -166,6 +174,14 @@ function RestrictedContent({
         viewer={{ isRestricted: true, canCreateEvents, today: now.date }}
         onRetry={onRetry}
       />
+      <DashboardWeek
+        translate={translate}
+        week={dashboard.week}
+        today={now.date}
+        nextUpStartsOn={nextUpStartsOn(dashboard.nextUp)}
+        isRestricted
+        onRetry={onRetry}
+      />
     </>
   );
 }
@@ -196,6 +212,14 @@ function MemberContent({
         translate={translate}
         nextUp={dashboard.nextUp}
         viewer={{ isRestricted: false, canCreateEvents, today: now.date }}
+        onRetry={onRetry}
+      />
+      <DashboardWeek
+        translate={translate}
+        week={dashboard.week}
+        today={now.date}
+        nextUpStartsOn={nextUpStartsOn(dashboard.nextUp)}
+        isRestricted={false}
         onRetry={onRetry}
       />
       <div className="dashboard-panels">

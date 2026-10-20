@@ -66,6 +66,19 @@ export const CALENDAR_EVENT_QUERY_PARAM = "evento";
  * que ya ocurrió. Sin él, en los próximos. */
 export const CALENDAR_PERIOD_QUERY_PARAM = "periodo";
 
+/** La fila de un evento en el calendario. El calendario separa próximos de
+ * pasados, y desde hoy (`today`, día del club) todo es próximo: un evento
+ * que empezó antes está en los pasados. */
+export function calendarEventHref(
+  event: { readonly id: string; readonly startsOn: string },
+  today: string,
+): string {
+  const target = `${CALENDAR_PATH}?${CALENDAR_EVENT_QUERY_PARAM}=${event.id}`;
+  return event.startsOn < today
+    ? `${target}&${CALENDAR_PERIOD_QUERY_PARAM}=past`
+    : target;
+}
+
 /** Con un tipo de evento, el calendario abre ya el formulario de crear con
  * ese tipo elegido, a quien puede crear: es a donde lleva "Nuevo
  * entrenamiento" desde el inicio (#426). */
