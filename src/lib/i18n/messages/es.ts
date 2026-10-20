@@ -273,9 +273,14 @@ export const spanishMessages: MessageCatalog = {
   "dashboard.upcoming.title": "Próximos",
   "dashboard.upcoming.all": "Calendario",
   "dashboard.upcoming.empty": "No hay eventos próximos.",
-  "dashboard.news.title": "Últimas noticias",
-  "dashboard.news.all": "Todas",
+  // Las noticias del inicio (#751, RF-7 del PRD de E27).
+  "dashboard.news.title": "Noticias",
+  "dashboard.news.all": "Todas las noticias",
   "dashboard.news.empty": "Todavía no hay noticias.",
+  "dashboard.news.unavailable": "No se pudieron cargar las noticias.",
+  "dashboard.news.unread": "Sin leer",
+  "dashboard.news.locked": "Las noticias son para miembros al día.",
+  "dashboard.news.renew": "Renovar",
   // La cabecera, los avisos y la tarjeta "Próximo" (#747, RF-3 y RF-8 del
   // PRD de E27).
   "dashboard.eyebrow.dated": "{date} · {section}",
