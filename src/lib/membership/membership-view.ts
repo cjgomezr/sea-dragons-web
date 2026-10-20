@@ -240,9 +240,16 @@ function monthlyPriceOf(
   return plan === null || plan === "Casual" ? null : planPrices[plan];
 }
 
+/** Lo que decide el próximo cobro: lo tiene una `Membership` y también la
+ * membresía que la ficha de un socio embebe (#774). */
+export type ChargeSchedule = Pick<
+  Membership,
+  "plan" | "status" | "trialEnd" | "currentPeriodEnd" | "scheduledChange"
+>;
+
 /** Stripe cobra al acabar la prueba o el periodo en curso; en cualquier otro
  * estado no hay cobro a la vista. */
-export function nextChargeOf(membership: Membership): Date | null {
+export function nextChargeOf(membership: ChargeSchedule): Date | null {
   if (
     membership.plan === null ||
     membership.plan === "Casual" ||

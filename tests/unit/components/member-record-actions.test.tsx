@@ -32,7 +32,8 @@ const SHARED = {
   membershipPlan: "Full",
   membershipStatus: "active",
   groups: [],
-  attendance: { kind: "no_data" },
+  membershipRenewsOn: null,
+  attendance: null,
 } as const satisfies Omit<CoachMemberRecord, "view">;
 
 const COMMITTEE_READING: CommitteeMemberRecord = {

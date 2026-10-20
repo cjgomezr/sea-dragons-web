@@ -377,11 +377,22 @@ export const spanishMessages: MessageCatalog = {
   "account.adminNote":
     "Como Admin ya tienes todas las capacidades, así que no hay ningún rol que pedir.",
   // Mis grupos (#229). Sólo los grupos propios, sin sus demás miembros.
-  "account.groups.title": "Mis grupos",
-  "account.groups.empty": "Todavía no perteneces a ningún grupo.",
   "account.evaluation.title": "Evaluación",
   "account.evaluation.staffOnly":
-    "Las notas de las evaluaciones solo las ve el personal de entrenamiento.",
+    "Tus coaches mantienen las evaluaciones en privado esta temporada. Pregúntales si quieres saber cómo vas.",
+  // La tarjeta Rol de la columna derecha del perfil (#774, D12).
+  "account.role.title": "Rol · {role}",
+  "account.role.hint": "¿Coach o committee? Pídeselo a un Admin.",
+  "account.role.request": "Solicitar",
+  // Grupos en la columna derecha del perfil y de la ficha (#774).
+  "profileAside.groups.title": "Grupos",
+  "profileAside.groups.empty": "Sin grupos",
+  "profileAside.groups.edit": "Editar",
+  "profileAside.groups.editLabel": "Editar Grupos",
+  "profileAside.groups.cancel": "Cancelar",
+  "profileAside.groups.save": "Guardar",
+  "profileAside.groups.saving": "Guardando…",
+  "profileAside.groups.saved": "Grupos guardados",
   "account.error.pending":
     "Ya tienes una solicitud esperando respuesta. Recarga la página para verla.",
   "account.error.roleAlreadyHeld": "Ya tienes ese rol.",
@@ -719,11 +730,16 @@ export const spanishMessages: MessageCatalog = {
   // perfil propio y la ficha. El prefijo sólo lo oye un lector de pantalla.
   "memberAttendance.title": "Asistencia",
   "memberAttendance.noData": "Sin datos",
-  "memberAttendance.spokenPrefix": "Asistencia: ",
-  "memberAttendance.sessions": {
-    one: "{count} sesión",
-    other: "{count} sesiones",
+  // La asistencia de la temporada en el perfil y la ficha (#774, D9).
+  "seasonAttendance.season": "Esta temporada",
+  "seasonAttendance.sessions": {
+    one: "{attended} de {count} sesión",
+    other: "{attended} de {count} sesiones",
   },
+  "seasonAttendance.last10": "Últimas 10",
+  "seasonAttendance.legend": "Leyenda",
+  "seasonAttendance.session": "{date}: {status}",
+  "seasonAttendance.none": "Todavía no hay sesiones esta temporada.",
   "directory.field.country": "País",
   "directory.field.level": "Nivel",
   "directory.sort.label": "Ordenar por",
@@ -863,7 +879,11 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.loading": "Cargando la ficha del miembro…",
   "memberRecord.evaluation.title": "Evaluación",
   "memberRecord.evaluation.loading": "Cargando la evaluación…",
-  "memberRecord.evaluation.open": "Abrir en Evaluaciones",
+  "memberRecord.evaluation.open": "Abrir",
+  "memberRecord.evaluation.openLabel": "Abrir la evaluación entera",
+  "memberRecord.evaluation.overall": "global · {date}",
+  "memberRecord.evaluation.categories": "Categorías",
+  "memberRecord.evaluation.notEvaluated": "Sin evaluar",
   "memberRecord.photoAlt": "Foto de {name}",
   "photoViewer.open": "Abrir la foto de {name}",
   "photoViewer.close": "Cerrar la foto",
@@ -1513,9 +1533,17 @@ export const spanishMessages: MessageCatalog = {
   "payments.planChange.failed":
     "No pudimos cambiar tu plan. Recarga la página y vuelve a intentarlo.",
   "account.membership.title": "Membresía",
-  "account.membership.type": "Tipo de membresía: {plan}",
-  "account.membership.none": "Todavía no elegiste tipo de membresía.",
-  "account.membership.change": "Cambiarlo en Pagos",
+  // La tarjeta Membresía de la columna derecha (#774).
+  "account.membership.payments": "Pagos",
+  "account.membership.noPlan": "Todavía sin plan",
+  "account.membership.renews": "{status} · se renueva el {date}",
+  "account.membership.status.none": "Todavía sin membresía",
+  "account.membership.status.pending": "Pendiente",
+  "account.membership.status.trialing": "En prueba",
+  "account.membership.status.active": "Activa",
+  "account.membership.status.pastDue": "Pago atrasado",
+  "account.membership.status.cancelled": "Vencida",
+  "account.membership.status.waived": "Exenta",
   "calendar.rsvp.error.unexpected":
     "No pudimos guardar tu respuesta. Vuelve a intentarlo.",
   "calendar.create.open": "Evento",

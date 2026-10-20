@@ -1,5 +1,5 @@
-import { MemberAttendanceSummary } from "@/components/attendance/MemberAttendanceSummary";
-import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
+import { SeasonAttendanceCard } from "@/components/attendance/SeasonAttendanceCard";
+import type { SeasonAttendance } from "@/lib/attendance/season-attendance";
 import type { RoleRequestAccount } from "@/lib/auth/role-request";
 import type { ProfileEvaluation as Evaluation } from "@/lib/evaluations/profile-evaluation";
 import type { CountryOption } from "@/lib/geo/countries";
@@ -19,11 +19,11 @@ import type {
   MembershipStatus,
 } from "@/lib/membership/membership";
 import { type HeroAuf, ProfileHero } from "./ProfileHero";
-import { MembershipTypeSummary } from "./MembershipTypeSummary";
+import { MembershipCard } from "./MembershipCard";
 import { MyGroups } from "./MyGroups";
 import { ProfileEvaluation } from "./ProfileEvaluation";
 import { ProfileForm } from "./ProfileForm";
-import { RoleRequestPanel } from "./RoleRequestPanel";
+import { RoleCard } from "./RoleCard";
 
 /** Sin AUF no hay ficha. Vencido se mira hoy en el club, como la ficha del
  * Admin. */
@@ -42,7 +42,9 @@ function heroAufOf(auf: OwnAuf): HeroAuf | null {
  * ya enseñaba (#209, #229), con su asistencia (#396) y la evaluación o el
  * aviso de que es privada (#324).
  * El tipo de membresía se ve, pero se cambia en Pagos (#456). La cabecera y,
- * bajo ella, la franja de lo que falta son las del rediseño (#771).
+ * bajo ella, la franja de lo que falta son las del rediseño (#771), y a la
+ * derecha de la ficha va su columna: membresía, asistencia de la temporada,
+ * grupos, evaluación y rol (#774).
  * La página lee los datos; esto sólo los coloca. */
 export function ProfileScreen({
   locale,
@@ -59,6 +61,7 @@ export function ProfileScreen({
   countries,
   membershipPlan,
   membershipStatus,
+  membershipRenewsOn,
   joinedOn,
 }: {
   locale: Locale;
@@ -76,12 +79,15 @@ export function ProfileScreen({
   photoUrl: string | null;
   groups: readonly MemberGroup[];
   evaluation: Evaluation;
-  attendance: MemberAttendance;
+  /** La de la temporada (#774, D9), o null sin sesiones esta temporada. */
+  attendance: SeasonAttendance | null;
   countries: readonly CountryOption[];
   /** El plan de su membresía, o null si aún no eligió (D8). */
   membershipPlan: MembershipPlan | null;
   /** El estado de su membresía, o null si no tiene (D8). */
   membershipStatus: MembershipStatus | null;
+  /** YYYY-MM-DD, el próximo cobro, o null si no hay ninguno a la vista. */
+  membershipRenewsOn: string | null;
   /** YYYY-MM-DD, el día en que ingresó. */
   joinedOn: string;
 }): React.JSX.Element {
@@ -107,31 +113,42 @@ export function ProfileScreen({
           photoUrl,
         }}
       />
-      <ProfileForm
-        locale={locale}
-        email={email}
-        profile={profile}
-        positionOptions={positionOptions}
-        countries={countries}
-        emergencyContactProposal={emergencyContactProposal}
-      />
-      <MembershipTypeSummary translate={translate} plan={membershipPlan} />
-      <MyGroups locale={locale} groups={groups} />
-      {/* La misma tarjeta que Mis grupos y la evaluación: la clase es la de
-          esa tarjeta, no dice qué lleva dentro. */}
-      <MemberAttendanceSummary
-        translate={translate}
-        locale={locale}
-        attendance={attendance}
-        headingId="mi-asistencia"
-        className="account-evaluation"
-      />
-      <ProfileEvaluation locale={locale} evaluation={evaluation} />
-      <RoleRequestPanel
-        locale={locale}
-        role={account.role}
-        latestRequest={account.latestRequest}
-      />
+      <div className="profile-layout">
+        <div className="profile-main">
+          <ProfileForm
+            locale={locale}
+            email={email}
+            profile={profile}
+            positionOptions={positionOptions}
+            countries={countries}
+            emergencyContactProposal={emergencyContactProposal}
+          />
+        </div>
+        <div className="profile-aside">
+          <MembershipCard
+            translate={translate}
+            headingId="mi-membresia"
+            membership={{
+              plan: membershipPlan,
+              status: membershipStatus,
+              renewsOn: membershipRenewsOn,
+            }}
+            hasPaymentsLink
+          />
+          <SeasonAttendanceCard
+            translate={translate}
+            attendance={attendance}
+            headingId="mi-asistencia"
+          />
+          <MyGroups translate={translate} groups={groups} />
+          <ProfileEvaluation locale={locale} evaluation={evaluation} />
+          <RoleCard
+            locale={locale}
+            role={account.role}
+            latestRequest={account.latestRequest}
+          />
+        </div>
+      </div>
     </div>
   );
 }

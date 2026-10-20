@@ -3,7 +3,6 @@
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { MemberAttendanceSummary } from "@/components/attendance/MemberAttendanceSummary";
 import { DIRECTORY_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -16,7 +15,6 @@ import {
 } from "./member-record-client";
 import { type AdminAction, MemberAdminMenu } from "./MemberAdminMenu";
 import { type AdminPanel, MemberAdminPanel } from "./MemberAdminPanel";
-import { MemberRecordEvaluation } from "./MemberRecordEvaluation";
 import { MemberRecordForm } from "./MemberRecordForm";
 import { useMemberStatusChange } from "./MemberStatusControl";
 
@@ -24,8 +22,9 @@ import { useMemberStatusChange } from "./MemberStatusControl";
  * La ficha reservada al Admin de un miembro (#242, RF-4 del PRD de E5), que se
  * abre desde su fila del directorio: su número de AUF, su vencimiento y sus
  * grupos, su asistencia (#396), su evaluación para leer (#324) y su rol
- * (#549). El rol, la exención, la invitación y la baja se piden en el ⋯ de
- * la cabecera (#775).
+ * (#549). La membresía, la asistencia de la temporada, los grupos y la
+ * evaluación van en la columna derecha del formulario (#774). El rol, la
+ * exención, la invitación y la baja se piden en el ⋯ de la cabecera (#775).
  *
  * La frontera ya mandó al panel a quien no es Admin; si alguien deja de serlo
  * con la pantalla abierta, el 403 del endpoint lo dice aquí. Es de cliente
@@ -83,7 +82,7 @@ export function MemberRecordScreen({
   }
 
   return (
-    <div className="member-record">
+    <div className="member-record member-record-wide">
       <Link href={DIRECTORY_PATH} className="member-record-back">
         <ArrowLeft aria-hidden="true" weight="bold" />
         {translate("memberRecord.back")}
@@ -191,14 +190,6 @@ function LoadedMemberRecord({
           />
         }
       />
-      <MemberAttendanceSummary
-        translate={translate}
-        locale={locale}
-        attendance={record.attendance}
-        headingId="ficha-asistencia"
-        className="admin-section"
-      />
-      <MemberRecordEvaluation translate={translate} userId={record.userId} />
     </>
   );
 }

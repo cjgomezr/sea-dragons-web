@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
+import { clubCalendarDate } from "@/lib/time/club-calendar";
 import {
   MEMBERSHIP_STATUSES,
   type MembershipCard,
@@ -32,6 +33,7 @@ import {
   PAYMENT_STATUSES,
   type PaymentCard,
   type PaymentHistoryGateway,
+  nextChargeOf,
 } from "./membership-view";
 import type {
   ChargeCard,
@@ -142,23 +144,45 @@ export function readEmbeddedMembershipStatus(
 /** La membresía embebida con el motivo de la exención (#457) y el plan
  * (#770): lo que la ficha de un socio enseña. */
 export const MEMBERSHIP_SUMMARY_EMBED =
-  "memberships!memberships_member_same_club_fkey(plan, status, stripe_subscription_id, trial_end, current_period_end, waived_until, waived_reason)";
+  "memberships!memberships_member_same_club_fkey(plan, status, stripe_subscription_id, trial_end, current_period_end, waived_until, waived_reason, scheduled_plan, scheduled_at)";
 
 const summaryRowSchema = standingRowSchema.extend({
   plan: z.enum(MEMBERSHIP_TYPES).nullable(),
   waived_reason: z.string().nullable(),
+  scheduled_plan: z.enum(MEMBERSHIP_TYPES).nullable(),
+  scheduled_at: z.string().nullable(),
 });
+
+type SummaryRow = z.infer<typeof summaryRowSchema>;
 
 const embeddedSummarySchema = z
   .union([summaryRowSchema, z.array(summaryRowSchema).max(1)])
   .nullish();
 
-/** El estado que cuenta hoy, la exención si está exento hoy, y el plan. */
+/** El estado que cuenta hoy, la exención si está exento hoy, el plan y el
+ * día del club en que se renueva (#774). */
 export type MembershipSummary = {
   readonly status: MembershipStatus | null;
   readonly waiver: MembershipWaiverView | null;
   readonly plan: MembershipPlan | null;
+  /** YYYY-MM-DD, o null sin cobro a la vista. */
+  readonly renewsOn: string | null;
 };
+
+/** El próximo cobro con la regla de Pagos, en el día del club. */
+function renewalDayOf(
+  row: SummaryRow,
+  status: MembershipStatus,
+): string | null {
+  const charge = nextChargeOf({
+    plan: row.plan,
+    status,
+    trialEnd: toDate(row.trial_end),
+    currentPeriodEnd: toDate(row.current_period_end),
+    scheduledChange: toScheduledChange(row),
+  });
+  return charge === null ? null : clubCalendarDate(charge);
+}
 
 export function readEmbeddedMembershipSummary(
   embedded: unknown,
@@ -166,15 +190,17 @@ export function readEmbeddedMembershipSummary(
 ): MembershipSummary {
   const row = singleEmbeddedRow(embeddedSummarySchema.parse(embedded));
   if (row === null) {
-    return { status: null, waiver: null, plan: null };
+    return { status: null, waiver: null, plan: null, renewsOn: null };
   }
   const status = resolveStandingStatus(toStanding(row), now);
+  const renewsOn = renewalDayOf(row, status);
   if (status !== "waived" || row.waived_reason === null) {
-    return { status, waiver: null, plan: row.plan };
+    return { status, waiver: null, plan: row.plan, renewsOn };
   }
   return {
     status,
     plan: row.plan,
+    renewsOn,
     waiver: {
       reason: row.waived_reason,
       until: toNullableIso(toDate(row.waived_until)),
@@ -218,7 +244,9 @@ function toWaiver(row: MembershipRow): MembershipWaiver | null {
 
 /** La base guarda el plan y la fecha juntos
  * (`memberships_scheduled_change_check`): sin alguno no hay cambio. */
-function toScheduledChange(row: MembershipRow): ScheduledPlanChange | null {
+function toScheduledChange(
+  row: Pick<MembershipRow, "scheduled_plan" | "scheduled_at">,
+): ScheduledPlanChange | null {
   if (row.scheduled_plan === null || row.scheduled_at === null) {
     return null;
   }

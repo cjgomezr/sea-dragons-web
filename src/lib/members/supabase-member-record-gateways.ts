@@ -4,7 +4,7 @@ import {
   parseAccountStatus,
 } from "@/lib/auth/account-status";
 import { type Role, parseRole } from "@/lib/auth/roles";
-import { createMemberAttendanceGateway } from "@/lib/attendance/supabase-attendance-stats";
+import { createSeasonAttendanceGateway } from "@/lib/attendance/supabase-season-attendance";
 import { readRequiredText, readText } from "@/lib/auth/supabase-auth-gateways";
 import { createGroupMembersGateways } from "@/lib/groups/supabase-group-members-gateways";
 import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
@@ -112,6 +112,7 @@ function toStoredMemberRecord(row: Row, now: Date): StoredMemberRecord {
     membershipStatus: membership.status,
     membershipWaiver: membership.waiver,
     membershipPlan: membership.plan,
+    membershipRenewsOn: membership.renewsOn,
     email: readRequiredText(row, "email", MEMBERS_TABLE),
     country: readText(row, "country", MEMBERS_TABLE),
     experienceLevel: readOptionalCatalogValue(
@@ -239,7 +240,7 @@ export function createMemberRecordGateways(
       signPhotoUrl: (photoPath) =>
         signProfilePhotoUrl(serviceClient, photoPath),
     },
-    attendance: createMemberAttendanceGateway(serviceClient),
+    attendance: createSeasonAttendanceGateway(serviceClient),
     records: {
       async findMemberRecord({ clubId, userId }) {
         const { data, error } = await serviceClient
