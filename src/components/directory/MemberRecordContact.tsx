@@ -307,8 +307,7 @@ export function MemberRecordContact({
       ) : (
         <ContactSummary
           translate={translate}
-          phone={record.phone}
-          email={record.email}
+          reachableAt={{ phone: record.phone, email: record.email }}
           emergencyContact={record.emergencyContact}
         />
       )}

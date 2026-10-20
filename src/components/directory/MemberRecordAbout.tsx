@@ -3,13 +3,13 @@ import { EditableCard } from "@/components/account/EditableCard";
 import { positionName } from "@/lib/club/club-positions";
 import { countryName } from "@/lib/geo/countries";
 import type { Translator } from "@/lib/i18n/translator";
-import type { MemberRecord } from "@/lib/members/member-record";
+import type { MemberRecordReading } from "@/lib/members/member-record";
 
 /**
  * Sobre mí en la ficha de un socio (#772, RF-3 del PRD de E30): el nombre,
  * el país, la posición y la experiencia, sólo para leer. Los cambia el socio
  * desde su perfil. El género no sale: es sólo suyo (D4), y la API de la ficha
- * ni lo devuelve.
+ * ni lo devuelve. Es la misma en todas las vistas (#776).
  */
 
 export function MemberRecordAbout({
@@ -17,7 +17,7 @@ export function MemberRecordAbout({
   record,
 }: {
   translate: Translator;
-  record: MemberRecord;
+  record: MemberRecordReading;
 }): React.JSX.Element {
   const { locale } = translate;
   return (

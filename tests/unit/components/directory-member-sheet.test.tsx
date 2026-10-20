@@ -616,7 +616,7 @@ describe("la ficha que sube: lo del Admin", () => {
     ).toHaveTextContent("Entreno a los juveniles los jueves.");
   });
 
-  it("a quien no es Admin no le enseña rol, AUF, membresía ni la ficha completa", async () => {
+  it("a quien no es Admin no le enseña rol, AUF ni membresía", async () => {
     const user = userEvent.setup();
     stubApi({ kind: "committee" });
     await renderDirectory({ isAdmin: false });
@@ -626,8 +626,34 @@ describe("la ficha que sube: lo del Admin", () => {
     expect(within(card).queryByRole("group", { name: "Role" })).toBeNull();
     expect(within(card).queryByText(/AUF/)).toBeNull();
     expect(within(card).queryByText("Membership")).toBeNull();
-    expect(within(card).queryByRole("link", { name: /record/ })).toBeNull();
     expect(within(card).getByText("81%")).toBeVisible();
+  });
+
+  it.each(["committee", "coach"] as const)(
+    "a la vista %s le lleva a la ficha completa en lectura (#776)",
+    async (kind) => {
+      const user = userEvent.setup();
+      stubApi({ kind });
+      await renderDirectory({ isAdmin: false });
+      await user.click(row("Nerea Ruiz"));
+
+      expect(
+        within(sheet("Nerea Ruiz")).getByRole("link", {
+          name: "Open full record",
+        }),
+      ).toHaveAttribute("href", `/directorio/${NEREA_ID}`);
+    },
+  );
+
+  it("a un Player no le lleva a la ficha completa", async () => {
+    const user = userEvent.setup();
+    stubApi({ kind: "member" });
+    await renderDirectory({ isAdmin: false });
+    await user.click(row("Nerea Ruiz"));
+
+    expect(
+      within(sheet("Nerea Ruiz")).queryByRole("link", { name: /record/ }),
+    ).toBeNull();
   });
 });
 

@@ -29,6 +29,7 @@ import {
   type MemberRecordIssueCode,
   type AufSubmission,
   type MemberRecordSubmission,
+  type StaffMemberRecord,
 } from "@/lib/members/member-record";
 import {
   type ProfileContactSubmission,
@@ -46,8 +47,9 @@ import { namedPositionSchema } from "@/components/club/positions-client";
 import { membershipWaiverSchema } from "./membership-waiver-client";
 
 /**
- * Lo que la ficha reservada al Admin (#242) le pide a la API v1 y cómo reduce
- * cada respuesta a algo que pintar.
+ * Lo que la ficha de un socio (#242) le pide a la API v1 y cómo reduce cada
+ * respuesta a algo que pintar. El Admin la edita; el Committee y el Coach la
+ * leen, cada uno con la vista que el servidor recorta para su rol (#776).
  *
  * Nada habla con la base: el endpoint es el producto, y la aplicación nativa
  * de Release 2 va a usar este mismo camino (CON-002). Los grupos que se
@@ -73,18 +75,27 @@ const seasonAttendanceSchema = z
   })
   .nullable();
 
-const recordSchema = z.object({
-  // La pantalla es la del Admin; la vista del Committee y la del Coach las
-  // pinta otro ticket de E30 (#776).
-  view: z.literal("admin"),
+/** Lo que traen las tres vistas de la ficha (#770). */
+const sharedRecordShape = {
   userId: z.uuid(),
   fullName: z.string(),
+  photoUrl: z.url().nullable(),
   role: z.enum(ROLES),
   positionName: namedPositionSchema.shape.names.nullable(),
   experienceLevel: z.enum(EXPERIENCE_LEVELS).nullable(),
   country: z.string().nullable(),
-  email: z.string(),
+  emergencyContact: emergencyContactSchema,
   membershipPlan: z.enum(MEMBERSHIP_TYPES).nullable(),
+  membershipStatus: membershipStatusSchema,
+  membershipRenewsOn: z.iso.date().nullable(),
+  groups: z.array(z.object({ id: z.uuid(), name: z.string() })),
+  attendance: seasonAttendanceSchema,
+};
+
+const recordSchema = z.object({
+  ...sharedRecordShape,
+  view: z.literal("admin"),
+  email: z.string(),
   joinedOn: z.string(),
   accountStatus: z.enum(ACCOUNT_STATUSES),
   aufNumber: z.string().nullable(),
@@ -93,27 +104,43 @@ const recordSchema = z.object({
   dateOfBirth: z.string().nullable(),
   registeredAt: z.string(),
   hasGuardianConsent: z.boolean(),
-  membershipStatus: membershipStatusSchema,
-  membershipRenewsOn: z.iso.date().nullable(),
   membershipWaiver: membershipWaiverSchema,
   phone: z.string().nullable(),
-  emergencyContact: emergencyContactSchema,
-  photoUrl: z.url().nullable(),
   isAufExpired: z.boolean(),
-  groups: z.array(z.object({ id: z.uuid(), name: z.string() })),
-  attendance: seasonAttendanceSchema,
 });
+
+/** Las vistas en lectura (D1, D3): el Committee con el correo y el teléfono,
+ * el Coach sin ellos. */
+const staffRecordSchema = z.discriminatedUnion("view", [
+  z.object({
+    ...sharedRecordShape,
+    view: z.literal("committee"),
+    email: z.string(),
+    phone: z.string().nullable(),
+  }),
+  z.object({ ...sharedRecordShape, view: z.literal("coach") }),
+]);
 
 const responseSchema = z.object({ data: recordSchema });
 
+const readingResponseSchema = z.object({
+  data: z.discriminatedUnion("view", [
+    recordSchema,
+    ...staffRecordSchema.options,
+  ]),
+});
+
 export type MemberRecordFailure = ApiRequestFailure;
 
+/** `loaded` es la ficha del Admin, con los grupos del club que ofrece al
+ * editar; `readOnly`, la del Committee o la del Coach, que no edita nada. */
 export type MemberRecordLoad =
   | {
       readonly kind: "loaded";
       readonly record: MemberRecord;
       readonly clubGroups: readonly Group[];
     }
+  | { readonly kind: "readOnly"; readonly record: StaffMemberRecord }
   | MemberRecordFailure;
 
 export type MemberRecordSave =
@@ -124,9 +151,10 @@ function recordPath(userId: string): string {
   return MEMBER_RECORD_API_PATH.replace("[id]", userId);
 }
 
-/** La ficha y los grupos del club a la vez. Si falla cualquiera de las dos no
- * hay nada que editar: la ficha sin grupos borraría los del miembro al
- * guardar. */
+/** La ficha y los grupos del club a la vez, para no hacer esperar al Admin
+ * una petición tras otra. Al Admin, si falla cualquiera de las dos no hay
+ * nada que editar: la ficha sin grupos borraría los del miembro al guardar.
+ * La vista en lectura no los usa, así que su fallo no la tapa. */
 export async function loadMemberRecord(
   userId: string,
 ): Promise<MemberRecordLoad> {
@@ -134,14 +162,18 @@ export async function loadMemberRecord(
     requestApi(recordPath(userId)),
     loadGroups(),
   ]);
-  const read = readApiPayload(recordOutcome, responseSchema);
+  const read = readApiPayload(recordOutcome, readingResponseSchema);
   if (read.kind === "failed") {
     return read;
+  }
+  const record = read.value.data;
+  if (record.view !== "admin") {
+    return { kind: "readOnly", record };
   }
   if (groups.kind === "failed") {
     return groups;
   }
-  return { kind: "loaded", record: read.value.data, clubGroups: groups.groups };
+  return { kind: "loaded", record, clubGroups: groups.groups };
 }
 
 /** El cuerpo que espera la API: el AUF en dos campos planos, y el contacto
