@@ -273,7 +273,9 @@ h6 {
 /* El nombre sale de la base y admite hasta 60 caracteres (#292). Junto al
    logo se parte entre palabras hasta en dos líneas, y sólo más allá se
    recorta: dos líneas de 20px caben en el alto de los botones de 44px, así
-   que la cabecera no crece ni empuja los controles fuera de la pantalla. */
+   que la cabecera no crece ni empuja los controles fuera de la pantalla. A
+   320px, con un logo apaisado, al nombre le quedan unos 80px: una palabra
+   más ancha que eso se parte en vez de cortarse por la mitad sin aviso. */
 .app-brand {
   display: -webkit-box;
   min-width: 0;
@@ -285,6 +287,7 @@ h6 {
   font-weight: 700;
   line-height: 1.25;
   color: var(--color-sidebar-text);
+  overflow-wrap: break-word;
   line-clamp: 2;
 }
 

@@ -461,8 +461,37 @@ describe("la lista de un Admin en el móvil", () => {
   // o aquí otra vez: no había camino al inicio.
   describe("volver", () => {
     beforeEach(() => {
-      back.mockClear();
-      push.mockClear();
+      back.mockReset();
+      push.mockReset();
+    });
+
+    // Volver a la lista dejaba otra entrada de /club en la historia, y el
+    // atrás de la lista caía en la sección que se acababa de dejar.
+    it("tras abrir una sección y volver a la lista, sale del club sin pasar por la sección", async () => {
+      window.history.pushState(null, "", "/dashboard");
+      window.history.pushState(null, "", "/club");
+      vi.stubGlobal("navigation", { canGoBack: true });
+      back.mockImplementation(() => window.history.back());
+      renderScreen();
+      await userEvent.click(sectionRow("General"));
+      await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+      await screen.findByRole("heading", { level: 1, name: "Club settings" });
+
+      await userEvent.click(screen.getByRole("button", { name: "Back" }));
+
+      await waitFor(() => expect(window.location.pathname).toBe("/dashboard"));
+    });
+
+    it("con la sección en la dirección, volver a la lista no deja otra entrada en la historia", async () => {
+      visit("/club?tab=general");
+      const pushState = vi.spyOn(window.history, "pushState");
+      renderScreen();
+
+      await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+      expect(window.location.search).toBe("");
+      expect(pushState).not.toHaveBeenCalled();
+      pushState.mockRestore();
     });
 
     it("vuelve a la pantalla de la que se vino", async () => {

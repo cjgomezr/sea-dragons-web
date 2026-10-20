@@ -41,7 +41,7 @@ const QUIET_FOCUS_ATTRIBUTE = "data-quiet-focus";
  * toque llega igual, para que un lector de pantalla siga donde estaba, pero
  * sin contorno hasta que el foco salga de él. Tras una tecla, con contorno. */
 export function returnFocus(element: HTMLElement): void {
-  if (wasLastInputPointer()) {
+  if (wasLastInputPointer() && !element.hasAttribute(QUIET_FOCUS_ATTRIBUTE)) {
     element.setAttribute(QUIET_FOCUS_ATTRIBUTE, "");
     element.addEventListener(
       "blur",

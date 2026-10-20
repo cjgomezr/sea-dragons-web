@@ -1,5 +1,5 @@
 import { fireEvent } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { returnFocus, wasLastInputPointer } from "@/components/input-modality";
 
 /**
@@ -57,6 +57,19 @@ describe("devolver el foco", () => {
     addButton().focus();
 
     expect(button).not.toHaveAttribute("data-quiet-focus");
+  });
+
+  it("devolverlo dos veces seguidas no apila otro aviso de salida", () => {
+    const button = addButton();
+    const listen = vi.spyOn(button, "addEventListener");
+    fireEvent.pointerDown(document.body);
+
+    returnFocus(button);
+    returnFocus(button);
+
+    expect(listen.mock.calls.filter(([type]) => type === "blur")).toHaveLength(
+      1,
+    );
   });
 
   it("tras una tecla llega con su contorno", () => {
