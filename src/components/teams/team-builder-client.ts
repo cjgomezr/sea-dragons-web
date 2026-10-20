@@ -139,6 +139,9 @@ export type PublishOutcome =
     }
   | TeamsFailure;
 
+export type ClubTeamsLoad =
+  { readonly kind: "loaded"; readonly teams: TeamLabels } | TeamsFailure;
+
 export type TeamsChangeOutcome =
   { readonly kind: "changed"; readonly teams: TeamLabels } | TeamsFailure;
 
@@ -211,6 +214,18 @@ export async function publishSplit(eventId: string): Promise<PublishOutcome> {
   return read.kind === "failed"
     ? read
     : { kind: "published", ...read.value.data };
+}
+
+/** Los equipos del club (#755): los que se editan, que no son por fuerza
+ * los del reparto abierto (un reparto guardado conserva los suyos, D4). */
+export async function loadClubTeams(): Promise<ClubTeamsLoad> {
+  const read = readApiPayload(
+    await requestApi(CLUB_TEAM_LABELS_API_PATH),
+    clubTeamsResponseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "loaded", teams: read.value.data };
 }
 
 /** Cambia el nombre y el color de los equipos del club (#755, RF-1 del PRD

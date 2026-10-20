@@ -17082,6 +17082,12 @@ a.agenda-take-attendance {
   box-shadow: var(--shadow);
 }
 
+/* Recibe el foco mientras llegan los equipos del club: no es un control y
+   Tab no llega a ella, así que no pinta contorno. */
+.team-edit-popover:focus {
+  outline: none;
+}
+
 .team-edit-title {
   margin: 0 0 var(--space-4);
   font-size: 15px;

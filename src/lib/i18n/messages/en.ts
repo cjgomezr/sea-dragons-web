@@ -2567,6 +2567,7 @@ export const englishMessages = {
   "teams.edit.takenHint": "The crossed one is the other team's colour.",
   "teams.edit.scope":
     "Used for every event from now on. Teams already published keep their colours.",
+  "teams.edit.loading": "Loading the club's teams…",
   "teams.edit.cancel": "Cancel",
   "teams.edit.apply": "Apply",
   "teams.edit.applying": "Applying…",

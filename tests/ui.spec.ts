@@ -21149,6 +21149,7 @@ async function stubAttendeeLargePhoto(page: Page): Promise<void> {
 
 const TEAMS_SCREEN_PATH = "/equipos";
 const TEAMS_ENDPOINT = "/api/v1/teams";
+const CLUB_TEAM_LABELS_ENDPOINT = "/api/v1/club/team-labels";
 const TEAMS_NARROW_WIDTHS = [320, 375, 768] as const;
 const TEAMS_MIN_TOUCH_TARGET_PX = 44;
 
@@ -21333,6 +21334,20 @@ type TeamsReads = {
 async function stubTeams(page: Page, reads: TeamsReads): Promise<TeamsWrite[]> {
   const writes: TeamsWrite[] = [];
   await stubDirectoryPhoto(page);
+  // Los equipos del club (#755), que pide la ventana de editar (#760).
+  await page.route(
+    (url) => url.pathname === CLUB_TEAM_LABELS_ENDPOINT,
+    (route, request) => {
+      if (request.method() === "GET") {
+        return route.fulfill(jsonBody(TEAMS_LABELS));
+      }
+      writes.push({
+        method: request.method(),
+        path: CLUB_TEAM_LABELS_ENDPOINT,
+      });
+      return route.fulfill(jsonBody(request.postDataJSON()));
+    },
+  );
   await page.route(
     (url) => url.pathname === TEAMS_ENDPOINT,
     (route) => route.fulfill(jsonBody({ events: reads.events })),
@@ -21414,7 +21429,7 @@ async function openTeamEditor(page: Page): Promise<void> {
   await waitForTeamBuilder(page);
   await page.getByRole("button", { name: TEAMS_EDIT_KELP }).click();
   await expect(
-    page.getByRole("dialog", { name: TEAMS_EDIT_DIALOG }),
+    page.getByRole("dialog", { name: TEAMS_EDIT_DIALOG }).getByRole("textbox"),
   ).toBeVisible();
   await page.mouse.move(0, 0);
 }
@@ -21602,16 +21617,13 @@ test.describe("equipos en el navegador", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await goToTeams(page, TEAMS_MANUAL_STATE);
     const patches: unknown[] = [];
-    await page.route(
-      (url) => url.pathname === "/api/v1/club/team-labels",
-      (route, request) => {
-        const body: unknown = request.postDataJSON();
-        patches.push(body);
-        return route.fulfill(jsonBody(body));
-      },
-    );
+    page.on("request", (request) => {
+      if (request.method() === "PATCH") {
+        patches.push(request.postDataJSON());
+      }
+    });
+    await goToTeams(page, TEAMS_MANUAL_STATE);
     await openTeamEditor(page);
     const dialog = page.getByRole("dialog", { name: "Edit team" });
     await expect(dialog.getByRole("textbox", { name: "Name" })).toBeFocused();

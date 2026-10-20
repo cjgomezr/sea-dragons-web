@@ -2586,6 +2586,7 @@ export const spanishMessages: MessageCatalog = {
   "teams.edit.takenHint": "El tachado es el color del otro equipo.",
   "teams.edit.scope":
     "Se usa en todos los eventos desde ahora. Los equipos ya publicados conservan sus colores.",
+  "teams.edit.loading": "Cargando los equipos del club…",
   "teams.edit.cancel": "Cancelar",
   "teams.edit.apply": "Aplicar",
   "teams.edit.applying": "Aplicando…",

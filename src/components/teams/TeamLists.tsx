@@ -159,7 +159,7 @@ function TeamCard({
         <TeamEditControl
           translate={translate}
           team={team}
-          teams={draft.teams}
+          teamName={name}
           onChangeTeams={onChangeTeams}
         />
       </div>

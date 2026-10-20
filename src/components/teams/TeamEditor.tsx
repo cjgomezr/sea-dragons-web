@@ -22,6 +22,7 @@ import {
   type TeamsChangeOutcome,
   type TeamsFailure,
   describeTeamsFailure,
+  loadClubTeams,
 } from "./team-builder-client";
 
 /**
@@ -31,8 +32,10 @@ import {
  * (`docs/design/design_handoff_teams/screenshots/02-desktop-edit-team.png`);
  * en el móvil, la hoja de abajo de la ficha del socio y de las posiciones.
  *
- * Lo que se aplica son los equipos del club: valen para todos los eventos
- * desde ahora y para el borrador abierto, no para lo ya publicado (D4).
+ * Lo que se edita son los equipos del club, que se piden al abrir: un
+ * reparto guardado conserva sus nombres y colores (D4, D5), así que los de
+ * la tarjeta pueden no ser los del club. Lo aplicado vale para todos los
+ * eventos desde ahora y para el borrador abierto.
  */
 
 export type ChangeTeams = (teams: TeamLabels) => Promise<TeamsChangeOutcome>;
@@ -40,9 +43,13 @@ export type ChangeTeams = (teams: TeamLabels) => Promise<TeamsChangeOutcome>;
 type EditedTeam = {
   readonly translate: Translator;
   readonly team: TeamId;
-  readonly teams: TeamLabels;
   readonly onChangeTeams: ChangeTeams;
 };
+
+type ClubTeamsState =
+  | { readonly kind: "loading" }
+  | { readonly kind: "failed"; readonly failure: TeamsFailure }
+  | { readonly kind: "loaded"; readonly teams: TeamLabels };
 
 type Submission =
   | { readonly kind: "idle" }
@@ -156,15 +163,22 @@ function TeamEditForm({
   team,
   teams,
   onChangeTeams,
-  nameRef,
+  shouldFocusName,
   onApplied,
   onCancel,
 }: EditedTeam & {
-  readonly nameRef?: React.RefObject<HTMLInputElement | null>;
+  readonly teams: TeamLabels;
+  readonly shouldFocusName: boolean;
   readonly onApplied: () => void;
   readonly onCancel: () => void;
 }): React.JSX.Element {
   const nameId = useId();
+  const nameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (shouldFocusName) {
+      nameRef.current?.focus();
+    }
+  }, [shouldFocusName]);
   const [name, setName] = useState(teams[team].name);
   const [color, setColor] = useState(teams[team].color.toUpperCase());
   const [submission, setSubmission] = useState<Submission>({ kind: "idle" });
@@ -240,6 +254,71 @@ function TeamEditForm({
   );
 }
 
+function useClubTeams(): ClubTeamsState {
+  const [state, setState] = useState<ClubTeamsState>({ kind: "loading" });
+  useEffect(() => {
+    let isCurrent = true;
+    void loadClubTeams().then((outcome) => {
+      if (isCurrent) {
+        setState(
+          outcome.kind === "loaded"
+            ? outcome
+            : { kind: "failed", failure: outcome },
+        );
+      }
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+  return state;
+}
+
+/** Lo de dentro de la ventana o la hoja: mientras llegan los equipos del
+ * club, una línea; si no llegan, el aviso y Cancelar. */
+function ClubTeamsEditor({
+  shouldFocusName,
+  onApplied,
+  onCancel,
+  ...edited
+}: EditedTeam & {
+  readonly shouldFocusName: boolean;
+  readonly onApplied: () => void;
+  readonly onCancel: () => void;
+}): React.JSX.Element {
+  const clubTeams = useClubTeams();
+  const { translate } = edited;
+  if (clubTeams.kind === "loaded") {
+    return (
+      <TeamEditForm
+        {...edited}
+        teams={clubTeams.teams}
+        shouldFocusName={shouldFocusName}
+        onApplied={onApplied}
+        onCancel={onCancel}
+      />
+    );
+  }
+  return (
+    <div className="team-edit-form">
+      {clubTeams.kind === "loading" ? (
+        <p className="team-edit-hint" role="status">
+          {translate("teams.edit.loading")}
+        </p>
+      ) : (
+        <p className="auth-error" role="alert">
+          {describeTeamsFailure(translate, clubTeams.failure)}
+        </p>
+      )}
+      <div className="team-edit-actions">
+        <button type="button" className="admin-secondary" onClick={onCancel}>
+          {translate("teams.edit.cancel")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** La ventana de escritorio. Escape, Cancelar o un clic fuera la cierran;
  * mientras está abierta, Tab no sale de ella. */
 function TeamEditPopover({
@@ -253,10 +332,10 @@ function TeamEditPopover({
 }): React.JSX.Element {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const nameRef = useRef<HTMLInputElement>(null);
 
+  // Hasta que llega el nombre, el foco espera en la ventana.
   useEffect(() => {
-    nameRef.current?.focus();
+    panelRef.current?.focus();
   }, []);
 
   const keepFocusInside = useCallback(() => {
@@ -277,14 +356,15 @@ function TeamEditPopover({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
+      tabIndex={-1}
       onKeyDown={(event) => cycleFocus(event, panelRef.current)}
     >
       <h3 id={titleId} className="team-edit-title">
         {edited.translate("teams.edit.title")}
       </h3>
-      <TeamEditForm
+      <ClubTeamsEditor
         {...edited}
-        nameRef={nameRef}
+        shouldFocusName
         onApplied={onClosed}
         onCancel={onClosed}
       />
@@ -304,7 +384,12 @@ function TeamEditSheet({
     >
       {(close) => (
         <div className="team-edit-sheet">
-          <TeamEditForm {...edited} onApplied={close} onCancel={close} />
+          <ClubTeamsEditor
+            {...edited}
+            shouldFocusName={false}
+            onApplied={close}
+            onCancel={close}
+          />
         </div>
       )}
     </BottomSheet>
@@ -313,7 +398,13 @@ function TeamEditSheet({
 
 /** El lápiz de la cabecera de un equipo y lo que abre. Al cerrar, el foco
  * vuelve a él. */
-export function TeamEditControl(edited: EditedTeam): React.JSX.Element {
+export function TeamEditControl({
+  teamName,
+  ...edited
+}: EditedTeam & {
+  /** El de la tarjeta, que nombra al botón. */
+  readonly teamName: string;
+}): React.JSX.Element {
   const isPhone = useIsPhone();
   const [isOpen, setIsOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -322,7 +413,7 @@ export function TeamEditControl(edited: EditedTeam): React.JSX.Element {
   const close = useCallback(() => {
     setIsOpen(false);
     buttonRef.current?.focus();
-  }, []);
+  }, [setIsOpen]);
 
   return (
     <div ref={anchorRef} className="team-edit">
@@ -330,9 +421,7 @@ export function TeamEditControl(edited: EditedTeam): React.JSX.Element {
         ref={buttonRef}
         type="button"
         className="team-edit-open"
-        aria-label={edited.translate("teams.edit.open", {
-          team: edited.teams[edited.team].name,
-        })}
+        aria-label={edited.translate("teams.edit.open", { team: teamName })}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         onClick={() => (isOpen ? close() : setIsOpen(true))}

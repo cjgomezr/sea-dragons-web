@@ -160,6 +160,8 @@ function stubApi(respond: Respond): void {
 type ClubApi = {
   readonly events?: BuildableEvents["events"];
   readonly builders?: readonly TeamBuilder[];
+  /** Los equipos del club (#755); por defecto, los de siempre. */
+  readonly clubTeams?: () => Response;
   /** Lo que responde cada escritura; por defecto, que salió bien. */
   readonly onWrite?: Respond;
 };
@@ -194,11 +196,15 @@ function savedOrPublished({ method, path, body }: RecordedRequest): Response {
 function stubClub({
   events = [SCRIMMAGE, COMPETITION],
   builders = [builderFor(SCRIMMAGE), builderFor(COMPETITION)],
+  clubTeams = () => jsonResponse(200, { data: DEFAULT_TEAM_LABELS }),
   onWrite = savedOrPublished,
 }: ClubApi = {}): void {
   stubApi((request) => {
     if (request.path === EVENTS_PATH) {
       return jsonResponse(200, { data: { events } });
+    }
+    if (request.method === "GET" && request.path === TEAM_LABELS_PATH) {
+      return clubTeams();
     }
     const builder = builders.find(
       (candidate) => builderPath(candidate.event.id) === request.path,
@@ -1453,6 +1459,7 @@ describe("editar un equipo (#760)", () => {
   async function openEditor(): Promise<void> {
     await openScreen();
     await userEvent.click(editButton());
+    await within(editor()).findByRole("textbox", { name: "Name" });
   }
 
   async function renameKelp(name: string): Promise<void> {
@@ -1669,6 +1676,55 @@ describe("editar un equipo (#760)", () => {
     expect(applyButton()).toHaveFocus();
   });
 
+  it("edita los equipos del club aunque el reparto guardado lleve otros", async () => {
+    const OLD_LABELS = {
+      a: { name: "Old Kelp", color: "#123456" },
+      b: { name: "Old Tide", color: "#654321" },
+    };
+    stubClub({ builders: [builderFor(SCRIMMAGE, { teams: OLD_LABELS })] });
+    await openScreen();
+    await userEvent.click(editButton("Edit name and colour of Old Kelp"));
+    await within(editor()).findByRole("textbox", { name: "Name" });
+
+    expect(nameField()).toHaveValue("Team Kelp");
+    expect(
+      within(editor()).getByRole("radio", { name: "Gold (used by Team Tide)" }),
+    ).toBeDisabled();
+    await userEvent.click(applyButton());
+
+    expect(writes()).toEqual([
+      {
+        method: "PATCH",
+        path: TEAM_LABELS_PATH,
+        body: DEFAULT_TEAM_LABELS,
+      },
+    ]);
+    expect(
+      await screen.findByRole("region", { name: "Team Kelp" }),
+    ).toBeInTheDocument();
+  });
+
+  it("si los equipos del club no llegan lo dice y deja cancelar", async () => {
+    stubClub({
+      clubTeams: () =>
+        jsonResponse(403, {
+          error: { code: "forbidden", message: "No." },
+        }),
+    });
+    await openScreen();
+
+    await userEvent.click(editButton());
+
+    expect(await within(editor()).findByRole("alert")).toHaveTextContent(
+      "Only Admins and Coaches build teams.",
+    );
+    await userEvent.click(
+      within(editor()).getByRole("button", { name: "Cancel" }),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(editButton()).toHaveFocus();
+  });
+
   it("en el móvil es una hoja inferior con Cancelar y Aplicar", async () => {
     stubScreenWidth(true);
     stubClub();
@@ -1710,7 +1766,7 @@ describe("editar un equipo (#760)", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Editar equipo" });
     expect(
-      within(dialog).getByRole("textbox", { name: "Nombre" }),
+      await within(dialog).findByRole("textbox", { name: "Nombre" }),
     ).toBeInTheDocument();
     expect(
       within(dialog).getByRole("radiogroup", { name: "Color del peto · Azul" }),
@@ -1739,7 +1795,9 @@ describe("editar un equipo (#760)", () => {
       }),
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Aplicar" }),
+    );
 
     expect(await screen.findByRole("status")).toHaveTextContent(
       "Equipo actualizado · se usa en todos los eventos desde ahora",
