@@ -21851,10 +21851,12 @@ test.describe("equipos en el navegador", () => {
 
     await expect(dialog).toBeHidden();
     await expect(teamsRegion(page, "Team Reef")).toBeVisible();
+    // Con el evento abierto, para que su reparto sin publicar cambie también.
     expect(patches).toEqual([
       {
         a: { name: "Team Reef", color: "#2B3F7A" },
         b: TEAMS_LABELS.b,
+        eventId: TEAMS_EVENT.id,
       },
     ]);
   });
