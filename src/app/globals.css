@@ -15808,6 +15808,7 @@ a.auth-brand-header:focus-visible {
   .attendance-row {
     display: grid;
     grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: var(--space-3);
     min-height: 44px;
     padding: 4px 8px 4px 12px;
   }
