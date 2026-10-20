@@ -8,3 +8,13 @@
 .account-avatar-face {
   color: transparent !important;
 }
+
+/* Los días que faltan para que venza el AUF (#773): "in 1,349 days" baja uno
+   cada día, y las fichas sembradas vencen en fechas fijas, así que la
+   captura cambiaba sola de un día a otro. La misma clase lleva la edad de
+   la ficha del club, que también depende de la fecha. Se esconde el texto,
+   no la celda; el vencido ("Expired") no depende del día y se sigue viendo.
+   Los días los prueban los tests unitarios del perfil y de la ficha. */
+.profile-cell-extra:not(.profile-cell-late) {
+  color: transparent !important;
+}
