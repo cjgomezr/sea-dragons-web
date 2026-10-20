@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Role } from "@/lib/auth/roles";
 import {
-  CLUB_TEAM_NAME_MAX_LENGTH,
   changeClubTeamLabels,
   clubTeamLabelsSchema,
   readClubTeamLabels,
@@ -10,6 +9,7 @@ import {
   DEFAULT_TEAM_LABELS,
   TeamBuilderForbiddenError,
 } from "@/lib/teams/team-builder";
+import { CLUB_TEAM_NAME_MAX_LENGTH } from "@/lib/teams/team-ids";
 import {
   TEAMS_CALLER_ID,
   TEAMS_CLUB_ID,

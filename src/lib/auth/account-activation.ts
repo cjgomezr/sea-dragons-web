@@ -89,15 +89,18 @@ function calendarParts(isoDate: string): CalendarParts {
 /** Edad en años cumplidos comparando dos fechas de calendario (AAAA-MM-DD).
  * Se hace sobre el texto y no con aritmética de `Date` para no arrastrar husos
  * horarios a una cuenta que sólo tiene día, mes y año. */
-export function isMinorOn(dateOfBirth: string, day: string): boolean {
+export function ageOn(dateOfBirth: string, day: string): number {
   const born = calendarParts(dateOfBirth);
   const today = calendarParts(day);
 
   const hadBirthdayThisYear =
     today.month > born.month ||
     (today.month === born.month && today.day >= born.day);
-  const age = today.year - born.year - (hadBirthdayThisYear ? 0 : 1);
-  return age < ADULT_AGE;
+  return today.year - born.year - (hadBirthdayThisYear ? 0 : 1);
+}
+
+export function isMinorOn(dateOfBirth: string, day: string): boolean {
+  return ageOn(dateOfBirth, day) < ADULT_AGE;
 }
 
 /**

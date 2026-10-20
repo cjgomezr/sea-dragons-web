@@ -427,9 +427,6 @@ export const englishMessages = {
   "account.profile.experienceLevel": "Experience level",
   "account.profile.gender": "Gender",
   "account.profile.notSet": "Not set",
-  "account.profile.save": "Save changes",
-  "account.profile.saving": "Saving…",
-  "account.profile.saved": "Changes saved.",
   "account.profile.issue.fullNameMissing": "Write your name.",
   "account.profile.issue.fullNameTooLong":
     "Your name can be at most {max} characters.",
@@ -451,13 +448,6 @@ export const englishMessages = {
   "account.profile.auf.title": "AUF registration",
   "account.profile.auf.number": "AUF number",
   "account.profile.auf.expiry": "AUF expiry",
-  "account.profile.auf.hint":
-    "An Admin checks it before it counts as verified.",
-  "account.profile.auf.pending": "Pending verification by an Admin.",
-  "account.profile.auf.verified":
-    "Verified by an Admin. Only an Admin can change it.",
-  "account.profile.auf.summary": "AUF {number} · expires {date}",
-  "account.profile.auf.withoutExpiry": "AUF {number} · no expiry",
   "account.profile.issue.aufNumberMissing": "Write your AUF number.",
   "account.profile.issue.aufNumberTooLong":
     "Your AUF number can be at most {max} characters.",
@@ -526,6 +516,28 @@ export const englishMessages = {
   "profileCard.contact.emergency": "Emergency contact",
   "profileCard.contact.notAdded": "Not added yet",
   "profileCard.contact.emergencySummary": "{name} · {relationship}",
+  // Registro AUF y Ficha del club, en el perfil y en la ficha (#773).
+  "profileCard.adminOnly": "Admin",
+  "profileCard.auf.saved": "AUF saved",
+  "profileCard.auf.number": "Number",
+  "profileCard.auf.expires": "Expires",
+  "profileCard.auf.status": "Status",
+  "profileCard.auf.verified": "Verified",
+  "profileCard.auf.pending": "Pending",
+  "profileCard.auf.notAdded": "Not added yet",
+  "profileCard.auf.inDays": {
+    one: "in {count} day",
+    other: "in {count} days",
+  },
+  "profileCard.auf.expired": "expired",
+  "profileCard.auf.pendingNote":
+    "An Admin will check it. Until then it shows as pending.",
+  "profileCard.auf.verifiedNote":
+    "Verified by the club. Ask an Admin to change it.",
+  "profileCard.clubRecord.title": "Club record",
+  "profileCard.clubRecord.saved": "Club record saved",
+  "profileCard.clubRecord.dateOfBirth": "Date of birth",
+  "profileCard.clubRecord.joined": "Joined",
   // La foto de perfil (#245): el círculo de la cabecera y sus controles.
   "account.photo.alt": "Your profile photo",
   "account.photo.add": "Add photo",
@@ -918,7 +930,6 @@ export const englishMessages = {
     "{name} added AUF {number} (expires {date}). Check it and verify.",
   "memberRecord.aufStrip.withoutExpiry":
     "{name} added AUF {number}. Check it and verify.",
-  "memberRecord.birth.title": "Personal details",
   "memberRecord.birth.label": "Date of birth",
   "memberRecord.birth.hint":
     "The member can't change it: it decides whether they need a guardian's consent.",
@@ -937,9 +948,6 @@ export const englishMessages = {
   "memberRecord.contact.samePhone":
     "This is {name}'s own phone. The emergency contact should be someone else.",
   "memberRecord.groups.empty": "The club has no groups yet.",
-  "memberRecord.save": "Save the record",
-  "memberRecord.saving": "Saving…",
-  "memberRecord.saved": "Record saved.",
   "memberRecord.issue.aufNumberTooLong":
     "The AUF number can have at most {max} characters.",
   "memberRecord.issue.aufExpiryNotADate": "That expiry isn't a valid date.",
@@ -1893,7 +1901,7 @@ export const englishMessages = {
   "clubSettings.sections.positions": "Positions",
   "clubSettings.sections.packs": "Session packs",
   "clubSettings.list.adminsOnly": "Only Admins see this.",
-  "clubSettings.list.backToAccount": "Back to My account",
+  "clubSettings.list.back": "Back",
   "clubSettings.list.backToList": "Settings",
   "clubSettings.draft.unsaved.general": "Unsaved changes to the club details",
   "clubSettings.draft.unsaved.sign-in": "Unsaved changes to the sign-in page",
@@ -2531,6 +2539,22 @@ export const englishMessages = {
     other: "{count} players",
   },
   "teams.column.empty": "Drag players here or use Add on the bench.",
+  "teams.edit.open": "Edit name and colour of {team}",
+  "teams.edit.title": "Edit team",
+  "teams.edit.name": "Name",
+  "teams.edit.color": "Bib colour",
+  "teams.edit.colorTaken": "{color} (used by {team})",
+  "teams.edit.takenHint": "The crossed one is the other team's colour.",
+  "teams.edit.scope":
+    "Used for every event from now on. Teams already published keep their colours.",
+  "teams.edit.loading": "Loading the club's teams…",
+  "teams.edit.cancel": "Cancel",
+  "teams.edit.apply": "Apply",
+  "teams.edit.applying": "Applying…",
+  "teams.edit.close": "Close",
+  "teams.edit.invalid":
+    "Check the name and the colour: the name takes 1 to 24 characters and each team a different colour.",
+  "teams.edit.changed": "Team updated · used for every event from now on",
   "teams.coverage.label": "Position coverage",
   "teams.coverage.goalkeeper": "GK",
   "teams.coverage.defender": "DEF",

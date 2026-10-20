@@ -65,6 +65,9 @@
   /* El color del equipo de quien mira en el evento desplegado (#403): la
      tarjeta lo pone en línea con el del reparto. */
   --team-color: var(--color-accent);
+  /* El color de cada círculo de la ventana de editar un equipo (#760): el
+     círculo lo pone en línea con el de su peto. */
+  --swatch-color: var(--color-accent);
   /* El principio del degradado de la cabecera del perfil (#771); acaba en
      --color-panel. */
   --color-hero-gradient-start: #dceaf5;
@@ -226,14 +229,12 @@ h6 {
   border-bottom: 1px solid var(--color-sidebar-border);
 }
 
-/* En el móvil el nombre y los tres controles (lupa, campana y cuenta)
-   comparten una sola fila, también a 360px: el resto vive en el menú de la
-   cuenta (#287). Con la lupa (#427) los tres botones de 44px ocupan 132px, y
-   al nombre le quedan 176px a 360 con los huecos de antes. Con la fuente del
-   sistema de Linux (la de CI; Archivo no se carga) el nombre sembrado mide
-   203px a 18px, así que en el móvil el nombre baja a 16px (180px), la
-   cabecera acolcha 12px a los lados y los iconos van pegados: sus 44px ya
-   los separan. En la barra lateral todo vuelve a su medida. */
+/* En el móvil la marca y los tres controles (lupa, campana y cuenta)
+   comparten una sola fila, también a 320px: el resto vive en el menú de la
+   cuenta (#287). Los tres botones de 44px van separados por 8px (148px en
+   total), la cabecera acolcha 12px a los lados y deja 12px entre la marca y
+   los botones: a 360px a la marca le quedan 176px. Pegados, los iconos se
+   leían como una sola pieza. En la barra lateral todo vuelve a su medida. */
 .app-sidebar-header {
   display: flex;
   align-items: center;
@@ -241,18 +242,24 @@ h6 {
   gap: var(--space-3);
 }
 
-/* En el móvil el logo va encima del nombre (#295): al lado, uno apaisado
-   dejaba el nombre en unas pocas letras junto a la campana y el menú a 375px.
-   En la barra lateral va en la misma fila (#352, más abajo). Sin logo el
-   contenedor sólo lleva el nombre, y se comporta como él: puede encogerse
-   para que recorte. */
+/* El logo va al lado del nombre, también en el móvil: encima, la cabecera
+   salía el doble de alta. Para que uno apaisado no deje el nombre en unas
+   pocas letras, en el móvil el logo no pasa de 48px de ancho y el nombre
+   puede partirse en dos líneas. Sin logo el contenedor sólo lleva el
+   nombre, y se comporta como él: puede encogerse para que recorte. Es el
+   enlace al inicio, así que no lleva el color ni el subrayado de un enlace. */
 .app-brand-lockup {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-2);
   min-width: 0;
   max-width: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-brand-lockup .club-logo {
+  max-width: calc(var(--space-8) * 1.5);
 }
 
 /* El logo ocupa el alto del recuadro de iniciales. Uno apaisado se ensancha
@@ -266,18 +273,25 @@ h6 {
   object-fit: contain;
 }
 
-/* El nombre sale de la base y admite hasta 60 caracteres (#292). En el móvil
-   va en una sola línea, recortado con puntos suspensivos, para que no parta la
-   cabecera en dos filas ni empuje los controles fuera de la pantalla a 360px. */
+/* El nombre sale de la base y admite hasta 60 caracteres (#292). Junto al
+   logo se parte entre palabras hasta en dos líneas, y sólo más allá se
+   recorta: dos líneas de 20px caben en el alto de los botones de 44px, así
+   que la cabecera no crece ni empuja los controles fuera de la pantalla. A
+   320px, con un logo apaisado, al nombre le quedan unos 80px: una palabra
+   más ancha que eso se parte en vez de cortarse por la mitad sin aviso. */
 .app-brand {
+  display: -webkit-box;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: 16px;
   font-weight: 700;
+  line-height: 1.25;
   color: var(--color-sidebar-text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  line-clamp: 2;
 }
 
 /* Below 768px the sections live in the bottom tab bar, so the sidebar list is
@@ -435,7 +449,7 @@ h6 {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 0;
+  gap: var(--space-2);
 }
 
 /* La campana y el botón de la cuenta, los dos iconos de la misma esquina. */
@@ -1411,8 +1425,6 @@ button.notification-item-content:hover {
 
   /* El logo y el nombre en una fila, como en el mockup del panel (#352). */
   .app-brand-lockup {
-    flex-direction: row;
-    align-items: center;
     align-self: stretch;
   }
 
@@ -1426,16 +1438,12 @@ button.notification-item-content:hover {
     );
   }
 
-  /* Junto al logo, una línea recortada dejaba el nombre en pocas letras: se
-     parte entre palabras hasta en dos líneas, y sólo más allá se recorta. */
+  /* En la barra lateral el nombre ocupa lo que deja el logo, con su letra y
+     su interlineado de siempre. */
   .app-brand {
-    display: -webkit-box;
     flex: 1 1 0;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
     font-size: 18px;
-    line-clamp: 2;
-    white-space: normal;
+    line-height: inherit;
   }
 
   .app-nav {
@@ -2326,7 +2334,9 @@ a.auth-brand-header:focus-visible {
   align-items: start;
 }
 
-@media (min-width: 768px) {
+/* Desde 1024 px: en la tableta la barra lateral deja a la principal sin
+   sitio para sus celdas (#773), y las dos columnas van apiladas. */
+@media (min-width: 1024px) {
   .profile-layout {
     grid-template-columns: minmax(0, 1fr) 340px;
   }
@@ -2845,6 +2855,117 @@ a.auth-brand-header:focus-visible {
   color: color-mix(in srgb, var(--color-warning) 55%, var(--color-text));
 }
 
+/* El título de una tarjeta con datos del Admin lleva al lado "🔒 Admin"
+   (#773), en 11,5 px y en el color secundario. */
+.profile-card-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.profile-card-admin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* La lectura de Registro AUF y de Ficha del club (#773): las celdas van en
+   fila, separadas por una raya, con la etiqueta de 12 px encima del valor de
+   14,5 px. Los tonos del texto se mezclan con el del cuerpo, como el "Aún no
+   añadido" de Contacto, para que lleguen a AA en claro. */
+.profile-cells {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.profile-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 11px 16px;
+}
+
+.profile-cell + .profile-cell {
+  border-left: 1px solid var(--color-border);
+}
+
+.profile-cell dt {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.profile-cell dd {
+  margin: 0;
+  font-size: 14.5px;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+}
+
+.profile-cell .profile-cell-mono {
+  font-family: var(--font-family-mono);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.profile-cell .profile-cell-extra {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.profile-cell .profile-cell-soon,
+.profile-cell .profile-cell-missing {
+  color: color-mix(in srgb, var(--color-warning) 55%, var(--color-text));
+}
+
+.profile-cell .profile-cell-late {
+  color: color-mix(in srgb, var(--color-danger) 55%, var(--color-text));
+}
+
+.profile-cell-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-cell .profile-cell-status-success {
+  color: color-mix(in srgb, var(--color-success) 55%, var(--color-text));
+}
+
+.profile-cell .profile-cell-status-warning {
+  color: color-mix(in srgb, var(--color-warning) 55%, var(--color-text));
+}
+
+.profile-cell-status svg {
+  flex: none;
+}
+
+/* La fecha de alta sigue en lectura mientras se edita la de nacimiento (D2):
+   dentro del formulario, sin la raya ni el relleno de la tarjeta. */
+.profile-card-form .profile-cells {
+  border-top: 0;
+}
+
+.profile-card-form .profile-cell {
+  padding: 0;
+}
+
+/* La nota de debajo de las celdas del AUF del perfil. */
+.profile-card-note {
+  margin: 0;
+  padding: 0 16px 12px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
 /* La edición: los campos en dos columnas, con el nombre a lo ancho, y
    Cancelar y Guardar abajo a la derecha. Las etiquetas son las del diseño,
    no las mayúsculas de los formularios de la cuenta. */
@@ -2946,9 +3067,14 @@ a.auth-brand-header:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .profile-contact-half + .profile-contact-half {
+  .profile-contact-half + .profile-contact-half,
+  .profile-cell + .profile-cell {
     border-top: 1px solid var(--color-border);
     border-left: 0;
+  }
+
+  .profile-cells {
+    grid-auto-flow: row;
   }
 }
 
@@ -5025,6 +5151,13 @@ a.auth-brand-header:focus-visible {
   outline-offset: -2px;
 }
 
+/* El foco que vuelve a la fila al cerrar su ficha tras un toque llega sin
+   contorno (`input-modality.ts`): Safari lo pintaba aunque nadie usara el
+   teclado. Con el teclado la fila sigue enmarcada. */
+.directory-row[data-quiet-focus]:focus-visible {
+  outline: none;
+}
+
 .directory-card-header {
   display: flex;
   gap: var(--space-3);
@@ -5905,6 +6038,10 @@ a.auth-brand-header:focus-visible {
     inset: 0 0 0 46px;
     pointer-events: none;
     border: 2px solid var(--color-accent-text);
+  }
+
+  .directory-row[data-quiet-focus]:focus-visible::after {
+    content: none;
   }
 
   .directory-name {
@@ -17028,7 +17165,228 @@ a.agenda-take-attendance {
 }
 
 .team-column-heading {
+  flex: 1;
   min-width: 0;
+}
+
+/* La tarjeta recorta lo que sale de sus esquinas redondeadas; con la ventana
+   de editar abierta (#760) la deja salir, o la cortaría por abajo. */
+.team-column:has(.team-edit-popover) {
+  overflow: visible;
+}
+
+/* El lápiz de la cabecera (#760) y la ventana que abre, anclada debajo de él
+   y alineada a su derecha. */
+.team-edit {
+  position: relative;
+  flex: none;
+}
+
+.team-edit-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.team-edit-open:hover,
+.team-edit-open[aria-expanded="true"] {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.team-edit-popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 20;
+  width: 320px;
+  padding: var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+/* Recibe el foco mientras llegan los equipos del club: no es un control y
+   Tab no llega a ella, así que no pinta contorno. */
+.team-edit-popover:focus {
+  outline: none;
+}
+
+.team-edit-title {
+  margin: 0 0 var(--space-4);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.team-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.team-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.team-edit-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.team-edit-color-name {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.team-edit-name {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.team-edit-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, auto);
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Cada color es un radio nativo, transparente encima de su círculo: el
+   navegador trae las flechas, el grupo y saltarse el desactivado. */
+.team-edit-swatch {
+  position: relative;
+  display: block;
+  width: 36px;
+  height: 36px;
+}
+
+.team-edit-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.team-edit-swatch-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 16px;
+  color: #fff;
+  pointer-events: none;
+  background: var(--swatch-color);
+  border: 1px solid rgb(0 0 0 / 15%);
+  border-radius: 999px;
+}
+
+.team-edit-swatch[data-tone="dark"] .team-edit-swatch-mark {
+  color: #1b1f24;
+}
+
+/* El elegido lleva un anillo de 2 px separado del círculo por el panel. */
+.team-edit-swatch input:checked + .team-edit-swatch-mark {
+  box-shadow:
+    0 0 0 2px var(--color-panel),
+    0 0 0 4px var(--color-text);
+}
+
+.team-edit-swatch input:focus-visible + .team-edit-swatch-mark {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 4px;
+}
+
+.team-edit-swatch input:disabled {
+  cursor: not-allowed;
+}
+
+.team-edit-swatch input:disabled + .team-edit-swatch-mark {
+  opacity: 0.35;
+}
+
+.team-edit-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.team-edit-scope {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.team-edit-scope svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.team-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.team-edit-actions button {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  font-size: 14px;
+}
+
+/* La hoja del móvil: el nombre de 48 px con texto de 16, círculos de 44 y
+   botones a la medida del dedo. */
+.team-edit-sheet .team-edit-name {
+  min-height: 48px;
+  font-size: 16px;
+}
+
+/* A 320 px seis círculos de 44 no caben con su hueco: encogen sin dejar de
+   ser redondos. */
+.team-edit-sheet .team-edit-swatches {
+  grid-template-columns: repeat(6, minmax(0, 44px));
+}
+
+.team-edit-sheet .team-edit-swatch {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.team-edit-sheet .team-edit-actions button {
+  flex: 1;
+  min-height: var(--touch-target-min);
+}
+
+@media (width < 768px) {
+  .team-edit-open {
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+  }
 }
 
 .team-column-title {
@@ -17583,6 +17941,19 @@ a.agenda-take-attendance {
 .contact-reminder-icon {
   flex: none;
   color: var(--color-warning);
+}
+
+/* En el móvil la frase se parte en varias líneas, y centrado en el alto el
+   teléfono quedaba suelto a media altura, lejos del título: va arriba, con
+   la primera línea (21px de alto, el icono mide 18). */
+@media (width < 768px) {
+  .contact-reminder-strip {
+    align-items: flex-start;
+  }
+
+  .contact-reminder-strip .contact-reminder-icon {
+    margin-top: 2px;
+  }
 }
 
 .contact-reminder-strip .contact-reminder-text {

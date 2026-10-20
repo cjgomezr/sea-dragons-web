@@ -2,9 +2,10 @@
 
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 import { CaretRight } from "@phosphor-icons/react/dist/ssr/CaretRight";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
-import { requestAccountMenu } from "@/components/AccountMenu";
 import { ClubBrandMark } from "@/components/ClubBrandMark";
+import { goBackOrHome } from "@/components/go-back";
 import { Icon } from "@/components/Icon";
 import type { ClubBrand } from "@/lib/club/club-brand";
 import type { ClubSettings } from "@/lib/club/club-settings";
@@ -153,6 +154,7 @@ export function ClubSettingsList({
 }): React.JSX.Element {
   const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const router = useRouter();
   const data = useListData();
 
   useEffect(() => {
@@ -161,7 +163,9 @@ export function ClubSettingsList({
     }
   }, [shouldFocusTitle]);
 
-  const backLabel = translate("clubSettings.list.backToAccount");
+  // Volver reabría el menú de la cuenta, y desde él sólo se llegaba al
+  // perfil o aquí otra vez: el atrás vuelve a la pantalla de antes.
+  const backLabel = translate("clubSettings.list.back");
   return (
     <section className="club-settings-list-screen" aria-labelledby={titleId}>
       <header className="club-settings-mobile-header">
@@ -170,7 +174,7 @@ export function ClubSettingsList({
           className="directory-back"
           aria-label={backLabel}
           title={backLabel}
-          onClick={requestAccountMenu}
+          onClick={() => goBackOrHome(router)}
         >
           <Icon glyph={ArrowLeft} />
         </button>

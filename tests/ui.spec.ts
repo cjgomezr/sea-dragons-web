@@ -2618,6 +2618,8 @@ const FULL_PROFILE_STORAGE_STATE =
  * capturas en español preparan la pantalla con la misma función. */
 const ABOUT_CARD = /^(About|Sobre mí)$/;
 const CONTACT_CARD = /^(Contact|Contacto)$/;
+const AUF_CARD = /^(AUF registration|Registro AUF)$/;
+const CLUB_RECORD_CARD = /^(Club record|Ficha del club)$/;
 const EDIT_CARD_BUTTON = /^(Edit|Editar) /;
 const SAVE_CARD_BUTTON = /^(Save|Guardar)$/;
 const ABOUT_SAVED_MESSAGE = /^(About saved|Sobre mí guardado)$/;
@@ -3102,39 +3104,48 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
   // #292: el nombre sale de la base y admite hasta 60 caracteres. Se pone en
   // la página y no en la base compartida de desarrollo: cambiarlo allí lo
   // vería cualquier otra corrida a la vez. Lo que se prueba es que el CSS lo
-  // aguanta: una sola fila, sin tapar los controles ni salirse, y el texto
-  // entero en el árbol aunque se vea recortado. El `title` que pone la cáscara
-  // lo prueba `tests/unit/app-shell.test.tsx`.
+  // aguanta con el logo apaisado al lado, el que más lo empuja: dos líneas
+  // como mucho, sin tapar los controles ni salirse, los tres botones
+  // separados, sin scroll horizontal ni a 320px, y el texto entero en el
+  // árbol aunque se vea recortado. El `title` que pone la cáscara lo prueba
+  // `tests/unit/app-shell.test.tsx`.
   const LONGEST_CLUB_NAME =
     "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania";
-  for (const width of [360, 375]) {
-    test(`un nombre de 60 caracteres se recorta en una sola fila a ${width}px`, async ({
+  /** El hueco entre los botones de la cabecera del móvil (`--space-2`). */
+  const HEADER_BUTTON_GAP_PX = 8;
+  for (const width of [320, 360, 375]) {
+    test(`un nombre de 60 caracteres junto al logo cabe en dos líneas a ${width}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 800 });
+      await serveClubLogos(page);
       await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+      await showLogoOnServedPage(page, PHOTOGRAPHED_LOGO);
       const brandLocator = page.locator(".app-brand");
-      const singleLineHeight = await brandLocator.evaluate(
-        (element) => element.getBoundingClientRect().height,
+      const lineHeight = await brandLocator.evaluate((element) =>
+        parseFloat(getComputedStyle(element).lineHeight),
       );
       await brandLocator.evaluate((element, name) => {
         element.textContent = name;
       }, LONGEST_CLUB_NAME);
 
+      const header = page.locator(".app-sidebar-header");
       const brand = await brandLocator.boundingBox();
       const controls = await Promise.all(
         [
-          page.getByRole("button", { name: /^Notifications/ }),
-          page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
+          header.getByRole("button", { name: "Search", exact: true }),
+          header.getByRole("button", { name: /^Notifications/ }),
+          header.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
         ].map((control) => control.boundingBox()),
       );
-      const boxes = controls.flatMap((box) => (box === null ? [] : [box]));
-      if (brand === null || boxes.length !== controls.length) {
+      const [search, bell, account] = controls;
+      if (brand === null || !search || !bell || !account) {
         throw new Error("la cabecera no dibujó el nombre o algún control");
       }
+      const boxes = [search, bell, account];
 
-      expect(brand.height, "el nombre se parte en dos filas").toBe(
-        singleLineHeight,
+      expect(brand.height, "el nombre pasa de dos líneas").toBeLessThanOrEqual(
+        2 * lineHeight + SUBPIXEL_TOLERANCE_PX,
       );
       const brandMiddle = brand.y + brand.height / 2;
       for (const box of boxes) {
@@ -3143,12 +3154,21 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
           "un control no está en la fila del nombre",
         ).toBe(true);
       }
+      for (const [previous, next] of [
+        [search, bell],
+        [bell, account],
+      ] as const) {
+        expect(
+          next.x - (previous.x + previous.width),
+          "dos botones de la cabecera van pegados",
+        ).toBeGreaterThanOrEqual(HEADER_BUTTON_GAP_PX - SUBPIXEL_TOLERANCE_PX);
+      }
       expect(
         brand.x + brand.width,
         "el nombre del club tapa los controles",
-      ).toBeLessThanOrEqual(Math.min(...boxes.map((box) => box.x)));
+      ).toBeLessThanOrEqual(search.x);
       expect(
-        Math.max(...boxes.map((box) => box.x + box.width)),
+        account.x + account.width,
         "un control se sale de la pantalla",
       ).toBeLessThanOrEqual(width);
       const hasHorizontalScroll = await page.evaluate(
@@ -3382,8 +3402,12 @@ test.describe("una socia con el AUF verificado", () => {
   test("la pantalla no le ofrece cambiarlo", async ({ page }) => {
     await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
 
-    await expect(page.getByText("AUF AUF-2026-0275 · expires")).toBeVisible();
-    await expect(page.getByLabel("AUF number")).toHaveCount(0);
+    const aufCard = page.getByRole("region", { name: AUF_CARD });
+    await expect(aufCard.getByText("AUF-2026-0275")).toBeVisible();
+    await expect(aufCard.getByText(/^Verified by the club\./)).toBeVisible();
+    await expect(
+      aufCard.getByRole("button", { name: EDIT_CARD_BUTTON }),
+    ).toHaveCount(0);
   });
 
   test("el endpoint le niega cambiarlo", async ({ request }) => {
@@ -8006,30 +8030,41 @@ async function stubMemberRecordReads(
   );
 }
 
-/** Pone un vencimiento anterior al ingreso y guarda: el servidor fingido lo
- * rechaza, y el aviso sale junto al campo. */
-function submitExpiryBeforeJoining(saveLabel: string, issueText: RegExp) {
+/** Abre con su Editar una tarjeta de la ficha (#772, #773) y la devuelve. */
+async function openRecordCard(page: Page, name: RegExp): Promise<Locator> {
+  const card = page.getByRole("region", { name });
+  await card.getByRole("button", { name: EDIT_CARD_BUTTON }).click();
+  return card;
+}
+
+/** Abre Registro AUF (#773), pone un vencimiento anterior al ingreso y
+ * guarda: el servidor fingido lo rechaza, y el aviso sale junto al campo. */
+function submitExpiryBeforeJoining(issueText: RegExp) {
   return async (page: Page): Promise<void> => {
+    const card = await openRecordCard(page, AUF_CARD);
     await page.locator("#ficha-auf-vencimiento").fill("2024-01-15");
-    await page.getByRole("button", { name: saveLabel }).click();
+    await card.getByRole("button", { name: SAVE_CARD_BUTTON }).click();
     await expect(page.getByText(issueText)).toBeVisible();
   };
 }
 
-/** Pone una fecha de nacimiento futura y guarda: el servidor fingido la
- * rechaza, y el aviso sale junto al campo. */
-function submitBirthInFuture(saveLabel: string, issueText: RegExp) {
+/** Abre Ficha del club (#773), pone una fecha de nacimiento futura y guarda:
+ * el servidor fingido la rechaza, y el aviso sale junto al campo. */
+function submitBirthInFuture(issueText: RegExp) {
   return async (page: Page): Promise<void> => {
+    const card = await openRecordCard(page, CLUB_RECORD_CARD);
     await page.locator("#ficha-nacimiento").fill("2999-01-01");
-    await page.getByRole("button", { name: saveLabel }).click();
+    await card.getByRole("button", { name: SAVE_CARD_BUTTON }).click();
     await expect(page.getByText(issueText)).toBeVisible();
   };
 }
 
-/** Pone la fecha de un menor sin guardar: la ficha avisa de que el miembro
- * tendrá que dar el consentimiento de su tutor. */
+/** Abre Ficha del club (#773) y pone la fecha de un menor sin guardar: la
+ * ficha avisa de que el miembro tendrá que dar el consentimiento de su
+ * tutor. */
 function typeMinorBirth(noticeText: RegExp) {
   return async (page: Page): Promise<void> => {
+    await openRecordCard(page, CLUB_RECORD_CARD);
     await page.locator("#ficha-nacimiento").fill(MINOR_BIRTH);
     await expect(page.getByText(noticeText)).toBeVisible();
   };
@@ -8106,7 +8141,6 @@ function fillWaiverDialog(labels: {
 type MemberRecordState = {
   readonly name: string;
   readonly record: StubbedMemberRecord;
-  readonly saveLabel: string;
   readonly saveRejection?: StubbedSaveRejection;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
@@ -8118,99 +8152,80 @@ type MemberRecordState = {
  * escritorio. */
 const RECORD_DESKTOP_VIEWPORTS = viewports.filter((vp) => vp.name !== "mobile");
 
-const ENGLISH_SAVE_RECORD = "Save the record";
-const SPANISH_SAVE_RECORD = "Guardar la ficha";
-
 const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
   {
     name: "ficha-auf-vigente",
     record: CURRENT_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
   },
   // #549: el cambio de rol se mudó de la fila del directorio a la ficha, y
   // con él el rechazo del último Admin.
   {
     name: "ficha-rol-ultimo-admin",
     record: { ...CURRENT_RECORD, role: "Admin" },
-    saveLabel: ENGLISH_SAVE_RECORD,
     prepare: refuseLastAdminChange(LONG_MEMBER_NAME),
   },
   {
     name: "ficha-auf-vigente-es",
     record: CURRENT_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },
   {
     name: "ficha-con-foto",
     record: PHOTO_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
   },
   {
     name: "ficha-con-foto-es",
     record: PHOTO_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },
   {
     name: "ficha-auf-vencido",
     record: EXPIRED_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
   },
   {
     name: "ficha-auf-vencido-es",
     record: EXPIRED_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },
   {
     name: "ficha-auf-sin-verificar",
     record: UNVERIFIED_AUF_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
   },
   {
     name: "ficha-auf-sin-verificar-es",
     record: UNVERIFIED_AUF_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },
   {
     name: "ficha-invitacion-pendiente",
     record: PENDING_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
   },
   {
     name: "ficha-invitacion-pendiente-es",
     record: PENDING_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },
   {
     name: "ficha-cuenta-desactivada",
     record: DEACTIVATED_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
   },
   {
     name: "ficha-cuenta-desactivada-es",
     record: DEACTIVATED_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },
   {
     name: "ficha-exenta",
     record: WAIVED_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
   },
   {
     name: "ficha-exenta-es",
     record: WAIVED_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },
   {
     name: "ficha-eximir-confirmacion",
     record: CURRENT_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
     prepare: fillWaiverDialog({
       menu: ENGLISH_RECORD_MENU,
       open: "Waive membership fee",
@@ -8222,7 +8237,6 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
   {
     name: "ficha-eximir-confirmacion-es",
     record: CURRENT_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
     prepare: fillWaiverDialog({
       menu: SPANISH_RECORD_MENU,
@@ -8236,14 +8250,12 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
   {
     name: "ficha-menu-abierto",
     record: CURRENT_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
     viewports: RECORD_DESKTOP_VIEWPORTS,
     prepare: openRecordMenu(ENGLISH_RECORD_MENU, "Deactivate member"),
   },
   {
     name: "ficha-desactivar-confirmacion",
     record: CURRENT_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
     viewports: RECORD_DESKTOP_VIEWPORTS,
     prepare: askToDeactivate({
       menu: ENGLISH_RECORD_MENU,
@@ -8254,66 +8266,50 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
   {
     name: "ficha-aviso-validacion",
     record: CURRENT_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
-    prepare: submitExpiryBeforeJoining(
-      ENGLISH_SAVE_RECORD,
-      /can't be before the date they joined/,
-    ),
+    prepare: submitExpiryBeforeJoining(/can't be before the date they joined/),
   },
   {
     name: "ficha-aviso-validacion-es",
     record: CURRENT_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
     prepare: submitExpiryBeforeJoining(
-      SPANISH_SAVE_RECORD,
       /no puede ser anterior a su fecha de ingreso/,
     ),
   },
   {
     name: "ficha-nacimiento-aviso-validacion",
     record: CURRENT_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
     saveRejection: BIRTH_IN_FUTURE_ERROR,
-    prepare: submitBirthInFuture(
-      ENGLISH_SAVE_RECORD,
-      /Date of birth can't be in the future/,
-    ),
+    prepare: submitBirthInFuture(/Date of birth can't be in the future/),
   },
   {
     name: "ficha-nacimiento-aviso-validacion-es",
     record: CURRENT_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     saveRejection: BIRTH_IN_FUTURE_ERROR,
     beforeVisit: chooseSpanish,
     prepare: submitBirthInFuture(
-      SPANISH_SAVE_RECORD,
       /La fecha de nacimiento no puede estar en el futuro/,
     ),
   },
   {
     name: "ficha-nacimiento-aviso-tutor",
     record: CURRENT_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
     prepare: typeMinorBirth(/will have to give a guardian's details/),
   },
   {
     name: "ficha-nacimiento-aviso-tutor-es",
     record: CURRENT_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
     prepare: typeMinorBirth(/tendrá que dar los datos y el consentimiento/),
   },
   {
     name: "ficha-contacto",
     record: CURRENT_RECORD,
-    saveLabel: ENGLISH_SAVE_RECORD,
     prepare: typeOwnPhoneAsEmergency(/should be someone else/),
   },
   {
     name: "ficha-contacto-es",
     record: CURRENT_RECORD,
-    saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
     prepare: typeOwnPhoneAsEmergency(/debería ser otra persona/),
   },
@@ -8334,9 +8330,7 @@ async function goToMemberRecord(
   await expect(
     page.getByRole("heading", { level: 1, name: LONG_MEMBER_NAME }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: state.saveLabel }),
-  ).toBeVisible();
+  await expect(page.getByRole("region", { name: AUF_CARD })).toBeVisible();
   await expect(
     page.getByRole("list", { name: MEMBER_RECORD_RATINGS }),
   ).toBeVisible();
@@ -8473,7 +8467,9 @@ test.describe("la ficha con una foto que no carga", () => {
     await expect(header.locator('[aria-hidden="true"]')).toHaveText(
       memberInitials(LONG_MEMBER_NAME),
     );
-    await expect(page.getByLabel("AUF number")).toHaveValue("AUF-2026-0042");
+    await expect(
+      page.getByRole("region", { name: AUF_CARD }).getByText("AUF-2026-0042"),
+    ).toBeVisible();
   });
 });
 
@@ -8508,17 +8504,18 @@ test.describe("un Admin frente a la ficha con los datos de verdad", () => {
     ).toBeVisible({ timeout: ACCOUNT_CHANGE_TIMEOUT_MS });
 
     const aufNumber = `AUF-E2E-${Date.now()}`;
-    await page.getByLabel("AUF number").fill(aufNumber);
-    await page.getByLabel("Expiry date").fill("2099-12-31");
+    const aufCard = await openRecordCard(page, AUF_CARD);
+    await aufCard.getByLabel("AUF number").fill(aufNumber);
+    await aufCard.getByLabel("Expiry date").fill("2099-12-31");
     const saved = page.waitForResponse(
       (response) =>
         response.url().includes("/record") &&
         response.request().method() === "PATCH",
       { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
     );
-    await page.getByRole("button", { name: ENGLISH_SAVE_RECORD }).click();
+    await aufCard.getByRole("button", { name: SAVE_CARD_BUTTON }).click();
     expect((await saved).status()).toBe(200);
-    await expect(page.getByText("Record saved.")).toBeVisible();
+    await expect(aufCard.getByText("AUF saved")).toBeVisible();
 
     // Desde #549 la fila no escribe el AUF: con número y un vencimiento
     // lejano, su fila ya no lleva ningún punto del AUF.
@@ -8537,10 +8534,11 @@ test.describe("un Admin frente a la ficha con los datos de verdad", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: ADMINISTRATION_ADMIN_NAME }),
     ).toBeVisible({ timeout: ACCOUNT_CHANGE_TIMEOUT_MS });
-    await page.getByLabel("AUF number").fill("");
-    await page.getByRole("button", { name: ENGLISH_SAVE_RECORD }).click();
-    await expect(page.getByText("Record saved.")).toBeVisible();
-    await expect(page.getByLabel("Expiry date")).toHaveValue("");
+    const resetCard = await openRecordCard(page, AUF_CARD);
+    await resetCard.getByLabel("AUF number").fill("");
+    await resetCard.getByRole("button", { name: SAVE_CARD_BUTTON }).click();
+    await expect(resetCard.getByText("AUF saved")).toBeVisible();
+    await expect(resetCard.getByText("Not added yet")).toBeVisible();
   });
 });
 
@@ -11982,6 +11980,9 @@ const CLUB_SETTINGS_LOGO_BOX_PX = 56 - 2;
 function clubLogoField(page: Page): Locator {
   return page.locator(".club-logo-field");
 }
+/** En la cabecera del móvil el logo va junto al nombre y no pasa de 48px de
+ * ancho, para que no deje el nombre en unas pocas letras. */
+const PHONE_HEADER_LOGO_MAX_WIDTH_PX = LOGO_BOX_HEIGHT_PX * 1.5;
 /** En la barra lateral de escritorio el logo va junto al nombre y su tope
  * baja a 2,5 veces el alto, para que el nombre conserve 120px (#352). */
 const SIDEBAR_LOGO_MAX_WIDTH_PX = 80;
@@ -12134,7 +12135,7 @@ const SIDEBAR_BRAND_SCREEN: BrandScreen = {
   logoMaxWidthAt: (viewportWidth) =>
     viewportWidth >= SIDEBAR_MIN_VIEWPORT_PX
       ? SIDEBAR_LOGO_MAX_WIDTH_PX
-      : LOGO_BOX_MAX_WIDTH_PX,
+      : PHONE_HEADER_LOGO_MAX_WIDTH_PX,
 };
 
 const BRAND_SCREENS: readonly BrandScreen[] = [
@@ -21149,6 +21150,7 @@ async function stubAttendeeLargePhoto(page: Page): Promise<void> {
 
 const TEAMS_SCREEN_PATH = "/equipos";
 const TEAMS_ENDPOINT = "/api/v1/teams";
+const CLUB_TEAM_LABELS_ENDPOINT = "/api/v1/club/team-labels";
 const TEAMS_NARROW_WIDTHS = [320, 375, 768] as const;
 const TEAMS_MIN_TOUCH_TARGET_PX = 44;
 
@@ -21333,6 +21335,20 @@ type TeamsReads = {
 async function stubTeams(page: Page, reads: TeamsReads): Promise<TeamsWrite[]> {
   const writes: TeamsWrite[] = [];
   await stubDirectoryPhoto(page);
+  // Los equipos del club (#755), que pide la ventana de editar (#760).
+  await page.route(
+    (url) => url.pathname === CLUB_TEAM_LABELS_ENDPOINT,
+    (route, request) => {
+      if (request.method() === "GET") {
+        return route.fulfill(jsonBody(TEAMS_LABELS));
+      }
+      writes.push({
+        method: request.method(),
+        path: CLUB_TEAM_LABELS_ENDPOINT,
+      });
+      return route.fulfill(jsonBody(request.postDataJSON()));
+    },
+  );
   await page.route(
     (url) => url.pathname === TEAMS_ENDPOINT,
     (route) => route.fulfill(jsonBody({ events: reads.events })),
@@ -21401,6 +21417,20 @@ async function balanceTeams(page: Page): Promise<void> {
   await page.getByRole("button", { name: TEAMS_BALANCE }).click();
   await expect(
     page.getByText(/^(Teams balanced|Equipos equilibrados)/),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+const TEAMS_EDIT_KELP =
+  /^(Edit name and colour of Team Kelp|Editar nombre y color de Team Kelp)$/;
+const TEAMS_EDIT_DIALOG = /^(Edit team|Editar equipo)$/;
+
+/** Abre la ventana de editar Team Kelp (#760): en el móvil, la hoja. */
+async function openTeamEditor(page: Page): Promise<void> {
+  await waitForTeamBuilder(page);
+  await page.getByRole("button", { name: TEAMS_EDIT_KELP }).click();
+  await expect(
+    page.getByRole("dialog", { name: TEAMS_EDIT_DIALOG }).getByRole("textbox"),
   ).toBeVisible();
   await page.mouse.move(0, 0);
 }
@@ -21475,6 +21505,20 @@ const TEAMS_STATES: readonly TeamsState[] = [
     builder: DRAFTED_BUILDER,
     ready: askToPublish,
   }),
+  {
+    name: "equipos-editar",
+    events: TEAMS_EVENTS,
+    builder: DRAFTED_BUILDER,
+    viewports: viewports.filter((vp) => vp.name !== "mobile"),
+    ready: openTeamEditor,
+  },
+  {
+    name: "equipos-editar-movil",
+    events: TEAMS_EVENTS,
+    builder: DRAFTED_BUILDER,
+    viewports: viewports.filter((vp) => vp.name === "mobile"),
+    ready: openTeamEditor,
+  },
   ...teamsWithSpanish({
     name: "equipos-publicado",
     events: TEAMS_EVENTS,
@@ -21568,6 +21612,40 @@ test.describe("equipos en el navegador", () => {
       "Daniela Vargas",
     );
     expect(writes).toEqual([]);
+  });
+
+  test("editar un equipo elige con las flechas, retiene el foco y aplica", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const patches: unknown[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "PATCH") {
+        patches.push(request.postDataJSON());
+      }
+    });
+    await goToTeams(page, TEAMS_MANUAL_STATE);
+    await openTeamEditor(page);
+    const dialog = page.getByRole("dialog", { name: "Edit team" });
+    await expect(dialog.getByRole("textbox", { name: "Name" })).toBeFocused();
+
+    await dialog.getByRole("radio", { name: "Blue" }).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(dialog.getByRole("radio", { name: "Navy" })).toBeChecked();
+    await dialog.getByRole("button", { name: "Apply" }).focus();
+    await page.keyboard.press("Tab");
+    await expect(dialog.getByRole("textbox", { name: "Name" })).toBeFocused();
+    await dialog.getByRole("textbox", { name: "Name" }).fill("Team Reef");
+    await dialog.getByRole("button", { name: "Apply" }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect(teamsRegion(page, "Team Reef")).toBeVisible();
+    expect(patches).toEqual([
+      {
+        a: { name: "Team Reef", color: "#2B3F7A" },
+        b: TEAMS_LABELS.b,
+      },
+    ]);
   });
 
   test("arrastrar a un disponible a una columna lo mueve", async ({ page }) => {

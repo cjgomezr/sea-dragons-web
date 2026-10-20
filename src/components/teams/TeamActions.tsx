@@ -134,6 +134,8 @@ function statusText(translate: Translator, action: BuilderAction): string {
       return translate("teams.saved");
     case "published":
       return translate("teams.published", { count: action.notifiedCount });
+    case "teamsChanged":
+      return translate("teams.edit.changed");
     default:
       return "";
   }

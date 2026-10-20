@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { returnFocus } from "@/components/input-modality";
 import type { Role } from "@/lib/auth/roles";
 import {
   DEFAULT_DIRECTORY_QUERY,
@@ -205,11 +206,12 @@ function requestedRolesOf(state: PendingRequestsState): RequestedRoles {
 }
 
 /** Devuelve el foco a un elemento si sigue en la página: quien cerró el
- * panel con el teclado sigue donde estaba. */
+ * panel con el teclado sigue donde estaba. Tras un toque llega sin contorno
+ * (`returnFocus`). */
 function focusById(id: string): void {
   const element = document.getElementById(id);
   if (element !== null) {
-    element.focus();
+    returnFocus(element);
   }
 }
 
