@@ -21955,9 +21955,21 @@ test.describe("equipos en el navegador", () => {
           name: /^(Remove|Sacar a) Isabella Muñoz (from|de) Team Kelp$/,
         })
         .click();
-      await expect(
-        page.getByRole("button", { name: /^(Save|Guardar)/ }),
-      ).toContainText(/^(Save|Guardar).*(Unsaved|Sin guardar)$/);
+      const save = page.getByRole("button", { name: /^(Save|Guardar)/ });
+      await expect(save).toContainText(
+        /^(Save|Guardar).*(Unsaved|Sin guardar)$/,
+      );
+      // Guardar no se corta: lo que pinta cabe en el botón.
+      for (const button of [
+        save,
+        page.getByRole("button", { name: TEAMS_PUBLISH }),
+      ]) {
+        expect(
+          await button.evaluate(
+            (element) => element.scrollWidth <= element.clientWidth,
+          ),
+        ).toBe(true);
+      }
       await showTeamsTab(page, TEAMS_BENCH_TAB);
       const lastRow = page.getByRole("tabpanel").getByRole("group").last();
 

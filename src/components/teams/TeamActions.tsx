@@ -109,7 +109,9 @@ export function SaveAndPublish({
             <span className="visually-hidden">·</span>{" "}
             <span className="team-unsaved">
               <span className="team-unsaved-dot" aria-hidden="true" />
-              {translate("teams.unsaved")}
+              <span className="team-unsaved-label">
+                {translate("teams.unsaved")}
+              </span>
             </span>
           </>
         ) : null}

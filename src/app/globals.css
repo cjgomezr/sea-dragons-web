@@ -17998,16 +17998,35 @@ a.agenda-take-attendance {
   flex-wrap: nowrap;
 }
 
-/* Los botones no parten en dos líneas: el hueco de abajo cuenta con 48px, y
-   a 320px "Guardar · Sin guardar" no cabe. Lo que sobra se corta con puntos
-   suspensivos. */
+/* Los botones no parten en dos líneas: el hueco de abajo cuenta con 48px.
+   Guardar va a su ancho y nunca se corta; Publicar se queda con el resto.
+   A 320px en español, Guardar con el punto mide unos 100px y Publicar
+   necesita unos 120 de los 180 que le quedan. */
 .team-phone-bar .team-actions button {
-  flex: 1 1 0;
-  min-width: 0;
   min-height: 48px;
   padding: 0 var(--space-3);
+  white-space: nowrap;
+}
+
+.team-phone-bar .team-save {
+  flex: none;
+}
+
+.team-phone-bar .team-publish {
+  flex: 1 1 0;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+/* En la barra, el aviso de sin guardar es el punto (y el borde de la barra
+   en aviso): "Sin guardar" junto a "Guardar" no cabe a 320px. El texto se
+   queda para el lector de pantalla. */
+.team-phone-bar .team-unsaved-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
 }
 
@@ -18086,6 +18105,11 @@ a.agenda-take-attendance {
     justify-content: center;
     width: var(--touch-target-min);
     padding: 0;
+  }
+
+  /* Los dos botones de 44px más juntos dejan más ancho al nombre. */
+  .team-player-benched .team-moves {
+    gap: var(--space-1);
   }
 }
 
