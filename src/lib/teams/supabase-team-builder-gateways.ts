@@ -390,6 +390,37 @@ async function publishSplit(
   };
 }
 
+/** El filtro por `published_at` nulo es la regla (D4): uno publicado no se
+ * toca. El de `club_id` es la frontera del club (NFR-009). */
+async function relabelDraftSplit(
+  serviceClient: SupabaseClient,
+  change: {
+    readonly clubId: string;
+    readonly eventId: string;
+    readonly teams: TeamLabels;
+  },
+): Promise<boolean> {
+  const { data, error } = await serviceClient
+    .from(SPLITS_TABLE)
+    .update({
+      team_a_name: change.teams.a.name,
+      team_a_color: change.teams.a.color,
+      team_b_name: change.teams.b.name,
+      team_b_color: change.teams.b.color,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("event_id", change.eventId)
+    .eq("club_id", change.clubId)
+    .is("published_at", null)
+    .select("id");
+  if (error) {
+    throw new Error(
+      `No se pudo cambiar el nombre y el color del reparto del evento ${change.eventId}: ${error.message}`,
+    );
+  }
+  return data.length > 0;
+}
+
 async function findClubTeamLabels(
   serviceClient: SupabaseClient,
   clubId: string,
@@ -450,6 +481,7 @@ function createTeamSplitsGateway(
     findSplit: (eventId) => findSplit(serviceClient, eventId),
     saveSplit: (split) => saveSplit(serviceClient, split),
     publishSplit: (query) => publishSplit(serviceClient, query),
+    relabelDraftSplit: (change) => relabelDraftSplit(serviceClient, change),
   };
 }
 

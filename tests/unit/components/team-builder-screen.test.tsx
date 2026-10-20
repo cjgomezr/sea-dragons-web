@@ -166,6 +166,13 @@ type ClubApi = {
   readonly onWrite?: Respond;
 };
 
+/** Lo que responde el cambio de los equipos del club: los que manda, sin
+ * el evento, y qué pasó con su reparto (D4). */
+function teamsChanged(body: unknown, eventSplit: string): Response {
+  const { a, b } = body as { a: unknown; b: unknown };
+  return jsonResponse(200, { data: { a, b, eventSplit } });
+}
+
 function savedOrPublished({ method, path, body }: RecordedRequest): Response {
   if (method === "PUT") {
     const { assignments } = body as { assignments: unknown[] };
@@ -178,7 +185,7 @@ function savedOrPublished({ method, path, body }: RecordedRequest): Response {
     });
   }
   if (method === "PATCH" && path === TEAM_LABELS_PATH) {
-    return jsonResponse(200, { data: body });
+    return teamsChanged(body, "none");
   }
   if (path.endsWith("/publication")) {
     return jsonResponse(201, {
@@ -1747,7 +1754,7 @@ describe("editar un equipo (#760)", () => {
     expect(applyButton()).toBeDisabled();
   });
 
-  it("al aplicar manda los dos equipos, cierra y pinta el nombre y el color nuevos", async () => {
+  it("al aplicar manda los dos equipos con el evento abierto, cierra y pinta el nombre y el color nuevos", async () => {
     stubClub();
     await openEditor();
     await renameKelp("Team Reef");
@@ -1762,6 +1769,7 @@ describe("editar un equipo (#760)", () => {
         body: {
           a: { name: "Team Reef", color: "#D64545" },
           b: { name: "Team Tide", color: "#C99A3E" },
+          eventId: SCRIMMAGE.id,
         },
       },
     ]);
@@ -1772,6 +1780,35 @@ describe("editar un equipo (#760)", () => {
     expect(totals()).toHaveTextContent("Team Reef");
     expect(screen.getByRole("status")).toHaveTextContent(
       "Team updated · used for every event from now on",
+    );
+  });
+
+  it("con el reparto ya publicado lo deja con sus equipos y lo dice", async () => {
+    stubClub({
+      builders: [
+        builderFor(SCRIMMAGE, {
+          split: {
+            mode: "manual",
+            publishedAt: "2027-06-15T10:05:00.000Z",
+            assignments: [assigned(DANIELA, "a"), assigned(ETHAN, "b")],
+          },
+        }),
+        builderFor(COMPETITION),
+      ],
+      onWrite: ({ body }) => teamsChanged(body, "published"),
+    });
+    await openEditor();
+    await renameKelp("Team Reef");
+
+    await userEvent.click(applyButton());
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(region("Team Kelp")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Team Reef" })).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Team updated for the next events. These published teams keep their name and colour.",
     );
   });
 
@@ -1885,7 +1922,7 @@ describe("editar un equipo (#760)", () => {
       {
         method: "PATCH",
         path: TEAM_LABELS_PATH,
-        body: DEFAULT_TEAM_LABELS,
+        body: { ...DEFAULT_TEAM_LABELS, eventId: SCRIMMAGE.id },
       },
     ]);
     expect(

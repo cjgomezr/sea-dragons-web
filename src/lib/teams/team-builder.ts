@@ -176,6 +176,13 @@ export type TeamSplitsGateway = {
     readonly clubId: string;
     readonly eventId: string;
   }): Promise<TeamSplitPublication>;
+  /** Cambia sólo el nombre y el color del reparto de ese evento del club, y
+   * sólo si está guardado y sin publicar (D4). Dice si cambió alguno. */
+  relabelDraftSplit(change: {
+    readonly clubId: string;
+    readonly eventId: string;
+    readonly teams: TeamLabels;
+  }): Promise<boolean>;
 };
 
 /** Los equipos del club (#755, D1 del PRD de E28): los que estrena un

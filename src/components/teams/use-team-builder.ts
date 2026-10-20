@@ -41,7 +41,8 @@ export type BuilderAction =
   | { readonly kind: "balanced" }
   | { readonly kind: "saved" }
   | { readonly kind: "published"; readonly notifiedCount: number }
-  | { readonly kind: "teamsChanged" }
+  /** `keptByPublished`: el reparto ya publicado conserva los suyos (D4). */
+  | { readonly kind: "teamsChanged"; readonly keptByPublished: boolean }
   | { readonly kind: "failed"; readonly failure: TeamsFailure };
 
 /** El último movimiento, para anunciarlo: un jugador, o los dos de un
@@ -242,16 +243,21 @@ export function useTeamBuilder(eventId: string): TeamBuilderControls {
       }));
     });
 
-  /** Cambia los equipos del club y, si los acepta, también los del borrador
-   * abierto (D4 del PRD de E28). Un fallo no toca el aviso de la pantalla:
-   * lo enseña la ventana de editar, que sigue abierta. */
+  /** Cambia los equipos del club y los del reparto de este evento, que el
+   * servidor ya guardó si estaba guardado sin publicar (D4 del PRD de E28).
+   * Uno publicado conserva los suyos, y la pantalla también. Un fallo no toca
+   * el aviso de la pantalla: lo enseña la ventana de editar, que sigue
+   * abierta. */
   async function changeTeams(teams: TeamLabels): Promise<TeamsChangeOutcome> {
-    const outcome = await changeClubTeams(teams);
+    const outcome = await changeClubTeams(teams, eventId);
     if (outcome.kind === "changed") {
+      const keptByPublished = outcome.eventSplit === "published";
       update((ready) => ({
         ...ready,
-        draft: { ...ready.draft, teams: outcome.teams },
-        action: { kind: "teamsChanged" },
+        draft: keptByPublished
+          ? ready.draft
+          : { ...ready.draft, teams: outcome.teams },
+        action: { kind: "teamsChanged", keptByPublished },
       }));
     }
     return outcome;

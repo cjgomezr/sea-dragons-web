@@ -15,6 +15,8 @@ import {
 import { EVENT_TYPES } from "@/lib/events/event-creation";
 import type { Translator } from "@/lib/i18n/translator";
 import {
+  EVENT_SPLIT_LABELS,
+  type EventSplitLabels,
   TEAM_IDS,
   TEAM_SPLIT_MODES,
   type TeamAssignment,
@@ -92,6 +94,10 @@ const balancedResponseSchema = z.object({
 
 const clubTeamsResponseSchema = z.object({ data: teamLabelsSchema });
 
+const clubTeamsChangeResponseSchema = z.object({
+  data: teamLabelsSchema.extend({ eventSplit: z.enum(EVENT_SPLIT_LABELS) }),
+});
+
 const savedResponseSchema = z.object({
   data: z.object({ assignedCount: z.number().int().nonnegative() }),
 });
@@ -143,7 +149,12 @@ export type ClubTeamsLoad =
   { readonly kind: "loaded"; readonly teams: TeamLabels } | TeamsFailure;
 
 export type TeamsChangeOutcome =
-  { readonly kind: "changed"; readonly teams: TeamLabels } | TeamsFailure;
+  | {
+      readonly kind: "changed";
+      readonly teams: TeamLabels;
+      readonly eventSplit: EventSplitLabels;
+    }
+  | TeamsFailure;
 
 function eventPath(template: string, eventId: string): string {
   return template.replace("[eventId]", encodeURIComponent(eventId));
@@ -229,21 +240,26 @@ export async function loadClubTeams(): Promise<ClubTeamsLoad> {
 }
 
 /** Cambia el nombre y el color de los equipos del club (#755, RF-1 del PRD
- * de E28). Responde los que quedaron guardados, ya recortados. */
+ * de E28) desde el builder de un evento, que los estrena si su reparto está
+ * guardado y sin publicar (D4). Responde los que quedaron guardados, ya
+ * recortados, y qué pasó con ese reparto. */
 export async function changeClubTeams(
   teams: TeamLabels,
+  eventId: string,
 ): Promise<TeamsChangeOutcome> {
   const read = readApiPayload(
     await requestApi(CLUB_TEAM_LABELS_API_PATH, {
       method: "PATCH",
       headers: JSON_REQUEST_HEADERS,
-      body: JSON.stringify(teams),
+      body: JSON.stringify({ ...teams, eventId }),
     }),
-    clubTeamsResponseSchema,
+    clubTeamsChangeResponseSchema,
   );
-  return read.kind === "failed"
-    ? read
-    : { kind: "changed", teams: read.value.data };
+  if (read.kind === "failed") {
+    return read;
+  }
+  const { eventSplit, ...saved } = read.value.data;
+  return { kind: "changed", teams: saved, eventSplit };
 }
 
 /** Los `reason` del 422 del builder (#401, D2). */
