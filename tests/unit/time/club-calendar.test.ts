@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CLUB_TIME_ZONE,
   clubCalendarDate,
+  clubDaysBetween,
   subtractClubDays,
 } from "@/lib/time/club-calendar";
 
@@ -42,5 +43,23 @@ describe("restar días a una fecha del club", () => {
 
   it("cruza el fin de año", () => {
     expect(subtractClubDays("2027-01-10", 30)).toBe("2026-12-11");
+  });
+});
+
+describe("días entre dos fechas del club (#773)", () => {
+  it("cuenta los días que faltan hasta una fecha posterior", () => {
+    expect(clubDaysBetween("2026-10-20", "2026-12-31")).toBe(72);
+  });
+
+  it("da cero para el mismo día", () => {
+    expect(clubDaysBetween("2026-10-20", "2026-10-20")).toBe(0);
+  });
+
+  it("da un número negativo para una fecha que ya pasó", () => {
+    expect(clubDaysBetween("2026-10-20", "2026-10-18")).toBe(-2);
+  });
+
+  it("no pierde un día al cruzar el cambio de horario de verano", () => {
+    expect(clubDaysBetween("2026-10-03", "2026-10-05")).toBe(2);
   });
 });
