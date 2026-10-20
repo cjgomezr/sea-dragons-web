@@ -6,6 +6,7 @@ import {
   requestApi,
 } from "@/lib/api/request-api";
 import {
+  CLUB_TEAM_LABELS_API_PATH,
   TEAMS_API_PATH,
   TEAM_AUTO_BALANCE_API_PATH,
   TEAM_BUILDER_API_PATH,
@@ -89,6 +90,8 @@ const balancedResponseSchema = z.object({
   }),
 });
 
+const clubTeamsResponseSchema = z.object({ data: teamLabelsSchema });
+
 const savedResponseSchema = z.object({
   data: z.object({ assignedCount: z.number().int().nonnegative() }),
 });
@@ -135,6 +138,9 @@ export type PublishOutcome =
       readonly notifiedCount: number;
     }
   | TeamsFailure;
+
+export type TeamsChangeOutcome =
+  { readonly kind: "changed"; readonly teams: TeamLabels } | TeamsFailure;
 
 function eventPath(template: string, eventId: string): string {
   return template.replace("[eventId]", encodeURIComponent(eventId));
@@ -205,6 +211,24 @@ export async function publishSplit(eventId: string): Promise<PublishOutcome> {
   return read.kind === "failed"
     ? read
     : { kind: "published", ...read.value.data };
+}
+
+/** Cambia el nombre y el color de los equipos del club (#755, RF-1 del PRD
+ * de E28). Responde los que quedaron guardados, ya recortados. */
+export async function changeClubTeams(
+  teams: TeamLabels,
+): Promise<TeamsChangeOutcome> {
+  const read = readApiPayload(
+    await requestApi(CLUB_TEAM_LABELS_API_PATH, {
+      method: "PATCH",
+      headers: JSON_REQUEST_HEADERS,
+      body: JSON.stringify(teams),
+    }),
+    clubTeamsResponseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "changed", teams: read.value.data };
 }
 
 /** Los `reason` del 422 del builder (#401, D2). */

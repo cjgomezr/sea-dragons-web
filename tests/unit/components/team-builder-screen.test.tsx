@@ -8,6 +8,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TeamBuilderScreen } from "@/components/teams/TeamBuilderScreen";
+import { stubScreenWidth } from "../../support/screen-width";
 import type { BuildableEvents } from "@/lib/teams/buildable-events";
 import {
   DEFAULT_TEAM_LABELS,
@@ -28,6 +29,7 @@ import {
 vi.mock("next/navigation", () => ({ usePathname: () => "/equipos" }));
 
 const EVENTS_PATH = "/api/v1/teams";
+const TEAM_LABELS_PATH = "/api/v1/club/team-labels";
 
 const SCRIMMAGE: TeamBuilderEventSummary = {
   id: "e1e1e1e1-0000-4000-8000-000000000001",
@@ -172,6 +174,9 @@ function savedOrPublished({ method, path, body }: RecordedRequest): Response {
         assignedCount: assignments.length,
       },
     });
+  }
+  if (method === "PATCH" && path === TEAM_LABELS_PATH) {
+    return jsonResponse(200, { data: body });
   }
   if (path.endsWith("/publication")) {
     return jsonResponse(201, {
@@ -1340,16 +1345,6 @@ describe("las columnas de equipo (#759)", () => {
     ).toHaveAttribute("aria-live", "polite");
   });
 
-  it("todavía no lleva el botón de editar el equipo", async () => {
-    stubClub({ builders: [COVERED] });
-
-    await openScreen();
-
-    expect(
-      within(region("Team Kelp")).queryByRole("button", { name: /edit/i }),
-    ).not.toBeInTheDocument();
-  });
-
   it("escribe en español la cabecera, la cobertura y los nombres de los botones", async () => {
     stubClub({ builders: [COVERED] });
 
@@ -1432,6 +1427,322 @@ describe("en español", () => {
       expect(
         screen.getByRole("link", { name: "Ir al calendario" }),
       ).toBeInTheDocument(),
+    );
+  });
+});
+
+describe("editar un equipo (#760)", () => {
+  const EDIT_KELP = "Edit name and colour of Team Kelp";
+
+  function editButton(name = EDIT_KELP): HTMLElement {
+    return screen.getByRole("button", { name });
+  }
+
+  function editor(): HTMLElement {
+    return screen.getByRole("dialog", { name: "Edit team" });
+  }
+
+  function nameField(): HTMLElement {
+    return within(editor()).getByRole("textbox", { name: "Name" });
+  }
+
+  function applyButton(): HTMLElement {
+    return within(editor()).getByRole("button", { name: "Apply" });
+  }
+
+  async function openEditor(): Promise<void> {
+    await openScreen();
+    await userEvent.click(editButton());
+  }
+
+  async function renameKelp(name: string): Promise<void> {
+    await userEvent.clear(nameField());
+    await userEvent.type(nameField(), name);
+  }
+
+  it("lleva en la cabecera de cada equipo un botón de icono que dice qué edita", async () => {
+    stubClub();
+
+    await openScreen();
+
+    for (const team of ["Team Kelp", "Team Tide"]) {
+      const button = within(region(team)).getByRole("button", {
+        name: `Edit name and colour of ${team}`,
+      });
+      expect(button).toHaveTextContent("");
+      expect(button.querySelector("svg")).not.toBeNull();
+    }
+  });
+
+  it("abre Editar equipo con el foco en el nombre, que trae el de ahora", async () => {
+    stubClub();
+
+    await openEditor();
+
+    expect(nameField()).toHaveFocus();
+    expect(nameField()).toHaveValue("Team Kelp");
+    expect(nameField()).toHaveAttribute("maxlength", "24");
+  });
+
+  it("ofrece los doce colores como un grupo de radios, con el elegido marcado y nombrado", async () => {
+    stubClub();
+
+    await openEditor();
+
+    const colors = within(editor()).getByRole("radiogroup", {
+      name: "Bib colour · Blue",
+    });
+    expect(within(colors).getAllByRole("radio")).toHaveLength(12);
+    expect(within(colors).getByRole("radio", { name: "Blue" })).toBeChecked();
+  });
+
+  it("desactiva el color del otro equipo y dice quién lo usa", async () => {
+    stubClub();
+
+    await openEditor();
+
+    expect(
+      within(editor()).getByRole("radio", { name: "Gold (used by Team Tide)" }),
+    ).toBeDisabled();
+  });
+
+  it("al elegir otro color lo nombra tras Color del peto", async () => {
+    stubClub();
+    await openEditor();
+
+    await userEvent.click(within(editor()).getByRole("radio", { name: "Red" }));
+
+    expect(
+      within(editor()).getByRole("radiogroup", { name: "Bib colour · Red" }),
+    ).toBeInTheDocument();
+    expect(within(editor()).getByRole("radio", { name: "Red" })).toBeChecked();
+  });
+
+  it("elige el color con las flechas", async () => {
+    stubClub();
+    await openEditor();
+    within(editor()).getByRole("radio", { name: "Blue" }).focus();
+
+    await userEvent.keyboard("{ArrowRight}");
+
+    expect(within(editor()).getByRole("radio", { name: "Navy" })).toBeChecked();
+  });
+
+  it("explica el tachado y que el cambio vale desde ahora", async () => {
+    stubClub();
+
+    await openEditor();
+
+    expect(editor()).toHaveTextContent(
+      "The crossed one is the other team's colour.",
+    );
+    expect(editor()).toHaveTextContent(
+      "Used for every event from now on. Teams already published keep their colours.",
+    );
+  });
+
+  it("no deja aplicar un nombre vacío", async () => {
+    stubClub();
+    await openEditor();
+
+    await userEvent.clear(nameField());
+    await userEvent.type(nameField(), "   ");
+
+    expect(applyButton()).toBeDisabled();
+  });
+
+  it("al aplicar manda los dos equipos, cierra y pinta el nombre y el color nuevos", async () => {
+    stubClub();
+    await openEditor();
+    await renameKelp("Team Reef");
+    await userEvent.click(within(editor()).getByRole("radio", { name: "Red" }));
+
+    await userEvent.click(applyButton());
+
+    expect(writes()).toEqual([
+      {
+        method: "PATCH",
+        path: TEAM_LABELS_PATH,
+        body: {
+          a: { name: "Team Reef", color: "#D64545" },
+          b: { name: "Team Tide", color: "#C99A3E" },
+        },
+      },
+    ]);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(region("Team Reef")).toHaveStyle({ "--team-color": "#D64545" });
+    expect(totals()).toHaveTextContent("Team Reef");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Team updated · used for every event from now on",
+    );
+  });
+
+  it("si el servidor responde 400 sigue abierta con el aviso y lo escrito", async () => {
+    stubClub({
+      onWrite: () =>
+        jsonResponse(400, {
+          error: { code: "validation_error", message: "No." },
+        }),
+    });
+    await openEditor();
+    await renameKelp("Team Reef");
+
+    await userEvent.click(applyButton());
+
+    expect(await within(editor()).findByRole("alert")).toHaveTextContent(
+      "Check the name and the colour",
+    );
+    expect(nameField()).toHaveValue("Team Reef");
+    expect(region("Team Kelp")).toBeInTheDocument();
+  });
+
+  it("si la red falla sigue abierta con el aviso y lo escrito", async () => {
+    stubClub({
+      onWrite: () => {
+        throw new TypeError("Failed to fetch");
+      },
+    });
+    await openEditor();
+    await renameKelp("Team Reef");
+
+    await userEvent.click(applyButton());
+
+    expect(await within(editor()).findByRole("alert")).toBeInTheDocument();
+    expect(nameField()).toHaveValue("Team Reef");
+  });
+
+  it("Escape la cierra sin cambios y devuelve el foco al botón", async () => {
+    stubClub();
+    await openEditor();
+    await renameKelp("Team Reef");
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(editButton()).toHaveFocus();
+    expect(region("Team Kelp")).toBeInTheDocument();
+    expect(writes()).toEqual([]);
+  });
+
+  it("Cancelar la cierra sin cambios y devuelve el foco al botón", async () => {
+    stubClub();
+    await openEditor();
+
+    await userEvent.click(
+      within(editor()).getByRole("button", { name: "Cancel" }),
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(editButton()).toHaveFocus();
+    expect(writes()).toEqual([]);
+  });
+
+  it("un clic fuera la cierra sin cambios y devuelve el foco al botón", async () => {
+    stubClub();
+    await openEditor();
+
+    fireEvent.mouseDown(region("Team Tide"));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(editButton()).toHaveFocus();
+    expect(writes()).toEqual([]);
+  });
+
+  it("Tab no saca el foco de la ventana", async () => {
+    stubClub();
+    await openEditor();
+    applyButton().focus();
+
+    await userEvent.tab();
+
+    expect(nameField()).toHaveFocus();
+  });
+
+  it("Mayúsculas+Tab desde el nombre va al último botón", async () => {
+    stubClub();
+    await openEditor();
+
+    await userEvent.tab({ shift: true });
+
+    expect(applyButton()).toHaveFocus();
+  });
+
+  it("en el móvil es una hoja inferior con Cancelar y Aplicar", async () => {
+    stubScreenWidth(true);
+    stubClub();
+
+    await openEditor();
+
+    expect(editor().tagName).toBe("DIALOG");
+    expect(editor()).toHaveClass("directory-sheet");
+    expect(nameField()).toHaveValue("Team Kelp");
+    expect(
+      within(editor()).getByRole("button", { name: "Cancel" }),
+    ).toBeInTheDocument();
+    expect(applyButton()).toBeInTheDocument();
+  });
+
+  it("en el móvil aplica y cierra la hoja", async () => {
+    stubScreenWidth(true);
+    stubClub();
+    await openEditor();
+    await renameKelp("Team Reef");
+
+    await userEvent.click(applyButton());
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(region("Team Reef")).toBeInTheDocument();
+  });
+
+  it("escribe la ventana en español", async () => {
+    stubClub();
+    await openScreen("es");
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Editar nombre y color de Team Kelp",
+      }),
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Editar equipo" });
+    expect(
+      within(dialog).getByRole("textbox", { name: "Nombre" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("radiogroup", { name: "Color del peto · Azul" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("radio", { name: "Dorado (lo usa Team Tide)" }),
+    ).toBeDisabled();
+    expect(dialog).toHaveTextContent("El tachado es el color del otro equipo.");
+    expect(dialog).toHaveTextContent(
+      "Se usa en todos los eventos desde ahora. Los equipos ya publicados conservan sus colores.",
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "Cancelar" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Aplicar" }),
+    ).toBeInTheDocument();
+  });
+
+  it("avisa en español que el equipo cambió", async () => {
+    stubClub();
+    await openScreen("es");
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Editar nombre y color de Team Kelp",
+      }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Equipo actualizado · se usa en todos los eventos desde ahora",
     );
   });
 });
