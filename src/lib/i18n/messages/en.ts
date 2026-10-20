@@ -400,6 +400,7 @@ export const englishMessages = {
   "account.role.title": "Role · {role}",
   "account.role.hint": "Coach or committee? Ask an Admin.",
   "account.role.request": "Request",
+  "account.role.requestChange": "Request a role change",
   // Grupos en la columna derecha del perfil y de la ficha (#774).
   "profileAside.groups.title": "Groups",
   "profileAside.groups.empty": "No groups",
@@ -557,6 +558,10 @@ export const englishMessages = {
   "profileCompletion.item.emergency_contact": "Emergency contact",
   "profileCompletion.item.phone": "Phone",
   "profileCompletion.item.country": "Country",
+  "profileCompletion.phoneTitle": "Almost there · {percent} complete",
+  "profileBar.back": "Back",
+  "profileBar.ownTitle": "My profile",
+  "profileBar.memberTitle": "Member",
   "account.photo.issue.photoTooLarge":
     "This photo is larger than {max} MB. Choose a smaller one.",
   "account.photo.issue.photoTypeUnsupported":
@@ -1152,6 +1157,7 @@ export const englishMessages = {
   "memberRecord.contactActions": "Contact {name}",
   "memberRecord.contactMissing": "{action} (none)",
   "memberRecord.menu.open": "More actions",
+  "memberRecord.menu.close": "Close actions",
   "memberRecord.menu.changeRole": "Change role",
   "memberRecord.menu.waive": "Waive membership fee",
   "memberRecord.menu.removeWaiver": "Remove waiver",

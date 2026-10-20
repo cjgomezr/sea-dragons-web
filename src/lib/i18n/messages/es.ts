@@ -394,6 +394,7 @@ export const spanishMessages: MessageCatalog = {
   "account.role.title": "Rol · {role}",
   "account.role.hint": "¿Coach o committee? Pídeselo a un Admin.",
   "account.role.request": "Solicitar",
+  "account.role.requestChange": "Solicitar un cambio de rol",
   // Grupos en la columna derecha del perfil y de la ficha (#774).
   "profileAside.groups.title": "Grupos",
   "profileAside.groups.empty": "Sin grupos",
@@ -551,6 +552,10 @@ export const spanishMessages: MessageCatalog = {
   "profileCompletion.item.emergency_contact": "Contacto de emergencia",
   "profileCompletion.item.phone": "Teléfono",
   "profileCompletion.item.country": "País",
+  "profileCompletion.phoneTitle": "Casi listo · {percent} completo",
+  "profileBar.back": "Volver",
+  "profileBar.ownTitle": "Mi perfil",
+  "profileBar.memberTitle": "Miembro",
   "account.photo.issue.photoTooLarge":
     "Esta foto pesa más de {max} MB. Elige una más pequeña.",
   "account.photo.issue.photoTypeUnsupported":
@@ -1148,6 +1153,7 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.contactActions": "Contactar a {name}",
   "memberRecord.contactMissing": "{action} (no hay)",
   "memberRecord.menu.open": "Más acciones",
+  "memberRecord.menu.close": "Cerrar acciones",
   "memberRecord.menu.changeRole": "Cambiar rol",
   "memberRecord.menu.waive": "Eximir de la cuota",
   "memberRecord.menu.removeWaiver": "Retirar la exención",

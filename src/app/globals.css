@@ -3238,6 +3238,458 @@ a.auth-brand-header:focus-visible {
   opacity: 0.6;
 }
 
+/* El perfil y la ficha en el móvil (#777, RF-7 y D14 del PRD de E30), de
+   docs/design/design_handoff_profile/screenshots/05, 06 y 07. Una columna:
+   la barra de arriba de 52 px, la cabecera centrada, tarjetas con filas
+   grandes y, para el Admin, el ⋯ en una hoja inferior. Desde 768 px nada de
+   esto cambia el escritorio: la barra y la línea "rol · posición ·
+   experiencia" se esconden. */
+.profile-phone-bar,
+.profile-hero-summary {
+  display: none;
+}
+
+/* La tarjeta de lo que falta en el móvil: una fila de 44 px por dato. */
+.profile-missing-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.profile-missing-card .profile-strip-text {
+  flex: none;
+  font-weight: 600;
+}
+
+.profile-missing-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target-min);
+  padding: 0 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.profile-missing-row-label,
+.profile-role-row-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-missing-row > svg:last-child,
+.profile-role-row > svg {
+  flex: none;
+  color: var(--color-text-secondary);
+}
+
+/* La fila de 56 px para pedir otro rol, al final del perfil. */
+.profile-role-phone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.profile-role-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.profile-role-row > svg:first-child {
+  font-size: 20px;
+}
+
+.profile-missing-row:hover,
+.profile-role-row:hover {
+  border-color: var(--color-accent);
+}
+
+.profile-missing-row:focus-visible,
+.profile-role-row:focus-visible,
+.profile-phone-bar-button:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+/* La hoja del ⋯: filas de 52 px y Desactivar en peligro tras la raya. */
+.member-admin-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.member-admin-sheet .member-admin-menu-item {
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 12px;
+  font-size: 15px;
+  border-radius: 10px;
+}
+
+.member-admin-sheet .member-admin-menu-item > svg {
+  font-size: 20px;
+}
+
+.member-admin-sheet .member-admin-menu-detail {
+  font-size: 13px;
+}
+
+@media (width < 768px) {
+  /* Sale por los lados hasta el borde, como la barra de una noticia, y se
+     pega bajo la cabecera de la app. */
+  .profile-phone-bar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns:
+      var(--touch-target-min) minmax(0, 1fr)
+      var(--touch-target-min);
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 52px;
+    margin: calc(-1 * var(--space-8)) calc(-1 * var(--space-4)) 0;
+    padding: 0 6px;
+    background: var(--color-background);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .profile-phone-bar-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+    padding: 0;
+    font-size: 21px;
+    color: var(--color-text);
+    background: none;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+
+  .profile-phone-bar-button:hover,
+  .profile-phone-bar-button[aria-expanded="true"] {
+    background: var(--color-hover);
+  }
+
+  .profile-phone-bar-title {
+    overflow: hidden;
+    font-size: 16px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .account,
+  .member-record-wide {
+    gap: 14px;
+  }
+
+  /* La cabecera centrada: la foto de 96 px (la cámara del socio de 40 px),
+     el nombre de 22 px, "rol · posición · experiencia" y las fichas. */
+  .profile-hero {
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-2) 0 0;
+    text-align: center;
+    background: none;
+    border: none;
+    border-radius: 0;
+  }
+
+  .profile-hero-camera {
+    right: -4px;
+    bottom: -4px;
+    width: 40px;
+    height: 40px;
+    font-size: 17px;
+    box-shadow: 0 0 0 3px var(--color-background);
+  }
+
+  .profile-hero-identity {
+    flex: none;
+    align-items: center;
+    width: 100%;
+  }
+
+  .profile-hero-title {
+    justify-content: center;
+  }
+
+  .app-main .profile-hero-title h1 {
+    font-size: 22px;
+    line-height: 1.25;
+  }
+
+  .profile-hero-identity:has(.profile-hero-summary) .profile-hero-role,
+  .profile-hero-details {
+    display: none;
+  }
+
+  .profile-hero-summary {
+    display: block;
+    margin: 0;
+    font-size: 14px;
+    color: var(--color-text-soft);
+  }
+
+  .profile-hero-chips {
+    justify-content: center;
+  }
+
+  .profile-hero-photo-remove {
+    align-self: center;
+  }
+
+  /* El staff: tres botones iguales de 48 px a lo ancho. El Coach, que sólo
+     tiene el de emergencia, lo lleva solo a lo ancho. */
+  .member-record-actions,
+  .member-record-contact {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .member-record-contact {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: var(--space-2);
+  }
+
+  .member-record-contact .directory-contact-action {
+    width: 100%;
+    height: 48px;
+    font-size: 20px;
+  }
+
+  /* El AUF sin verificar: Verificar AUF a lo ancho, de 46 px. */
+  .profile-strip-warning:has(.profile-strip-button) {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .profile-strip-warning:has(.profile-strip-button) .profile-strip-text {
+    flex: none;
+  }
+
+  .profile-strip-warning:has(.profile-strip-button) .profile-strip-icon {
+    display: none;
+  }
+
+  .profile-strip-button {
+    justify-content: center;
+    width: 100%;
+    min-height: 46px;
+    font-size: 15px;
+  }
+
+  /* Sobre mí y Contacto: Editar de 44 px, filas de lectura de al menos
+     46 px con la etiqueta a la izquierda y el valor a la derecha, y las de
+     Contacto de 58 px. */
+  .profile-card-header {
+    padding: 0 0 0 14px;
+  }
+
+  .profile-card-edit {
+    min-width: var(--touch-target-min);
+    height: var(--touch-target-min);
+  }
+
+  .profile-details,
+  .profile-contact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-detail {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 46px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .profile-detail:nth-last-child(-n + 2):nth-child(odd) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .profile-detail:last-child {
+    border-bottom: 0;
+  }
+
+  .profile-detail dt {
+    flex: none;
+    font-size: 13.5px;
+  }
+
+  .profile-detail dd {
+    text-align: right;
+  }
+
+  .profile-contact-half {
+    min-height: 58px;
+    padding: 6px 14px;
+  }
+
+  .profile-contact-half + .profile-contact-half {
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
+  }
+
+  /* La edición: los campos apilados, de 48 px con texto de 16 px, la
+     experiencia en un segmento de 40 px y Cancelar y Guardar de 48 px. */
+  .profile-card-form {
+    padding: 12px 14px 14px;
+  }
+
+  .profile-card-grid,
+  .profile-card-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-card-form .auth-field input,
+  .profile-card-form .auth-field select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .profile-card-form .segmented-choice-option span {
+    min-height: 40px;
+  }
+
+  .profile-card-actions {
+    flex-wrap: nowrap;
+  }
+
+  .profile-card-cancel,
+  .profile-card-form .profile-card-save {
+    min-height: 48px;
+    font-size: 15px;
+  }
+
+  .profile-card-cancel {
+    flex: 1;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+  }
+
+  .profile-card-form .profile-card-save {
+    flex: 1.4;
+    border-radius: 10px;
+  }
+
+  /* El AUF: una fila de 58 px, el número y el vencimiento a la izquierda y
+     el estado a la derecha. Las etiquetas siguen ahí para quien no ve. */
+  .profile-auf-cells {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-auto-flow: row;
+    align-items: center;
+    column-gap: 12px;
+    min-height: 58px;
+    padding: 6px 14px;
+  }
+
+  .profile-auf-cells .profile-cell {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+    padding: 0;
+  }
+
+  .profile-auf-cells .profile-cell + .profile-cell {
+    border: 0;
+  }
+
+  .profile-auf-cells .profile-cell:last-child {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+  }
+
+  .profile-auf-cells .profile-cell:last-child dt {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  /* Asistencia y Membresía, lado a lado en dos tarjetas resumen; lo que
+     sigue va a lo ancho. */
+  .profile-aside {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .profile-aside > :nth-child(n + 3) {
+    grid-column: 1 / -1;
+  }
+
+  .profile-aside > :nth-child(-n + 2) {
+    gap: var(--space-1);
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .profile-aside > :nth-child(-n + 2) .profile-side-card-note,
+  .profile-aside > :nth-child(-n + 2) .profile-membership-tile,
+  .profile-aside > :nth-child(-n + 2) .season-attendance-legend,
+  .profile-aside > :nth-child(-n + 2) .season-attendance-figures > :last-child {
+    display: none;
+  }
+
+  .app-main .profile-aside > :nth-child(-n + 2) h2 {
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--color-text-secondary);
+  }
+
+  .profile-aside .season-attendance-percent {
+    font-size: 24px;
+  }
+
+  .profile-aside .season-attendance-blocks {
+    gap: 2px;
+  }
+
+  .profile-aside .season-attendance-block {
+    height: 10px;
+    border-radius: 2px;
+  }
+
+  /* Grupos: fichas de 30 px. */
+  .profile-group-chips li {
+    min-height: 30px;
+  }
+}
+
 /* La foto de perfil (#245). La imagen ocupa el mismo círculo que las
    iniciales y se recorta a él sin deformarse. */
 .member-photo {
