@@ -256,6 +256,7 @@ function SplitBoard({
         draft={draft}
         totals={totals}
         onMove={controls.move}
+        onChangeTeams={controls.changeTeams}
       />
       {suggestion === null ? null : (
         <SwapSuggestion

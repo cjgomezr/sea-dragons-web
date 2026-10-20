@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { cycleFocus, focusableIn } from "@/components/focus-cycle";
 import { wasLastInputPointer } from "@/components/input-modality";
 import { useDismissal } from "@/components/use-dismissal";
 import { useSheetDrag } from "./use-sheet-drag";
@@ -26,35 +27,6 @@ import { useSheetDrag } from "./use-sheet-drag";
  * Se cierra también arrastrándola hacia abajo desde arriba: el asa y el
  * título, o el encabezado propio (`useSheetDrag`).
  */
-
-const FOCUSABLE_SELECTOR = "select, input, button:not(:disabled), a[href]";
-
-function focusableIn(panel: HTMLElement | null): readonly HTMLElement[] {
-  return panel === null
-    ? []
-    : [...panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
-}
-
-/** Tab desde el último control vuelve al primero, y Mayúsculas+Tab desde el
- * primero va al último. El `<dialog>` modal deja inerte la página, pero no
- * impide que el foco salga a la barra del navegador. */
-function cycleFocus(
-  event: React.KeyboardEvent,
-  panel: HTMLElement | null,
-): void {
-  if (event.key !== "Tab") {
-    return;
-  }
-  const focusable = focusableIn(panel);
-  const first = focusable.at(0);
-  const last = focusable.at(-1);
-  const edge = event.shiftKey ? first : last;
-  if (edge === undefined || document.activeElement !== edge) {
-    return;
-  }
-  event.preventDefault();
-  (event.shiftKey ? last : first)?.focus();
-}
 
 /** Quien abre la hoja con el teclado deja el foco con su contorno en el
  * botón o la fila que la abre; un toque no. El contorno solo no basta: tras
