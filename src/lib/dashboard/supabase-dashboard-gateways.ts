@@ -1,10 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createAttendanceSessionsGateways } from "@/lib/attendance/supabase-attendance-gateways";
-import {
-  createClubAttendanceRateGateways,
-  createMemberAttendanceGateway,
-} from "@/lib/attendance/supabase-attendance-stats";
+import { createClubAttendanceRateGateways } from "@/lib/attendance/supabase-attendance-stats";
 import { createSeasonAttendanceGateway } from "@/lib/attendance/supabase-season-attendance";
 import { createClubAdministrationGateways } from "@/lib/auth/supabase-club-administration-gateways";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
@@ -148,14 +145,9 @@ const consoleFailureLog: DashboardFailureLog = {
 export function createDashboardGateways(
   serviceClient: SupabaseClient,
 ): DashboardGateways {
-  const members = createRoleRequestGateways(serviceClient).members;
   return {
-    members,
-    clubRate: createClubAttendanceRateGateways(serviceClient),
-    ownAttendance: {
-      members,
-      attendance: createMemberAttendanceGateway(serviceClient),
-    },
+    members: createRoleRequestGateways(serviceClient).members,
+    clubRate: createClubAttendanceRateGateways(serviceClient).clubRate,
     agenda: createEventAgendaGateways(serviceClient),
     news: createNewsGateways(serviceClient),
     roster: createDashboardRosterGateway(serviceClient),

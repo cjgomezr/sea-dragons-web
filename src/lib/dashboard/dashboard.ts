@@ -1,15 +1,4 @@
-import type {
-  ClubAttendanceRate,
-  MemberAttendance,
-} from "@/lib/attendance/attendance-stats";
-import {
-  type ClubAttendanceRateGateways,
-  readClubAttendanceRate,
-} from "@/lib/attendance/club-attendance-rate";
-import {
-  type OwnAttendanceGateways,
-  readOwnAttendance,
-} from "@/lib/attendance/own-attendance";
+import type { ClubAttendanceRateGateways } from "@/lib/attendance/club-attendance-rate";
 import {
   type SeasonAttendance,
   type SeasonAttendanceGateway,
@@ -17,14 +6,11 @@ import {
 } from "@/lib/attendance/season-attendance";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { RoleRequestGateways } from "@/lib/auth/role-request";
-import { type Role, hasCapability } from "@/lib/auth/roles";
 import {
-  type AgendaEvent,
   type AgendaPeriod,
   type EventAgendaGateways,
   listAgenda,
 } from "@/lib/events/event-agenda";
-import { isStillAhead } from "@/lib/events/event-occurrences";
 import {
   type MembershipBlock,
   type MembershipGateway,
@@ -34,7 +20,6 @@ import {
   readMembership,
 } from "@/lib/membership/membership";
 import { nextChargeOf } from "@/lib/membership/membership-view";
-import type { RsvpResponse } from "@/lib/events/event-rsvp";
 import {
   type NewsFeedItem,
   type NewsFeedPage,
@@ -48,11 +33,7 @@ import {
 } from "@/lib/members/contact-reminder";
 import type { ProfileContact } from "@/lib/members/profile-contact";
 import type { MyTeamGateways } from "@/lib/teams/my-team";
-import {
-  clubCalendarDate,
-  clubMoment,
-  subtractClubDays,
-} from "@/lib/time/club-calendar";
+import { clubCalendarDate } from "@/lib/time/club-calendar";
 import {
   type AgendaWindow,
   type DashboardNextUpEvent,
@@ -70,6 +51,7 @@ import {
   readClubAttendanceTrend,
   seesManagementColumn,
 } from "./dashboard-management";
+import { firstNameOf } from "./dashboard-view";
 
 export type {
   ClubAttendanceTrend,
@@ -95,75 +77,27 @@ export type {
  * resto se sirve igual (RF-6).
  *
  * Quien no tiene la membresía al día (#453, D2 del PRD de E12) recibe el
- * inicio reducido: el saludo, el motivo y el próximo entrenamiento, sin
- * teselas de club ni noticias. Vale para todos los roles: el personal
- * conserva sus pantallas de gestión desde el menú, no desde el inicio.
+ * inicio reducido: el saludo, el motivo y lo que hay, sin responder. Vale
+ * para todos los roles: el personal conserva sus pantallas de gestión desde
+ * el menú, no desde el inicio.
  *
  * Los dos inicios llevan el aviso de los datos de contacto que faltan (#498,
  * RF-2 del PRD de E19): no depende de tener la membresía al día.
  *
  * El rediseño de E27 (#745) añade a los dos el próximo evento, la semana, la
  * membresía y las noticias. Al inicio reducido las noticias le llegan sólo
- * con el título, la categoría y la fecha (D2).
+ * con el título, la categoría y la fecha (D2). Las teselas, la lista de
+ * próximos y el próximo entrenamiento del inicio de E14 ya no salen (#752).
  *
  * Los dos llevan también la asistencia de la temporada de quien mira (#746,
  * D13). Admin, Coach y Committee al día reciben además la columna de
  * gestión: los pendientes y los números del club (D3, D9, D11).
  */
 
-/** Cuántos eventos y noticias enseña el inicio (FR-077). */
+/** Cuántas noticias enseña el inicio (FR-077). */
 export const DASHBOARD_LIST_SIZE = 3;
 
-/** Los días hacia atrás que cubren las altas (D2). Las noticias sin leer
- * usan la misma ventana, `NEWS_UNREAD_WINDOW_DAYS`. */
-export const DASHBOARD_WINDOW_DAYS = 30;
-
 export type Unavailable = { readonly kind: "unavailable" };
-
-/** La primera tesela según el rol (D1). */
-export type AttendanceTile =
-  | { readonly kind: "club_rate"; readonly rate: ClubAttendanceRate }
-  | { readonly kind: "own_attendance"; readonly attendance: MemberAttendance }
-  | Unavailable;
-
-export type MembersTile =
-  | {
-      readonly kind: "members";
-      readonly active: number;
-      /** Cuántos de los activos se unieron en los últimos 30 días. */
-      readonly joinedRecently: number;
-    }
-  | Unavailable;
-
-export type NextTraining = {
-  readonly id: string;
-  readonly title: string;
-  readonly startsOn: string;
-  readonly startTime: string;
-  readonly location: string;
-  /** Los conteos van con la respuesta: la tarjeta del móvil responde con
-   * ellos igual que una fila del calendario (#426). */
-  readonly goingCount: number;
-  readonly maybeCount: number;
-  readonly myResponse: RsvpResponse | null;
-};
-
-export type NextTrainingTile =
-  | { readonly kind: "training"; readonly training: NextTraining }
-  | { readonly kind: "none" }
-  | Unavailable;
-
-export type UnreadNewsTile =
-  | {
-      readonly kind: "unread";
-      readonly count: number;
-      readonly announcements: number;
-    }
-  | Unavailable;
-
-export type UpcomingEvents =
-  | { readonly kind: "events"; readonly events: readonly AgendaEvent[] }
-  | Unavailable;
 
 /** Lo que ve de una noticia quien no tiene la membresía al día (D2). */
 export type LatestNewsItem = {
@@ -259,13 +193,6 @@ export type MemberDashboard = (PlayerColumn | ManagementColumn) & {
   readonly kind: "member";
   readonly viewer: DashboardViewer;
   readonly me: DashboardMe;
-  readonly tiles: {
-    readonly attendance: AttendanceTile;
-    readonly members: MembersTile;
-    readonly nextTraining: NextTrainingTile;
-    readonly unreadNews: UnreadNewsTile;
-  };
-  readonly upcomingEvents: UpcomingEvents;
   readonly latestNews: LatestNews;
   readonly contactReminder: ContactReminderPart;
   readonly nextUp: NextUp;
@@ -280,7 +207,6 @@ export type RestrictedDashboard = {
   readonly me: DashboardMe;
   /** Por qué: lo que dice el aviso que lleva a Pagos. */
   readonly block: MembershipBlock;
-  readonly nextTraining: NextTrainingTile;
   readonly contactReminder: ContactReminderPart;
   readonly nextUp: NextUp;
   readonly week: Week;
@@ -311,7 +237,6 @@ export type DashboardRosterGateway = {
 
 /** Las partes que pueden caer por separado, para el log. */
 export type DashboardSource =
-  | "attendance"
   | "members"
   | "agenda"
   | "next_up"
@@ -328,8 +253,8 @@ export type DashboardFailureLog = {
 
 export type DashboardGateways = TodoGateways & {
   readonly members: RoleRequestGateways["members"];
-  readonly clubRate: ClubAttendanceRateGateways;
-  readonly ownAttendance: OwnAttendanceGateways;
+  /** Sólo la tasa: de ella salen los números del club (D11). */
+  readonly clubRate: ClubAttendanceRateGateways["clubRate"];
   readonly agenda: EventAgendaGateways;
   readonly news: NewsGateways;
   readonly roster: DashboardRosterGateway;
@@ -346,90 +271,8 @@ export type DashboardRequest = {
 
 const UNAVAILABLE: Unavailable = { kind: "unavailable" };
 
-/** La primera palabra del nombre completo: el saludo dice "Alba", no
- * "Alba Ferrer". */
-function firstNameOf(fullName: string): string {
-  const [firstName = fullName] = fullName.trim().split(/\s+/);
-  return firstName;
-}
-
-/** Admin y Coach, los que pasan lista, ven la tasa del club (D1). */
-function seesClubRate(role: Role): boolean {
-  return hasCapability(role, "buildTeamsAndTrackAttendance");
-}
-
-async function readAttendanceTile(
-  gateways: DashboardGateways,
-  request: DashboardRequest & { readonly role: Role },
-): Promise<AttendanceTile> {
-  if (seesClubRate(request.role)) {
-    return {
-      kind: "club_rate",
-      rate: await readClubAttendanceRate(gateways.clubRate, {
-        callerId: request.callerId,
-        todayInClub: clubCalendarDate(request.now),
-      }),
-    };
-  }
-  return {
-    kind: "own_attendance",
-    attendance: await readOwnAttendance(
-      gateways.ownAttendance,
-      request.callerId,
-    ),
-  };
-}
-
-async function readMembersTile(
-  gateways: DashboardGateways,
-  request: { readonly clubId: string; readonly now: Date },
-): Promise<MembersTile> {
-  const counts = await gateways.roster.countActiveMembers({
-    clubId: request.clubId,
-    // Hoy y los 29 días anteriores, como la tasa del club.
-    joinedSince: subtractClubDays(
-      clubCalendarDate(request.now),
-      DASHBOARD_WINDOW_DAYS - 1,
-    ),
-  });
-  return { kind: "members", ...counts };
-}
-
-/** Lo que el inicio puede enseñar como "próximo": dirigido a quien mira,
- * no cancelado y que todavía no empezó en la hora del club (RF-3). */
-function isAheadForViewer(event: AgendaEvent, now: Date): boolean {
-  return (
-    event.inAudience &&
-    event.status === "scheduled" &&
-    isStillAhead(
-      { date: event.startsOn, time: event.startTime },
-      clubMoment(now),
-    )
-  );
-}
-
-function toNextTrainingTile(events: readonly AgendaEvent[]): NextTrainingTile {
-  const training = events.find((event) => event.eventType === "training");
-  if (training === undefined) {
-    return { kind: "none" };
-  }
-  return {
-    kind: "training",
-    training: {
-      id: training.id,
-      title: training.title,
-      startsOn: training.startsOn,
-      startTime: training.startTime,
-      location: training.location,
-      goingCount: training.goingCount,
-      maybeCount: training.maybeCount,
-      myResponse: training.myResponse,
-    },
-  };
-}
-
 /** La primera página de próximos y la de pasados: 50 eventos sobran para
- * encontrar tres, un entrenamiento y la semana, y los pasados recientes son
+ * encontrar el próximo y la semana, y los pasados recientes son
  * donde está un evento de varios días que sigue en curso (D4). Uno que
  * empezó antes de los 50 pasados más recientes no se ve: para este club no
  * pasa. */
@@ -479,8 +322,8 @@ function toLatestNewsItem(post: NewsFeedItem): LatestNewsItem {
 }
 
 /** `unreadCutoff` es nulo si no se pudo leer la marca de visita: el fallo
- * ya está en el log y la tesela sin leer lo dice, y sin saber qué es nuevo
- * es mejor no marcar ninguna que marcarlas todas. */
+ * ya está en el log, y sin saber qué es nuevo es mejor no marcar ninguna que
+ * marcarlas todas. */
 function toMemberLatestNews(
   page: NewsFeedPage,
   unreadCutoff: number | null,
@@ -538,13 +381,13 @@ async function countUnreadFrom(
   };
 }
 
-async function readUnreadNewsTile(
+async function countUnreadNews(
   gateways: DashboardGateways,
   request: DashboardRequest & {
     readonly firstPage: NewsFeedPage;
     readonly seenAt: string | null;
   },
-): Promise<UnreadNewsTile> {
+): Promise<ClubUnreadNews> {
   const sinceMs = newsUnreadCutoff(request.seenAt, request.now);
   const unread = await countUnreadFrom(gateways, {
     callerId: request.callerId,
@@ -552,10 +395,7 @@ async function readUnreadNewsTile(
     sinceMs,
     now: request.now,
   });
-  return {
-    kind: "unread",
-    ...addPinnedUnread(unread, request.firstPage, sinceMs),
-  };
+  return addPinnedUnread(unread, request.firstPage, sinceMs);
 }
 
 /** La fijada no sale en ninguna página del feed (#592), así que se cuenta
@@ -602,15 +442,11 @@ function isUnavailable<T>(value: T | Unavailable): value is Unavailable {
 }
 
 type EventParts = {
-  readonly nextTraining: NextTrainingTile;
-  readonly upcomingEvents: UpcomingEvents;
   readonly nextUp: NextUp;
   readonly week: Week;
 };
 
 const UNAVAILABLE_EVENT_PARTS: EventParts = {
-  nextTraining: UNAVAILABLE,
-  upcomingEvents: UNAVAILABLE,
   nextUp: UNAVAILABLE,
   week: UNAVAILABLE,
 };
@@ -655,31 +491,23 @@ async function readEventParts(
   if (isUnavailable(window)) {
     return UNAVAILABLE_EVENT_PARTS;
   }
-  const ahead = window.upcoming.filter((event) =>
-    isAheadForViewer(event, request.now),
-  );
   return {
-    nextTraining: toNextTrainingTile(ahead),
-    upcomingEvents: {
-      kind: "events",
-      events: ahead.slice(0, DASHBOARD_LIST_SIZE),
-    },
     nextUp: await readNextUp(gateways, { ...request, window }),
     week: { kind: "week", events: listWeekEvents(window, request.now) },
   };
 }
 
-type NewsParts = {
-  readonly unreadNews: UnreadNewsTile;
-  readonly latestNews: LatestNews;
+/** La primera página del feed y la marca de visita: las noticias del inicio
+ * y la cuenta sin leer de la gestión salen de las dos. */
+type NewsReads = {
+  readonly firstPage: NewsFeedPage | Unavailable;
+  readonly seenAt: string | null | Unavailable;
 };
 
-/** La primera página del feed sirve a las dos partes; sin la marca de
- * visita sólo cae la cuenta sin leer. */
-async function readNewsParts(
+async function readNews(
   gateways: DashboardGateways,
   request: DashboardRequest,
-): Promise<NewsParts> {
+): Promise<NewsReads> {
   const [firstPage, seenAt] = await Promise.all([
     orUnavailable(
       gateways,
@@ -695,25 +523,34 @@ async function readNewsParts(
       gateways.roster.findNewsSeenAt(request.callerId),
     ),
   ]);
+  return { firstPage, seenAt };
+}
+
+function toLatestNews({ firstPage, seenAt }: NewsReads, now: Date): LatestNews {
   if (isUnavailable(firstPage)) {
-    return { unreadNews: UNAVAILABLE, latestNews: UNAVAILABLE };
+    return firstPage;
   }
-  if (isUnavailable(seenAt)) {
-    return {
-      unreadNews: UNAVAILABLE,
-      latestNews: toMemberLatestNews(firstPage, null),
-    };
-  }
-  const latestNews = toMemberLatestNews(
+  return toMemberLatestNews(
     firstPage,
-    newsUnreadCutoff(seenAt, request.now),
+    isUnavailable(seenAt) ? null : newsUnreadCutoff(seenAt, now),
   );
-  const unreadNews = await orUnavailable(
+}
+
+/** Sin el feed o sin la marca de visita no se sabe cuántas hay; el fallo ya
+ * está en el log. */
+async function readUnreadNews(
+  gateways: DashboardGateways,
+  request: DashboardRequest & { readonly news: NewsReads },
+): Promise<ClubUnreadNews | Unavailable> {
+  const { firstPage, seenAt } = request.news;
+  if (isUnavailable(firstPage) || isUnavailable(seenAt)) {
+    return UNAVAILABLE;
+  }
+  return orUnavailable(
     gateways,
     "news",
-    readUnreadNewsTile(gateways, { ...request, firstPage, seenAt }),
+    countUnreadNews(gateways, { ...request, firstPage, seenAt }),
   );
-  return { unreadNews, latestNews };
 }
 
 /** Las mismas tres que el inicio de socio, sin portada, extracto ni punto
@@ -814,15 +651,9 @@ async function readClubMembers(
   return { active: counts.active, joinedThisMonth: counts.joinedRecently };
 }
 
-function toClubUnreadNews(tile: UnreadNewsTile): ClubUnreadNews | Unavailable {
-  return isUnavailable(tile)
-    ? tile
-    : { count: tile.count, announcements: tile.announcements };
-}
-
 async function readClubNumbers(
   gateways: DashboardGateways,
-  request: CallerRequest & { readonly unreadNews: Promise<UnreadNewsTile> },
+  request: CallerRequest & { readonly news: Promise<NewsReads> },
 ): Promise<ClubNumbers> {
   const scope = {
     clubId: request.caller.clubId,
@@ -832,21 +663,21 @@ async function readClubNumbers(
     orUnavailable(
       gateways,
       "club_attendance",
-      readClubAttendanceTrend(gateways.clubRate.clubRate, scope),
+      readClubAttendanceTrend(gateways.clubRate, scope),
     ),
     orUnavailable(gateways, "members", readClubMembers(gateways, scope)),
-    request.unreadNews.then(toClubUnreadNews),
+    request.news.then((news) => readUnreadNews(gateways, { ...request, news })),
   ]);
   return { attendance, members, unreadNews };
 }
 
-/** La columna de gestión espera al próximo evento y a la cuenta sin leer,
- * que ya se piden para el resto del inicio. */
+/** La columna de gestión espera al próximo evento y a la primera página de
+ * noticias, que ya se piden para el resto del inicio. */
 async function readColumn(
   gateways: DashboardGateways,
   request: CallerRequest & {
     readonly eventParts: Promise<EventParts>;
-    readonly newsParts: Promise<NewsParts>;
+    readonly news: Promise<NewsReads>;
   },
 ): Promise<PlayerColumn | ManagementColumn> {
   if (!seesManagementColumn(request.caller.role)) {
@@ -856,10 +687,7 @@ async function readColumn(
     request.eventParts.then(({ nextUp }) =>
       readTodos(gateways, { ...request, nextUp }),
     ),
-    readClubNumbers(gateways, {
-      ...request,
-      unreadNews: request.newsParts.then(({ unreadNews }) => unreadNews),
-    }),
+    readClubNumbers(gateways, request),
   ]);
   return { column: "management", todos, club };
 }
@@ -871,54 +699,28 @@ async function readMemberDashboard(
     readonly membership: ActiveMembershipSummary;
   },
 ): Promise<MemberDashboard> {
-  const { caller } = request;
   const eventPartsRead = readEventParts(gateways, {
     ...request,
     isRestricted: false,
   });
-  const newsPartsRead = readNewsParts(gateways, request);
-  const [
-    attendance,
-    members,
-    eventParts,
-    newsParts,
-    contactReminder,
-    me,
-    column,
-  ] = await Promise.all([
-    orUnavailable(
-      gateways,
-      "attendance",
-      readAttendanceTile(gateways, { ...request, role: caller.role }),
-    ),
-    orUnavailable(
-      gateways,
-      "members",
-      readMembersTile(gateways, { clubId: caller.clubId, now: request.now }),
-    ),
+  const newsRead = readNews(gateways, request);
+  const [eventParts, news, contactReminder, me, column] = await Promise.all([
     eventPartsRead,
-    newsPartsRead,
+    newsRead,
     readContactReminder(gateways, request.callerId),
     readMe(gateways, request),
     readColumn(gateways, {
       ...request,
       eventParts: eventPartsRead,
-      newsParts: newsPartsRead,
+      news: newsRead,
     }),
   ]);
   return {
     kind: "member",
     ...column,
-    viewer: { firstName: firstNameOf(caller.fullName) },
+    viewer: { firstName: firstNameOf(request.caller.fullName) },
     me,
-    tiles: {
-      attendance,
-      members,
-      nextTraining: eventParts.nextTraining,
-      unreadNews: newsParts.unreadNews,
-    },
-    upcomingEvents: eventParts.upcomingEvents,
-    latestNews: newsParts.latestNews,
+    latestNews: toLatestNews(news, request.now),
     contactReminder,
     nextUp: eventParts.nextUp,
     week: eventParts.week,
@@ -944,7 +746,6 @@ async function readRestrictedDashboard(
     viewer: { firstName: firstNameOf(request.caller.fullName) },
     me,
     block: request.membership.block,
-    nextTraining: eventParts.nextTraining,
     contactReminder,
     nextUp: eventParts.nextUp,
     week: eventParts.week,

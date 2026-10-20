@@ -1,4 +1,10 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  waitForElementToBeRemoved,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
@@ -7,12 +13,10 @@ import type {
   Dashboard,
   DashboardNextUpEvent,
   MemberDashboard,
-  NextTraining,
   NextUp,
   NextUpTeam,
   RestrictedDashboard,
 } from "@/lib/dashboard/dashboard";
-import type { AgendaEvent } from "@/lib/events/event-agenda";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
 import type { ContactReminder } from "@/lib/members/contact-reminder";
 
@@ -35,57 +39,7 @@ const ALL_SECTIONS: OpenableSections = {
   news: true,
 };
 
-const POOL_TRAINING: NextTraining = {
-  id: "aaaaaaaa-0000-4000-8000-00000000000a",
-  title: "Pool Training",
-  startsOn: "2026-10-02",
-  startTime: "19:00",
-  location: "MSAC",
-  goingCount: 14,
-  maybeCount: 2,
-  myResponse: "yes",
-};
-
-function agendaEvent(
-  overrides: Partial<AgendaEvent> & Pick<AgendaEvent, "id" | "title">,
-): AgendaEvent {
-  return {
-    startsOn: "2026-10-02",
-    startTime: "19:00",
-    endTime: null,
-    endsOn: null,
-    eventType: "training",
-    location: "MSAC Dive Pool",
-    place: null,
-    placeDetail: null,
-    status: "scheduled",
-    seriesId: null,
-    goingCount: 0,
-    maybeCount: 0,
-    myResponse: null,
-    inAudience: true,
-    coverThumbUrl: null,
-    ...overrides,
-  };
-}
-
-const UPCOMING: readonly AgendaEvent[] = [
-  agendaEvent({ id: POOL_TRAINING.id, title: "Pool Training" }),
-  agendaEvent({
-    id: "bbbbbbbb-0000-4000-8000-00000000000b",
-    title: "Skills & Conditioning",
-    startsOn: "2026-10-04",
-    location: "Fitzroy Pool",
-  }),
-  agendaEvent({
-    id: "cccccccc-0000-4000-8000-00000000000c",
-    title: "Scrimmage vs Geelong Krakens",
-    startsOn: "2026-10-06",
-    startTime: "10:00",
-    eventType: "competition",
-    location: "Geelong Aquatic Centre",
-  }),
-];
+const TRAINING_ID = "aaaaaaaa-0000-4000-8000-00000000000a";
 
 function daysAgo(days: number): string {
   return new Date(NOW.getTime() - days * DAY_IN_MS).toISOString();
@@ -126,7 +80,7 @@ const LATEST_NEWS = [
 
 const NEXT_UP: DashboardNextUpEvent = {
   kind: "event",
-  id: POOL_TRAINING.id,
+  id: TRAINING_ID,
   title: "Saturday scrimmage",
   eventType: "training",
   startsOn: "2026-10-02",
@@ -168,16 +122,6 @@ const ADMIN_DASHBOARD: MemberDashboard = {
   },
   viewer: { firstName: "Alba" },
   me: { attendance: null },
-  tiles: {
-    attendance: {
-      kind: "club_rate",
-      rate: { kind: "rate", percent: 86, records: 42 },
-    },
-    members: { kind: "members", active: 48, joinedRecently: 3 },
-    nextTraining: { kind: "training", training: POOL_TRAINING },
-    unreadNews: { kind: "unread", count: 3, announcements: 1 },
-  },
-  upcomingEvents: { kind: "events", events: UPCOMING },
   latestNews: { kind: "news", posts: LATEST_NEWS },
   contactReminder: { kind: "reminder", reminder: "none" },
   nextUp: { ...NEXT_UP, teamsStatus: "none" },
@@ -188,13 +132,6 @@ const ADMIN_DASHBOARD: MemberDashboard = {
 const PLAYER_DASHBOARD: MemberDashboard = {
   ...ADMIN_DASHBOARD,
   column: "player",
-  tiles: {
-    ...ADMIN_DASHBOARD.tiles,
-    attendance: {
-      kind: "own_attendance",
-      attendance: { kind: "rate", percent: 75, sessions: 6 },
-    },
-  },
   nextUp: NEXT_UP,
 };
 
@@ -203,13 +140,6 @@ const EMPTY_DASHBOARD: MemberDashboard = {
   column: "player",
   viewer: { firstName: "Alba" },
   me: { attendance: null },
-  tiles: {
-    attendance: { kind: "club_rate", rate: { kind: "no_data" } },
-    members: { kind: "members", active: 1, joinedRecently: 0 },
-    nextTraining: { kind: "none" },
-    unreadNews: { kind: "unread", count: 0, announcements: 0 },
-  },
-  upcomingEvents: { kind: "events", events: [] },
   latestNews: { kind: "news", posts: [] },
   contactReminder: { kind: "reminder", reminder: "none" },
   nextUp: { kind: "none" },
@@ -266,6 +196,8 @@ function setClubTime(instant: string): void {
   vi.setSystemTime(new Date(instant));
 }
 
+const LOADING_TEXT = { en: "Loading…", es: "Cargando…" } as const;
+
 async function renderScreen(
   options: {
     readonly locale?: "en" | "es";
@@ -273,29 +205,42 @@ async function renderScreen(
     readonly openableSections?: OpenableSections;
   } = {},
 ): Promise<ReturnType<typeof render>> {
+  const locale = options.locale ?? "en";
   const view = render(
     <DashboardScreen
-      locale={options.locale ?? "en"}
+      locale={locale}
+      firstName="Alba"
       userId={USER_ID}
       canCreateEvents={options.canCreateEvents ?? false}
       openableSections={options.openableSections ?? ALL_SECTIONS}
     />,
   );
-  await screen.findByRole("heading", { level: 1, name: /Alba/ });
+  await waitForElementToBeRemoved(() =>
+    screen.queryByText(LOADING_TEXT[locale]),
+  );
   return view;
+}
+
+/** Los bloques del inicio con nombre, en el orden en que van en la página. */
+function blockNames(): readonly string[] {
+  return screen
+    .getAllByRole("region")
+    .map((region) => region.getAttribute("aria-label") ?? labelOf(region));
+}
+
+function labelOf(region: HTMLElement): string {
+  const [labelId = ""] = (region.getAttribute("aria-labelledby") ?? "").split(
+    " ",
+  );
+  const label = document.getElementById(labelId);
+  if (label === null) {
+    throw new Error(`Un bloque sin nombre: ${region.outerHTML.slice(0, 80)}`);
+  }
+  return label.textContent;
 }
 
 function nextUpCard(): HTMLElement {
   return screen.getByRole("region", { name: "Next up" });
-}
-
-/** La fila `index` de una lista, o un fallo que dice cuántas había. */
-function rowAt(rows: readonly HTMLElement[], index: number): HTMLElement {
-  const row = rows[index];
-  if (row === undefined) {
-    throw new Error(`No hay fila ${index}: la lista tiene ${rows.length}.`);
-  }
-  return row;
 }
 
 function rsvpButton(name: "Going" | "Maybe" | "Can't go"): HTMLElement {
@@ -357,50 +302,13 @@ describe("el saludo", () => {
   });
 });
 
-describe("próximos y noticias", () => {
-  it("pinta los tres próximos, cada uno enlazando al calendario, con su chip", async () => {
-    stubDashboard(ADMIN_DASHBOARD);
-
-    await renderScreen();
-
-    const upcoming = screen.getByRole("region", { name: "Upcoming" });
-    const rows = within(upcoming).getAllByRole("listitem");
-    expect(rows).toHaveLength(3);
-    const scrimmage = within(rowAt(rows, 2)).getByRole("link");
-    expect(scrimmage).toHaveAttribute("href", "/calendario");
-    expect(scrimmage).toHaveTextContent("Scrimmage vs Geelong Krakens");
-    expect(scrimmage).toHaveTextContent("Geelong Aquatic Centre");
-    expect(within(rowAt(rows, 2)).getByText("Competition")).toBeInTheDocument();
-    expect(
-      within(upcoming).getByRole("link", { name: "Calendar" }),
-    ).toHaveAttribute("href", "/calendario");
-  });
-
-  it("pinta los próximos que haya cuando son menos de tres", async () => {
-    stubDashboard({
-      ...ADMIN_DASHBOARD,
-      upcomingEvents: { kind: "events", events: UPCOMING.slice(0, 1) },
-    });
-
-    await renderScreen();
-
-    const upcoming = screen.getByRole("region", { name: "Upcoming" });
-    expect(within(upcoming).getAllByRole("listitem")).toHaveLength(1);
-  });
-
-  it("sin eventos ni noticias dice una frase y deja los enlaces", async () => {
+describe("las noticias", () => {
+  it("sin noticias dice una frase y deja el enlace", async () => {
     stubDashboard(EMPTY_DASHBOARD);
 
     await renderScreen();
 
-    const upcoming = screen.getByRole("region", { name: "Upcoming" });
     const news = screen.getByRole("region", { name: "News" });
-    expect(
-      within(upcoming).getByText("No upcoming events."),
-    ).toBeInTheDocument();
-    expect(
-      within(upcoming).getByRole("link", { name: "Calendar" }),
-    ).toBeInTheDocument();
     expect(within(news).getByText("No news yet.")).toBeInTheDocument();
     expect(
       within(news).getByRole("link", { name: "All news" }),
@@ -434,11 +342,7 @@ describe("próximos y noticias", () => {
     expect(
       within(news).getByText("We couldn't load the news."),
     ).toBeInTheDocument();
-    expect(
-      within(screen.getByRole("region", { name: "Upcoming" })).getAllByRole(
-        "listitem",
-      ),
-    ).toHaveLength(3);
+    expect(nextUpCard()).toBeInTheDocument();
   });
 
   it("cambia cabeceras y hace cuánto con el idioma sin volver a pedir", async () => {
@@ -448,6 +352,7 @@ describe("próximos y noticias", () => {
     view.rerender(
       <DashboardScreen
         locale="es"
+        firstName="Alba"
         userId={USER_ID}
         canCreateEvents={false}
         openableSections={ALL_SECTIONS}
@@ -460,7 +365,7 @@ describe("próximos y noticias", () => {
     const news = screen.getByRole("region", { name: "Noticias" });
     expect(within(news).getByText("hace 4 días")).toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: "Próximos" }),
+      screen.getByRole("region", { name: "Esta semana" }),
     ).toBeInTheDocument();
     expect(requests).toHaveLength(1);
   });
@@ -503,7 +408,7 @@ describe("la cabecera (#747)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("ya no pinta las teselas ni la tarjeta del entrenamiento", async () => {
+  it("ya no pinta las teselas, la tarjeta del entrenamiento ni los próximos", async () => {
     stubDashboard(ADMIN_DASHBOARD);
 
     await renderScreen();
@@ -513,6 +418,9 @@ describe("la cabecera (#747)", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("region", { name: "Next training" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Upcoming" }),
     ).not.toBeInTheDocument();
   });
 });
@@ -928,7 +836,7 @@ describe("el equipo en la tarjeta Próximo (#747)", () => {
 });
 
 const WEEK_TRAINING = {
-  id: POOL_TRAINING.id,
+  id: TRAINING_ID,
   title: "Saturday scrimmage",
   eventType: "training",
   startsOn: "2026-10-02",
@@ -1010,6 +918,7 @@ describe("errores", () => {
     render(
       <DashboardScreen
         locale="en"
+        firstName="Alba"
         userId={USER_ID}
         canCreateEvents={false}
         openableSections={ALL_SECTIONS}
@@ -1022,10 +931,7 @@ describe("errores", () => {
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(
-      await screen.findByRole("heading", {
-        level: 1,
-        name: "Good afternoon, Alba",
-      }),
+      await screen.findByRole("region", { name: "Next up" }),
     ).toBeInTheDocument();
   });
 
@@ -1038,6 +944,7 @@ describe("errores", () => {
     render(
       <DashboardScreen
         locale="en"
+        firstName="Alba"
         userId={USER_ID}
         canCreateEvents={false}
         openableSections={ALL_SECTIONS}
@@ -1058,7 +965,6 @@ const RESTRICTED_DASHBOARD: RestrictedDashboard = {
   viewer: { firstName: "Alba" },
   me: { attendance: null },
   block: "pending",
-  nextTraining: { kind: "training", training: POOL_TRAINING },
   contactReminder: { kind: "reminder", reminder: "none" },
   nextUp: NEXT_UP,
   week: { kind: "week", events: [] },
@@ -1267,6 +1173,7 @@ describe("el aviso del contacto (#498)", () => {
     render(
       <DashboardScreen
         locale="en"
+        firstName="Alba"
         userId="00000000-0000-4000-8000-0000000000aa"
         canCreateEvents={false}
         openableSections={ALL_SECTIONS}
@@ -1358,6 +1265,7 @@ describe("el aviso del contacto (#498)", () => {
     view.rerender(
       <DashboardScreen
         locale="es"
+        firstName="Alba"
         userId={USER_ID}
         canCreateEvents={false}
         openableSections={ALL_SECTIONS}
@@ -1386,9 +1294,7 @@ describe("la columna del Player (#749)", () => {
     percent: 82,
     attended: 18,
     sessions: 22,
-    last10: [
-      { eventId: POOL_TRAINING.id, startsOn: "2026-09-26", status: "late" },
-    ],
+    last10: [{ eventId: TRAINING_ID, startsOn: "2026-09-26", status: "late" }],
   } as const;
 
   it("a un Player le pinta Mi asistencia y la membresía", async () => {
@@ -1464,5 +1370,116 @@ describe("la columna del Player (#749)", () => {
     );
 
     expect(await screen.findByText("82%")).toBeInTheDocument();
+  });
+});
+
+describe("el orden de los bloques (#752, RF-9)", () => {
+  it("a un Player le pinta Próximo, Esta semana, su columna y Noticias", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
+
+    await renderScreen();
+
+    expect(blockNames()).toEqual([
+      "Next up",
+      "This week",
+      "My attendance",
+      "Membership",
+      "News",
+    ]);
+  });
+
+  it("a la gestión le pinta Próximo y Esta semana, la columna de gestión y Noticias", async () => {
+    stubDashboard(ADMIN_DASHBOARD);
+
+    await renderScreen();
+
+    expect(blockNames()).toEqual([
+      "Next up",
+      "This week",
+      "To do",
+      "Club numbers",
+      "News",
+    ]);
+  });
+
+  it("a un socio restringido le pinta lo mismo que a un Player, tras el aviso", async () => {
+    stubDashboard(RESTRICTED_DASHBOARD);
+
+    await renderScreen();
+
+    expect(blockNames()).toEqual([
+      "Next up",
+      "This week",
+      "My attendance",
+      "Membership",
+      "News",
+    ]);
+    const notice = screen.getByRole("note", {
+      name: "Your membership is pending: you haven't added a card yet.",
+    });
+    expect(
+      notice.compareDocumentPosition(nextUpCard()) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+});
+
+describe("la carga (#752)", () => {
+  function stubPendingDashboard(): void {
+    stubApi(() => new Promise<Response>(() => undefined));
+  }
+
+  function renderLoading(
+    options: { readonly canCreateEvents?: boolean } = {},
+  ): void {
+    render(
+      <DashboardScreen
+        locale="en"
+        firstName="Alba"
+        userId={USER_ID}
+        canCreateEvents={options.canCreateEvents ?? false}
+        openableSections={ALL_SECTIONS}
+      />,
+    );
+  }
+
+  it("el saludo no espera a la respuesta", () => {
+    stubPendingDashboard();
+
+    renderLoading();
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Good afternoon, Alba" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Wed 30 Sep · Dashboard")).toBeInTheDocument();
+  });
+
+  it("+ Evento tampoco espera a la respuesta", () => {
+    stubPendingDashboard();
+
+    renderLoading({ canCreateEvents: true });
+
+    expect(screen.getByRole("link", { name: "New event" })).toHaveAttribute(
+      "href",
+      "/calendario?nuevo=training",
+    );
+  });
+
+  it("mientras espera dice que carga y aún no pinta ningún bloque", () => {
+    stubPendingDashboard();
+
+    renderLoading();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…");
+    expect(screen.queryAllByRole("region")).toEqual([]);
+  });
+
+  it("cuando llega deja de decir que carga", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
+
+    renderLoading();
+
+    expect(await screen.findByRole("region", { name: "News" })).toBeVisible();
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
   });
 });

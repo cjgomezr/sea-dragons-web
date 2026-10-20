@@ -23,82 +23,14 @@ import { NEWS_CATEGORIES } from "@/lib/news/news-posts";
  * Lo que la pantalla de inicio (#426) le pide a `GET /api/v1/dashboard`
  * (#424) y cómo lo reduce a algo que pintar. Una sola petición, la misma que
  * hará la aplicación nativa de Release 2 (CON-002). De un error se guarda el
- * código y no la frase, para que el aviso cambie con el idioma (E17).
+ * código y no la frase, para que el aviso cambie con el idioma (E17). Lo que
+ * el esquema no nombra no pasa: las teselas de E14 se quedan fuera (#752).
  */
 
 const unavailableSchema = z.object({ kind: z.literal("unavailable") });
 
-const noDataSchema = z.object({ kind: z.literal("no_data") });
-
 const percentSchema = z.number().min(0).max(100);
 const countSchema = z.number().int().nonnegative();
-
-const attendanceTileSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("club_rate"),
-    rate: z.discriminatedUnion("kind", [
-      z.object({
-        kind: z.literal("rate"),
-        percent: percentSchema,
-        records: countSchema,
-      }),
-      noDataSchema,
-    ]),
-  }),
-  z.object({
-    kind: z.literal("own_attendance"),
-    attendance: z.discriminatedUnion("kind", [
-      z.object({
-        kind: z.literal("rate"),
-        percent: percentSchema,
-        sessions: countSchema,
-      }),
-      noDataSchema,
-    ]),
-  }),
-  unavailableSchema,
-]);
-
-const membersTileSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("members"),
-    active: countSchema,
-    joinedRecently: countSchema,
-  }),
-  unavailableSchema,
-]);
-
-const nextTrainingTileSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("training"),
-    training: agendaEventSchema.pick({
-      id: true,
-      title: true,
-      startsOn: true,
-      startTime: true,
-      location: true,
-      goingCount: true,
-      maybeCount: true,
-      myResponse: true,
-    }),
-  }),
-  z.object({ kind: z.literal("none") }),
-  unavailableSchema,
-]);
-
-const unreadNewsTileSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("unread"),
-    count: countSchema,
-    announcements: countSchema,
-  }),
-  unavailableSchema,
-]);
-
-const upcomingEventsSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("events"), events: z.array(agendaEventSchema) }),
-  unavailableSchema,
-]);
 
 /** Lo que llega de una noticia al inicio reducido (D2 de E27). */
 const restrictedNewsItemSchema = z.object({
@@ -262,13 +194,6 @@ const memberDashboardBaseSchema = z.object({
   kind: z.literal("member"),
   viewer: viewerSchema,
   me: meSchema,
-  tiles: z.object({
-    attendance: attendanceTileSchema,
-    members: membersTileSchema,
-    nextTraining: nextTrainingTileSchema,
-    unreadNews: unreadNewsTileSchema,
-  }),
-  upcomingEvents: upcomingEventsSchema,
   latestNews: latestNewsSchemaOf(memberNewsItemSchema),
   contactReminder: contactReminderSchema,
   nextUp: nextUpSchema,
@@ -292,7 +217,6 @@ const restrictedDashboardSchema = z.object({
   viewer: viewerSchema,
   me: meSchema,
   block: membershipBlockSchema,
-  nextTraining: nextTrainingTileSchema,
   contactReminder: contactReminderSchema,
   nextUp: nextUpSchema,
   week: weekSchema,

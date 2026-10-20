@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { ContactReminderNotice } from "@/components/account/ContactReminderNotice";
 import type {
   Dashboard,
@@ -20,7 +20,6 @@ import {
 } from "./dashboard-client";
 import { DashboardMembershipNotice } from "./DashboardMembershipNotice";
 import { DashboardWeek } from "./DashboardWeek";
-import { UpcomingPanel } from "./DashboardLists";
 import { DashboardNews, DashboardRestrictedNews } from "./DashboardNews";
 import { ManagementColumn, type OpenableSections } from "./ManagementColumn";
 import { NewEventLink } from "./NewEventLink";
@@ -28,12 +27,15 @@ import { NextUpCard } from "./NextUpCard";
 import { PlayerColumn } from "./PlayerColumn";
 
 /**
- * La pantalla de inicio (#426, RF-1 a RF-4 del PRD de E14), que E27 rehace
- * por partes. De arriba abajo: la cabecera con el día y el saludo, los avisos
- * y la tarjeta "Próximo" con el RSVP y el equipo (#747, RF-3 y RF-8 del PRD
- * de E27), con la columna del Player a su derecha (#749, RF-5) y "Esta
- * semana" (#748, RF-4) bajo "Próximo"; debajo, las noticias (#751, RF-7) y,
- * de momento, los próximos eventos.
+ * La pantalla de inicio (#426, RF-1 a RF-4 del PRD de E14), que E27 rehizo.
+ * De arriba abajo: la cabecera con el día y el saludo, los avisos y la
+ * tarjeta "Próximo" con el RSVP y el equipo (#747, RF-3 y RF-8 del PRD de
+ * E27), con la columna del rol a su derecha (#749 y #750, RF-5 y RF-6) y
+ * "Esta semana" (#748, RF-4) bajo "Próximo"; debajo, las noticias (#751,
+ * RF-7). En el móvil va todo en una columna en el orden de #2a (#752, RF-9).
+ *
+ * El saludo no espera a la respuesta (#752): el nombre lo lee la página en
+ * el servidor, y cada bloque enseña su esqueleto mientras tanto.
  *
  * Es de cliente porque responde al RSVP sin recargar y porque la hora del
  * saludo y de "hace N" es la del momento en que se pintó. Lo lee todo de
@@ -56,8 +58,8 @@ type DashboardState =
   | {
       readonly kind: "ready";
       readonly dashboard: Dashboard;
-      /** Cuándo llegó: de aquí salen el saludo, el tiempo hasta el
-       * entrenamiento y "hace N". */
+      /** Cuándo llegó: de aquí salen el día de hoy de los bloques y "hace
+       * N". */
       readonly loadedAt: Date;
     };
 
@@ -67,34 +69,97 @@ const GREETING_KEYS = {
   evening: "dashboard.greeting.evening",
 } as const;
 
-function DashboardHeader({
+function subscribeToNothing(): () => void {
+  return () => {};
+}
+
+/** El día y la franja del saludo son los del navegador que abre el inicio,
+ * no los del servidor que lo pintó: hasta hidratar, el título dice sólo la
+ * sección, para que lo del servidor no choque con lo del navegador. */
+function useIsHydrated(): boolean {
+  return useSyncExternalStore(
+    subscribeToNothing,
+    () => true,
+    () => false,
+  );
+}
+
+function DashboardGreeting({
   translate,
   firstName,
   now,
-  canCreateEvents,
 }: {
   readonly translate: Translator;
   readonly firstName: string;
   readonly now: ClubMoment;
-  readonly canCreateEvents: boolean;
 }): React.JSX.Element {
   return (
+    <div>
+      <p className="dashboard-eyebrow">
+        {translate("dashboard.eyebrow.dated", {
+          date: formatDashboardDay(translate.locale, now.date),
+          section: translate("dashboard.eyebrow"),
+        })}
+      </p>
+      <h1>
+        {translate(GREETING_KEYS[greetingPeriodAt(now)], { name: firstName })}
+      </h1>
+    </div>
+  );
+}
+
+function DashboardHeader({
+  translate,
+  firstName,
+  openedAt,
+  canCreateEvents,
+}: {
+  readonly translate: Translator;
+  readonly firstName: string;
+  readonly openedAt: Date;
+  readonly canCreateEvents: boolean;
+}): React.JSX.Element {
+  const isHydrated = useIsHydrated();
+  return (
     <header className="dashboard-header">
-      <div>
-        <p className="dashboard-eyebrow">
-          {translate("dashboard.eyebrow.dated", {
-            date: formatDashboardDay(translate.locale, now.date),
-            section: translate("dashboard.eyebrow"),
-          })}
-        </p>
-        <h1>
-          {translate(GREETING_KEYS[greetingPeriodAt(now)], {
-            name: firstName,
-          })}
-        </h1>
-      </div>
+      {isHydrated ? (
+        <DashboardGreeting
+          translate={translate}
+          firstName={firstName}
+          now={clubMoment(openedAt)}
+        />
+      ) : (
+        <h1>{translate("dashboard.eyebrow")}</h1>
+      )}
       {canCreateEvents ? <NewEventLink translate={translate} /> : null}
     </header>
+  );
+}
+
+/** La forma de cada bloque mientras llega la respuesta: "Próximo" y "Esta
+ * semana", la columna del rol y las noticias, sin texto a la vista. */
+function DashboardSkeleton({
+  translate,
+}: {
+  readonly translate: Translator;
+}): React.JSX.Element {
+  return (
+    <div className="dashboard-skeleton" role="status">
+      <span className="visually-hidden">{translate("dashboard.loading")}</span>
+      <div className="dashboard-columns" aria-hidden="true">
+        <div className="dashboard-main">
+          <div className="dashboard-next-up-slot">
+            <div className="section-loading-block dashboard-skeleton-next-up" />
+          </div>
+          <div className="section-loading-block dashboard-skeleton-week" />
+        </div>
+        <div className="section-loading-block dashboard-skeleton-column" />
+      </div>
+      <div
+        className="section-loading-block dashboard-skeleton-news"
+        aria-hidden="true"
+      />
+    </div>
   );
 }
 
@@ -164,12 +229,6 @@ function RestrictedContent({
   const now = clubMoment(loadedAt);
   return (
     <>
-      <DashboardHeader
-        translate={translate}
-        firstName={dashboard.viewer.firstName}
-        now={now}
-        canCreateEvents={canCreateEvents}
-      />
       <DashboardMembershipNotice
         translate={translate}
         membership={dashboard.membership}
@@ -222,12 +281,6 @@ function MemberContent({
   const now = clubMoment(loadedAt);
   return (
     <>
-      <DashboardHeader
-        translate={translate}
-        firstName={dashboard.viewer.firstName}
-        now={now}
-        canCreateEvents={canCreateEvents}
-      />
       <DashboardContactReminder
         translate={translate}
         userId={userId}
@@ -282,21 +335,20 @@ function MemberContent({
         now={loadedAt}
         onRetry={onRetry}
       />
-      <UpcomingPanel
-        translate={translate}
-        upcoming={dashboard.upcomingEvents}
-      />
     </>
   );
 }
 
 export function DashboardScreen({
   locale,
+  firstName,
   userId,
   canCreateEvents,
   openableSections,
 }: {
   readonly locale: Locale;
+  /** El nombre de pila del saludo, que así no espera a la respuesta. */
+  readonly firstName: string;
   /** Quien mira: el cierre del aviso del teléfono es de su cuenta (#498). */
   readonly userId: string;
   /** Si se pinta "+ Evento". Sólo decide el botón: crear lo
@@ -307,6 +359,7 @@ export function DashboardScreen({
   readonly openableSections: OpenableSections;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
+  const [openedAt] = useState(() => new Date());
   const [state, setState] = useState<DashboardState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
 
@@ -338,12 +391,14 @@ export function DashboardScreen({
 
   return (
     <div className="dashboard">
-      {/* Sin el nombre todavía, la pantalla se titula igual. */}
-      {state.kind === "ready" ? null : (
-        <h1>{translate("dashboard.eyebrow")}</h1>
-      )}
+      <DashboardHeader
+        translate={translate}
+        firstName={firstName}
+        openedAt={openedAt}
+        canCreateEvents={canCreateEvents}
+      />
       {state.kind === "loading" ? (
-        <p className="admin-empty">{translate("dashboard.loading")}</p>
+        <DashboardSkeleton translate={translate} />
       ) : null}
       {state.kind === "failed" ? (
         <LoadFailure
