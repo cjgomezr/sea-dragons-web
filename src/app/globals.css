@@ -2326,7 +2326,9 @@ a.auth-brand-header:focus-visible {
   align-items: start;
 }
 
-@media (min-width: 768px) {
+/* Desde 1024 px: en la tableta la barra lateral deja a la principal sin
+   sitio para sus celdas (#773), y las dos columnas van apiladas. */
+@media (min-width: 1024px) {
   .profile-layout {
     grid-template-columns: minmax(0, 1fr) 340px;
   }
@@ -2926,11 +2928,11 @@ a.auth-brand-header:focus-visible {
   gap: 6px;
 }
 
-.profile-cell-status-success {
+.profile-cell .profile-cell-status-success {
   color: color-mix(in srgb, var(--color-success) 55%, var(--color-text));
 }
 
-.profile-cell-status-warning {
+.profile-cell .profile-cell-status-warning {
   color: color-mix(in srgb, var(--color-warning) 55%, var(--color-text));
 }
 
