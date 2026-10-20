@@ -8455,6 +8455,138 @@ test.describe("la ficha con una foto que no carga", () => {
   });
 });
 
+/* ---------------------------------------------------------------------------
+   La ficha en lectura del Committee y del Coach (#776, D1 y D3 del PRD de
+   E30). Mockup del Committee:
+   docs/design/design_handoff_profile/screenshots/04-desktop-committee.png,
+   sin la ficha AUF que dibuja (manda D1). El Coach no está dibujado: se
+   revisa contra design-system.md con la del Committee de referencia.
+
+   La vista la finge `page.route`, como las de la ficha del Admin. La sesión
+   es la del Committee sembrado también para la del Coach: la frontera deja
+   pasar a los dos, y sembrar un Coach sólo para esto costaría una identidad
+   de Auth más (#415). Lo que la pantalla pinta lo decide la vista.
+   --------------------------------------------------------------------------- */
+
+/** Declarado aquí y no reutilizando el de la configuración del club, que
+ * está más abajo: `test.use` lo lee al recorrer el archivo. */
+const RECORD_READER_STORAGE_STATE = roleRequestStorageStatePath(
+  "committee-de-configuracion",
+);
+
+const GROUPS_CARD = /^(Groups|Grupos)$/;
+
+/** Lo que las dos vistas en lectura traen (#770): ni AUF, ni fechas, ni
+ * nada de la cuenta. */
+const STAFF_RECORD_SHARED = {
+  userId: RECORD_MEMBER_ID,
+  fullName: LONG_MEMBER_NAME,
+  photoUrl: null,
+  role: "Player",
+  positionName: { en: "Goalkeeper", es: "Portero" },
+  experienceLevel: "Intermediate",
+  country: "AU",
+  emergencyContact: CURRENT_RECORD.emergencyContact,
+  membershipPlan: "Full",
+  membershipStatus: "active",
+  membershipRenewsOn: "2027-06-30",
+  groups: CURRENT_RECORD.groups,
+  attendance: CURRENT_RECORD.attendance,
+} as const;
+
+type StaffRecordState = {
+  readonly name: string;
+  readonly reading: Readonly<Record<string, unknown>>;
+};
+
+const STAFF_RECORD_STATES: readonly StaffRecordState[] = [
+  {
+    name: "ficha-committee",
+    reading: {
+      ...STAFF_RECORD_SHARED,
+      view: "committee",
+      email: "socia.de.prueba@example.test",
+      phone: CURRENT_RECORD.phone,
+    },
+  },
+  {
+    name: "ficha-coach",
+    reading: { ...STAFF_RECORD_SHARED, view: "coach" },
+  },
+  {
+    name: "ficha-coach-sin-emergencia",
+    reading: { ...STAFF_RECORD_SHARED, view: "coach", emergencyContact: null },
+  },
+];
+
+async function goToStaffRecord(
+  page: Page,
+  state: StaffRecordState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === MEMBER_RECORD_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: state.reading }),
+      }),
+  );
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${MEMBER_RECORD_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, MEMBER_RECORD_SCREEN_PATH, theme);
+  }
+  await expect(
+    page.getByRole("heading", { level: 1, name: LONG_MEMBER_NAME }),
+  ).toBeVisible();
+  await expect(page.getByRole("region", { name: GROUPS_CARD })).toBeVisible();
+  await waitForAccountInitials(page);
+}
+
+for (const state of STAFF_RECORD_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: RECORD_READER_STORAGE_STATE });
+    for (const vp of RECORD_DESKTOP_VIEWPORTS) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToStaffRecord(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+          test(`has no accessibility violations (${theme})`, async ({
+            page,
+          }) => {
+            await goToStaffRecord(page, state, theme);
+            await expectNoAxeViolations(page);
+          });
+        }
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToStaffRecord(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+  });
+}
+
 function openOwnRecordLink(page: Page) {
   return page.getByRole("link", {
     name: `Open ${ADMINISTRATION_ADMIN_NAME}'s record`,
