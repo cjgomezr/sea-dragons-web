@@ -21405,6 +21405,20 @@ async function balanceTeams(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
 }
 
+const TEAMS_EDIT_KELP =
+  /^(Edit name and colour of Team Kelp|Editar nombre y color de Team Kelp)$/;
+const TEAMS_EDIT_DIALOG = /^(Edit team|Editar equipo)$/;
+
+/** Abre la ventana de editar Team Kelp (#760): en el móvil, la hoja. */
+async function openTeamEditor(page: Page): Promise<void> {
+  await waitForTeamBuilder(page);
+  await page.getByRole("button", { name: TEAMS_EDIT_KELP }).click();
+  await expect(
+    page.getByRole("dialog", { name: TEAMS_EDIT_DIALOG }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
 async function askToPublish(page: Page): Promise<void> {
   await waitForTeamBuilder(page);
   await page.getByRole("button", { name: TEAMS_PUBLISH }).click();
@@ -21475,6 +21489,20 @@ const TEAMS_STATES: readonly TeamsState[] = [
     builder: DRAFTED_BUILDER,
     ready: askToPublish,
   }),
+  {
+    name: "equipos-editar",
+    events: TEAMS_EVENTS,
+    builder: DRAFTED_BUILDER,
+    viewports: viewports.filter((vp) => vp.name !== "mobile"),
+    ready: openTeamEditor,
+  },
+  {
+    name: "equipos-editar-movil",
+    events: TEAMS_EVENTS,
+    builder: DRAFTED_BUILDER,
+    viewports: viewports.filter((vp) => vp.name === "mobile"),
+    ready: openTeamEditor,
+  },
   ...teamsWithSpanish({
     name: "equipos-publicado",
     events: TEAMS_EVENTS,
@@ -21568,6 +21596,43 @@ test.describe("equipos en el navegador", () => {
       "Daniela Vargas",
     );
     expect(writes).toEqual([]);
+  });
+
+  test("editar un equipo elige con las flechas, retiene el foco y aplica", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToTeams(page, TEAMS_MANUAL_STATE);
+    const patches: unknown[] = [];
+    await page.route(
+      (url) => url.pathname === "/api/v1/club/team-labels",
+      (route, request) => {
+        const body: unknown = request.postDataJSON();
+        patches.push(body);
+        return route.fulfill(jsonBody(body));
+      },
+    );
+    await openTeamEditor(page);
+    const dialog = page.getByRole("dialog", { name: "Edit team" });
+    await expect(dialog.getByRole("textbox", { name: "Name" })).toBeFocused();
+
+    await dialog.getByRole("radio", { name: "Blue" }).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(dialog.getByRole("radio", { name: "Navy" })).toBeChecked();
+    await dialog.getByRole("button", { name: "Apply" }).focus();
+    await page.keyboard.press("Tab");
+    await expect(dialog.getByRole("textbox", { name: "Name" })).toBeFocused();
+    await dialog.getByRole("textbox", { name: "Name" }).fill("Team Reef");
+    await dialog.getByRole("button", { name: "Apply" }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect(teamsRegion(page, "Team Reef")).toBeVisible();
+    expect(patches).toEqual([
+      {
+        a: { name: "Team Reef", color: "#2B3F7A" },
+        b: TEAMS_LABELS.b,
+      },
+    ]);
   });
 
   test("arrastrar a un disponible a una columna lo mueve", async ({ page }) => {
