@@ -66,13 +66,13 @@ describe("notas privadas en el perfil", () => {
     const evaluation = section("Evaluation");
     expect(within(evaluation).getByText("7.5")).toBeVisible();
     const ratings = within(evaluation).getByRole("list", {
-      name: "Skill ratings",
+      name: "Categories",
     });
     expect(
       within(ratings)
         .getAllByRole("listitem")
         .map((item) => item.textContent),
-    ).toEqual(["Fitness8 out of 10", "Speed7 out of 10"]);
+    ).toEqual(["Fitness8.0", "Speed7.0"]);
     expect(within(evaluation).queryByText(STAFF_ONLY_NOTICE)).toBeNull();
     expect(within(evaluation).queryByRole("slider")).toBeNull();
   });
@@ -89,7 +89,7 @@ describe("notas privadas en el perfil", () => {
     );
 
     const evaluation = section("Evaluation");
-    expect(within(evaluation).getByText("No evaluation yet.")).toBeVisible();
+    expect(within(evaluation).getByText("Not evaluated")).toBeVisible();
     expect(within(evaluation).queryByText("Overall score")).toBeNull();
   });
 

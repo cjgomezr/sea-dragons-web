@@ -17856,6 +17856,12 @@ p.dashboard-next-up-line {
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
+}
+
+/* "Próximo" mide su propio hueco y no la columna (#750): en la columna de
+   gestión la columna se deshace por debajo de 1076px, y el hueco sigue. */
+.dashboard-next-up-slot {
+  min-width: 0;
   container: dashboard-main / inline-size;
 }
 
@@ -18110,6 +18116,292 @@ p.dashboard-attendance-empty {
   .dashboard-membership-card-link {
     width: 32px;
     height: 32px;
+  }
+}
+
+/* La columna de gestión del inicio (#750, RF-6 del PRD de E27, "To do" y
+   "Club numbers" del handoff). Por debajo de las dos columnas se deshacen
+   ella y la de "Próximo", y las cuatro tarjetas van en el orden de #2a:
+   "Próximo", Pendientes, "Esta semana" y los números del club. */
+.dashboard-management-column {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+@container dashboard (max-width: 1075px) {
+  .dashboard-columns-management > .dashboard-main,
+  .dashboard-columns-management > .dashboard-management-column {
+    display: contents;
+  }
+
+  .dashboard-columns-management .dashboard-next-up-slot {
+    order: 1;
+  }
+
+  .dashboard-columns-management .dashboard-todos {
+    order: 2;
+  }
+
+  .dashboard-columns-management .dashboard-week {
+    order: 3;
+  }
+
+  .dashboard-columns-management .dashboard-club {
+    order: 4;
+  }
+}
+
+.dashboard-todos,
+.dashboard-club {
+  min-width: 0;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-todos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 14px var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dashboard-todos-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* El número va sobre un tinte del aviso: el aviso a secas no deja leer
+   ningún texto encima en los dos temas. */
+.dashboard-todos-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--color-warning) 45%, var(--color-text));
+  background: color-mix(in srgb, var(--color-warning) 30%, var(--color-panel));
+  border-radius: 999px;
+}
+
+.dashboard-todos-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* La acción se estira sobre toda la fila, así que tocar cualquier punto la
+   abre; el título y el subtítulo siguen siendo texto que se puede leer. */
+.dashboard-todo {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px var(--space-4);
+}
+
+.dashboard-todo + .dashboard-todo {
+  border-top: 1px solid var(--color-border);
+}
+
+.dashboard-todo:last-child {
+  border-radius: 0 0 11px 11px;
+}
+
+.dashboard-todo:hover {
+  background: var(--color-hover);
+}
+
+.dashboard-todo-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  border-radius: 8px;
+}
+
+.dashboard-todo-icon-accent {
+  color: var(--color-accent-text);
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-panel));
+}
+
+.dashboard-todo-icon-danger {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 18%, var(--color-panel));
+}
+
+.dashboard-todo-icon-warning {
+  color: color-mix(in srgb, var(--color-warning) 55%, var(--color-text));
+  background: color-mix(in srgb, var(--color-warning) 22%, var(--color-panel));
+}
+
+.dashboard-todo-icon-neutral {
+  color: var(--color-text-secondary);
+  background: color-mix(
+    in srgb,
+    var(--color-type-meeting) 22%,
+    var(--color-panel)
+  );
+}
+
+.dashboard-todo-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dashboard-todo-text p {
+  margin: 0;
+}
+
+.dashboard-todo-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dashboard-todo-detail {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.dashboard-todo-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  text-decoration: none;
+}
+
+.dashboard-todo-action::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+
+.dashboard-todo-action svg {
+  display: none;
+}
+
+.dashboard-todos-empty {
+  margin: 0;
+  padding: var(--space-4);
+  font-size: 14px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-success) 65%, var(--color-text));
+}
+
+.dashboard-management-failure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.dashboard-management-failure p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* Las rayas entre celdas son el borde que asoma por el hueco de 1px. Con
+   tres celdas, la última ocupa las dos columnas y no queda hueco. */
+.dashboard-club {
+  overflow: hidden;
+}
+
+.dashboard-club-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--color-border);
+}
+
+.dashboard-club-cell {
+  display: flex;
+  min-width: 0;
+  background: var(--color-panel);
+}
+
+.dashboard-club-cell:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.dashboard-club-cell-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 14px var(--space-4);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+a.dashboard-club-cell-body:hover {
+  background: var(--color-hover);
+}
+
+a.dashboard-club-cell-body:focus-visible {
+  outline-offset: -3px;
+}
+
+.dashboard-club-label,
+.dashboard-club-caption {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.dashboard-club-value {
+  font-family: var(--font-family-mono);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.dashboard-club-trend-up {
+  color: color-mix(in srgb, var(--color-success) 65%, var(--color-text));
+}
+
+.dashboard-club-trend-down {
+  color: var(--color-danger);
+}
+
+/* En el móvil las filas miden 60px y la acción se queda en la flecha; su
+   texto sigue en el enlace para el lector de pantalla. */
+@media (max-width: 767px) {
+  .dashboard-todo {
+    min-height: 60px;
+  }
+
+  .dashboard-todo-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .dashboard-todo-action svg {
+    display: block;
+    font-size: 18px;
+    color: var(--color-text-secondary);
   }
 }
 

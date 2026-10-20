@@ -22,6 +22,7 @@ import { DashboardMembershipNotice } from "./DashboardMembershipNotice";
 import { DashboardWeek } from "./DashboardWeek";
 import { UpcomingPanel } from "./DashboardLists";
 import { DashboardNews, DashboardRestrictedNews } from "./DashboardNews";
+import { ManagementColumn, type OpenableSections } from "./ManagementColumn";
 import { NewEventLink } from "./NewEventLink";
 import { NextUpCard } from "./NextUpCard";
 import { PlayerColumn } from "./PlayerColumn";
@@ -129,6 +130,7 @@ type ContentProps<Shown extends Dashboard> = {
   readonly dashboard: Shown;
   readonly loadedAt: Date;
   readonly canCreateEvents: boolean;
+  readonly openableSections: OpenableSections;
   readonly onRetry: () => void;
 };
 
@@ -174,12 +176,14 @@ function RestrictedContent({
       />
       <div className="dashboard-columns">
         <div className="dashboard-main">
-          <NextUpCard
-            translate={translate}
-            nextUp={dashboard.nextUp}
-            viewer={{ isRestricted: true, canCreateEvents, today: now.date }}
-            onRetry={onRetry}
-          />
+          <div className="dashboard-next-up-slot">
+            <NextUpCard
+              translate={translate}
+              nextUp={dashboard.nextUp}
+              viewer={{ isRestricted: true, canCreateEvents, today: now.date }}
+              onRetry={onRetry}
+            />
+          </div>
           <DashboardWeek
             translate={translate}
             week={dashboard.week}
@@ -212,6 +216,7 @@ function MemberContent({
   dashboard,
   loadedAt,
   canCreateEvents,
+  openableSections,
   onRetry,
 }: ContentProps<MemberDashboard>): React.JSX.Element {
   const now = clubMoment(loadedAt);
@@ -228,14 +233,22 @@ function MemberContent({
         userId={userId}
         dashboard={dashboard}
       />
-      <div className="dashboard-columns">
+      <div
+        className={
+          dashboard.column === "management"
+            ? "dashboard-columns dashboard-columns-management"
+            : "dashboard-columns"
+        }
+      >
         <div className="dashboard-main">
-          <NextUpCard
-            translate={translate}
-            nextUp={dashboard.nextUp}
-            viewer={{ isRestricted: false, canCreateEvents, today: now.date }}
-            onRetry={onRetry}
-          />
+          <div className="dashboard-next-up-slot">
+            <NextUpCard
+              translate={translate}
+              nextUp={dashboard.nextUp}
+              viewer={{ isRestricted: false, canCreateEvents, today: now.date }}
+              onRetry={onRetry}
+            />
+          </div>
           <DashboardWeek
             translate={translate}
             week={dashboard.week}
@@ -252,7 +265,16 @@ function MemberContent({
             membership={dashboard.membership}
             onRetry={onRetry}
           />
-        ) : null}
+        ) : (
+          <ManagementColumn
+            translate={translate}
+            todos={dashboard.todos}
+            club={dashboard.club}
+            myAttendance={dashboard.me.attendance}
+            openableSections={openableSections}
+            onRetry={onRetry}
+          />
+        )}
       </div>
       <DashboardNews
         translate={translate}
@@ -272,6 +294,7 @@ export function DashboardScreen({
   locale,
   userId,
   canCreateEvents,
+  openableSections,
 }: {
   readonly locale: Locale;
   /** Quien mira: el cierre del aviso del teléfono es de su cuenta (#498). */
@@ -279,6 +302,9 @@ export function DashboardScreen({
   /** Si se pinta "+ Evento". Sólo decide el botón: crear lo
    * vuelve a comprobar el endpoint (#307). */
   readonly canCreateEvents: boolean;
+  /** Las secciones que el rol abre: deciden qué números del club enlazan.
+   * Abrirlas lo vuelve a comprobar la frontera de la sesión. */
+  readonly openableSections: OpenableSections;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [state, setState] = useState<DashboardState>({ kind: "loading" });
@@ -333,6 +359,7 @@ export function DashboardScreen({
           dashboard={state.dashboard}
           loadedAt={state.loadedAt}
           canCreateEvents={canCreateEvents}
+          openableSections={openableSections}
           onRetry={retry}
         />
       ) : null}
@@ -343,6 +370,7 @@ export function DashboardScreen({
           dashboard={state.dashboard}
           loadedAt={state.loadedAt}
           canCreateEvents={canCreateEvents}
+          openableSections={openableSections}
           onRetry={retry}
         />
       ) : null}

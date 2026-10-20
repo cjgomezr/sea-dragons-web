@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
+import type { OpenableSections } from "@/components/dashboard/ManagementColumn";
 import type {
   Dashboard,
   DashboardNextUpEvent,
@@ -27,6 +28,12 @@ const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
 // 30 de septiembre de 2026 a las 18:00 en Melbourne (AEST, UTC+10).
 const NOW = new Date("2026-09-30T08:00:00.000Z");
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+const ALL_SECTIONS: OpenableSections = {
+  attendance: true,
+  directory: true,
+  news: true,
+};
 
 const POOL_TRAINING: NextTraining = {
   id: "aaaaaaaa-0000-4000-8000-00000000000a",
@@ -263,6 +270,7 @@ async function renderScreen(
   options: {
     readonly locale?: "en" | "es";
     readonly canCreateEvents?: boolean;
+    readonly openableSections?: OpenableSections;
   } = {},
 ): Promise<ReturnType<typeof render>> {
   const view = render(
@@ -270,6 +278,7 @@ async function renderScreen(
       locale={options.locale ?? "en"}
       userId={USER_ID}
       canCreateEvents={options.canCreateEvents ?? false}
+      openableSections={options.openableSections ?? ALL_SECTIONS}
     />,
   );
   await screen.findByRole("heading", { level: 1, name: /Alba/ });
@@ -437,7 +446,12 @@ describe("próximos y noticias", () => {
     const view = await renderScreen();
 
     view.rerender(
-      <DashboardScreen locale="es" userId={USER_ID} canCreateEvents={false} />,
+      <DashboardScreen
+        locale="es"
+        userId={USER_ID}
+        canCreateEvents={false}
+        openableSections={ALL_SECTIONS}
+      />,
     );
 
     expect(
@@ -500,6 +514,72 @@ describe("la cabecera (#747)", () => {
     expect(
       screen.queryByRole("region", { name: "Next training" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("la columna de gestión (#750)", () => {
+  it("pinta Pendientes y los números del club a Admin, Coach y Committee", async () => {
+    stubDashboard({
+      ...ADMIN_DASHBOARD,
+      todos: [{ kind: "role_requests", count: 2 }],
+    });
+
+    await renderScreen();
+
+    const todos = screen.getByRole("region", { name: "To do" });
+    expect(within(todos).getByText("2 role requests")).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Club numbers" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Membership" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("enlaza los números sólo a las secciones que el rol puede abrir", async () => {
+    stubDashboard(ADMIN_DASHBOARD);
+
+    await renderScreen({
+      openableSections: { attendance: false, directory: false, news: true },
+    });
+
+    const club = screen.getByRole("region", { name: "Club numbers" });
+    expect(within(club).getAllByRole("link")).toHaveLength(1);
+    expect(
+      within(club).getByRole("link", { name: /Unread news/ }),
+    ).toHaveAttribute("href", "/noticias");
+  });
+
+  it("no la pinta a un Player", async () => {
+    stubDashboard(PLAYER_DASHBOARD);
+
+    await renderScreen();
+
+    expect(
+      screen.queryByRole("region", { name: "To do" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Club numbers" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("vuelve a pedir el inicio desde Reintentar de Pendientes", async () => {
+    let attempts = 0;
+    stubApi(() => {
+      attempts += 1;
+      const todos = attempts === 1 ? { kind: "unavailable" } : [];
+      return jsonResponse(200, { data: { ...ADMIN_DASHBOARD, todos } });
+    });
+    await renderScreen();
+
+    await userEvent.click(
+      within(screen.getByRole("region", { name: "To do" })).getByRole(
+        "button",
+        { name: "Try again" },
+      ),
+    );
+
+    expect(await screen.findByText("✓ All caught up.")).toBeInTheDocument();
   });
 });
 
@@ -928,7 +1008,12 @@ describe("errores", () => {
       return jsonResponse(200, { data: ADMIN_DASHBOARD });
     });
     render(
-      <DashboardScreen locale="en" userId={USER_ID} canCreateEvents={false} />,
+      <DashboardScreen
+        locale="en"
+        userId={USER_ID}
+        canCreateEvents={false}
+        openableSections={ALL_SECTIONS}
+      />,
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -951,7 +1036,12 @@ describe("errores", () => {
       }),
     );
     render(
-      <DashboardScreen locale="en" userId={USER_ID} canCreateEvents={false} />,
+      <DashboardScreen
+        locale="en"
+        userId={USER_ID}
+        canCreateEvents={false}
+        openableSections={ALL_SECTIONS}
+      />,
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -1179,6 +1269,7 @@ describe("el aviso del contacto (#498)", () => {
         locale="en"
         userId="00000000-0000-4000-8000-0000000000aa"
         canCreateEvents={false}
+        openableSections={ALL_SECTIONS}
       />,
     );
 
@@ -1265,7 +1356,12 @@ describe("el aviso del contacto (#498)", () => {
     const requestsBefore = requests.length;
 
     view.rerender(
-      <DashboardScreen locale="es" userId={USER_ID} canCreateEvents={false} />,
+      <DashboardScreen
+        locale="es"
+        userId={USER_ID}
+        canCreateEvents={false}
+        openableSections={ALL_SECTIONS}
+      />,
     );
 
     const note = screen.getByRole("note", {

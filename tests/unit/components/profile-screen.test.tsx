@@ -1083,6 +1083,16 @@ describe("perfil propio: los grupos (#774)", () => {
   });
 });
 
+/** Cinco categorías: en el perfil salen todas, no sólo las cuatro de la
+ * ficha, porque el socio no tiene otro sitio donde verlas. */
+const FIVE_RATINGS = [
+  { categoryId: "c1", name: "Technique", rating: 7, isRetired: false },
+  { categoryId: "c2", name: "Fitness", rating: 8, isRetired: false },
+  { categoryId: "c3", name: "Speed", rating: 5, isRetired: false },
+  { categoryId: "c4", name: "Teamwork", rating: 6, isRetired: false },
+  { categoryId: "c5", name: "Breath hold", rating: 9, isRetired: false },
+] as const;
+
 describe("perfil propio: la evaluación (#774, D10)", () => {
   it("explica al socio que sus coaches la mantienen en privado", () => {
     renderScreen();
@@ -1106,7 +1116,7 @@ describe("perfil propio: la evaluación (#774, D10)", () => {
     ).toBeVisible();
   });
 
-  it("enseña la evaluación entera cuando la regla de hoy se la deja ver", () => {
+  it("enseña la nota global con su fecha y cada categoría con su barra", () => {
     renderScreen({
       evaluation: {
         visibility: "visible",
@@ -1115,25 +1125,66 @@ describe("perfil propio: la evaluación (#774, D10)", () => {
           memberId: "cccccccc-0000-4000-8000-00000000000c",
           updatedAt: "2026-09-12T08:00:00.000Z",
           overallRating: 7.5,
-          ratings: [
-            {
-              categoryId: "c1",
-              name: "Technique",
-              rating: 7,
-              isRetired: false,
-            },
-          ],
+          ratings: FIVE_RATINGS,
           isCurrent: true,
         },
       },
     });
 
     const evaluation = screen.getByRole("region", { name: "Evaluation" });
-    expect(within(evaluation).getByText("Overall score")).toBeVisible();
     expect(within(evaluation).getByText("7.5")).toBeVisible();
+    expect(within(evaluation).getByText("overall · 12 Sept")).toBeVisible();
+    expect(
+      within(within(evaluation).getByRole("list", { name: "Categories" }))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual([
+      "Technique7.0",
+      "Fitness8.0",
+      "Speed5.0",
+      "Teamwork6.0",
+      "Breath hold9.0",
+    ]);
+  });
+
+  it("no mete en la tarjeta la evaluación de pantalla entera", () => {
+    renderScreen({
+      evaluation: {
+        visibility: "visible",
+        evaluation: {
+          status: "evaluated",
+          memberId: "cccccccc-0000-4000-8000-00000000000c",
+          updatedAt: "2026-09-12T08:00:00.000Z",
+          overallRating: 7.5,
+          ratings: FIVE_RATINGS,
+          isCurrent: true,
+        },
+      },
+    });
+
+    const evaluation = screen.getByRole("region", { name: "Evaluation" });
+    expect(within(evaluation).queryByText("Overall score")).toBeNull();
     expect(
       within(evaluation).queryByText(/keep evaluations private/),
     ).toBeNull();
+  });
+
+  it("sin evaluación dice que aún no la tiene", () => {
+    renderScreen({
+      evaluation: {
+        visibility: "visible",
+        evaluation: {
+          status: "not_evaluated",
+          memberId: "cccccccc-0000-4000-8000-00000000000c",
+        },
+      },
+    });
+
+    expect(
+      within(screen.getByRole("region", { name: "Evaluation" })).getByText(
+        "Not evaluated",
+      ),
+    ).toBeVisible();
   });
 });
 
