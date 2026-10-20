@@ -103,7 +103,6 @@ export function ContactReminderNotice({
   }
 
   const texts = {
-    titleId,
     title: translate(TITLE_KEYS[reminder]),
     why: translate(WHY_KEYS[reminder]),
     action: translate(LINK_KEYS[variant]),
@@ -115,9 +114,9 @@ export function ContactReminderNotice({
       aria-labelledby={titleId}
     >
       {variant === "strip" ? (
-        <ReminderRow texts={texts} />
+        <ReminderRow titleId={titleId} texts={texts} />
       ) : (
-        <ReminderCardText texts={texts} />
+        <ReminderCardText titleId={titleId} texts={texts} />
       )}
       {isDismissible ? (
         <button
@@ -134,7 +133,6 @@ export function ContactReminderNotice({
 }
 
 type ReminderTexts = {
-  readonly titleId: string;
   readonly title: string;
   readonly why: string;
   readonly action: string;
@@ -142,13 +140,15 @@ type ReminderTexts = {
 
 /** El perfil: el título, el porqué y el enlace debajo. */
 function ReminderCardText({
+  titleId,
   texts,
 }: {
+  titleId: string;
   texts: ReminderTexts;
 }): React.JSX.Element {
   return (
     <div className="contact-reminder-text">
-      <p className="contact-reminder-title" id={texts.titleId}>
+      <p className="contact-reminder-title" id={titleId}>
         {texts.title}
       </p>
       <p>{texts.why}</p>
@@ -158,24 +158,35 @@ function ReminderCardText({
 }
 
 /** El inicio: la fila entera es el enlace. Su nombre es el título y, detrás,
- * la acción, que se dice pero no se pinta. El botón de cerrar va fuera: uno
+ * la acción, que se dice pero no se pinta; el porqué es su descripción, para
+ * que quien llega con Tab también lo oiga. El botón de cerrar va fuera: uno
  * dentro de un enlace no se puede pulsar sin seguirlo. */
-function ReminderRow({ texts }: { texts: ReminderTexts }): React.JSX.Element {
-  const actionId = `${texts.titleId}-accion`;
+function ReminderRow({
+  titleId,
+  texts,
+}: {
+  titleId: string;
+  texts: ReminderTexts;
+}): React.JSX.Element {
+  const actionId = `${titleId}-accion`;
+  const whyId = `${titleId}-porque`;
   return (
     <Link
       href={CONTACT_SECTION_HREF}
       className="contact-reminder-row"
-      aria-labelledby={`${texts.titleId} ${actionId}`}
+      aria-labelledby={`${titleId} ${actionId}`}
+      aria-describedby={whyId}
     >
       <span className="contact-reminder-tile" aria-hidden="true">
         <Phone focusable="false" size={18} />
       </span>
       <span className="contact-reminder-text">
-        <span className="contact-reminder-title" id={texts.titleId}>
+        <span className="contact-reminder-title" id={titleId}>
           {texts.title}
         </span>
-        <span className="contact-reminder-why">{texts.why}</span>
+        <span className="contact-reminder-why" id={whyId}>
+          {texts.why}
+        </span>
         <span className="visually-hidden" id={actionId}>
           {texts.action}
         </span>

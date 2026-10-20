@@ -1126,9 +1126,14 @@ describe("el aviso del contacto (#498)", () => {
         "So the club knows who to call if something happens to you at the pool.",
       ),
     ).toBeInTheDocument();
-    expect(
-      within(note).getByRole("link", { name: contactLink(EMERGENCY_NOTE) }),
-    ).toHaveAttribute("href", "/cuenta#perfil-contacto");
+    const link = within(note).getByRole("link", {
+      name: contactLink(EMERGENCY_NOTE),
+    });
+    expect(link).toHaveAttribute("href", "/cuenta#perfil-contacto");
+    // Quien llega con Tab oye también el porqué, no sólo el título.
+    expect(link).toHaveAccessibleDescription(
+      "So the club knows who to call if something happens to you at the pool.",
+    );
     expect(within(note).queryByRole("button")).not.toBeInTheDocument();
   });
 
