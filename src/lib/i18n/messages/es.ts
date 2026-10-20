@@ -2586,6 +2586,23 @@ export const spanishMessages: MessageCatalog = {
     other: "{count} jugadores",
   },
   "teams.column.empty": "Arrastra jugadores aquí o usa Añadir en el banco.",
+  "teams.edit.open": "Editar nombre y color de {team}",
+  "teams.edit.title": "Editar equipo",
+  "teams.edit.name": "Nombre",
+  "teams.edit.color": "Color del peto",
+  "teams.edit.colorTaken": "{color} (lo usa {team})",
+  "teams.edit.takenHint": "El tachado es el color del otro equipo.",
+  "teams.edit.scope":
+    "Se usa en todos los eventos desde ahora. Los equipos ya publicados conservan sus colores.",
+  "teams.edit.loading": "Cargando los equipos del club…",
+  "teams.edit.cancel": "Cancelar",
+  "teams.edit.apply": "Aplicar",
+  "teams.edit.applying": "Aplicando…",
+  "teams.edit.close": "Cerrar",
+  "teams.edit.invalid":
+    "Revisa el nombre y el color: el nombre lleva de 1 a 24 caracteres y cada equipo, un color distinto.",
+  "teams.edit.changed":
+    "Equipo actualizado · se usa en todos los eventos desde ahora",
   "teams.coverage.label": "Cobertura de puestos",
   "teams.coverage.goalkeeper": "POR",
   "teams.coverage.defender": "DEF",

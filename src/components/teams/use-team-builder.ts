@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { TeamLabels } from "@/lib/teams/team-ids";
 import {
+  type TeamsChangeOutcome,
   type TeamsFailure,
   autoBalance,
+  changeClubTeams,
   openBuilder,
   publishSplit,
   saveSplit,
@@ -38,6 +41,7 @@ export type BuilderAction =
   | { readonly kind: "balanced" }
   | { readonly kind: "saved" }
   | { readonly kind: "published"; readonly notifiedCount: number }
+  | { readonly kind: "teamsChanged" }
   | { readonly kind: "failed"; readonly failure: TeamsFailure };
 
 /** El último movimiento, para anunciarlo: un jugador, o los dos de un
@@ -72,6 +76,7 @@ export type TeamBuilderControls = {
   readonly cancelPublish: () => void;
   readonly publish: () => Promise<void>;
   readonly retry: () => void;
+  readonly changeTeams: (teams: TeamLabels) => Promise<TeamsChangeOutcome>;
 };
 
 const IN_FLIGHT: ReadonlySet<BuilderAction["kind"]> = new Set([
@@ -237,6 +242,21 @@ export function useTeamBuilder(eventId: string): TeamBuilderControls {
       }));
     });
 
+  /** Cambia los equipos del club y, si los acepta, también los del borrador
+   * abierto (D4 del PRD de E28). Un fallo no toca el aviso de la pantalla:
+   * lo enseña la ventana de editar, que sigue abierta. */
+  async function changeTeams(teams: TeamLabels): Promise<TeamsChangeOutcome> {
+    const outcome = await changeClubTeams(teams);
+    if (outcome.kind === "changed") {
+      update((ready) => ({
+        ...ready,
+        draft: { ...ready.draft, teams: outcome.teams },
+        action: { kind: "teamsChanged" },
+      }));
+    }
+    return outcome;
+  }
+
   function askToPublish(): void {
     if (!isBusyRef.current) {
       setAction({ kind: "confirmingPublish" });
@@ -257,5 +277,6 @@ export function useTeamBuilder(eventId: string): TeamBuilderControls {
     cancelPublish,
     publish,
     retry,
+    changeTeams,
   };
 }

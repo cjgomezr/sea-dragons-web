@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TEAM_BIB_COLORS } from "./team-color-name";
+import { CLUB_TEAM_NAME_MAX_LENGTH } from "./team-ids";
 import {
   type TeamBuilderGateways,
   type TeamLabels,
@@ -16,9 +17,6 @@ import {
  * Un reparto guardado conserva los suyos (D4), y su guardado sigue aceptando
  * cualquier `#RRGGBB` (D5). Sólo esto exige el muestrario.
  */
-
-/** El límite de `clubs_team_a_name_length` en `0077_club_team_labels.sql`. */
-export const CLUB_TEAM_NAME_MAX_LENGTH = 24;
 
 const BIB_HEXES = TEAM_BIB_COLORS.map((color) => color.hex);
 

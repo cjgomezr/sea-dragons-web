@@ -21129,6 +21129,7 @@ async function stubAttendeeLargePhoto(page: Page): Promise<void> {
 
 const TEAMS_SCREEN_PATH = "/equipos";
 const TEAMS_ENDPOINT = "/api/v1/teams";
+const CLUB_TEAM_LABELS_ENDPOINT = "/api/v1/club/team-labels";
 const TEAMS_NARROW_WIDTHS = [320, 375, 768] as const;
 const TEAMS_MIN_TOUCH_TARGET_PX = 44;
 
@@ -21313,6 +21314,20 @@ type TeamsReads = {
 async function stubTeams(page: Page, reads: TeamsReads): Promise<TeamsWrite[]> {
   const writes: TeamsWrite[] = [];
   await stubDirectoryPhoto(page);
+  // Los equipos del club (#755), que pide la ventana de editar (#760).
+  await page.route(
+    (url) => url.pathname === CLUB_TEAM_LABELS_ENDPOINT,
+    (route, request) => {
+      if (request.method() === "GET") {
+        return route.fulfill(jsonBody(TEAMS_LABELS));
+      }
+      writes.push({
+        method: request.method(),
+        path: CLUB_TEAM_LABELS_ENDPOINT,
+      });
+      return route.fulfill(jsonBody(request.postDataJSON()));
+    },
+  );
   await page.route(
     (url) => url.pathname === TEAMS_ENDPOINT,
     (route) => route.fulfill(jsonBody({ events: reads.events })),
@@ -21381,6 +21396,20 @@ async function balanceTeams(page: Page): Promise<void> {
   await page.getByRole("button", { name: TEAMS_BALANCE }).click();
   await expect(
     page.getByText(/^(Teams balanced|Equipos equilibrados)/),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+const TEAMS_EDIT_KELP =
+  /^(Edit name and colour of Team Kelp|Editar nombre y color de Team Kelp)$/;
+const TEAMS_EDIT_DIALOG = /^(Edit team|Editar equipo)$/;
+
+/** Abre la ventana de editar Team Kelp (#760): en el móvil, la hoja. */
+async function openTeamEditor(page: Page): Promise<void> {
+  await waitForTeamBuilder(page);
+  await page.getByRole("button", { name: TEAMS_EDIT_KELP }).click();
+  await expect(
+    page.getByRole("dialog", { name: TEAMS_EDIT_DIALOG }).getByRole("textbox"),
   ).toBeVisible();
   await page.mouse.move(0, 0);
 }
@@ -21455,6 +21484,20 @@ const TEAMS_STATES: readonly TeamsState[] = [
     builder: DRAFTED_BUILDER,
     ready: askToPublish,
   }),
+  {
+    name: "equipos-editar",
+    events: TEAMS_EVENTS,
+    builder: DRAFTED_BUILDER,
+    viewports: viewports.filter((vp) => vp.name !== "mobile"),
+    ready: openTeamEditor,
+  },
+  {
+    name: "equipos-editar-movil",
+    events: TEAMS_EVENTS,
+    builder: DRAFTED_BUILDER,
+    viewports: viewports.filter((vp) => vp.name === "mobile"),
+    ready: openTeamEditor,
+  },
   ...teamsWithSpanish({
     name: "equipos-publicado",
     events: TEAMS_EVENTS,
@@ -21548,6 +21591,40 @@ test.describe("equipos en el navegador", () => {
       "Daniela Vargas",
     );
     expect(writes).toEqual([]);
+  });
+
+  test("editar un equipo elige con las flechas, retiene el foco y aplica", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const patches: unknown[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "PATCH") {
+        patches.push(request.postDataJSON());
+      }
+    });
+    await goToTeams(page, TEAMS_MANUAL_STATE);
+    await openTeamEditor(page);
+    const dialog = page.getByRole("dialog", { name: "Edit team" });
+    await expect(dialog.getByRole("textbox", { name: "Name" })).toBeFocused();
+
+    await dialog.getByRole("radio", { name: "Blue" }).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(dialog.getByRole("radio", { name: "Navy" })).toBeChecked();
+    await dialog.getByRole("button", { name: "Apply" }).focus();
+    await page.keyboard.press("Tab");
+    await expect(dialog.getByRole("textbox", { name: "Name" })).toBeFocused();
+    await dialog.getByRole("textbox", { name: "Name" }).fill("Team Reef");
+    await dialog.getByRole("button", { name: "Apply" }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect(teamsRegion(page, "Team Reef")).toBeVisible();
+    expect(patches).toEqual([
+      {
+        a: { name: "Team Reef", color: "#2B3F7A" },
+        b: TEAMS_LABELS.b,
+      },
+    ]);
   });
 
   test("arrastrar a un disponible a una columna lo mueve", async ({ page }) => {
