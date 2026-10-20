@@ -22072,17 +22072,48 @@ const DASHBOARD_WEEK = {
   ],
 } as const;
 
+// Los cuatro pendientes de la columna de gestión (#750), como en la captura
+// 02 del handoff de E27. Cada rol recibe sólo los que puede resolver (D9).
+const TODO_ROLE_REQUESTS = { kind: "role_requests", count: 3 } as const;
+
+const TODO_ATTENDANCE_MISSING = {
+  kind: "attendance_missing",
+  eventId: "d0d0d0d0-0000-4000-8000-0000000000f1",
+  title: "Monday training",
+  startsOn: "2026-09-28",
+} as const;
+
+const TODO_TEAMS_UNPUBLISHED = {
+  kind: "teams_unpublished",
+  eventId: DASHBOARD_NEXT_UP.id,
+  title: DASHBOARD_NEXT_UP.title,
+} as const;
+
+const TODO_NO_REPLY = {
+  kind: "no_reply",
+  eventId: DASHBOARD_NEXT_UP.id,
+  title: DASHBOARD_NEXT_UP.title,
+  count: 6,
+} as const;
+
 const ADMIN_DASHBOARD = {
   kind: "member",
   column: "management",
-  todos: [],
+  todos: [
+    TODO_ROLE_REQUESTS,
+    TODO_ATTENDANCE_MISSING,
+    TODO_TEAMS_UNPUBLISHED,
+    TODO_NO_REPLY,
+  ],
   club: {
     attendance: { percent: 86, previousPercent: 80 },
     members: { active: 48, joinedThisMonth: 3 },
     unreadNews: { count: 3, announcements: 1 },
   },
   viewer: { firstName: "Liam" },
-  me: { attendance: null },
+  me: {
+    attendance: { percent: 85, attended: 11, sessions: 13, last10: [] },
+  },
   tiles: {
     attendance: {
       kind: "club_rate",
@@ -22153,6 +22184,28 @@ const MY_TEAM_DASHBOARD = {
 const UNPUBLISHED_TEAMS_DASHBOARD = {
   ...ADMIN_DASHBOARD,
   nextUp: { ...DASHBOARD_NEXT_UP, teamsStatus: "draft" },
+};
+
+// La columna de gestión sin pendientes (#750), la del Coach, que no ve las
+// solicitudes de rol, y la del Committee, que sólo ve quién no ha respondido
+// y no entrena: sin "Mi asistencia" la cuadrícula se queda en tres celdas. La
+// del Coach entra con la sesión del Admin, como la hoja de asistencia del
+// Coach: no hay Coach sembrado, y cada identidad nueva cuenta en Auth (#415).
+const ADMIN_ALL_CAUGHT_UP_DASHBOARD = { ...ADMIN_DASHBOARD, todos: [] };
+
+const COACH_DASHBOARD = {
+  ...ADMIN_DASHBOARD,
+  todos: [TODO_ATTENDANCE_MISSING, TODO_TEAMS_UNPUBLISHED, TODO_NO_REPLY],
+};
+
+const COMMITTEE_DASHBOARD = {
+  ...ADMIN_DASHBOARD,
+  todos: [TODO_NO_REPLY],
+  me: { attendance: null },
+  club: {
+    ...ADMIN_DASHBOARD.club,
+    attendance: { percent: 78, previousPercent: 84 },
+  },
 };
 
 // La columna del Player sin sesiones elegibles en la temporada (#749).
@@ -22275,6 +22328,17 @@ function dashboardStates(
 
 const DASHBOARD_STATES: readonly DashboardScreenState[] = [
   ...dashboardStates("inicio-admin", ADMIN_DASHBOARD, ADMIN_STORAGE_STATE),
+  ...dashboardStates(
+    "inicio-admin-todo-al-dia",
+    ADMIN_ALL_CAUGHT_UP_DASHBOARD,
+    ADMIN_STORAGE_STATE,
+  ),
+  ...dashboardStates("inicio-coach", COACH_DASHBOARD, ADMIN_STORAGE_STATE),
+  ...dashboardStates(
+    "inicio-committee",
+    COMMITTEE_DASHBOARD,
+    CLUB_COMMITTEE_STORAGE_STATE,
+  ),
   ...dashboardStates(
     "inicio-jugador",
     PLAYER_DASHBOARD,
@@ -22444,6 +22508,111 @@ test.describe("la columna del Player en el navegador (#749)", () => {
     ]);
     expect(column.y).toBe(card.y);
     expect(column.x).toBeGreaterThan(card.x);
+  });
+});
+
+test.describe("la columna de gestión en el navegador (#750)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  /** La caja de un elemento que se ve, o un fallo que dice cuál faltaba. */
+  async function boxOf(
+    locator: Locator,
+  ): Promise<{ x: number; y: number; width: number; height: number }> {
+    const box = await locator.boundingBox();
+    if (box === null) {
+      throw new Error(`${locator.toString()} no se ve.`);
+    }
+    return box;
+  }
+
+  function todoRows(page: Page): Locator {
+    return page.getByRole("region", { name: "To do" }).getByRole("listitem");
+  }
+
+  test("en el móvil Pendientes va entre Próximo y Esta semana, y los números después", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
+
+    const regionBox = (name: string): ReturnType<typeof boxOf> =>
+      boxOf(page.getByRole("region", { name }));
+    const [nextUp, todos, week, club] = await Promise.all([
+      regionBox("Next up"),
+      regionBox("To do"),
+      regionBox("This week"),
+      regionBox("Club numbers"),
+    ]);
+    expect(todos.y).toBeGreaterThan(nextUp.y);
+    expect(week.y).toBeGreaterThan(todos.y);
+    expect(club.y).toBeGreaterThan(week.y);
+  });
+
+  test("en el móvil cada pendiente mide al menos 60px y termina en flecha", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
+
+    const rows = await todoRows(page).all();
+    expect(rows).toHaveLength(4);
+    for (const row of rows) {
+      expect((await boxOf(row)).height).toBeGreaterThanOrEqual(60);
+      await expect(row.locator(".dashboard-todo-action svg")).toBeVisible();
+      await expect(row.locator(".dashboard-todo-action-label")).toHaveCSS(
+        "position",
+        "absolute",
+      );
+    }
+  });
+
+  test("en escritorio va a la derecha de Próximo con filas de al menos 56px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
+
+    const nextUp = await boxOf(page.getByRole("region", { name: "Next up" }));
+    const todos = await boxOf(page.getByRole("region", { name: "To do" }));
+    expect(todos.y).toBe(nextUp.y);
+    expect(todos.x).toBeGreaterThan(nextUp.x);
+    for (const row of await todoRows(page).all()) {
+      expect((await boxOf(row)).height).toBeGreaterThanOrEqual(56);
+      await expect(row.getByRole("link")).toContainText(
+        /Review|Take|Open|See who/,
+      );
+    }
+  });
+
+  test("sin Mi asistencia la última celda ocupa la fila y no deja hueco", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToDashboard(page, { dashboard: COMMITTEE_DASHBOARD });
+
+    const grid = await boxOf(page.locator(".dashboard-club-grid"));
+    const cells = page
+      .getByRole("region", { name: "Club numbers" })
+      .getByRole("listitem");
+    await expect(cells).toHaveCount(3);
+    const last = await boxOf(cells.last());
+    expect(last.width).toBeCloseTo(grid.width, 0);
+  });
+
+  test("abre la hoja de la sesión desde Tomar", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
+
+    await page
+      .getByRole("region", { name: "To do" })
+      .getByRole("link", { name: "Take" })
+      .click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`/asistencia\?sesion=${TODO_ATTENDANCE_MISSING.eventId}$`),
+    );
   });
 });
 
