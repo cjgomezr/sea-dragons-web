@@ -21522,16 +21522,31 @@ const TEAMS_AVAILABLE = /^(Available · Going|Disponibles · Van)$/;
 const TEAMS_BALANCE = /^Auto-balance$/;
 const TEAMS_PUBLISH = /^(Publish|Publicar)$/;
 const TEAMS_PUBLISH_QUESTION = /^(Publish teams\?|¿Publicar equipos\?)/;
+const TEAMS_TOTALS = /^(Totals|Totales)$/;
+const TEAMS_BENCH_TAB = /^(Bench|Banco) /;
+/** En el móvil (#762) se comprueba sin scroll en los dos anchos del móvil. */
+const TEAMS_PHONE_WIDTHS = [320, 375] as const;
+/** Lo que mide cada pieza del móvil (#762, RF-8 del PRD de E28). */
+const TEAMS_PHONE_ROW_MIN_PX = 58;
+const TEAMS_PHONE_TAB_PX = 40;
+const TEAMS_PHONE_BAR_BUTTON_PX = 48;
 
 function teamsRegion(page: Page, name: string | RegExp): Locator {
   return page.getByRole("region", { name });
 }
 
-/** El Publicar de la confirmación: el de la cabecera se llama igual. */
-function teamsConfirmPublish(page: Page): Locator {
+/** La pregunta de publicar: en la página o, en el móvil, la hoja (#762). */
+function teamsPublishQuestion(page: Page): Locator {
   return page
     .getByRole("group", { name: TEAMS_PUBLISH_QUESTION })
-    .getByRole("button", { name: TEAMS_PUBLISH });
+    .or(page.getByRole("dialog", { name: TEAMS_PUBLISH_QUESTION }));
+}
+
+/** El Publicar de la confirmación: el de la cabecera se llama igual. */
+function teamsConfirmPublish(page: Page): Locator {
+  return teamsPublishQuestion(page).getByRole("button", {
+    name: TEAMS_PUBLISH,
+  });
 }
 
 function teamsPlayerRow(page: Page, fullName: string): Locator {
@@ -21540,8 +21555,17 @@ function teamsPlayerRow(page: Page, fullName: string): Locator {
     .filter({ has: page.getByRole("group", { name: fullName }) });
 }
 
+/** Los totales están en el escritorio y en el móvil, donde el banco va en
+ * su pestaña (#762). */
 async function waitForTeamBuilder(page: Page): Promise<void> {
-  await expect(teamsRegion(page, TEAMS_AVAILABLE)).toBeVisible();
+  await expect(page.getByRole("group", { name: TEAMS_TOTALS })).toBeVisible();
+}
+
+/** Elige una pestaña del móvil (#762); en escritorio no hay y no hace nada. */
+async function showTeamsTab(page: Page, name: RegExp): Promise<void> {
+  if (await page.getByRole("tablist").isVisible()) {
+    await page.getByRole("tab", { name }).click();
+  }
 }
 
 async function balanceTeams(page: Page): Promise<void> {
@@ -21585,6 +21609,8 @@ type TeamsState = TeamsReads & {
   readonly name: string;
   readonly isSpanish?: boolean;
   readonly viewports?: readonly (typeof viewports)[number][];
+  /** Los anchos sin scroll horizontal; por defecto, los tres estrechos. */
+  readonly narrowWidths?: readonly number[];
   readonly ready: (page: Page) => Promise<void>;
 };
 
@@ -21626,6 +21652,7 @@ const TEAMS_STATES: readonly TeamsState[] = [
     viewports: viewports.filter((vp) => vp.name !== "mobile"),
     ready: async (page) => {
       await waitForTeamBuilder(page);
+      await showTeamsTab(page, /^Tide /);
       await expect(
         teamsRegion(page, "Team Tide").getByText("No goalkeeper"),
       ).toBeVisible();
@@ -21650,6 +21677,46 @@ const TEAMS_STATES: readonly TeamsState[] = [
     builder: DRAFTED_BUILDER,
     viewports: viewports.filter((vp) => vp.name === "mobile"),
     ready: openTeamEditor,
+  },
+  // El móvil (#762): la pestaña de un equipo con cambios sin guardar, el
+  // banco y la hoja de publicar.
+  {
+    name: "equipos-movil-equipo",
+    events: TEAMS_EVENTS,
+    builder: MANUAL_BUILDER,
+    viewports: viewports.filter((vp) => vp.name === "mobile"),
+    narrowWidths: TEAMS_PHONE_WIDTHS,
+    ready: async (page) => {
+      await waitForTeamBuilder(page);
+      await page
+        .getByRole("button", { name: "Remove Isabella Muñoz from Team Kelp" })
+        .click();
+      await expect(page.getByRole("button", { name: /^Save/ })).toContainText(
+        "Unsaved",
+      );
+      await page.mouse.move(0, 0);
+    },
+  },
+  {
+    name: "equipos-movil-banco",
+    events: TEAMS_EVENTS,
+    builder: MANUAL_BUILDER,
+    viewports: viewports.filter((vp) => vp.name === "mobile"),
+    narrowWidths: TEAMS_PHONE_WIDTHS,
+    ready: async (page) => {
+      await waitForTeamBuilder(page);
+      await page.getByRole("tab", { name: TEAMS_BENCH_TAB }).click();
+      await expect(teamsRegion(page, TEAMS_AVAILABLE)).toBeVisible();
+      await page.mouse.move(0, 0);
+    },
+  },
+  {
+    name: "equipos-movil-publicar",
+    events: TEAMS_EVENTS,
+    builder: DRAFTED_BUILDER,
+    viewports: viewports.filter((vp) => vp.name === "mobile"),
+    narrowWidths: TEAMS_PHONE_WIDTHS,
+    ready: askToPublish,
   },
   ...teamsWithSpanish({
     name: "equipos-publicado",
@@ -21707,7 +21774,7 @@ for (const state of TEAMS_STATES) {
       });
     }
 
-    for (const width of TEAMS_NARROW_WIDTHS) {
+    for (const width of state.narrowWidths ?? TEAMS_NARROW_WIDTHS) {
       test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 812 });
         await goToTeams(page, state);
@@ -21716,6 +21783,15 @@ for (const state of TEAMS_STATES) {
     }
 
     test("has no accessibility violations (axe-core)", async ({ page }) => {
+      // Un estado sólo del móvil (#762) no existe en escritorio: sus
+      // pestañas no se pintan. axe lo mira en el primero de sus tamaños.
+      const viewport = state.viewports?.at(0);
+      if (viewport !== undefined) {
+        await page.setViewportSize({
+          width: viewport.width,
+          height: viewport.height,
+        });
+      }
       await goToTeams(page, state);
       await expectNoAxeViolations(page);
     });
@@ -21821,6 +21897,7 @@ test.describe("equipos en el navegador", () => {
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await goToTeams(page, TEAMS_MANUAL_STATE);
+    await showTeamsTab(page, TEAMS_BENCH_TAB);
 
     const heights = await page
       .getByRole("group", { name: LONG_NAMED_PLAYER })
@@ -21834,6 +21911,83 @@ test.describe("equipos en el navegador", () => {
       expect(height).toBeGreaterThanOrEqual(TEAMS_MIN_TOUCH_TARGET_PX);
     }
   });
+
+  test("a 375px las pestañas, las filas y la barra fija miden lo del diseño", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToTeams(page, TEAMS_MANUAL_STATE);
+    const heightOf = async (locator: Locator): Promise<number> => {
+      const box = await locator.boundingBox();
+      if (box === null) {
+        throw new Error("La pieza no se ve.");
+      }
+      return box.height;
+    };
+
+    for (const tab of await page.getByRole("tab").all()) {
+      expect(await heightOf(tab)).toBeCloseTo(TEAMS_PHONE_TAB_PX, 0);
+    }
+    expect(
+      await heightOf(teamsPlayerRow(page, "Mateo Restrepo")),
+    ).toBeGreaterThanOrEqual(TEAMS_PHONE_ROW_MIN_PX);
+    for (const name of [/^Save/, TEAMS_PUBLISH]) {
+      expect(
+        await heightOf(page.getByRole("button", { name })),
+      ).toBeGreaterThanOrEqual(TEAMS_PHONE_BAR_BUTTON_PX);
+    }
+  });
+
+  // Con cambios sin guardar, que es cuando Guardar lleva más texto; a 320 en
+  // español es lo más largo que puede llevar.
+  for (const { width, isSpanish } of [
+    { width: 375, isSpanish: false },
+    { width: 320, isSpanish: true },
+  ]) {
+    const language = isSpanish ? " en español" : "";
+    test(`a ${width}px${language} la barra fija no tapa la última fila del banco`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 812 });
+      await goToTeams(page, { ...TEAMS_MANUAL_STATE, isSpanish });
+      await page
+        .getByRole("button", {
+          name: /^(Remove|Sacar a) Isabella Muñoz (from|de) Team Kelp$/,
+        })
+        .click();
+      const save = page.getByRole("button", { name: /^(Save|Guardar)/ });
+      await expect(save).toContainText(
+        /^(Save|Guardar).*(Unsaved|Sin guardar)$/,
+      );
+      // Guardar no se corta: lo que pinta cabe en el botón.
+      for (const button of [
+        save,
+        page.getByRole("button", { name: TEAMS_PUBLISH }),
+      ]) {
+        expect(
+          await button.evaluate(
+            (element) => element.scrollWidth <= element.clientWidth,
+          ),
+        ).toBe(true);
+      }
+      await showTeamsTab(page, TEAMS_BENCH_TAB);
+      const lastRow = page.getByRole("tabpanel").getByRole("group").last();
+
+      await page.evaluate(() =>
+        window.scrollTo(0, document.documentElement.scrollHeight),
+      );
+
+      const row = await lastRow.boundingBox();
+      const bar = await page
+        .getByRole("button", { name: TEAMS_PUBLISH })
+        .locator("xpath=ancestor::div[contains(@class, 'team-phone-bar')]")
+        .boundingBox();
+      if (row === null || bar === null) {
+        throw new Error("La última fila o la barra no se ven.");
+      }
+      expect(row.y + row.height).toBeLessThanOrEqual(bar.y);
+    });
+  }
 });
 /* ---------------------------------------------------------------------------
    La búsqueda global (#427, RF-8 del PRD de E14). El cuadro de la barra de
