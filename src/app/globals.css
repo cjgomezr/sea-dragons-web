@@ -17050,11 +17050,13 @@ a.agenda-take-attendance {
 }
 
 /* La fila de un jugador dentro de un equipo (#759): avatar, nombre y
-   posición, OVR y los dos botones de icono, en una sola línea. Lleva las
-   dos clases para ganarle a la rejilla de `.team-player` a 1200px. */
+   posición, OVR y los dos botones de icono. Por debajo de 1200px la tarjeta
+   es estrecha y los botones bajan a su línea, a la derecha, para que el
+   nombre no se quede en tres letras; a 1200px va todo en una sola. Lleva
+   las dos clases para ganarle a la rejilla de `.team-player`. */
 .team-player.team-player-assigned {
-  grid-template-columns: 36px minmax(0, 1fr) 40px auto;
-  gap: 0 10px;
+  grid-template-columns: 36px minmax(0, 1fr) 40px;
+  gap: 2px 10px;
   min-height: 48px;
   padding: 6px var(--space-2) 6px var(--space-4);
 }
@@ -17093,7 +17095,8 @@ a.agenda-take-attendance {
 }
 
 .team-player-assigned .team-moves {
-  grid-column: auto;
+  grid-column: 2 / -1;
+  justify-content: flex-end;
   flex-wrap: nowrap;
   gap: 2px;
 }
@@ -17258,6 +17261,15 @@ a.agenda-take-attendance {
   .team-moves {
     grid-column: auto;
     flex-wrap: nowrap;
+  }
+
+  .team-player.team-player-assigned {
+    grid-template-columns: 36px minmax(0, 1fr) 40px auto;
+    gap: 0 10px;
+  }
+
+  .team-player-assigned .team-moves {
+    grid-column: auto;
   }
 }
 
