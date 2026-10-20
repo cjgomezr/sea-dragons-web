@@ -1435,28 +1435,134 @@ describe("ficha en pantalla: asistencia", () => {
     expect(within(region).getByText("9 sesiones")).toBeVisible();
   });
 });
-describe("ficha en pantalla: contacto (#499)", () => {
-  it("enseña el teléfono y el contacto de emergencia del socio", async () => {
+/** La etiqueta de la lista de lectura, sin lo que la acompaña (el candado
+ * del género). */
+function termOf(card: HTMLElement, label: string): HTMLElement {
+  return within(card).getByText(
+    (_, element) =>
+      element?.tagName === "DT" && element.firstChild?.textContent === label,
+  );
+}
+
+/** El valor que la lista de lectura enseña junto a una etiqueta. */
+function readValueOf(card: HTMLElement, label: string): string {
+  const term = termOf(card, label);
+  return term.nextElementSibling?.textContent ?? "";
+}
+
+function contactCard(name = "Contact"): HTMLElement {
+  return screen.getByRole("region", { name });
+}
+
+async function openContact(
+  user: ReturnType<typeof userEvent.setup>,
+): Promise<HTMLElement> {
+  const card = contactCard();
+  await user.click(within(card).getByRole("button", { name: "Edit Contact" }));
+  return card;
+}
+
+function saveContact(card: HTMLElement): HTMLElement {
+  return within(card).getByRole("button", { name: /^(Save|Saving…)$/ });
+}
+
+describe("ficha en pantalla: Sobre mí (#772)", () => {
+  it("lista el nombre, el país, la posición y la experiencia, sin género", async () => {
     stubApi();
 
     await renderScreen();
 
-    const section = screen.getByRole("region", { name: "Contact" });
-    expect(within(section).getByLabelText("Phone (optional)")).toHaveValue(
-      "0412 345 678",
-    );
-    expect(within(section).getByLabelText("Contact name")).toHaveValue(
-      "Rosa Player",
-    );
-    expect(within(section).getByLabelText("Contact phone")).toHaveValue(
-      "0499 111 222",
-    );
-    expect(within(section).getByLabelText("Relationship")).toHaveValue(
-      "Mother",
-    );
+    const card = screen.getByRole("region", { name: "About" });
+    expect(readValueOf(card, "Full name")).toBe("Paula Player");
+    expect(readValueOf(card, "Country")).toBe("Australia");
+    expect(readValueOf(card, "Position")).toBe("Goalkeeper");
+    expect(readValueOf(card, "Experience")).toBe("Intermediate");
+    expect(within(card).queryByText("Gender")).not.toBeInTheDocument();
   });
 
-  it("no manda el contacto si no lo tocó: el socio puede haberlo cambiado entretanto", async () => {
+  it("es sólo lectura: no lleva Editar", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    const card = screen.getByRole("region", { name: "About" });
+    expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("pinta un guion en los datos vacíos", async () => {
+    stubApi({
+      record: {
+        ...RECORD,
+        positionName: null,
+        experienceLevel: null,
+        country: null,
+      },
+    });
+
+    await renderScreen();
+
+    const card = screen.getByRole("region", { name: "About" });
+    expect(readValueOf(card, "Country")).toContain("—");
+    expect(readValueOf(card, "Position")).toContain("—");
+    expect(readValueOf(card, "Experience")).toContain("—");
+  });
+
+  it("se lee en español", async () => {
+    stubApi();
+
+    await renderScreen("es");
+
+    const card = screen.getByRole("region", { name: "Sobre mí" });
+    expect(readValueOf(card, "Posición")).toBe("Portero");
+    expect(readValueOf(card, "Experiencia")).toBe("Intermedio");
+  });
+});
+
+describe("ficha en pantalla: contacto (#499, #772)", () => {
+  it("en lectura enseña el teléfono con el correo y el contacto de emergencia", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    const card = contactCard();
+    expect(within(card).getByText("0412 345 678")).toBeInTheDocument();
+    expect(within(card).getByText("paula@example.com")).toBeInTheDocument();
+    expect(within(card).getByText("Rosa Player · Mother")).toBeInTheDocument();
+    expect(within(card).getByText("0499 111 222")).toBeInTheDocument();
+    expect(within(card).queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("sin contacto de emergencia dice que aún no se añadió", async () => {
+    stubApi({ record: { ...RECORD, emergencyContact: null } });
+
+    await renderScreen();
+
+    expect(
+      within(contactCard()).getByText("Not added yet"),
+    ).toBeInTheDocument();
+  });
+
+  it("Editar abre el teléfono y el contacto con lo guardado, con el foco en el teléfono", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    const card = await openContact(user);
+
+    expect(within(card).getByLabelText("Phone (optional)")).toHaveFocus();
+    expect(within(card).getByLabelText("Phone (optional)")).toHaveValue(
+      "0412 345 678",
+    );
+    expect(within(card).getByLabelText("Contact name")).toHaveValue(
+      "Rosa Player",
+    );
+    expect(within(card).getByLabelText("Contact phone")).toHaveValue(
+      "0499 111 222",
+    );
+    expect(within(card).getByLabelText("Relationship")).toHaveValue("Mother");
+  });
+
+  it("guardar el resto de la ficha no manda el contacto", async () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
@@ -1469,42 +1575,89 @@ describe("ficha en pantalla: contacto (#499)", () => {
     expect(patches[0]?.body).not.toHaveProperty("emergencyContact");
   });
 
-  it("manda el contacto corregido entero y enseña lo guardado", async () => {
+  it("manda el contacto corregido con los grupos y la fecha guardados, sin el AUF", async () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
+    const card = await openContact(user);
 
-    await user.clear(screen.getByLabelText("Phone (optional)"));
-    await user.type(screen.getByLabelText("Phone (optional)"), "0400 000 111");
-    await user.clear(screen.getByLabelText("Relationship"));
-    await user.type(screen.getByLabelText("Relationship"), "Aunt");
-    await user.click(saveButton());
-
-    expect(patches[0]?.body).toMatchObject({
-      phone: "0400 000 111",
-      emergencyContact: {
-        name: "Rosa Player",
-        phone: "0499 111 222",
-        relationship: "Aunt",
-      },
-    });
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Record saved.",
+    await user.clear(within(card).getByLabelText("Phone (optional)"));
+    await user.type(
+      within(card).getByLabelText("Phone (optional)"),
+      "0400 000 111",
     );
-    expect(screen.getByLabelText("Relationship")).toHaveValue("Aunt");
+    await user.clear(within(card).getByLabelText("Relationship"));
+    await user.type(within(card).getByLabelText("Relationship"), "Aunt");
+    await user.click(saveContact(card));
+
+    expect(await within(card).findByRole("status")).toHaveTextContent(
+      "Contact saved",
+    );
+    expect(patches).toEqual([
+      {
+        method: "PATCH",
+        body: {
+          groupIds: [SENIOR_ID],
+          dateOfBirth: "1990-05-10",
+          phone: "0400 000 111",
+          emergencyContact: {
+            name: "Rosa Player",
+            phone: "0499 111 222",
+            relationship: "Aunt",
+          },
+        },
+      },
+    ]);
+  });
+
+  it("guardar sin tocar nada vuelve a lectura sin mandar nada", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+    const card = await openContact(user);
+
+    await user.click(saveContact(card));
+
+    expect(within(card).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(
+      within(card).getByRole("button", { name: "Edit Contact" }),
+    ).toHaveFocus();
+    expect(patches).toEqual([]);
+  });
+
+  it("al guardar vuelve a lectura con lo nuevo y el foco en Editar", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+    const card = await openContact(user);
+
+    await user.clear(within(card).getByLabelText("Relationship"));
+    await user.type(within(card).getByLabelText("Relationship"), "Aunt");
+    await user.click(saveContact(card));
+
+    await within(card).findByRole("status");
+    expect(within(card).getByText("Rosa Player · Aunt")).toBeInTheDocument();
+    expect(
+      within(card).queryByLabelText("Relationship"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card).getByRole("button", { name: "Edit Contact" }),
+    ).toHaveFocus();
   });
 
   it("manda vacíos como null el teléfono y el contacto que se borran", async () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
+    const card = await openContact(user);
 
-    await user.clear(screen.getByLabelText("Phone (optional)"));
-    await user.clear(screen.getByLabelText("Contact name"));
-    await user.clear(screen.getByLabelText("Contact phone"));
-    await user.clear(screen.getByLabelText("Relationship"));
-    await user.click(saveButton());
+    await user.clear(within(card).getByLabelText("Phone (optional)"));
+    await user.clear(within(card).getByLabelText("Contact name"));
+    await user.clear(within(card).getByLabelText("Contact phone"));
+    await user.clear(within(card).getByLabelText("Relationship"));
+    await user.click(saveContact(card));
 
+    await within(card).findByRole("status");
     expect(patches[0]?.body).toMatchObject({
       phone: null,
       emergencyContact: null,
@@ -1515,13 +1668,14 @@ describe("ficha en pantalla: contacto (#499)", () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
+    const card = await openContact(user);
 
-    await user.clear(screen.getByLabelText("Phone (optional)"));
-    await user.type(screen.getByLabelText("Phone (optional)"), "1234");
-    await user.click(saveButton());
+    await user.clear(within(card).getByLabelText("Phone (optional)"));
+    await user.type(within(card).getByLabelText("Phone (optional)"), "1234");
+    await user.click(saveContact(card));
 
     expect(patches).toEqual([]);
-    const phone = screen.getByLabelText("Phone (optional)");
+    const phone = within(card).getByLabelText("Phone (optional)");
     expect(phone).toHaveAccessibleDescription(
       "A phone number needs at least 8 digits.",
     );
@@ -1532,64 +1686,112 @@ describe("ficha en pantalla: contacto (#499)", () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
+    const card = await openContact(user);
 
-    await user.clear(screen.getByLabelText("Relationship"));
-    await user.click(saveButton());
+    await user.clear(within(card).getByLabelText("Relationship"));
+    await user.click(saveContact(card));
 
     expect(patches).toEqual([]);
-    expect(screen.getByLabelText("Relationship")).toHaveAccessibleDescription(
+    expect(
+      within(card).getByLabelText("Relationship"),
+    ).toHaveAccessibleDescription(
       "Add how they're related, or leave all three empty.",
     );
   });
 
-  it("explica junto al campo el rechazo del servidor", async () => {
+  it("explica junto al campo el rechazo del servidor y sigue abierta", async () => {
     stubApi({
       save: () => errorResponse(400, "validation_error", "phone_too_long"),
     });
     const user = userEvent.setup();
     await renderScreen();
+    const card = await openContact(user);
 
-    await user.type(screen.getByLabelText("Phone (optional)"), "9");
-    await user.click(saveButton());
+    await user.type(within(card).getByLabelText("Phone (optional)"), "9");
+    await user.click(saveContact(card));
 
     await vi.waitFor(() =>
       expect(
-        screen.getByLabelText("Phone (optional)"),
+        within(card).getByLabelText("Phone (optional)"),
       ).toHaveAccessibleDescription(
         "A phone number can have at most 15 digits.",
       ),
     );
   });
 
+  it("si falla la red sigue abierta con el aviso y lo escrito", async () => {
+    stubApi({
+      save: () => {
+        throw new TypeError("Failed to fetch");
+      },
+    });
+    const user = userEvent.setup();
+    await renderScreen();
+    const card = await openContact(user);
+
+    await user.clear(within(card).getByLabelText("Relationship"));
+    await user.type(within(card).getByLabelText("Relationship"), "Aunt");
+    await user.click(saveContact(card));
+
+    expect(await within(card).findByRole("alert")).toBeInTheDocument();
+    expect(within(card).getByLabelText("Relationship")).toHaveValue("Aunt");
+  });
+
+  it("Cancelar vuelve a lectura sin cambios y con el foco en Editar", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+    const card = await openContact(user);
+    await user.clear(within(card).getByLabelText("Relationship"));
+
+    await user.click(within(card).getByRole("button", { name: "Cancel" }));
+
+    expect(within(card).getByText("Rosa Player · Mother")).toBeInTheDocument();
+    expect(
+      within(card).getByRole("button", { name: "Edit Contact" }),
+    ).toHaveFocus();
+    expect(patches).toEqual([]);
+  });
+
   it("avisa si el contacto de emergencia tiene el teléfono del propio socio", async () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
+    const card = await openContact(user);
 
-    await user.clear(screen.getByLabelText("Contact phone"));
-    await user.type(screen.getByLabelText("Contact phone"), "0412-345-678");
+    await user.clear(within(card).getByLabelText("Contact phone"));
+    await user.type(
+      within(card).getByLabelText("Contact phone"),
+      "0412-345-678",
+    );
 
-    expect(screen.getByLabelText("Contact phone")).toHaveAccessibleDescription(
+    expect(
+      within(card).getByLabelText("Contact phone"),
+    ).toHaveAccessibleDescription(
       "This is Paula Player's own phone. The emergency contact should be someone else.",
     );
   });
 
   it("sale en español", async () => {
     stubApi();
-
+    const user = userEvent.setup();
     await renderScreen("es");
+    const card = contactCard("Contacto");
 
-    const section = screen.getByRole("region", { name: "Contacto" });
+    await user.click(
+      within(card).getByRole("button", { name: "Editar Contacto" }),
+    );
+
     expect(
-      within(section).getByLabelText("Teléfono (opcional)"),
+      within(card).getByLabelText("Teléfono (opcional)"),
     ).toBeInTheDocument();
     expect(
-      within(section).getByRole("group", { name: "Contacto de emergencia" }),
+      within(card).getByRole("group", { name: "Contacto de emergencia" }),
     ).toHaveAccessibleDescription(
       "A quién llama el club si a Paula Player le pasa algo en el agua. Rellena los tres datos o déjalos vacíos.",
     );
     expect(
-      within(section).getByLabelText("Nombre del contacto"),
+      within(card).getByLabelText("Nombre del contacto"),
     ).toBeInTheDocument();
   });
 });

@@ -59,7 +59,7 @@ export function OwnAufSection({
 }): React.JSX.Element {
   return (
     <section className="auth-fields" aria-labelledby="perfil-auf">
-      <h3 id="perfil-auf">{translate("account.profile.auf.title")}</h3>
+      <h2 id="perfil-auf">{translate("account.profile.auf.title")}</h2>
       {auf.status === "verified" ? (
         <>
           <p>{describeRegistration(translate, locale, auf)}</p>

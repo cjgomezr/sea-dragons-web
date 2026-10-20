@@ -14,13 +14,11 @@ import type {
   OwnProfile,
 } from "@/lib/members/own-profile";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
-import { profileCompletenessOf } from "@/lib/members/contact-reminder";
 import type {
   MembershipPlan,
   MembershipStatus,
 } from "@/lib/membership/membership";
 import { type HeroAuf, ProfileHero } from "./ProfileHero";
-import { ProfileCompletionStrip } from "./ProfileCompletionStrip";
 import { MembershipTypeSummary } from "./MembershipTypeSummary";
 import { MyGroups } from "./MyGroups";
 import { ProfileEvaluation } from "./ProfileEvaluation";
@@ -39,15 +37,17 @@ function heroAufOf(auf: OwnAuf): HeroAuf | null {
   };
 }
 
-/** El perfil propio (#241): Mi cuenta convertida en perfil. La cabecera, la
- * ficha editable y, debajo, lo que Mi cuenta ya enseñaba (#209, #229), con
- * su asistencia (#396) y la evaluación o el aviso de que es privada (#324).
+/** El perfil propio (#241): Mi cuenta convertida en perfil. La cabecera, las
+ * tarjetas de Sobre mí y Contacto (#772), el AUF y, debajo, lo que Mi cuenta
+ * ya enseñaba (#209, #229), con su asistencia (#396) y la evaluación o el
+ * aviso de que es privada (#324).
  * El tipo de membresía se ve, pero se cambia en Pagos (#456). La cabecera y,
  * bajo ella, la franja de lo que falta son las del rediseño (#771).
  * La página lee los datos; esto sólo los coloca. */
 export function ProfileScreen({
   locale,
   userId,
+  email,
   account,
   profile,
   positionOptions,
@@ -64,6 +64,8 @@ export function ProfileScreen({
   locale: Locale;
   /** El `user_id` de quien mira su perfil. */
   userId: string;
+  /** El correo de su cuenta, que Contacto enseña bajo el teléfono. */
+  email: string;
   account: RoleRequestAccount;
   profile: OwnProfile;
   /** Las posiciones del club que se le ofrecen, en su orden (#299). */
@@ -105,12 +107,9 @@ export function ProfileScreen({
           photoUrl,
         }}
       />
-      <ProfileCompletionStrip
-        locale={locale}
-        completeness={profileCompletenessOf(profile)}
-      />
       <ProfileForm
         locale={locale}
+        email={email}
         profile={profile}
         positionOptions={positionOptions}
         countries={countries}
