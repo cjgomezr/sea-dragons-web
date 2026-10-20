@@ -21929,28 +21929,44 @@ test.describe("equipos en el navegador", () => {
     }
   });
 
-  test("a 375px la barra fija no tapa la última fila del banco", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await goToTeams(page, TEAMS_MANUAL_STATE);
-    await showTeamsTab(page, TEAMS_BENCH_TAB);
-    const lastRow = teamsPlayerRow(page, "Ruby Tan");
+  // Con cambios sin guardar, que es cuando Guardar lleva más texto; a 320 en
+  // español es lo más largo que puede llevar.
+  for (const { width, isSpanish } of [
+    { width: 375, isSpanish: false },
+    { width: 320, isSpanish: true },
+  ]) {
+    const language = isSpanish ? " en español" : "";
+    test(`a ${width}px${language} la barra fija no tapa la última fila del banco`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 812 });
+      await goToTeams(page, { ...TEAMS_MANUAL_STATE, isSpanish });
+      await page
+        .getByRole("button", {
+          name: /^(Remove|Sacar a) Isabella Muñoz (from|de) Team Kelp$/,
+        })
+        .click();
+      await expect(
+        page.getByRole("button", { name: /^(Save|Guardar)/ }),
+      ).toContainText(/^(Save|Guardar).*(Unsaved|Sin guardar)$/);
+      await showTeamsTab(page, TEAMS_BENCH_TAB);
+      const lastRow = page.getByRole("tabpanel").getByRole("group").last();
 
-    await page.evaluate(() =>
-      window.scrollTo(0, document.documentElement.scrollHeight),
-    );
+      await page.evaluate(() =>
+        window.scrollTo(0, document.documentElement.scrollHeight),
+      );
 
-    const row = await lastRow.boundingBox();
-    const bar = await page
-      .getByRole("button", { name: TEAMS_PUBLISH })
-      .locator("xpath=ancestor::div[contains(@class, 'team-phone-bar')]")
-      .boundingBox();
-    if (row === null || bar === null) {
-      throw new Error("La última fila o la barra no se ven.");
-    }
-    expect(row.y + row.height).toBeLessThanOrEqual(bar.y);
-  });
+      const row = await lastRow.boundingBox();
+      const bar = await page
+        .getByRole("button", { name: TEAMS_PUBLISH })
+        .locator("xpath=ancestor::div[contains(@class, 'team-phone-bar')]")
+        .boundingBox();
+      if (row === null || bar === null) {
+        throw new Error("La última fila o la barra no se ven.");
+      }
+      expect(row.y + row.height).toBeLessThanOrEqual(bar.y);
+    });
+  }
 });
 /* ---------------------------------------------------------------------------
    La búsqueda global (#427, RF-8 del PRD de E14). El cuadro de la barra de

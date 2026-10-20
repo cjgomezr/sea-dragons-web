@@ -2239,6 +2239,20 @@ describe("en el móvil (#762)", () => {
     ]);
   });
 
+  it("devuelve el foco a Publicar al publicar desde la hoja", async () => {
+    await openPhoneScreen();
+    await userEvent.click(publishButton());
+
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Publish",
+      }),
+    );
+
+    await screen.findByText("Published · 3 players notified");
+    expect(publishButton()).toHaveFocus();
+  });
+
   it("cierra la hoja con Cancelar sin publicar", async () => {
     await openPhoneScreen();
     await userEvent.click(publishButton());

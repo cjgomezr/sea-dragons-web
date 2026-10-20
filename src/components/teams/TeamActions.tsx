@@ -61,6 +61,13 @@ function PublishChoices({
   );
 }
 
+/** El foco quedó en ningún sitio: en el body, porque lo que lo tenía se fue. */
+function hasLostFocus(): boolean {
+  return (
+    document.activeElement === null || document.activeElement === document.body
+  );
+}
+
 export function SaveAndPublish({
   translate,
   action,
@@ -77,6 +84,15 @@ export function SaveAndPublish({
   readonly onAskToPublish: () => void;
 }): React.JSX.Element {
   const isSaving = action.kind === "saving";
+  const publishRef = useRef<HTMLButtonElement>(null);
+  const isPublished = action.kind === "published";
+  // Al publicar se va la pregunta (la tarjeta o la hoja) que tenía el foco, y
+  // el foco caería al body: vuelve a Publicar, de donde salió.
+  useEffect(() => {
+    if (isPublished && hasLostFocus()) {
+      publishRef.current?.focus();
+    }
+  }, [isPublished]);
   return (
     <div className="team-actions">
       <button
@@ -99,6 +115,7 @@ export function SaveAndPublish({
         ) : null}
       </button>
       <button
+        ref={publishRef}
         type="button"
         className="auth-submit team-publish"
         disabled={assignedCount === 0}
