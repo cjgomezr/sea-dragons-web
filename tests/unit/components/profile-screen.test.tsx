@@ -198,11 +198,6 @@ function profileScreen(
   );
 }
 
-/** El Guardar del AUF, que sigue siendo un formulario (otro ticket de E30). */
-function saveButton(): HTMLElement {
-  return screen.getByRole("button", { name: "Save changes" });
-}
-
 type User = ReturnType<typeof userEvent.setup>;
 
 function aboutCard(name = "About"): HTMLElement {
@@ -718,46 +713,185 @@ function withAuf(auf: OwnAuf): OwnProfile {
   return { ...PROFILE, auf };
 }
 
-describe("el AUF en el perfil propio", () => {
-  it("sin AUF, ofrece escribirlo y dice que un Admin lo revisará", () => {
-    renderScreen();
+/** Las 13:00 del 20 de octubre de 2026 en Melbourne: el día desde el que la
+ * tarjeta cuenta lo que falta para el vencimiento. */
+const NOW_IN_CLUB = new Date("2026-10-20T02:00:00.000Z");
 
-    expect(screen.getByLabelText("AUF number")).toHaveValue("");
-    expect(screen.getByLabelText("AUF expiry")).toHaveValue("");
+function aufCard(name = "AUF registration"): HTMLElement {
+  return screen.getByRole("region", { name });
+}
+
+async function openAuf(user: User): Promise<HTMLElement> {
+  const card = aufCard();
+  await user.click(
+    within(card).getByRole("button", { name: "Edit AUF registration" }),
+  );
+  return card;
+}
+
+/** El valor de una de las celdas de la tarjeta. */
+function cellOf(card: HTMLElement, label: string): HTMLElement {
+  const term = within(card).getByText(label, { selector: "dt" });
+  const value = term.nextElementSibling;
+  if (!(value instanceof HTMLElement)) {
+    throw new Error(`Falta el valor de ${label}.`);
+  }
+  return value;
+}
+
+describe("perfil propio: el AUF en su tarjeta (#274, #773)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW_IN_CLUB);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("lee un AUF pendiente en tres celdas: número, vencimiento y estado", () => {
+    renderScreen({ profile: withAuf(PENDING_AUF) });
+
+    const card = aufCard();
+    expect(cellOf(card, "Number")).toHaveTextContent("AUF-100");
+    expect(cellOf(card, "Expires")).toHaveTextContent(
+      "30 June 2027 · in 253 days",
+    );
+    expect(cellOf(card, "Status")).toHaveTextContent("Pending");
+    expect(within(card).queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("pone en aviso el vencimiento cuando faltan menos de 90 días", () => {
+    renderScreen({
+      profile: withAuf({ ...PENDING_AUF, expiry: "2026-12-31" }),
+    });
+
+    const remaining = within(cellOf(aufCard(), "Expires")).getByText(
+      "· in 72 days",
+    );
+    expect(remaining).toHaveClass("profile-cell-soon");
+  });
+
+  it("no pone en aviso un vencimiento lejano", () => {
+    renderScreen({ profile: withAuf(PENDING_AUF) });
+
+    const remaining = within(cellOf(aufCard(), "Expires")).getByText(
+      "· in 253 days",
+    );
+    expect(remaining).not.toHaveClass("profile-cell-soon");
+  });
+
+  it("dice que un AUF vencido ya venció", () => {
+    renderScreen({
+      profile: withAuf({ ...VERIFIED_AUF, expiry: "2026-10-19" }),
+    });
+
+    expect(cellOf(aufCard(), "Expires")).toHaveTextContent(
+      "19 October 2026 · expired",
+    );
+  });
+
+  it("un AUF sin verificar se puede editar y avisa de que un Admin lo revisará", () => {
+    renderScreen({ profile: withAuf(PENDING_AUF) });
+
+    const card = aufCard();
     expect(
-      screen.getByText("An Admin checks it before it counts as verified."),
+      within(card).getByRole("button", { name: "Edit AUF registration" }),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByText(
+        "An Admin will check it. Until then it shows as pending.",
+      ),
     ).toBeInTheDocument();
   });
 
-  it("guardar sin tocar el AUF vacío no lo manda", async () => {
-    echoSavedProfile();
+  it("sin AUF, dice que no lo ha añadido y deja escribirlo", async () => {
     const user = userEvent.setup();
     renderScreen();
 
-    await user.click(saveButton());
+    const card = aufCard();
+    expect(cellOf(card, "Number")).toHaveTextContent("Not set");
+    expect(cellOf(card, "Status")).toHaveTextContent("Not added yet");
 
-    await screen.findByRole("status");
-    expect(calls[0]?.body).not.toHaveProperty("aufNumber");
-    expect(calls[0]?.body).not.toHaveProperty("aufExpiry");
+    await openAuf(user);
+
+    expect(within(card).getByLabelText("AUF number")).toHaveValue("");
+    expect(within(card).getByLabelText("AUF expiry")).toHaveValue("");
   });
 
-  it("manda el AUF escrito y después lo enseña pendiente", async () => {
+  it("un AUF verificado se lee sin Editar y dice que lo cambia un Admin", () => {
+    renderScreen({ profile: withAuf(VERIFIED_AUF) });
+
+    const card = aufCard();
+    expect(cellOf(card, "Status")).toHaveTextContent("Verified");
+    expect(
+      within(card).queryByRole("button", { name: /Edit/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card).getByText(
+        "Verified by the club. Ask an Admin to change it.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("al abrirse enseña el AUF guardado en sus campos, con el foco en el número", async () => {
+    const user = userEvent.setup();
+    renderScreen({ profile: withAuf(PENDING_AUF) });
+
+    const card = await openAuf(user);
+
+    expect(within(card).getByLabelText("AUF number")).toHaveValue("AUF-100");
+    expect(within(card).getByLabelText("AUF expiry")).toHaveValue("2027-06-30");
+    expect(within(card).getByLabelText("AUF number")).toHaveFocus();
+  });
+
+  it("guardar sin tocar el AUF no lo manda y vuelve a lectura", async () => {
+    echoSavedProfile(PENDING_AUF);
+    const user = userEvent.setup();
+    renderScreen({ profile: withAuf(PENDING_AUF) });
+
+    const card = await openAuf(user);
+    await user.click(saveIn(card));
+
+    expect(calls).toEqual([]);
+    expect(within(card).queryByLabelText("AUF number")).not.toBeInTheDocument();
+  });
+
+  it("guardar sin escribir nada sin AUF no manda nada", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen();
 
-    await user.type(screen.getByLabelText("AUF number"), "AUF-200");
-    await user.type(screen.getByLabelText("AUF expiry"), "2028-01-31");
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.click(saveIn(card));
 
-    await screen.findByRole("status");
+    expect(calls).toEqual([]);
+  });
+
+  it("manda el AUF escrito con el resto del perfil guardado y lo lee pendiente", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "AUF-200");
+    await user.type(within(card).getByLabelText("AUF expiry"), "2028-01-31");
+    await user.click(saveIn(card));
+
+    expect(await within(card).findByRole("status")).toHaveTextContent(
+      "AUF saved",
+    );
     expect(calls[0]?.body).toMatchObject({
+      fullName: PROFILE.fullName,
+      positionId: PROFILE.positionId,
       aufNumber: "AUF-200",
       aufExpiry: "2028-01-31",
     });
+    expect(cellOf(card, "Number")).toHaveTextContent("AUF-200");
+    expect(cellOf(card, "Status")).toHaveTextContent("Pending");
     expect(
-      screen.getByText("Pending verification by an Admin."),
-    ).toBeInTheDocument();
+      within(card).getByRole("button", { name: "Edit AUF registration" }),
+    ).toHaveFocus();
   });
 
   it("manda null por un vencimiento que no se conoce", async () => {
@@ -765,24 +899,15 @@ describe("el AUF en el perfil propio", () => {
     const user = userEvent.setup();
     renderScreen();
 
-    await user.type(screen.getByLabelText("AUF number"), "AUF-200");
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "AUF-200");
+    await user.click(saveIn(card));
 
-    await screen.findByRole("status");
+    await within(card).findByRole("status");
     expect(calls[0]?.body).toMatchObject({
       aufNumber: "AUF-200",
       aufExpiry: null,
     });
-  });
-
-  it("un AUF pendiente se enseña en sus campos y como pendiente", () => {
-    renderScreen({ profile: withAuf(PENDING_AUF) });
-
-    expect(screen.getByLabelText("AUF number")).toHaveValue("AUF-100");
-    expect(screen.getByLabelText("AUF expiry")).toHaveValue("2027-06-30");
-    expect(
-      screen.getByText("Pending verification by an Admin."),
-    ).toBeInTheDocument();
   });
 
   it("no envía un AUF pendiente vaciado y dice por qué", async () => {
@@ -790,14 +915,17 @@ describe("el AUF en el perfil propio", () => {
     const user = userEvent.setup();
     renderScreen({ profile: withAuf(PENDING_AUF) });
 
-    await user.clear(screen.getByLabelText("AUF number"));
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.clear(within(card).getByLabelText("AUF number"));
+    await user.click(saveIn(card));
 
-    expect(screen.getByLabelText("AUF number")).toHaveAttribute(
+    expect(within(card).getByLabelText("AUF number")).toHaveAttribute(
       "aria-invalid",
       "true",
     );
-    expect(screen.getByText("Write your AUF number.")).toBeInTheDocument();
+    expect(
+      within(card).getByText("Write your AUF number."),
+    ).toBeInTheDocument();
     expect(calls).toEqual([]);
   });
 
@@ -806,36 +934,18 @@ describe("el AUF en el perfil propio", () => {
     const user = userEvent.setup();
     renderScreen();
 
-    await user.click(screen.getByLabelText("AUF number"));
+    const card = await openAuf(user);
+    await user.click(within(card).getByLabelText("AUF number"));
     await user.paste("A".repeat(41));
-    await user.click(saveButton());
+    await user.click(saveIn(card));
 
     expect(
-      screen.getByText("Your AUF number can be at most 40 characters."),
+      within(card).getByText("Your AUF number can be at most 40 characters."),
     ).toBeInTheDocument();
     expect(calls).toEqual([]);
   });
 
-  it("un AUF verificado se lee pero no se edita, y no se manda", async () => {
-    echoSavedProfile(VERIFIED_AUF);
-    const user = userEvent.setup();
-    renderScreen({ profile: withAuf(VERIFIED_AUF) });
-
-    expect(screen.queryByLabelText("AUF number")).not.toBeInTheDocument();
-    expect(
-      screen.getByText("AUF AUF-100 · expires 30 June 2027"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Verified by an Admin. Only an Admin can change it."),
-    ).toBeInTheDocument();
-
-    await user.click(saveButton());
-
-    await screen.findByRole("status");
-    expect(calls[0]?.body).not.toHaveProperty("aufNumber");
-  });
-
-  it("traduce el rechazo de un AUF que un Admin verificó entretanto", async () => {
+  it("traduce el rechazo de un AUF que un Admin verificó entretanto y sigue abierta", async () => {
     stubFetch(() =>
       jsonResponse(403, {
         error: { code: "forbidden", message: "x", reason: "auf_verified" },
@@ -844,13 +954,15 @@ describe("el AUF en el perfil propio", () => {
     const user = userEvent.setup();
     renderScreen({ profile: withAuf(PENDING_AUF) });
 
-    await user.clear(screen.getByLabelText("AUF number"));
-    await user.type(screen.getByLabelText("AUF number"), "AUF-300");
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.clear(within(card).getByLabelText("AUF number"));
+    await user.type(within(card).getByLabelText("AUF number"), "AUF-300");
+    await user.click(saveIn(card));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect(await within(card).findByRole("alert")).toHaveTextContent(
       "Your AUF is already verified. Only an Admin can change it.",
     );
+    expect(within(card).getByLabelText("AUF number")).toHaveValue("AUF-300");
   });
 
   it("traduce un vencimiento anterior a su ingreso", async () => {
@@ -866,21 +978,62 @@ describe("el AUF en el perfil propio", () => {
     const user = userEvent.setup();
     renderScreen();
 
-    await user.type(screen.getByLabelText("AUF number"), "AUF-200");
-    await user.type(screen.getByLabelText("AUF expiry"), "2001-01-01");
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "AUF-200");
+    await user.type(within(card).getByLabelText("AUF expiry"), "2001-01-01");
+    await user.click(saveIn(card));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect(await within(card).findByRole("alert")).toHaveTextContent(
       "The expiry can't be before the day you joined the club.",
     );
+  });
+
+  it("Cancelar vuelve a lectura sin mandar nada, con el foco en Editar", async () => {
+    echoSavedProfile(PENDING_AUF);
+    const user = userEvent.setup();
+    renderScreen({ profile: withAuf(PENDING_AUF) });
+
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "9");
+    await user.click(within(card).getByRole("button", { name: "Cancel" }));
+
+    expect(calls).toEqual([]);
+    expect(cellOf(card, "Number")).toHaveTextContent("AUF-100");
+    expect(
+      within(card).getByRole("button", { name: "Edit AUF registration" }),
+    ).toHaveFocus();
+  });
+
+  it("abrir el AUF cierra Sobre mí, que estaba abierta sin cambios", async () => {
+    const user = userEvent.setup();
+    renderScreen({ profile: withAuf(PENDING_AUF) });
+
+    const about = await openAbout(user);
+    await openAuf(user);
+
+    expect(within(about).queryByLabelText("Full name")).not.toBeInTheDocument();
+    expect(within(aufCard()).getByLabelText("AUF number")).toHaveFocus();
+  });
+
+  it("no lleva la Ficha del club, que es del Admin", () => {
+    renderScreen({ profile: withAuf(PENDING_AUF) });
+
+    expect(
+      screen.queryByRole("region", { name: "Club record" }),
+    ).not.toBeInTheDocument();
   });
 
   it("en español, el AUF y su estado salen en español", () => {
     renderScreen({ locale: "es", profile: withAuf(PENDING_AUF) });
 
-    expect(screen.getByLabelText("Número de AUF")).toHaveValue("AUF-100");
+    const card = aufCard("Registro AUF");
+    expect(cellOf(card, "Número")).toHaveTextContent("AUF-100");
+    expect(cellOf(card, "Vence")).toHaveTextContent("en 253 días");
+    expect(cellOf(card, "Estado")).toHaveTextContent("Pendiente");
     expect(
-      screen.getByText("Pendiente de que un Admin lo verifique."),
+      within(card).getByText(
+        "Un Admin lo revisará. Hasta entonces se ve como pendiente.",
+      ),
     ).toBeInTheDocument();
   });
 });

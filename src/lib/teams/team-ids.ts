@@ -21,6 +21,11 @@ export const TEAM_SPLIT_MODES = ["manual", "auto"] as const;
 
 export type TeamSplitMode = (typeof TEAM_SPLIT_MODES)[number];
 
+/** El límite de `clubs_team_a_name_length` en `0077_club_team_labels.sql`.
+ * Vive aquí y no en `club-team-labels.ts` porque también lo usa el campo
+ * Nombre de la pantalla (#760). */
+export const CLUB_TEAM_NAME_MAX_LENGTH = 24;
+
 export type TeamLabel = { readonly name: string; readonly color: string };
 
 export type TeamLabels = { readonly [Team in TeamId]: TeamLabel };

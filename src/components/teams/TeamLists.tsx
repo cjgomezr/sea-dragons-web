@@ -12,15 +12,17 @@ import {
   teamPlayers,
 } from "./team-draft";
 import { TeamCoverage } from "./TeamCoverage";
+import { type ChangeTeams, TeamEditControl } from "./TeamEditor";
 import { PLAYER_DRAG_TYPE, TeamPlayerRow } from "./TeamPlayerRow";
 
 /**
  * Las dos tarjetas de equipo del handoff de E28
  * (`docs/design/design_handoff_teams/screenshots/01-desktop-builder.png`,
- * #759) y las dos listas del banco: los disponibles y los "Quizás" (#402),
- * con cuántos quedan en cada una (#761). Cada una es una región con su
- * título y admite que le suelten un jugador. La región se llama sólo por el
- * título, sin el número, para que no cambie de nombre al mover a alguien.
+ * #759), con el lápiz que edita su nombre y su color (#760), y las dos
+ * listas del banco: los disponibles y los "Quizás" (#402), con cuántos
+ * quedan en cada una (#761). Cada una es una región con su título y admite
+ * que le suelten un jugador. La región se llama sólo por el título, sin el
+ * número, para que no cambie de nombre al mover a alguien.
  */
 
 export type MovePlayer = (userId: string, destination: Destination) => void;
@@ -127,12 +129,14 @@ function TeamCard({
   team,
   totals,
   onMove,
+  onChangeTeams,
 }: {
   readonly translate: Translator;
   readonly draft: TeamDraft;
   readonly team: TeamId;
   readonly totals: TeamTotals;
   readonly onMove: MovePlayer;
+  readonly onChangeTeams: ChangeTeams;
 }): React.JSX.Element {
   const titleId = useId();
   const { name, color } = draft.teams[team];
@@ -154,6 +158,12 @@ function TeamCard({
           </h2>
           <ColumnSummary translate={translate} totals={totals} />
         </div>
+        <TeamEditControl
+          translate={translate}
+          team={team}
+          teamName={name}
+          onChangeTeams={onChangeTeams}
+        />
       </div>
       <TeamCoverage
         translate={translate}
@@ -177,11 +187,13 @@ export function TeamColumns({
   draft,
   totals,
   onMove,
+  onChangeTeams,
 }: {
   readonly translate: Translator;
   readonly draft: TeamDraft;
   readonly totals: Readonly<Record<TeamId, TeamTotals>>;
   readonly onMove: MovePlayer;
+  readonly onChangeTeams: ChangeTeams;
 }): React.JSX.Element {
   return (
     <div className="team-columns">
@@ -193,6 +205,7 @@ export function TeamColumns({
           team={team}
           totals={totals[team]}
           onMove={onMove}
+          onChangeTeams={onChangeTeams}
         />
       ))}
     </div>
