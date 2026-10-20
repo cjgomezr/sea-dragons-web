@@ -1440,9 +1440,11 @@ describe("la hoja en el móvil (#766)", () => {
       name: MATEO.fullName,
     });
     const buttons = within(segment).getAllByRole("button");
-    expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual(
-      ["Present", "Late", "Absent"],
-    );
+    expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Present",
+      "Late",
+      "Absent",
+    ]);
     for (const button of buttons) {
       expect(button).toHaveTextContent(/^$/);
     }

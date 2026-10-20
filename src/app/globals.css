@@ -15288,11 +15288,11 @@ a.auth-brand-header:focus-visible {
   min-height: 56px;
 }
 
-/* La pantalla de Asistencia (#395). Sigue docs/mockups/attendance-light.png:
-   la cabecera con el título y el botón de guardar, las fichas de las sesiones,
-   tres contadores y la lista en un solo panel. Sin mockup móvil: los tres
-   botones de cada fila bajan a lo ancho de la fila, como el RSVP del
-   calendario, y cada uno mide al menos 44px. */
+/* La pantalla de Asistencia (#395), rediseñada en E29 siguiendo
+   docs/design/design_handoff_attendance/: la cabecera con el título y el
+   botón de guardar, las fichas de las sesiones, los totales y la lista por
+   grupos. En el móvil (#766) cada socio sigue siendo una fila, y Guardar
+   baja a una barra fija. */
 .attendance {
   display: flex;
   flex-direction: column;
@@ -15308,11 +15308,16 @@ a.auth-brand-header:focus-visible {
   gap: var(--space-3) var(--space-4);
 }
 
+/* En el móvil, 21px y como mucho dos líneas. */
 .attendance-header h1 {
+  display: -webkit-box;
   margin: 0;
-  font-size: 26px;
+  overflow: hidden;
+  font-size: 21px;
   line-height: 1.2;
   overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .attendance-eyebrow {
@@ -15325,15 +15330,15 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text-secondary);
 }
 
-/* En el móvil ocupa el ancho, y con "{n} sin guardar" parte la línea en vez
-   de empujar la pantalla hacia un lado (#765). */
+/* Sólo en escritorio: en el móvil Guardar va en `.attendance-save-bar`. */
 .attendance-save {
   display: inline-flex;
-  flex: 1 1 100%;
+  flex: none;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  min-height: 40px;
   padding: var(--space-2) var(--space-4);
   font-size: 14px;
 }
@@ -15366,22 +15371,29 @@ a.auth-brand-header:focus-visible {
   opacity: 0.6;
 }
 
+/* En el móvil las fichas van en una sola fila que se desplaza de lado
+   (#766); es lo único de la hoja que se sale del ancho. */
 .attendance-sessions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 /* Las fichas de sesión (#765): sin relleno salvo la abierta, que lleva el
    fondo de seleccionado del segmento y el borde de acento. */
 .attendance-session {
-  min-height: var(--touch-target-min);
+  flex: none;
+  min-height: 36px;
   padding: 0 var(--space-3);
   font-family: inherit;
   font-size: 13px;
   color: var(--color-text-secondary);
   background: transparent;
   border: 1px solid var(--color-border);
+  white-space: nowrap;
   border-radius: 999px;
   cursor: pointer;
 }
@@ -15403,6 +15415,7 @@ a.auth-brand-header:focus-visible {
    subrayado desde E29: lo dicen la flecha y el color de acento. */
 .attendance-older-sessions {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: var(--space-1);
   min-height: var(--touch-target-min);
@@ -15410,6 +15423,7 @@ a.auth-brand-header:focus-visible {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-accent-text);
+  white-space: nowrap;
   text-decoration: none;
 }
 
@@ -15548,14 +15562,14 @@ a.auth-brand-header:focus-visible {
 }
 
 /* La fila compacta (#764, E29): en escritorio, una línea de 44px con la foto,
-   el nombre y el segmento en una rejilla de tres columnas. En el móvil, hasta
-   su ticket, el segmento sigue bajando a lo ancho de la fila. */
+   el nombre y el segmento en una rejilla de tres columnas. En el móvil
+   (#766), una fila flexible de al menos 56px que nunca se apila. */
 .attendance-row {
-  display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  gap: 10px;
+  min-height: 56px;
+  padding: 6px 6px 6px 10px;
 }
 
 .attendance-row + .attendance-row {
@@ -15587,8 +15601,8 @@ a.auth-brand-header:focus-visible {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   font-family: var(--font-family-mono);
   font-size: 11px;
   font-weight: 700;
@@ -15599,8 +15613,8 @@ a.auth-brand-header:focus-visible {
   object-fit: cover;
 }
 
-/* La foto mide 30px: su botón le suma 7px por lado para llegar a los 44px de
-   toque sin mover la fila. */
+/* La foto mide 30px (32px en el móvil): su botón le suma 7px por lado para
+   llegar a los 44px de toque sin mover la fila. */
 .attendance-avatar-cell .member-photo-button {
   margin: -7px;
   padding: 7px;
@@ -15623,14 +15637,12 @@ a.auth-brand-header:focus-visible {
 }
 
 /* Al Admin el nombre le abre la ficha (#414). Sin subrayado desde E29: lo
-   dicen la flecha y el color de acento al pasar el ratón. En el móvil mide
-   los 44px de toque de alto. */
+   dicen la flecha y el color de acento al pasar el ratón. */
 .attendance-record-link {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
-  min-height: var(--touch-target-min);
   color: var(--color-text);
   text-decoration: none;
 }
@@ -15686,9 +15698,8 @@ a.auth-brand-header:focus-visible {
 }
 
 .attendance-segment {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex: none;
   padding: 1px;
   background: var(--color-background);
   border: 1px solid var(--color-border);
@@ -15700,7 +15711,7 @@ a.auth-brand-header:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-height: var(--touch-target-min);
+  min-height: 26px;
   padding: 0 10px;
   font-family: inherit;
   font-size: 12.5px;
@@ -15780,9 +15791,14 @@ a.auth-brand-header:focus-visible {
 }
 
 @media (min-width: 768px) {
-  .attendance-save {
-    flex: none;
-    min-height: 40px;
+  .attendance-header h1 {
+    display: block;
+    font-size: 26px;
+  }
+
+  .attendance-sessions {
+    flex-wrap: wrap;
+    overflow-x: visible;
   }
 
   .attendance-session {
@@ -15790,9 +15806,15 @@ a.auth-brand-header:focus-visible {
   }
 
   .attendance-row {
+    display: grid;
     grid-template-columns: 30px minmax(0, 1fr) auto;
     min-height: 44px;
     padding: 4px 8px 4px 12px;
+  }
+
+  .attendance-avatar {
+    width: 30px;
+    height: 30px;
   }
 
   /* En una línea: el nombre largo se corta con puntos suspensivos y las
@@ -15806,18 +15828,186 @@ a.auth-brand-header:focus-visible {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
 
-  .attendance-record-link {
-    min-height: 0;
+/* El móvil (#766, #2a del handoff). */
+@media (width < 768px) {
+  /* El hueco de lado deja ver entero el foco de la primera y la última
+     ficha, que el desplazamiento recortaría. */
+  .attendance-sessions {
+    margin: 0 calc(-1 * var(--space-1));
+    padding: 0 var(--space-1);
   }
 
+  /* Las fichas miden 36px a la vista y su zona de toque llega a 44px (D4). */
+  .attendance-session {
+    position: relative;
+  }
+
+  .attendance-session::after {
+    content: "";
+    position: absolute;
+    inset: calc((36px - 2px - var(--touch-target-min)) / 2) 0;
+  }
+
+  .attendance-total-count {
+    font-size: 16px;
+  }
+
+  .attendance-totals-bar {
+    height: 5px;
+  }
+
+  .attendance-list {
+    border-radius: 12px;
+  }
+
+  .attendance-row:first-child {
+    border-radius: 11px 11px 0 0;
+  }
+
+  .attendance-row:last-child {
+    border-radius: 0 0 11px 11px;
+  }
+
+  .attendance-row:only-child {
+    border-radius: 11px;
+  }
+
+  /* El bloque de texto es la zona de toque del nombre: al Admin, el enlace
+     lo cubre entero con su ::after. */
+  .attendance-member-text {
+    position: relative;
+    flex: 1;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 2px;
+    min-height: var(--touch-target-min);
+  }
+
+  /* El nombre en hasta dos líneas, con el ↗ y el punto detrás, en la misma
+     línea que su última palabra. */
+  .attendance-name-line {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .attendance-name-line .attendance-name {
+    font-size: inherit;
+  }
+
+  .attendance-name-line .attendance-record-link {
+    display: inline;
+  }
+
+  .attendance-name-line .attendance-record-icon {
+    display: inline-block;
+    margin-left: var(--space-1);
+    vertical-align: -1px;
+  }
+
+  .attendance-name-line .attendance-unsaved-dot {
+    display: inline-block;
+    margin-left: 6px;
+    vertical-align: 2px;
+  }
+
+  .attendance-record-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .attendance-member-detail {
+    overflow: hidden;
+    font-family: var(--font-family-mono);
+    font-size: 11.5px;
+    color: var(--color-text-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Un control unido de unos 106px: tres botones de 34 × 40 sin hueco. */
   .attendance-segment {
-    display: flex;
-    grid-column: auto;
+    padding: 2px;
+    border-radius: 9px;
   }
 
+  /* Su zona de toque llega a 44px de alto sin pisar la del vecino (D4). Tres
+     zonas de 44px de ancho no caben en 106px sin solaparse: las de los
+     extremos se alargan hacia fuera, hasta el hueco de la fila. */
   .attendance-choice {
-    min-height: 26px;
+    position: relative;
+    width: 34px;
+    height: 40px;
+    padding: 0;
+    border-radius: 7px;
+  }
+
+  .attendance-choice::after {
+    content: "";
+    position: absolute;
+    inset: calc((40px - var(--touch-target-min)) / 2) 0;
+  }
+
+  .attendance-choice:first-child::after {
+    left: calc(34px - var(--touch-target-min));
+  }
+
+  .attendance-choice:last-child::after {
+    right: calc(34px - var(--touch-target-min));
+  }
+
+  .attendance-choice-icon {
+    font-size: 16px;
+  }
+
+  /* La barra fija de guardar (D5), sobre las pestañas como la de la
+     configuración del club. La hoja deja debajo un hueco de su alto para que
+     la última fila no quede tapada. */
+  .attendance:has(.attendance-save-bar) {
+    padding-bottom: calc(var(--space-12) + var(--space-8));
+  }
+
+  .attendance-save-bar {
+    position: fixed;
+    right: 0;
+    bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+    left: 0;
+    z-index: 9;
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-panel);
+    border-top: 1px solid
+      color-mix(in srgb, var(--color-warning) 40%, transparent);
+    box-shadow: var(--shadow);
+  }
+
+  .attendance-save-bar-count {
+    display: inline-flex;
+    gap: var(--space-2);
+    align-items: center;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .attendance-save-bar-button {
+    min-height: var(--space-12);
+    padding: 0 var(--space-6);
+    font-size: 15px;
   }
 }
 
