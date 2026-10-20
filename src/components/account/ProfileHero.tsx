@@ -46,8 +46,9 @@ export type HeroMember = {
   readonly membershipStatus: MembershipStatus | null;
   /** Null sin AUF, o para quien no debe verlo. */
   readonly auf: HeroAuf | null;
-  /** YYYY-MM-DD, el día en que ingresó. */
-  readonly joinedOn: string;
+  /** YYYY-MM-DD, el día en que ingresó, o null para quien no lo ve: el
+   * Committee y el Coach (#770). */
+  readonly joinedOn: string | null;
   readonly photoUrl: string | null;
 };
 
@@ -140,14 +141,16 @@ function HeroIdentity({
             {text}
           </span>
         ))}
-        <span className="profile-hero-since">
-          {translate("profileHero.memberSince", {
-            date: formatCalendarMonth(
-              translate.locale,
-              member.joinedOn.slice(0, "YYYY-MM".length),
-            ),
-          })}
-        </span>
+        {member.joinedOn === null ? null : (
+          <span className="profile-hero-since">
+            {translate("profileHero.memberSince", {
+              date: formatCalendarMonth(
+                translate.locale,
+                member.joinedOn.slice(0, "YYYY-MM".length),
+              ),
+            })}
+          </span>
+        )}
       </div>
     </>
   );

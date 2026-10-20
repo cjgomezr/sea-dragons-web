@@ -813,10 +813,45 @@ describe("la ficha rápida de quien no es Admin (D4)", () => {
       ).toBeNull();
       expect(within(card).queryByText(/AUF/)).toBeNull();
       expect(within(card).queryByText(/Membership/)).toBeNull();
-      expect(within(card).queryByRole("link", { name: /record/ })).toBeNull();
       expect(within(card).getByText("Goalkeeper")).toBeVisible();
     },
   );
+
+  it.each(["committee", "coach"] as const)(
+    "a la vista %s el nombre y el botón le abren la ficha en lectura (#776)",
+    async (kind) => {
+      const user = userEvent.setup();
+      stubApi({ kind });
+      await renderDirectory({ isAdmin: false });
+
+      expect(
+        within(row("Nerea Ruiz")).getByRole("link", {
+          name: "Open Nerea Ruiz's record",
+        }),
+      ).toHaveAttribute("href", `/directorio/${NEREA_ID}`);
+      await user.click(row("Nerea Ruiz"));
+      const card = panel("Nerea Ruiz");
+
+      expect(
+        within(card).getByRole("link", { name: "Open Nerea Ruiz's record" }),
+      ).toHaveAttribute("href", `/directorio/${NEREA_ID}`);
+      expect(
+        within(card).getByRole("link", { name: "Open full record" }),
+      ).toHaveAttribute("href", `/directorio/${NEREA_ID}`);
+    },
+  );
+
+  it("a un Player no le abre la ficha", async () => {
+    const user = userEvent.setup();
+    stubApi({ kind: "member" });
+    await renderDirectory({ isAdmin: false });
+
+    await user.click(row("Nerea Ruiz"));
+
+    expect(
+      within(panel("Nerea Ruiz")).queryByRole("link", { name: /record/ }),
+    ).toBeNull();
+  });
 
   it("al Committee le enseña todo el contacto", async () => {
     const user = userEvent.setup();

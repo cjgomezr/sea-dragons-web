@@ -10,8 +10,7 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
  * `READABLE_ROUTES` la abre al Admin, al Committee y al Coach (#770); a un
  * Player la frontera lo manda al panel antes de llegar aquí. Lo que se enseña
  * lo lee la pantalla del endpoint de la ficha, que recorta la vista de cada
- * rol. Esta pantalla todavía es la del Admin: la del Committee y la del Coach
- * llegan con #776.
+ * rol. La del Admin edita; la del Committee y la del Coach se leen (#776).
  */
 
 type MemberRecordPageProps = {

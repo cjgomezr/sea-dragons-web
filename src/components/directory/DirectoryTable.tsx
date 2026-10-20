@@ -90,12 +90,13 @@ type AdminRowView = {
 
 /** Lo que una fila necesita saber, con lo que sólo un Admin recibe ya
  * resuelto: así la fila no tiene que volver a preguntarse quién la mira. Con
- * `admin` la fila es de Admin: enlaza la ficha (#242) y enseña puntos y
- * solicitud (#549). `isEvaluated` es null para quien no ve evaluaciones
- * (#324). */
+ * `admin` la fila es de Admin: enseña puntos y solicitud (#549). La ficha
+ * (#242) la enlaza también para el Committee y el Coach, que la leen (#776).
+ * `isEvaluated` es null para quien no ve evaluaciones (#324). */
 type DirectoryRow = {
   readonly member: DirectoryMember;
   readonly admin: AdminRowView | null;
+  readonly opensRecord: boolean;
   readonly isEvaluated: boolean | null;
   readonly contact: RowContact;
 };
@@ -150,6 +151,7 @@ function rowsOf(
           dots: statusDotsOf(translate, member),
           requestedRole: requestedRoles.get(member.userId) ?? null,
         },
+        opensRecord: true,
         isEvaluated: member.isEvaluated,
         contact: fullContactOf(member),
       }));
@@ -157,6 +159,7 @@ function rowsOf(
       return listing.members.map((member) => ({
         admin: null,
         member,
+        opensRecord: true,
         isEvaluated: null,
         contact: fullContactOf(member),
       }));
@@ -164,6 +167,7 @@ function rowsOf(
       return listing.members.map((member) => ({
         admin: null,
         member,
+        opensRecord: true,
         isEvaluated: member.isEvaluated,
         contact: {
           kind: "emergency",
@@ -174,6 +178,7 @@ function rowsOf(
       return listing.members.map((member) => ({
         admin: null,
         member,
+        opensRecord: false,
         isEvaluated: null,
         contact: NO_CONTACT,
       }));
@@ -319,10 +324,10 @@ function StatusPills({
   return null;
 }
 
-/** A un Admin el nombre le abre la ficha del miembro (#242). El nombre
- * accesible dice a dónde lleva y contiene el nombre visible (WCAG 2.5.3).
- * En el móvil no enlaza: tocar la fila sube su ficha (#554), que lleva a la
- * completa. */
+/** A quien abre fichas el nombre le abre la del miembro (#242, #776). El
+ * nombre accesible dice a dónde lleva y contiene el nombre visible (WCAG
+ * 2.5.3). En el móvil no enlaza: tocar la fila sube su ficha (#554), que
+ * lleva a la completa. */
 function MemberName({
   translate,
   row,
@@ -333,7 +338,7 @@ function MemberName({
   isPhone: boolean;
 }): React.JSX.Element {
   const { member } = row;
-  if (row.admin === null || isPhone) {
+  if (!row.opensRecord || isPhone) {
     return <span className="directory-name">{member.fullName}</span>;
   }
   return (

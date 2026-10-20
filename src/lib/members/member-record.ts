@@ -184,9 +184,11 @@ export type CoachMemberRecord = {
   readonly view: "coach";
 } & SharedMemberRecordFields;
 
+/** Las vistas en lectura, sin nada que se edite (#776). */
+export type StaffMemberRecord = CommitteeMemberRecord | CoachMemberRecord;
+
 /** La ficha según quién la lee (#770). */
-export type MemberRecordReading =
-  MemberRecord | CommitteeMemberRecord | CoachMemberRecord;
+export type MemberRecordReading = MemberRecord | StaffMemberRecord;
 
 export type MemberRecordView = MemberRecordReading["view"];
 

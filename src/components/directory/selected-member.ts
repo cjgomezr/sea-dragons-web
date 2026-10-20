@@ -71,6 +71,12 @@ export function contactOf(selected: SelectedMember): RowContact {
   }
 }
 
+/** Si esa vista abre la ficha completa: el Admin la edita, y el Committee y
+ * el Coach la leen (#776). El Player no la abre. */
+export function canOpenRecord(selected: SelectedMember): boolean {
+  return selected.kind !== "member";
+}
+
 export type CardTagTone = "danger" | "warning" | "neutral";
 
 export type CardTag = { readonly text: string; readonly tone: CardTagTone };

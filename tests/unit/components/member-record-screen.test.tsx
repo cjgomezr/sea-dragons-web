@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemberRecordScreen } from "@/components/directory/MemberRecordScreen";
 import type { Group } from "@/lib/groups/groups";
-import type { MemberRecord } from "@/lib/members/member-record";
+import type {
+  CoachMemberRecord,
+  CommitteeMemberRecord,
+  MemberRecord,
+  MemberRecordReading,
+} from "@/lib/members/member-record";
 
 /**
  * La ficha reservada al Admin en pantalla (#242, RF-4 del PRD de E5): carga la
@@ -2864,5 +2869,258 @@ describe("ficha en pantalla: sin la tarjeta Rol (#774)", () => {
     expect(
       screen.queryByRole("button", { name: "Request" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("ficha en pantalla: en lectura para Committee y Coach (#776)", () => {
+  const COMMITTEE_RECORD: CommitteeMemberRecord = {
+    view: "committee",
+    userId: RECORD.userId,
+    fullName: RECORD.fullName,
+    photoUrl: RECORD.photoUrl,
+    role: RECORD.role,
+    positionName: RECORD.positionName,
+    experienceLevel: RECORD.experienceLevel,
+    country: RECORD.country,
+    emergencyContact: RECORD.emergencyContact,
+    membershipPlan: RECORD.membershipPlan,
+    membershipStatus: RECORD.membershipStatus,
+    membershipRenewsOn: RECORD.membershipRenewsOn,
+    groups: RECORD.groups,
+    attendance: RECORD.attendance,
+    email: RECORD.email,
+    phone: RECORD.phone,
+  };
+  const COACH_RECORD: CoachMemberRecord = {
+    view: "coach",
+    userId: RECORD.userId,
+    fullName: RECORD.fullName,
+    photoUrl: RECORD.photoUrl,
+    role: RECORD.role,
+    positionName: RECORD.positionName,
+    experienceLevel: RECORD.experienceLevel,
+    country: RECORD.country,
+    emergencyContact: RECORD.emergencyContact,
+    membershipPlan: RECORD.membershipPlan,
+    membershipStatus: RECORD.membershipStatus,
+    membershipRenewsOn: RECORD.membershipRenewsOn,
+    groups: RECORD.groups,
+    attendance: RECORD.attendance,
+  };
+  const EMERGENCY_CALL = "Call Paula Player's emergency contact";
+
+  function stubReading(reading: MemberRecordReading): void {
+    stubApi({ load: () => jsonResponse(200, { data: reading }) });
+  }
+
+  function header(): HTMLElement {
+    return screen.getByRole("banner");
+  }
+
+  describe("Committee", () => {
+    it("pinta la cabecera sin ficha AUF, con su rol, sus datos y la membresía", async () => {
+      stubReading(COMMITTEE_RECORD);
+
+      await renderScreen();
+
+      expect(within(header()).getByText("Player")).toBeInTheDocument();
+      expect(
+        within(header()).getByText("Goalkeeper · Intermediate · Australia"),
+      ).toBeInTheDocument();
+      expect(
+        within(header()).getByText("Membership active"),
+      ).toBeInTheDocument();
+      expect(within(header()).queryByText(/AUF/)).not.toBeInTheDocument();
+    });
+
+    it("lleva los botones de correo, llamada y emergencia", async () => {
+      stubReading(COMMITTEE_RECORD);
+
+      await renderScreen();
+
+      expect(
+        within(header()).getByRole("link", { name: "Email Paula Player" }),
+      ).toHaveAttribute("href", "mailto:paula@example.com");
+      expect(
+        within(header()).getByRole("link", { name: "Call Paula Player" }),
+      ).toHaveAttribute("href", "tel:0412345678");
+      expect(
+        within(header()).getByRole("link", { name: EMERGENCY_CALL }),
+      ).toHaveAttribute("href", "tel:0499111222");
+    });
+
+    it("pinta Sobre mí, Contacto, Membresía, Asistencia y Grupos", async () => {
+      stubReading(COMMITTEE_RECORD);
+
+      await renderScreen();
+
+      const about = screen.getByRole("region", { name: "About" });
+      expect(readValueOf(about, "Position")).toBe("Goalkeeper");
+      const contact = contactCard();
+      expect(within(contact).getByText("0412 345 678")).toBeInTheDocument();
+      expect(
+        within(contact).getByText("paula@example.com"),
+      ).toBeInTheDocument();
+      expect(
+        within(contact).getByText("Rosa Player · Mother"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("region", { name: "Membership" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("region", { name: "Attendance" }),
+      ).toBeInTheDocument();
+      const groups = screen.getByRole("region", { name: "Groups" });
+      expect(within(groups).getByText("Senior Squad")).toBeVisible();
+    });
+
+    it("no pinta Registro AUF, Ficha del club, Evaluación, Rol ni el ⋯", async () => {
+      stubReading(COMMITTEE_RECORD);
+
+      await renderScreen();
+
+      expect(
+        screen.queryByRole("region", { name: "AUF registration" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("region", { name: "Club record" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("region", { name: "Evaluation" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("region", { name: /^Role/ }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "More actions" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("no lleva ningún Editar, ni el género", async () => {
+      stubReading(COMMITTEE_RECORD);
+
+      await renderScreen();
+
+      expect(
+        screen.queryByRole("button", { name: /^Edit/ }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.queryByText("Gender")).not.toBeInTheDocument();
+    });
+
+    it("no pinta la franja del AUF pendiente ni pide la evaluación", async () => {
+      stubReading(COMMITTEE_RECORD);
+
+      await renderScreen();
+
+      expect(screen.queryByRole("note")).not.toBeInTheDocument();
+      const requested = vi.mocked(fetch).mock.calls.map(([url]) => String(url));
+      expect(requested).not.toContain(EVALUATION_PATH);
+    });
+
+    it("se lee en español", async () => {
+      stubReading(COMMITTEE_RECORD);
+
+      await renderScreen("es");
+
+      expect(
+        screen.getByRole("region", { name: "Sobre mí" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("region", { name: "Grupos" }),
+      ).toBeInTheDocument();
+      expect(
+        within(header()).getByRole("link", { name: "Escribir a Paula Player" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("Coach", () => {
+    it("ve lo mismo que el Committee, sin el ⋯ ni ningún Editar", async () => {
+      stubReading(COACH_RECORD);
+
+      await renderScreen();
+
+      expect(screen.getByRole("region", { name: "About" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("region", { name: "Membership" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("region", { name: "Attendance" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("region", { name: "Groups" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("region", { name: "AUF registration" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("region", { name: "Evaluation" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /^Edit|More actions/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("no pinta el correo ni el teléfono en Contacto, pero sí el contacto de emergencia (D3)", async () => {
+      stubReading(COACH_RECORD);
+
+      await renderScreen();
+
+      const contact = contactCard();
+      expect(within(contact).queryByText("0412 345 678")).toBeNull();
+      expect(within(contact).queryByText("paula@example.com")).toBeNull();
+      expect(within(contact).queryByText("Phone")).toBeNull();
+      expect(
+        within(contact).getByText("Rosa Player · Mother"),
+      ).toBeInTheDocument();
+      expect(within(contact).getByText("0499 111 222")).toBeInTheDocument();
+    });
+
+    it("sólo lleva el botón del contacto de emergencia en la cabecera", async () => {
+      stubReading(COACH_RECORD);
+
+      await renderScreen();
+
+      expect(
+        within(header()).queryByRole("link", { name: "Email Paula Player" }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(header()).queryByRole("link", { name: "Call Paula Player" }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(header()).getByRole("link", { name: EMERGENCY_CALL }),
+      ).toHaveAttribute("href", "tel:0499111222");
+    });
+
+    it("dice que el socio no tiene contacto de emergencia", async () => {
+      stubReading({ ...COACH_RECORD, emergencyContact: null });
+
+      await renderScreen();
+
+      expect(
+        within(contactCard()).getByText("Not added yet"),
+      ).toBeInTheDocument();
+      expect(
+        within(header()).getByRole("button", {
+          name: `${EMERGENCY_CALL} (none)`,
+        }),
+      ).toBeDisabled();
+    });
+  });
+
+  it("pinta la ficha aunque no pueda leer los grupos del club: no los edita", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url === RECORD_PATH
+          ? jsonResponse(200, { data: COMMITTEE_RECORD })
+          : errorResponse(403, "forbidden"),
+      ),
+    );
+
+    await renderScreen();
+
+    expect(screen.getByRole("region", { name: "Groups" })).toBeInTheDocument();
   });
 });
