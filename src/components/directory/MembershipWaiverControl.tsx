@@ -17,6 +17,9 @@ import { RemoveWaiverDialog, WaiveDialog } from "./MembershipWaiverDialogs";
  *
  * Lo que enseña es lo que la ficha tiene de verdad: sólo cambia cuando el
  * servidor confirma.
+ *
+ * Desde #775 sale al elegir la exención en el ⋯ de la cabecera, y por eso
+ * nace con su confirmación abierta: elegirla ya fue pedirla.
  */
 
 type OpenDialog = "none" | "waive" | "remove";
@@ -68,10 +71,12 @@ export function MembershipWaiverControl({
    * cambia. */
   readonly onWaiverChanged: (change: MembershipWaiverChange) => void;
 }): React.JSX.Element {
-  const [openDialog, setOpenDialog] = useState<OpenDialog>("none");
-  const [notice, setNotice] = useState<Notice>("none");
   const waiver =
     member.membershipStatus === "waived" ? member.membershipWaiver : null;
+  const [openDialog, setOpenDialog] = useState<OpenDialog>(
+    waiver === null ? "waive" : "remove",
+  );
+  const [notice, setNotice] = useState<Notice>("none");
   const name = member.fullName;
 
   function applyChange(change: MembershipWaiverChange): void {

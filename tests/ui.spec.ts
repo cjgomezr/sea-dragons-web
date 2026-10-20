@@ -4531,7 +4531,8 @@ async function waitForDirectory(
  * puede. Lo que responde la base se finge, porque cuántos Admin tiene el club
  * de pruebas depende de qué otros tests estén corriendo. El aviso se busca
  * por su texto: el anunciador de rutas del dev server de Next también lleva
- * `role="alert"`. Desde #549 el rol se cambia en la ficha, no en la fila. */
+ * `role="alert"`. Desde #549 el rol se cambia en la ficha, no en la fila,
+ * y desde #775 se abre con Cambiar rol en el ⋯ de la cabecera. */
 function refuseLastAdminChange(name: string) {
   return async (page: Page): Promise<void> => {
     await page.route(
@@ -4549,6 +4550,7 @@ function refuseLastAdminChange(name: string) {
           }),
         }),
     );
+    await chooseRecordAction(page, ENGLISH_RECORD_MENU, "Change role");
     await page
       .getByRole("combobox", { name: `Role for ${name}` })
       .selectOption("Player");
@@ -8047,15 +8049,53 @@ function typeOwnPhoneAsEmergency(warning: RegExp) {
   };
 }
 
-/** Abre el diálogo de la exención (#457) y lo deja escrito, sin confirmar. */
+const ENGLISH_RECORD_MENU = "More actions";
+const SPANISH_RECORD_MENU = "Más acciones";
+
+/** Abre el ⋯ de la cabecera de la ficha (#775) y elige una opción. */
+async function chooseRecordAction(
+  page: Page,
+  menuLabel: string,
+  action: string,
+): Promise<void> {
+  await page.getByRole("button", { name: menuLabel }).click();
+  await page.getByRole("button", { name: action, exact: true }).click();
+}
+
+/** Deja abierto el ⋯ de la cabecera (#775), esperando a su última opción. */
+function openRecordMenu(menuLabel: string, lastAction: string) {
+  return async (page: Page): Promise<void> => {
+    await page.getByRole("button", { name: menuLabel }).click();
+    await expect(
+      page.getByRole("button", { name: lastAction, exact: true }),
+    ).toBeVisible();
+  };
+}
+
+/** Elige desactivar en el ⋯ y deja a la vista la franja que lo confirma
+ * (#775), sin confirmar. */
+function askToDeactivate(labels: {
+  readonly menu: string;
+  readonly action: string;
+  readonly prompt: RegExp;
+}) {
+  return async (page: Page): Promise<void> => {
+    await chooseRecordAction(page, labels.menu, labels.action);
+    await expect(page.getByText(labels.prompt)).toBeVisible();
+  };
+}
+
+/** Abre el diálogo de la exención (#457) desde el ⋯ (#775) y lo deja
+ * escrito, sin confirmar. */
 function fillWaiverDialog(labels: {
+  readonly menu: string;
   readonly open: string;
   readonly reason: string;
   readonly until: RegExp;
   readonly text: string;
 }) {
   return async (page: Page): Promise<void> => {
-    await page.getByRole("button", { name: labels.open }).click();
+    await chooseRecordAction(page, labels.menu, labels.open);
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel(labels.reason).fill(labels.text);
     await dialog.getByLabel(labels.until).fill("2027-03-01");
@@ -8070,7 +8110,13 @@ type MemberRecordState = {
   readonly saveRejection?: StubbedSaveRejection;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
+  /** Sin ellos, los tres. El móvil de la cabecera es otro ticket (#777). */
+  readonly viewports?: readonly (typeof viewports)[number][];
 };
+
+/** Lo que dibujó el handoff de escritorio (#775): la tableta y el
+ * escritorio. */
+const RECORD_DESKTOP_VIEWPORTS = viewports.filter((vp) => vp.name !== "mobile");
 
 const ENGLISH_SAVE_RECORD = "Save the record";
 const SPANISH_SAVE_RECORD = "Guardar la ficha";
@@ -8166,6 +8212,7 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
     record: CURRENT_RECORD,
     saveLabel: ENGLISH_SAVE_RECORD,
     prepare: fillWaiverDialog({
+      menu: ENGLISH_RECORD_MENU,
       open: "Waive membership fee",
       reason: "Reason",
       until: /End date/,
@@ -8178,10 +8225,30 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
     saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
     prepare: fillWaiverDialog({
-      open: "Eximir de cuota",
+      menu: SPANISH_RECORD_MENU,
+      open: "Eximir de la cuota",
       reason: "Motivo",
       until: /Fecha de fin/,
       text: "Entrenadora de los juveniles",
+    }),
+  },
+  // #775: el ⋯ abierto y la franja que confirma la baja.
+  {
+    name: "ficha-menu-abierto",
+    record: CURRENT_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+    viewports: RECORD_DESKTOP_VIEWPORTS,
+    prepare: openRecordMenu(ENGLISH_RECORD_MENU, "Deactivate member"),
+  },
+  {
+    name: "ficha-desactivar-confirmacion",
+    record: CURRENT_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+    viewports: RECORD_DESKTOP_VIEWPORTS,
+    prepare: askToDeactivate({
+      menu: ENGLISH_RECORD_MENU,
+      action: "Deactivate member",
+      prompt: /won't be able to sign in/,
     }),
   },
   {
@@ -8287,7 +8354,7 @@ for (const state of MEMBER_RECORD_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of state.viewports ?? viewports) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -8342,6 +8409,37 @@ test.describe("el contacto de la ficha con axe en cada ancho y tema", () => {
       test.use({ viewport: { width: vp.width, height: vp.height } });
 
       for (const state of contactStates) {
+        for (const theme of themes) {
+          test(`${state.name} (${theme}) no tiene violaciones`, async ({
+            page,
+          }) => {
+            await goToMemberRecord(page, state, theme);
+            await expectNoAxeViolations(page);
+          });
+        }
+      }
+    });
+  }
+});
+
+/* El ⋯ de la ficha abierto y la franja de desactivar (#775) con axe en la
+   tableta y el escritorio, en claro y en oscuro. */
+test.describe("el menú ⋯ de la ficha con axe en cada ancho y tema", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const menuStates = MEMBER_RECORD_STATES.filter(
+    (state) =>
+      state.name === "ficha-menu-abierto" ||
+      state.name === "ficha-desactivar-confirmacion",
+  );
+
+  for (const vp of RECORD_DESKTOP_VIEWPORTS) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const state of menuStates) {
         for (const theme of themes) {
           test(`${state.name} (${theme}) no tiene violaciones`, async ({
             page,

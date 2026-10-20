@@ -16,6 +16,9 @@ import { type RowContact, telHref } from "./row-contact";
  * Committee tienen los tres, el Coach sólo el de emergencia. Un dato que esa
  * vista trae vacío sale desactivado y dice que falta; uno que no trae, no
  * sale.
+ *
+ * La cabecera de la ficha (#775) usa los mismos botones, y nombra el que
+ * falta con la acción y "(no hay)" en vez de con la frase de la fila.
  */
 
 type ContactField = "email" | "phone" | "emergency";
@@ -75,18 +78,29 @@ function contactActionsOf(contact: ReachableContact): readonly ContactAction[] {
   ];
 }
 
+/** Cómo se nombra el botón de un dato que falta, a partir del nombre que
+ * tendría si estuviera. */
+export type MissingContactLabel = (availableLabel: string) => string;
+
 function ContactActionButton({
   translate,
   action,
   fullName,
+  labelMissing,
 }: {
   translate: Translator;
   action: ContactAction;
   fullName: string;
+  labelMissing: MissingContactLabel | null;
 }): React.JSX.Element {
   const glyph = <Icon glyph={FIELD_GLYPHS[action.field]} />;
   if (action.kind === "missing") {
-    const label = translate(MISSING_LABELS[action.field], { name: fullName });
+    const label =
+      labelMissing === null
+        ? translate(MISSING_LABELS[action.field], { name: fullName })
+        : labelMissing(
+            translate(AVAILABLE_LABELS[action.field], { name: fullName }),
+          );
     return (
       <button
         type="button"
@@ -118,6 +132,7 @@ export function ContactActions({
   fullName,
   label,
   className,
+  labelMissing = null,
 }: {
   translate: Translator;
   contact: ReachableContact;
@@ -126,6 +141,9 @@ export function ContactActions({
    * fila. */
   label: string;
   className: string;
+  /** Sin él, el que falta se nombra con la frase de la fila ("no tiene
+   * teléfono"). */
+  labelMissing?: MissingContactLabel | null;
 }): React.JSX.Element {
   return (
     <div role="group" aria-label={label} className={className}>
@@ -135,6 +153,7 @@ export function ContactActions({
           translate={translate}
           action={action}
           fullName={fullName}
+          labelMissing={labelMissing}
         />
       ))}
     </div>

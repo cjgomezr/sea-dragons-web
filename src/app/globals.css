@@ -2952,6 +2952,166 @@ a.auth-brand-header:focus-visible {
   }
 }
 
+/* Las acciones de la cabecera de la ficha (#775, RF-2 y RF-6 del PRD de E30),
+   de docs/design/design_handoff_profile/screenshots/03: botones de 40 px
+   para escribir, llamar y llamar al contacto de emergencia (este en peligro,
+   con el borde al 50 %), y el ⋯ del Admin con su desplegable de 260 px. */
+.member-record-actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.member-record-contact {
+  display: flex;
+  gap: 6px;
+}
+
+.member-record-contact .directory-contact-action,
+.member-record-action {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 18px;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.member-record-contact .directory-contact-action-emergency {
+  color: var(--color-danger);
+  border-color: color-mix(
+    in srgb,
+    var(--color-danger) 50%,
+    var(--color-border)
+  );
+}
+
+.member-record-contact a.directory-contact-action:hover,
+.member-record-action:hover,
+.member-record-action[aria-expanded="true"] {
+  border-color: var(--color-accent);
+}
+
+.member-record-contact .directory-contact-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.member-admin-menu-anchor {
+  position: relative;
+}
+
+.member-admin-menu {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  padding: 6px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.member-admin-menu-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.member-admin-menu-item:hover {
+  background: var(--color-hover);
+}
+
+.member-admin-menu-item:focus-visible {
+  outline-offset: -2px;
+}
+
+.member-admin-menu-item > svg {
+  flex: none;
+  font-size: 17px;
+}
+
+.member-admin-menu-label {
+  flex: 1;
+}
+
+.member-admin-menu-detail {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.member-admin-menu-item-danger {
+  color: var(--color-danger);
+}
+
+.member-admin-menu-rule {
+  width: 100%;
+  margin: 4px 0;
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
+/* La franja que confirma desactivar (#775): en peligro, con Cancelar a secas
+   y Desactivar con el contorno en peligro. */
+.profile-strip-danger {
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-panel));
+  border: 1px solid color-mix(in srgb, var(--color-danger) 50%, transparent);
+}
+
+.profile-strip-danger .profile-strip-icon {
+  font-size: 20px;
+  color: var(--color-danger);
+}
+
+.profile-strip-cancel,
+.profile-strip-danger-button {
+  font: inherit;
+  font-size: 13.5px;
+  background: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.profile-strip-cancel {
+  font-weight: 600;
+  color: var(--color-text-soft);
+  border: none;
+}
+
+.profile-strip-danger-button {
+  font-weight: 700;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+
+.profile-strip-cancel:disabled,
+.profile-strip-danger-button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
 /* La foto de perfil (#245). La imagen ocupa el mismo círculo que las
    iniciales y se recorta a él sin deformarse. */
 .member-photo {

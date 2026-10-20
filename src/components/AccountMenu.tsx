@@ -6,14 +6,14 @@ import { GearSix } from "@phosphor-icons/react/dist/ssr/GearSix";
 import { UserCircle } from "@phosphor-icons/react/dist/ssr/UserCircle";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef } from "react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { Icon } from "@/components/Icon";
 import { LanguageChoice } from "@/components/LanguageChoice";
 import { MemberAvatar } from "@/components/MemberAvatar";
 import { AccountIcon } from "@/components/NavIcons";
 import { ThemeChoice } from "@/components/ThemeChoice";
-import { useDismissal } from "@/components/use-dismissal";
+import { useDropdownMenu } from "@/components/use-dropdown-menu";
 import type { MemberIdentity } from "@/lib/auth/caller-identity";
 import type { Role } from "@/lib/auth/roles";
 import { ACCOUNT_PAGE_PATH, CLUB_SETTINGS_PATH } from "@/lib/auth/routes";
@@ -59,16 +59,6 @@ export const OPEN_ACCOUNT_MENU_EVENT = "seadragons:open-account-menu";
 
 export function requestAccountMenu(): void {
   window.dispatchEvent(new Event(OPEN_ACCOUNT_MENU_EVENT));
-}
-
-/** Lo que se queda con el foco al pulsarlo. */
-const FOCUSABLE_SELECTOR =
-  "a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]";
-
-function canTakeFocus(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element && target.closest(FOCUSABLE_SELECTOR) !== null
-  );
 }
 
 function AccountIdentityRow({
@@ -233,37 +223,10 @@ export function AccountMenu({
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const menuId = useId();
-  const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
-
-  const close = useCallback(() => setIsOpen(false), [setIsOpen]);
-  const closeAndReturnFocus = useCallback(() => {
-    setIsOpen(false);
-    buttonRef.current?.focus();
-  }, [setIsOpen]);
-  // Un clic fuera sobre algo que toma el foco se lo cede; sobre cualquier
-  // otra cosa el navegador lo dejaría en el `body`, y ahí se pierde quien
-  // navega con teclado.
-  const pressOutside = useCallback(
-    (event: MouseEvent) => {
-      if (canTakeFocus(event.target)) {
-        close();
-        return;
-      }
-      event.preventDefault();
-      closeAndReturnFocus();
-    },
-    [close, closeAndReturnFocus],
-  );
-  useDismissal({
-    isOpen,
-    containerRef,
-    onEscape: closeAndReturnFocus,
-    onPressOutside: pressOutside,
-    onFocusOutside: closeAndReturnFocus,
-  });
+  const { isOpen, containerRef, open, toggle, close, closeAndReturnFocus } =
+    useDropdownMenu(buttonRef);
 
   useEffect(() => {
     if (isOpen) {
@@ -272,10 +235,9 @@ export function AccountMenu({
   }, [isOpen]);
 
   useEffect(() => {
-    const open = (): void => setIsOpen(true);
     window.addEventListener(OPEN_ACCOUNT_MENU_EVENT, open);
     return () => window.removeEventListener(OPEN_ACCOUNT_MENU_EVENT, open);
-  }, []);
+  }, [open]);
 
   const label = translate("account.link");
   return (
@@ -290,7 +252,7 @@ export function AccountMenu({
         title={label}
         aria-expanded={isOpen}
         aria-controls={menuId}
-        onClick={() => setIsOpen((wasOpen) => !wasOpen)}
+        onClick={toggle}
       >
         <TriggerFace trigger={trigger} account={account} />
       </button>

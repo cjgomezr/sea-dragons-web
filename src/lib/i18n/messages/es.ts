@@ -1159,13 +1159,20 @@ export const spanishMessages: MessageCatalog = {
     "{name} todavía no activó su cuenta. El enlace de la invitación caduca a la hora, así que puedes mandarle uno nuevo.",
   "memberRecord.invitation.resent":
     "Le mandamos una invitación nueva a {name}.",
-  "memberStatus.title": "Estado de la cuenta",
-  "memberStatus.lead.active":
-    "{name} es miembro del club. Si desactivas su cuenta, su historial se conserva, pero {name} deja de entrar y de aparecer en el directorio.",
-  "memberStatus.lead.inactive":
-    "La cuenta de {name} está desactivada. Su historial se conserva, y si la reactivas, {name} vuelve a entrar y a aparecer en el directorio.",
-  "memberStatus.deactivate": "Desactivar cuenta",
-  "memberStatus.reactivate": "Reactivar cuenta",
+  // Las acciones de la cabecera de la ficha (#775, RF-2 y RF-6 del PRD de E30).
+  "memberRecord.contactActions": "Contactar a {name}",
+  "memberRecord.contactMissing": "{action} (no hay)",
+  "memberRecord.menu.open": "Más acciones",
+  "memberRecord.menu.changeRole": "Cambiar rol",
+  "memberRecord.menu.waive": "Eximir de la cuota",
+  "memberRecord.menu.removeWaiver": "Retirar la exención",
+  "memberRecord.menu.resendInvitation": "Reenviar invitación",
+  "memberRecord.menu.deactivate": "Desactivar miembro",
+  "memberRecord.menu.reactivate": "Reactivar miembro",
+  "memberRecord.deactivation.prompt":
+    "¿Desactivar a {name}? No podrá entrar. Su historial se queda y puedes reactivarlo después.",
+  "memberRecord.deactivation.cancel": "Cancelar",
+  "memberRecord.deactivation.confirm": "Desactivar",
   "memberStatus.saving": "Guardando…",
   "memberStatus.deactivated": "La cuenta de {name} quedó desactivada.",
   "memberStatus.reactivated": "La cuenta de {name} quedó reactivada.",

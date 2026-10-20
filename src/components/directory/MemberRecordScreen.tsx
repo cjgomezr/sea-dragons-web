@@ -2,30 +2,29 @@
 
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import type { AccountStatus } from "@/lib/auth/account-status";
-import type { Role } from "@/lib/auth/roles";
+import { useEffect, useRef, useState } from "react";
 import { DIRECTORY_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
-import type { MembershipWaiverChange } from "@/lib/membership/membership-waiver";
-import { createTranslator } from "@/lib/i18n/translator";
+import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { Group } from "@/lib/groups/groups";
+import type { MemberRecord } from "@/lib/members/member-record";
 import {
   type MemberRecordLoad,
   describeMemberRecordFailure,
   loadMemberRecord,
 } from "./member-record-client";
-import { InvitationResend } from "./InvitationResend";
+import { type AdminAction, MemberAdminMenu } from "./MemberAdminMenu";
+import { type AdminPanel, MemberAdminPanel } from "./MemberAdminPanel";
 import { MemberRecordForm } from "./MemberRecordForm";
-import { MemberRecordRole } from "./MemberRecordRole";
-import { MemberStatusControl } from "./MemberStatusControl";
-import { MembershipWaiverControl } from "./MembershipWaiverControl";
+import { useMemberStatusChange } from "./MemberStatusControl";
 
 /**
  * La ficha reservada al Admin de un miembro (#242, RF-4 del PRD de E5), que se
  * abre desde su fila del directorio: su número de AUF, su vencimiento y sus
  * grupos, su asistencia (#396), su evaluación para leer (#324) y su rol
  * (#549). La membresía, la asistencia de la temporada, los grupos y la
- * evaluación van en la columna derecha del formulario (#774).
+ * evaluación van en la columna derecha del formulario (#774). El rol, la
+ * exención, la invitación y la baja se piden en el ⋯ de la cabecera (#775).
  *
  * La frontera ya mandó al panel a quien no es Admin; si alguien deja de serlo
  * con la pantalla abierta, el 403 del endpoint lo dice aquí. Es de cliente
@@ -35,6 +34,14 @@ import { MembershipWaiverControl } from "./MembershipWaiverControl";
  */
 
 type ScreenState = { readonly kind: "loading" } | MemberRecordLoad;
+
+/** Lo que la ficha cambia de sí misma desde el ⋯ de la cabecera. */
+type RecordChange = Partial<
+  Pick<
+    MemberRecord,
+    "role" | "accountStatus" | "membershipStatus" | "membershipWaiver"
+  >
+>;
 
 export function MemberRecordScreen({
   locale,
@@ -64,41 +71,12 @@ export function MemberRecordScreen({
     setReloads((count) => count + 1);
   }
 
-  /** La baja o la reactivación (#244) cambia sólo el estado: el resto de la
-   * ficha sigue siendo la misma y no hace falta volver a pedirla. */
-  function applyStatus(accountStatus: AccountStatus): void {
+  /** El rol, la exención o el estado que el ⋯ cambió: el resto de la ficha
+   * sigue siendo la misma y no hace falta volver a pedirla. */
+  function applyChange(change: RecordChange): void {
     setState((current) =>
       current.kind === "loaded"
-        ? { ...current, record: { ...current.record, accountStatus } }
-        : current,
-    );
-  }
-
-  /** El rol confirmado (#549) sólo cambia el rol. */
-  function applyRole(role: Role): void {
-    setState((current) =>
-      current.kind === "loaded"
-        ? { ...current, record: { ...current.record, role } }
-        : current,
-    );
-  }
-
-  /** La exención (#457) cambia sólo la membresía: el chip de la cabecera y
-   * la sección de la cuota la leen de la misma ficha. */
-  function applyWaiver({
-    membershipStatus,
-    waiver,
-  }: MembershipWaiverChange): void {
-    setState((current) =>
-      current.kind === "loaded"
-        ? {
-            ...current,
-            record: {
-              ...current.record,
-              membershipStatus,
-              membershipWaiver: waiver,
-            },
-          }
+        ? { ...current, record: { ...current.record, ...change } }
         : current,
     );
   }
@@ -123,54 +101,95 @@ export function MemberRecordScreen({
         </div>
       ) : null}
       {state.kind === "loaded" ? (
-        <MemberRecordForm
+        <LoadedMemberRecord
           locale={locale}
-          record={state.record}
-          clubGroups={state.clubGroups}
-        />
-      ) : null}
-      {state.kind === "loaded" &&
-      state.record.accountStatus === "incomplete" ? (
-        <section className="admin-section" aria-labelledby="ficha-invitacion">
-          <h2 id="ficha-invitacion">
-            {translate("memberRecord.invitation.title")}
-          </h2>
-          <p className="app-lead">
-            {translate("memberRecord.invitation.lead", {
-              name: state.record.fullName,
-            })}
-          </p>
-          <InvitationResend
-            translate={translate}
-            userId={userId}
-            isPrimary={false}
-            sentText={translate("memberRecord.invitation.resent", {
-              name: state.record.fullName,
-            })}
-          />
-        </section>
-      ) : null}
-      {state.kind === "loaded" ? (
-        <MemberRecordRole
           translate={translate}
-          member={state.record}
-          onRoleChanged={applyRole}
-        />
-      ) : null}
-      {state.kind === "loaded" ? (
-        <MembershipWaiverControl
-          translate={translate}
-          member={state.record}
-          onWaiverChanged={applyWaiver}
-        />
-      ) : null}
-      {state.kind === "loaded" ? (
-        <MemberStatusControl
-          translate={translate}
-          member={state.record}
-          onStatusChanged={applyStatus}
+          loaded={state}
+          onRecordChanged={applyChange}
         />
       ) : null}
     </div>
+  );
+}
+
+/** La ficha ya cargada, con el ⋯ del Admin y lo que abre cada opción. */
+function LoadedMemberRecord({
+  locale,
+  translate,
+  loaded,
+  onRecordChanged,
+}: {
+  locale: Locale;
+  translate: Translator;
+  loaded: {
+    readonly record: MemberRecord;
+    readonly clubGroups: readonly Group[];
+  };
+  onRecordChanged: (change: RecordChange) => void;
+}): React.JSX.Element {
+  const { record } = loaded;
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  // La clave cambia con cada elección: elegir otra vez la misma opción la
+  // abre de nuevo, con su diálogo si lo tiene.
+  const [choice, setChoice] = useState<{
+    readonly panel: AdminPanel;
+    readonly key: number;
+  }>({ panel: "none", key: 0 });
+  const statusChange = useMemberStatusChange({
+    member: record,
+    onStatusChanged: (accountStatus) => onRecordChanged({ accountStatus }),
+  });
+
+  function chooseAction(action: AdminAction): void {
+    setChoice((current) => ({ panel: action, key: current.key + 1 }));
+    // Un cambio en curso no se olvida: su respuesta todavía tiene que verse.
+    const isSaving = statusChange.state.kind === "saving";
+    if ((action === "deactivate" || action === "reactivate") && !isSaving) {
+      statusChange.reset();
+    }
+    if (action === "reactivate") {
+      void statusChange.changeStatus();
+    }
+  }
+
+  function cancelDeactivation(): void {
+    setChoice((current) => ({ ...current, panel: "none" }));
+    menuButtonRef.current?.focus();
+  }
+
+  return (
+    <>
+      <MemberRecordForm
+        locale={locale}
+        record={record}
+        clubGroups={loaded.clubGroups}
+        adminMenu={
+          <MemberAdminMenu
+            translate={translate}
+            member={record}
+            openerRef={menuButtonRef}
+            onChoose={chooseAction}
+          />
+        }
+        adminPanel={
+          <MemberAdminPanel
+            key={choice.key}
+            translate={translate}
+            record={record}
+            panel={choice.panel}
+            statusChange={statusChange}
+            handlers={{
+              onRoleChanged: (role) => onRecordChanged({ role }),
+              onWaiverChanged: ({ membershipStatus, waiver }) =>
+                onRecordChanged({
+                  membershipStatus,
+                  membershipWaiver: waiver,
+                }),
+              onDeactivationCancelled: cancelDeactivation,
+            }}
+          />
+        }
+      />
+    </>
   );
 }

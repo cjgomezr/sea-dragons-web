@@ -25,6 +25,9 @@ import { HERO_AVATAR_SIZE, ProfilePhoto } from "./ProfilePhoto";
  * Sólo el socio cambia su foto: en su perfil la foto es `ProfilePhoto`, con
  * el botón de cámara; en la ficha, el círculo a secas. La ficha del AUF no la
  * ve quien no debe ver el AUF (Committee y Coach): para ellos llega null.
+ *
+ * A la derecha, la ficha pone sus acciones (#775): los botones de contacto y
+ * el ⋯ del Admin. El perfil propio no lleva ninguna.
  */
 
 export type HeroAuf = {
@@ -154,11 +157,14 @@ export function ProfileHero({
   locale,
   member,
   isOwnProfile,
+  actions = null,
 }: {
   locale: Locale;
   member: HeroMember;
   /** El socio en su perfil: su foto lleva la cámara. */
   isOwnProfile: boolean;
+  /** Lo que va a la derecha, o null. */
+  actions?: React.ReactNode;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const identity = <HeroIdentity translate={translate} member={member} />;
@@ -190,6 +196,7 @@ export function ProfileHero({
           <div className="profile-hero-identity">{identity}</div>
         </>
       )}
+      {actions}
     </header>
   );
 }
