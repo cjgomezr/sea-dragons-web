@@ -141,6 +141,28 @@ function brandLockupOf(sidebar: HTMLElement): HTMLElement {
   return lockup;
 }
 
+describe("la marca lleva al inicio", () => {
+  it("el logo y el nombre son un enlace al inicio con el nombre del club", () => {
+    const sidebar = renderShellWithLogo();
+
+    const link = within(sidebar).getByRole("link", { name: BRAND.name });
+    expect(link).toHaveAttribute("href", "/dashboard");
+    expect(link.querySelector("img.club-logo")).not.toBeNull();
+  });
+
+  it("en el móvil también", () => {
+    emulatePhone();
+    usePathname.mockReturnValue("/cuenta");
+    renderShell();
+
+    expect(
+      within(screen.getByRole("complementary")).getByRole("link", {
+        name: BRAND.name,
+      }),
+    ).toHaveAttribute("href", "/dashboard");
+  });
+});
+
 // #352: el logo y el nombre en una sola fila, como en el mockup.
 describe("la marca en la barra lateral", () => {
   it("con logo pone el logo y el nombre en el mismo contenedor de fila", () => {

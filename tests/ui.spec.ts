@@ -3104,39 +3104,48 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
   // #292: el nombre sale de la base y admite hasta 60 caracteres. Se pone en
   // la página y no en la base compartida de desarrollo: cambiarlo allí lo
   // vería cualquier otra corrida a la vez. Lo que se prueba es que el CSS lo
-  // aguanta: una sola fila, sin tapar los controles ni salirse, y el texto
-  // entero en el árbol aunque se vea recortado. El `title` que pone la cáscara
-  // lo prueba `tests/unit/app-shell.test.tsx`.
+  // aguanta con el logo apaisado al lado, el que más lo empuja: dos líneas
+  // como mucho, sin tapar los controles ni salirse, los tres botones
+  // separados, sin scroll horizontal ni a 320px, y el texto entero en el
+  // árbol aunque se vea recortado. El `title` que pone la cáscara lo prueba
+  // `tests/unit/app-shell.test.tsx`.
   const LONGEST_CLUB_NAME =
     "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania";
-  for (const width of [360, 375]) {
-    test(`un nombre de 60 caracteres se recorta en una sola fila a ${width}px`, async ({
+  /** El hueco entre los botones de la cabecera del móvil (`--space-2`). */
+  const HEADER_BUTTON_GAP_PX = 8;
+  for (const width of [320, 360, 375]) {
+    test(`un nombre de 60 caracteres junto al logo cabe en dos líneas a ${width}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 800 });
+      await serveClubLogos(page);
       await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+      await showLogoOnServedPage(page, PHOTOGRAPHED_LOGO);
       const brandLocator = page.locator(".app-brand");
-      const singleLineHeight = await brandLocator.evaluate(
-        (element) => element.getBoundingClientRect().height,
+      const lineHeight = await brandLocator.evaluate((element) =>
+        parseFloat(getComputedStyle(element).lineHeight),
       );
       await brandLocator.evaluate((element, name) => {
         element.textContent = name;
       }, LONGEST_CLUB_NAME);
 
+      const header = page.locator(".app-sidebar-header");
       const brand = await brandLocator.boundingBox();
       const controls = await Promise.all(
         [
-          page.getByRole("button", { name: /^Notifications/ }),
-          page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
+          header.getByRole("button", { name: "Search", exact: true }),
+          header.getByRole("button", { name: /^Notifications/ }),
+          header.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
         ].map((control) => control.boundingBox()),
       );
-      const boxes = controls.flatMap((box) => (box === null ? [] : [box]));
-      if (brand === null || boxes.length !== controls.length) {
+      const [search, bell, account] = controls;
+      if (brand === null || !search || !bell || !account) {
         throw new Error("la cabecera no dibujó el nombre o algún control");
       }
+      const boxes = [search, bell, account];
 
-      expect(brand.height, "el nombre se parte en dos filas").toBe(
-        singleLineHeight,
+      expect(brand.height, "el nombre pasa de dos líneas").toBeLessThanOrEqual(
+        2 * lineHeight + SUBPIXEL_TOLERANCE_PX,
       );
       const brandMiddle = brand.y + brand.height / 2;
       for (const box of boxes) {
@@ -3145,12 +3154,21 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
           "un control no está en la fila del nombre",
         ).toBe(true);
       }
+      for (const [previous, next] of [
+        [search, bell],
+        [bell, account],
+      ] as const) {
+        expect(
+          next.x - (previous.x + previous.width),
+          "dos botones de la cabecera van pegados",
+        ).toBeGreaterThanOrEqual(HEADER_BUTTON_GAP_PX - SUBPIXEL_TOLERANCE_PX);
+      }
       expect(
         brand.x + brand.width,
         "el nombre del club tapa los controles",
-      ).toBeLessThanOrEqual(Math.min(...boxes.map((box) => box.x)));
+      ).toBeLessThanOrEqual(search.x);
       expect(
-        Math.max(...boxes.map((box) => box.x + box.width)),
+        account.x + account.width,
         "un control se sale de la pantalla",
       ).toBeLessThanOrEqual(width);
       const hasHorizontalScroll = await page.evaluate(
@@ -11962,6 +11980,9 @@ const CLUB_SETTINGS_LOGO_BOX_PX = 56 - 2;
 function clubLogoField(page: Page): Locator {
   return page.locator(".club-logo-field");
 }
+/** En la cabecera del móvil el logo va junto al nombre y no pasa de 48px de
+ * ancho, para que no deje el nombre en unas pocas letras. */
+const PHONE_HEADER_LOGO_MAX_WIDTH_PX = LOGO_BOX_HEIGHT_PX * 1.5;
 /** En la barra lateral de escritorio el logo va junto al nombre y su tope
  * baja a 2,5 veces el alto, para que el nombre conserve 120px (#352). */
 const SIDEBAR_LOGO_MAX_WIDTH_PX = 80;
@@ -12114,7 +12135,7 @@ const SIDEBAR_BRAND_SCREEN: BrandScreen = {
   logoMaxWidthAt: (viewportWidth) =>
     viewportWidth >= SIDEBAR_MIN_VIEWPORT_PX
       ? SIDEBAR_LOGO_MAX_WIDTH_PX
-      : LOGO_BOX_MAX_WIDTH_PX,
+      : PHONE_HEADER_LOGO_MAX_WIDTH_PX,
 };
 
 const BRAND_SCREENS: readonly BrandScreen[] = [

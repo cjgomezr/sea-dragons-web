@@ -1929,7 +1929,7 @@ export const englishMessages = {
   "clubSettings.sections.positions": "Positions",
   "clubSettings.sections.packs": "Session packs",
   "clubSettings.list.adminsOnly": "Only Admins see this.",
-  "clubSettings.list.backToAccount": "Back to My account",
+  "clubSettings.list.back": "Back",
   "clubSettings.list.backToList": "Settings",
   "clubSettings.draft.unsaved.general": "Unsaved changes to the club details",
   "clubSettings.draft.unsaved.sign-in": "Unsaved changes to the sign-in page",

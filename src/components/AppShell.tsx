@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   AccountMenu,
@@ -12,7 +13,11 @@ import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { MobileSearch } from "@/components/search/MobileSearch";
 import { ScreenOnly } from "@/components/ScreenOnly";
 import { SidebarNav } from "@/components/SidebarNav";
-import { CLUB_SETTINGS_PATH, SEARCH_API_PATH } from "@/lib/auth/routes";
+import {
+  CLUB_SETTINGS_PATH,
+  DASHBOARD_PATH,
+  SEARCH_API_PATH,
+} from "@/lib/auth/routes";
 import {
   type ActiveAccess,
   isAllowedForAccess,
@@ -91,8 +96,10 @@ export function AppShell({
       <aside className="app-sidebar">
         <div className="app-sidebar-header">
           {/* Un nombre largo se recorta: el título lo deja leer entero, y el
-              texto sigue completo para un lector de pantalla. */}
-          <div className="app-brand-lockup">
+              texto sigue completo para un lector de pantalla. La marca lleva
+              al inicio, como en casi cualquier aplicación: en el móvil era la
+              única forma rápida de volver desde el perfil o el club. */}
+          <Link href={DASHBOARD_PATH} className="app-brand-lockup">
             {/* Sin logo, la cabecera sigue siendo sólo el nombre (#295). El
                 logo va sin texto alternativo porque el nombre ya está al lado:
                 con él, un lector de pantalla leería el club dos veces (#352). */}
@@ -100,7 +107,7 @@ export function AppShell({
             <span className="app-brand" title={brand.name}>
               {brand.name}
             </span>
-          </div>
+          </Link>
           {/* Sólo en el móvil (#717): en escritorio la cabecera de la barra
               lateral es la marca, y la lupa no hace falta porque el cuadro
               ya está en la barra de arriba (#427). */}
