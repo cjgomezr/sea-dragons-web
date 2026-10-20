@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import type { AnchorHTMLAttributes } from "react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttendanceScreen } from "@/components/attendance/AttendanceScreen";
 import { SidebarNav } from "@/components/SidebarNav";
 import type {
@@ -10,6 +10,7 @@ import type {
 } from "@/lib/attendance/attendance-sheet";
 import type { AttendanceSession } from "@/lib/attendance/attendance-sessions";
 import { ROLES } from "@/lib/auth/roles";
+import { stubScreenWidth } from "../../support/screen-width";
 
 /**
  * La pantalla de Asistencia (#395, RF-8 del PRD de E8). Quién sale en la
@@ -257,6 +258,10 @@ function sessionChip(name: string): HTMLElement {
 function recordLink(name: string): HTMLElement {
   return screen.getByRole("link", { name: `Open ${name}'s record` });
 }
+
+beforeEach(() => {
+  stubScreenWidth(false);
+});
 
 afterEach(() => {
   navigate.mockReset();
@@ -1322,5 +1327,227 @@ describe("la cabecera, las sesiones, el aviso y los totales (#765)", () => {
     expect(
       within(screen.getByRole("region", { name: "Maybe" })).getByText("1"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("la hoja en el móvil (#766)", () => {
+  beforeEach(() => {
+    stubScreenWidth(true);
+  });
+
+  function olderSessionsLink(groupName = "Sessions"): HTMLElement {
+    return within(screen.getByRole("group", { name: groupName })).getByRole(
+      "link",
+    );
+  }
+
+  it("encabeza con Take attendance y el título, sin botón de guardar", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(screen.getByText("Take attendance")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Pool Training · Tue 23 Jun",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Save attendance/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("deja las fichas de sesión y cierra la fila con Older, sin cambiar adónde lleva", async () => {
+    stubClub([POOL_TRAINING, SKILLS], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(sessionChip("Tue 23 · Pool Training")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(olderSessionsLink()).toHaveTextContent(/^Older$/);
+    expect(olderSessionsLink()).toHaveAccessibleName(
+      "Older sessions: open the calendar",
+    );
+  });
+
+  it("en español la fila de sesiones acaba en Anteriores", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(olderSessionsLink("Sesiones")).toHaveTextContent(/^Anteriores$/);
+  });
+
+  it("debajo del nombre pone la posición", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    expect(
+      within(await findRow(MATEO.fullName)).getByText("Forward"),
+    ).toBeInTheDocument();
+  });
+
+  it("a quien no tiene posición le pone No position", async () => {
+    const longName = "Maximiliana Alejandra Fernández-Rodríguez de la Torre";
+    stubClub(
+      [POOL_TRAINING],
+      [sheetFor(POOL_TRAINING, [{ ...RUBY, fullName: longName }])],
+    );
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    expect(
+      within(await findRow(longName)).getByText("No position"),
+    ).toBeInTheDocument();
+  });
+
+  it("a un socio desactivado le pone la posición y Deactivated en la misma línea", async () => {
+    stubClub(
+      [POOL_TRAINING],
+      [sheetFor(POOL_TRAINING, [{ ...MATEO, isInactive: true }])],
+    );
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    expect(
+      within(await findRow(MATEO.fullName)).getByText("Forward · Deactivated"),
+    ).toBeInTheDocument();
+  });
+
+  it("en español dice Sin posición", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+
+    expect(
+      within(await findRow(RUBY.fullName)).getByText("Sin posición"),
+    ).toBeInTheDocument();
+  });
+
+  it("cada botón del segmento es solo icono y se nombra con su estado", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    const segment = within(await findRow(MATEO.fullName)).getByRole("group", {
+      name: MATEO.fullName,
+    });
+    const buttons = within(segment).getAllByRole("button");
+    expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Present",
+      "Late",
+      "Absent",
+    ]);
+    for (const button of buttons) {
+      expect(button).toHaveTextContent(/^$/);
+    }
+  });
+
+  it("al Admin el nombre le abre la ficha del socio", async () => {
+    stubClub([POOL_TRAINING], [ADMIN_POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await findRow(MATEO.fullName);
+
+    await userEvent.click(recordLink(MATEO.fullName));
+
+    expect(navigate).toHaveBeenCalledWith(`/directorio/${MATEO.userId}`);
+  });
+
+  it("sin cambios no hay barra de guardar", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(screen.queryByText(/unsaved$/)).not.toBeInTheDocument();
+  });
+
+  it("con cambios sale la barra con cuántos faltan y Guardar asistencia", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+    const ruby = await findRow(RUBY.fullName);
+
+    await userEvent.click(choice(mateo, "Late"));
+    await userEvent.click(choice(ruby, "Late"));
+
+    expect(screen.getByText("2 unsaved")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save attendance" }),
+    ).toBeEnabled();
+  });
+
+  it("en español la barra dice n sin guardar", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+
+    await userEvent.click(choice(mateo, "Tarde"));
+
+    expect(screen.getByText("1 sin guardar")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Guardar asistencia" }),
+    ).toBeInTheDocument();
+  });
+
+  it("la barra se va al volver al estado guardado", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+    await userEvent.click(choice(mateo, "Late"));
+
+    await userEvent.click(choice(mateo, "Present"));
+
+    expect(
+      screen.queryByRole("button", { name: /^Save attendance/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("guardar desde la barra manda la hoja, quita la barra y confirma", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+    await userEvent.click(choice(mateo, "Late"));
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save attendance" }),
+    );
+
+    expect(
+      await screen.findByText("Saved · 1 present, 1 late, 1 absent"),
+    ).toBeInTheDocument();
+    expect(saveRequests()).toHaveLength(1);
+    expect(
+      screen.queryByRole("button", { name: /^Save attendance/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("si guardar desde la barra falla, la barra se queda", async () => {
+    stubApi(({ method, path }) => {
+      if (path === SESSIONS_PATH) {
+        return jsonResponse(200, { data: { sessions: [POOL_TRAINING] } });
+      }
+      if (method === "PUT") {
+        throw new TypeError("Failed to fetch");
+      }
+      return jsonResponse(200, { data: POOL_SHEET });
+    });
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+    await userEvent.click(choice(mateo, "Late"));
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save attendance" }),
+    );
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("1 unsaved")).toBeInTheDocument();
   });
 });

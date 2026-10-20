@@ -20456,8 +20456,10 @@ async function markTwoUnsaved(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
 }
 
-/** La fila compacta es de escritorio (#764); el móvil es otro ticket. */
+/** Con cambios, el escritorio los cuenta en Guardar (#764) y el móvil saca
+ * la barra fija (#766): cada uno es su propio estado. */
 const ATTENDANCE_DESKTOP_VIEWPORTS = viewports.filter((vp) => vp.width >= 768);
+const ATTENDANCE_PHONE_VIEWPORTS = viewports.filter((vp) => vp.width < 768);
 
 function withSpanish(state: AttendanceState): readonly AttendanceState[] {
   return [state, { ...state, name: `${state.name}-es`, isSpanish: true }];
@@ -20492,6 +20494,16 @@ const ATTENDANCE_STATES: readonly AttendanceState[] = [
     members: ATTENDANCE_MEMBERS,
     viewports: ATTENDANCE_DESKTOP_VIEWPORTS,
     ready: markTwoUnsaved,
+  },
+  {
+    name: "asistencia-sin-guardar-movil",
+    sessions: ATTENDANCE_SESSIONS,
+    members: ATTENDANCE_MEMBERS,
+    viewports: ATTENDANCE_PHONE_VIEWPORTS,
+    ready: async (page) => {
+      await markTwoUnsaved(page);
+      await expect(page.getByText(/^(2 unsaved|2 sin guardar)$/)).toBeVisible();
+    },
   },
   ...withSpanish({
     name: "asistencia-error",
@@ -20741,45 +20753,159 @@ test.describe("asistencia en el navegador", () => {
     await expect(row.getByTitle("Not saved yet")).toHaveCount(0);
   });
 
-  test("a 375px cada botón de la fila mide al menos 44px de alto", async ({
+  test("a 375px cada estado tiene 44px de toque de alto sin pisar al vecino (D4, #766)", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+    const segment = attendanceRow(page, FIRST_ATTENDEE).getByRole("group");
+    await segment.scrollIntoViewIfNeeded();
 
-    const heights = await page
-      .getByRole("group", { name: LONG_NAMED_ATTENDEE })
+    const zones = await segment
       .getByRole("button")
-      .evaluateAll((buttons) =>
-        buttons.map((button) => button.getBoundingClientRect().height),
-      );
+      .evaluateAll((buttons, reach) => {
+        // Chromium redondea el punto: medio píxel justo en el borde de un
+        // botón ya cae en el vecino.
+        const inset = 0.5;
+        const edgeInset = 1;
+        const isHit = (button: Element, x: number, y: number): boolean =>
+          document.elementFromPoint(x, y)?.closest("button") === button;
+        return buttons.map((button, index) => {
+          const box = button.getBoundingClientRect();
+          const centerX = box.left + box.width / 2;
+          const centerY = box.top + box.height / 2;
+          const outward = reach - box.width - inset;
+          return {
+            width: box.width,
+            height: box.height,
+            reachesTop: isHit(button, centerX, centerY - reach / 2 + inset),
+            reachesBottom: isHit(button, centerX, centerY + reach / 2 - inset),
+            ownsItsEdges:
+              isHit(button, box.left + edgeInset, centerY) &&
+              isHit(button, box.right - edgeInset, centerY),
+            reachesOutward:
+              index === 0
+                ? isHit(button, box.left - outward, centerY)
+                : index === buttons.length - 1
+                  ? isHit(button, box.right + outward, centerY)
+                  : null,
+          };
+        });
+      }, ATTENDANCE_MIN_TOUCH_TARGET_PX);
 
-    expect(heights).toHaveLength(3);
-    for (const height of heights) {
-      expect(height).toBeGreaterThanOrEqual(ATTENDANCE_MIN_TOUCH_TARGET_PX);
+    expect(zones).toHaveLength(3);
+    for (const zone of zones) {
+      expect(zone.width).toBeCloseTo(34, 0);
+      expect(zone.height).toBeCloseTo(40, 0);
+      expect(zone).toMatchObject({
+        reachesTop: true,
+        reachesBottom: true,
+        ownsItsEdges: true,
+      });
     }
+    // Tres zonas de 44px de ancho no caben en un control de 106px sin
+    // solaparse: las de los extremos se alargan hacia fuera.
+    expect(zones.map((zone) => zone.reachesOutward)).toEqual([
+      true,
+      null,
+      true,
+    ]);
   });
 
-  test("a 375px el nombre y la foto miden 44px de alto sin pisar los estados (#414)", async ({
+  test("a 375px la fila no se apila y todo su bloque de texto abre la ficha (#766)", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await goToAttendance(page, ATTENDANCE_SHEET_STATE);
     const row = attendanceRow(page, FIRST_ATTENDEE);
-    const segmentTop = await topOf(row.getByRole("group"));
-
-    for (const target of [
-      row.getByRole("link", { name: ATTENDANCE_RECORD_LINK }),
+    await row.scrollIntoViewIfNeeded();
+    const rowBox = await boxOf(row);
+    const segmentBox = await boxOf(row.getByRole("group"));
+    const photoBox = await boxOf(
       row.getByRole("button", { name: OPEN_PHOTO_BUTTON }),
-    ]) {
-      const box = await target.boundingBox();
-      expect(box?.height).toBeGreaterThanOrEqual(
-        ATTENDANCE_MIN_TOUCH_TARGET_PX,
-      );
-      expect(Number(box?.y) + Number(box?.height)).toBeLessThanOrEqual(
-        segmentTop,
-      );
-    }
+    );
+    const nameBox = await boxOf(row.getByText(FIRST_ATTENDEE));
+
+    const touchesOpenRecord = await page.evaluate(
+      ({ x, top, bottom }) =>
+        [top, bottom].map(
+          (y) =>
+            document.elementFromPoint(x, y)?.closest("a")?.ariaLabel ?? null,
+        ),
+      {
+        x: nameBox.x + 2,
+        top:
+          rowBox.y +
+          rowBox.height / 2 -
+          ATTENDANCE_MIN_TOUCH_TARGET_PX / 2 +
+          0.5,
+        bottom:
+          rowBox.y +
+          rowBox.height / 2 +
+          ATTENDANCE_MIN_TOUCH_TARGET_PX / 2 -
+          0.5,
+      },
+    );
+
+    expect(rowBox.height).toBeGreaterThanOrEqual(56);
+    expect(segmentBox.y).toBeGreaterThan(rowBox.y);
+    expect(segmentBox.y + segmentBox.height).toBeLessThan(
+      rowBox.y + rowBox.height,
+    );
+    expect(segmentBox.x).toBeGreaterThan(nameBox.x + nameBox.width);
+    expect(photoBox.height).toBeGreaterThanOrEqual(
+      ATTENDANCE_MIN_TOUCH_TARGET_PX,
+    );
+    expect(touchesOpenRecord).toEqual([
+      ATTENDANCE_RECORD_LINK,
+      ATTENDANCE_RECORD_LINK,
+    ]);
+  });
+
+  test("a 375px el nombre largo ocupa como mucho dos líneas (#766)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+    const row = attendanceRow(page, LONG_NAMED_ATTENDEE);
+
+    const nameLineHeight = await row
+      .getByText(LONG_NAMED_ATTENDEE)
+      .evaluate((name) => {
+        const line = name.closest("a")?.parentElement ?? name.parentElement;
+        return line === null ? 0 : line.getBoundingClientRect().height;
+      });
+
+    expect(nameLineHeight).toBeGreaterThan(15 * 1.25);
+    expect(nameLineHeight).toBeLessThanOrEqual(2 * 15 * 1.25 + 1);
+  });
+
+  test("a 375px la barra fija sale con cambios, no tapa la última fila y se va al guardar (#766)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+    const save = page.getByRole("button", { name: ATTENDANCE_SAVE });
+    await expect(save).toHaveCount(0);
+
+    await attendanceRow(page, FIRST_ATTENDEE)
+      .getByRole("button", { name: "Late" })
+      .click();
+    await expect(save).toBeVisible();
+    await page.evaluate(() =>
+      window.scrollTo(0, document.documentElement.scrollHeight),
+    );
+    const lastRowBox = await boxOf(attendanceRow(page, "Ethan Brown"));
+    const barTop = await save.evaluate(
+      (button) => button.parentElement?.getBoundingClientRect().top ?? 0,
+    );
+
+    expect((await boxOf(save)).height).toBeCloseTo(48, 0);
+    expect(lastRowBox.y + lastRowBox.height).toBeLessThanOrEqual(barTop);
+
+    await save.click();
+    await expect(page.getByText(/^Saved · /)).toBeAttached();
+    await expect(save).toHaveCount(0);
   });
 
   test("abre la foto de una fila y la cierra con Escape (#414)", async ({
@@ -20856,15 +20982,6 @@ test.describe("asistencia en el navegador", () => {
 });
 
 const ATTENDANCE_RECORD_LINK = `Open ${FIRST_ATTENDEE}'s record`;
-
-/** Dónde empieza, en vertical, un elemento que tiene que estar pintado. */
-async function topOf(locator: Locator): Promise<number> {
-  const box = await locator.boundingBox();
-  if (box === null) {
-    throw new Error("El elemento no está pintado.");
-  }
-  return box.y;
-}
 
 /** La foto grande de la primera fila, servida como en el directorio. */
 async function stubAttendeeLargePhoto(page: Page): Promise<void> {
