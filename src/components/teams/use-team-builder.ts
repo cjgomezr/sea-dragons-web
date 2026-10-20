@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { TeamLabels } from "@/lib/teams/team-ids";
 import {
-  type TeamsChangeOutcome,
+  type TeamsEditOutcome,
   type TeamsFailure,
   autoBalance,
   changeClubTeams,
@@ -77,7 +77,7 @@ export type TeamBuilderControls = {
   readonly cancelPublish: () => void;
   readonly publish: () => Promise<void>;
   readonly retry: () => void;
-  readonly changeTeams: (teams: TeamLabels) => Promise<TeamsChangeOutcome>;
+  readonly changeTeams: (teams: TeamLabels) => Promise<TeamsEditOutcome>;
 };
 
 const IN_FLIGHT: ReadonlySet<BuilderAction["kind"]> = new Set([
@@ -247,20 +247,29 @@ export function useTeamBuilder(eventId: string): TeamBuilderControls {
    * servidor ya guardó si estaba guardado sin publicar (D4 del PRD de E28).
    * Uno publicado conserva los suyos, y la pantalla también. Un fallo no toca
    * el aviso de la pantalla: lo enseña la ventana de editar, que sigue
-   * abierta. */
-  async function changeTeams(teams: TeamLabels): Promise<TeamsChangeOutcome> {
-    const outcome = await changeClubTeams(teams, eventId);
-    if (outcome.kind === "changed") {
-      const keptByPublished = outcome.eventSplit === "published";
-      update((ready) => ({
-        ...ready,
-        draft: keptByPublished
-          ? ready.draft
-          : { ...ready.draft, teams: outcome.teams },
-        action: { kind: "teamsChanged", keptByPublished },
-      }));
+   * abierta. Toma el mismo cerrojo que guardar, publicar y balancear: un
+   * guardado en vuelo con los equipos de antes los pisaría en el reparto. */
+  async function changeTeams(teams: TeamLabels): Promise<TeamsEditOutcome> {
+    if (isBusyRef.current) {
+      return { kind: "busy" };
     }
-    return outcome;
+    isBusyRef.current = true;
+    try {
+      const outcome = await changeClubTeams(teams, eventId);
+      if (outcome.kind === "changed") {
+        const keptByPublished = outcome.eventSplit === "published";
+        update((ready) => ({
+          ...ready,
+          draft: keptByPublished
+            ? ready.draft
+            : { ...ready.draft, teams: outcome.teams },
+          action: { kind: "teamsChanged", keptByPublished },
+        }));
+      }
+      return outcome;
+    } finally {
+      isBusyRef.current = false;
+    }
   }
 
   function askToPublish(): void {

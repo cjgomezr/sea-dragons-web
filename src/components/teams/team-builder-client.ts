@@ -156,6 +156,10 @@ export type TeamsChangeOutcome =
     }
   | TeamsFailure;
 
+/** Lo que ve la ventana de editar: `busy` si guardar, publicar o balancear
+ * siguen en vuelo y el cambio no se mandó. */
+export type TeamsEditOutcome = TeamsChangeOutcome | { readonly kind: "busy" };
+
 function eventPath(template: string, eventId: string): string {
   return template.replace("[eventId]", encodeURIComponent(eventId));
 }

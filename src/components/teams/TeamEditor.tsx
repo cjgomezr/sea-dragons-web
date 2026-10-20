@@ -19,7 +19,7 @@ import {
   type TeamLabels,
 } from "@/lib/teams/team-ids";
 import {
-  type TeamsChangeOutcome,
+  type TeamsEditOutcome,
   type TeamsFailure,
   describeTeamsFailure,
   loadClubTeams,
@@ -38,7 +38,7 @@ import {
  * eventos desde ahora y para el borrador abierto.
  */
 
-export type ChangeTeams = (teams: TeamLabels) => Promise<TeamsChangeOutcome>;
+export type ChangeTeams = (teams: TeamLabels) => Promise<TeamsEditOutcome>;
 
 type EditedTeam = {
   readonly translate: Translator;
@@ -54,6 +54,7 @@ type ClubTeamsState =
 type Submission =
   | { readonly kind: "idle" }
   | { readonly kind: "sending" }
+  | { readonly kind: "busy" }
   | { readonly kind: "failed"; readonly failure: TeamsFailure };
 
 function otherTeam(team: TeamId): TeamId {
@@ -202,7 +203,9 @@ function TeamEditForm({
       onApplied();
       return;
     }
-    setSubmission({ kind: "failed", failure: outcome });
+    setSubmission(
+      outcome.kind === "busy" ? outcome : { kind: "failed", failure: outcome },
+    );
   }
 
   return (
@@ -235,6 +238,11 @@ function TeamEditForm({
       {submission.kind === "failed" ? (
         <p className="auth-error" role="alert">
           {describeEditFailure(translate, submission.failure)}
+        </p>
+      ) : null}
+      {submission.kind === "busy" ? (
+        <p className="auth-error" role="alert">
+          {translate("teams.edit.busy")}
         </p>
       ) : null}
       <div className="team-edit-actions">

@@ -106,6 +106,9 @@ export async function changeClubTeamLabels(
     clubId: actor.clubId,
     teams: request.teams,
   });
+  // Las dos escrituras no van en una transacción: el cambio es idempotente
+  // y, si la del reparto falla, la petición responde error y repetirla deja
+  // el club y el reparto iguales.
   const eventSplit =
     request.eventId === undefined
       ? "none"
