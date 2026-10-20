@@ -3652,6 +3652,17 @@ a.auth-brand-header:focus-visible {
 
   .profile-aside > :not(.profile-side-card-summary) {
     grid-column: 1 / -1;
+    order: 1;
+  }
+
+  /* Como en el diseño, Asistencia a la izquierda y Membresía a la derecha,
+     aunque en el DOM (y en el escritorio) Membresía vaya primero. */
+  .profile-aside > .profile-side-card-summary:has(.profile-membership) {
+    order: 0;
+  }
+
+  .profile-aside > .profile-side-card-summary:not(:has(.profile-membership)) {
+    order: -1;
   }
 
   .profile-aside > .profile-side-card-summary {
