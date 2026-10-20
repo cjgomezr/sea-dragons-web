@@ -2106,3 +2106,18 @@ describe("ficha en pantalla: la franja del AUF pendiente (#771)", () => {
     );
   });
 });
+
+describe("ficha en pantalla: sin la tarjeta Rol (#774)", () => {
+  it("no ofrece al staff pedir un rol en la ficha de otro", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(
+      screen.queryByRole("region", { name: /^Role · / }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Request" }),
+    ).not.toBeInTheDocument();
+  });
+});
