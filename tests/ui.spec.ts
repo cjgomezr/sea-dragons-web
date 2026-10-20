@@ -8407,6 +8407,13 @@ async function goToMemberRecord(
   await state.prepare?.(page);
 }
 
+/** Las capturas de la ficha con algo abierto en escritorio, que se cierra si
+ * la página entera no cabe en la ventana (#675). */
+const OPEN_RECORD_STATES: ReadonlySet<string> = new Set([
+  "ficha-menu-abierto",
+  "ficha-desactivar-confirmacion",
+]);
+
 for (const state of MEMBER_RECORD_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
@@ -8421,6 +8428,12 @@ for (const state of MEMBER_RECORD_STATES) {
           for (const theme of themes) {
             test(`matches approved baseline (${theme})`, async ({ page }) => {
               await goToMemberRecord(page, state, theme);
+              // La ficha usa `useIsPhone` (#777): si no cabe, la captura de
+              // página entera la ve un instante como móvil y cierra el ⋯
+              // abierto (#675). Con la ventana a su altura no pasa.
+              if (OPEN_RECORD_STATES.has(state.name)) {
+                await fitViewportToPage(page);
+              }
               const snapshot = `${state.name}-${vp.name}-${theme}.png`;
               await createMissingLocalBaseline(snapshot, () =>
                 page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
