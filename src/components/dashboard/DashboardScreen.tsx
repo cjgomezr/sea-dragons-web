@@ -23,12 +23,14 @@ import { DashboardWeek } from "./DashboardWeek";
 import { LatestNewsPanel, UpcomingPanel } from "./DashboardLists";
 import { NewEventLink } from "./NewEventLink";
 import { NextUpCard } from "./NextUpCard";
+import { PlayerColumn } from "./PlayerColumn";
 
 /**
  * La pantalla de inicio (#426, RF-1 a RF-4 del PRD de E14), que E27 rehace
  * por partes. De arriba abajo: la cabecera con el día y el saludo, los avisos
  * y la tarjeta "Próximo" con el RSVP y el equipo (#747, RF-3 y RF-8 del PRD
- * de E27); "Esta semana" (#748, RF-4), y debajo, de momento, los próximos
+ * de E27), con la columna del Player a su derecha (#749, RF-5) y "Esta
+ * semana" (#748, RF-4) bajo "Próximo"; debajo, de momento, los próximos
  * eventos y las últimas noticias.
  *
  * Es de cliente porque responde al RSVP sin recargar y porque la hora del
@@ -168,20 +170,30 @@ function RestrictedContent({
         translate={translate}
         membership={dashboard.membership}
       />
-      <NextUpCard
-        translate={translate}
-        nextUp={dashboard.nextUp}
-        viewer={{ isRestricted: true, canCreateEvents, today: now.date }}
-        onRetry={onRetry}
-      />
-      <DashboardWeek
-        translate={translate}
-        week={dashboard.week}
-        today={now.date}
-        nextUpStartsOn={nextUpStartsOn(dashboard.nextUp)}
-        isRestricted
-        onRetry={onRetry}
-      />
+      <div className="dashboard-columns">
+        <div className="dashboard-main">
+          <NextUpCard
+            translate={translate}
+            nextUp={dashboard.nextUp}
+            viewer={{ isRestricted: true, canCreateEvents, today: now.date }}
+            onRetry={onRetry}
+          />
+          <DashboardWeek
+            translate={translate}
+            week={dashboard.week}
+            today={now.date}
+            nextUpStartsOn={nextUpStartsOn(dashboard.nextUp)}
+            isRestricted
+            onRetry={onRetry}
+          />
+        </div>
+        <PlayerColumn
+          translate={translate}
+          attendance={dashboard.me.attendance}
+          membership={dashboard.membership}
+          onRetry={onRetry}
+        />
+      </div>
     </>
   );
 }
@@ -208,20 +220,32 @@ function MemberContent({
         userId={userId}
         dashboard={dashboard}
       />
-      <NextUpCard
-        translate={translate}
-        nextUp={dashboard.nextUp}
-        viewer={{ isRestricted: false, canCreateEvents, today: now.date }}
-        onRetry={onRetry}
-      />
-      <DashboardWeek
-        translate={translate}
-        week={dashboard.week}
-        today={now.date}
-        nextUpStartsOn={nextUpStartsOn(dashboard.nextUp)}
-        isRestricted={false}
-        onRetry={onRetry}
-      />
+      <div className="dashboard-columns">
+        <div className="dashboard-main">
+          <NextUpCard
+            translate={translate}
+            nextUp={dashboard.nextUp}
+            viewer={{ isRestricted: false, canCreateEvents, today: now.date }}
+            onRetry={onRetry}
+          />
+          <DashboardWeek
+            translate={translate}
+            week={dashboard.week}
+            today={now.date}
+            nextUpStartsOn={nextUpStartsOn(dashboard.nextUp)}
+            isRestricted={false}
+            onRetry={onRetry}
+          />
+        </div>
+        {dashboard.column === "player" ? (
+          <PlayerColumn
+            translate={translate}
+            attendance={dashboard.me.attendance}
+            membership={dashboard.membership}
+            onRetry={onRetry}
+          />
+        ) : null}
+      </div>
       <div className="dashboard-panels">
         <UpcomingPanel
           translate={translate}

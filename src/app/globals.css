@@ -17553,8 +17553,9 @@ p.dashboard-next-up-line {
 /* La imagen va a la izquierda cuando la tarjeta tiene sitio, no según la
    ventana: a 768px la barra lateral deja al inicio unos 500px, y con la
    columna de 280px el texto se partía en tres líneas (#747). Por debajo,
-   la tarjeta sigue como en el móvil. */
-@container dashboard (min-width: 720px) {
+   la tarjeta sigue como en el móvil. Mide su columna, no el inicio entero,
+   porque desde #749 puede llevar la del Player al lado. */
+@container dashboard-main (min-width: 720px) {
   .dashboard-next-up {
     grid-template-columns: 280px minmax(0, 1fr);
   }
@@ -17592,6 +17593,278 @@ p.dashboard-next-up-line {
 
   .dashboard-next-up-counts {
     text-align: start;
+  }
+}
+
+/* Las columnas del inicio (#749): "Próximo" a la izquierda y la del Player a
+   la derecha, de 340px, cuando caben las dos sin que la tarjeta pierda su
+   imagen al lado (720px). Por debajo van una encima de otra. */
+.dashboard-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.dashboard-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  container: dashboard-main / inline-size;
+}
+
+.dashboard-player-column {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+@container dashboard (min-width: 1076px) {
+  .dashboard-columns {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+.dashboard-attendance,
+.dashboard-membership-card {
+  min-width: 0;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-attendance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.dashboard-attendance p,
+.dashboard-membership-card p {
+  margin: 0;
+}
+
+.dashboard-attendance-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+}
+
+.dashboard-attendance-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.dashboard-attendance-season,
+.dashboard-attendance-sessions,
+.dashboard-attendance-caption,
+.dashboard-attendance-legend,
+.dashboard-attendance-empty p,
+p.dashboard-attendance-empty {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.dashboard-attendance-figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) 10px;
+}
+
+.dashboard-attendance-percent {
+  font-family: var(--font-family-mono);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.dashboard-attendance-last10 {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Diez huecos siempre: con menos sesiones los bloques no se estiran. */
+.dashboard-attendance-blocks {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard-attendance-block {
+  height: 22px;
+  border-radius: 4px;
+}
+
+.dashboard-attendance-block-present,
+.dashboard-attendance-legend-present::before {
+  background: var(--color-success);
+}
+
+.dashboard-attendance-block-late,
+.dashboard-attendance-legend-late::before {
+  background: var(--color-warning);
+}
+
+.dashboard-attendance-block-absent,
+.dashboard-attendance-legend-absent::before {
+  background: var(--color-danger);
+}
+
+.dashboard-attendance-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard-attendance-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dashboard-attendance-legend li::before {
+  width: 8px;
+  height: 8px;
+  content: "";
+  border-radius: 2px;
+}
+
+.dashboard-attendance-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* La membresía: el icono de 38px teñido de éxito o de peligro, el estado y
+   la flecha a Pagos, que cubre la tarjeta entera con su ::after. */
+.dashboard-membership-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 14px var(--space-2) 14px var(--space-4);
+}
+
+.dashboard-membership-card-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 18%, var(--color-panel));
+  border-radius: 10px;
+}
+
+.dashboard-membership-card-restricted .dashboard-membership-card-icon {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 18%, var(--color-panel));
+}
+
+.dashboard-membership-card-text {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 1px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  overflow-wrap: break-word;
+}
+
+.dashboard-membership-card .dashboard-membership-card-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.dashboard-membership-card-link {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  color: var(--color-text-secondary);
+  border-radius: 8px;
+}
+
+.dashboard-membership-card-link::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  border-radius: 12px;
+}
+
+.dashboard-membership-card-link:hover {
+  color: var(--color-text);
+}
+
+/* En el móvil las dos tarjetas van lado a lado (#2a): la asistencia en el
+   porcentaje y una barra de 10px, la membresía sin el icono. Lo que se
+   esconde sigue en la lista para el lector de pantalla. */
+@media (max-width: 767px) {
+  .dashboard-player-column {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+    align-items: stretch;
+  }
+
+  .dashboard-attendance {
+    gap: var(--space-1);
+    padding: var(--space-3);
+  }
+
+  .dashboard-attendance-header h2 {
+    font-size: 14.5px;
+  }
+
+  .dashboard-attendance-season,
+  .dashboard-attendance-sessions,
+  .dashboard-attendance-caption,
+  .dashboard-attendance-legend {
+    display: none;
+  }
+
+  .dashboard-attendance-percent {
+    font-size: 24px;
+  }
+
+  .dashboard-attendance-blocks {
+    gap: 2px;
+  }
+
+  .dashboard-attendance-block {
+    height: 10px;
+    border-radius: 2px;
+  }
+
+  .dashboard-membership-card {
+    align-items: flex-start;
+    padding: var(--space-3) 0 var(--space-3) var(--space-3);
+  }
+
+  .dashboard-membership-card-icon {
+    display: none;
+  }
+
+  .dashboard-membership-card-link {
+    width: 32px;
+    height: 32px;
   }
 }
 
