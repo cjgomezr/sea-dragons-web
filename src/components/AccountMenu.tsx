@@ -52,15 +52,6 @@ const AVATAR_SIZE = 52;
 /** El círculo del botón en la barra de arriba (#717). */
 const TRIGGER_AVATAR_SIZE = 38;
 
-/** Lo que avisa al menú de que otra pantalla quiere volver a él: la lista
- * de la configuración del club en el móvil (#718) vuelve "a la cuenta", y la
- * cuenta del móvil es este menú, no una ruta. */
-export const OPEN_ACCOUNT_MENU_EVENT = "seadragons:open-account-menu";
-
-export function requestAccountMenu(): void {
-  window.dispatchEvent(new Event(OPEN_ACCOUNT_MENU_EVENT));
-}
-
 function AccountIdentityRow({
   account,
   translate,
@@ -225,7 +216,7 @@ export function AccountMenu({
   const menuId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const { isOpen, containerRef, open, toggle, close, closeAndReturnFocus } =
+  const { isOpen, containerRef, toggle, close, closeAndReturnFocus } =
     useDropdownMenu(buttonRef);
 
   useEffect(() => {
@@ -233,11 +224,6 @@ export function AccountMenu({
       headingRef.current?.focus();
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    window.addEventListener(OPEN_ACCOUNT_MENU_EVENT, open);
-    return () => window.removeEventListener(OPEN_ACCOUNT_MENU_EVENT, open);
-  }, [open]);
 
   const label = translate("account.link");
   return (

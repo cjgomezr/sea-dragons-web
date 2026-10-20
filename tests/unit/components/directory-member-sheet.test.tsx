@@ -373,6 +373,58 @@ describe("la ficha que sube: abrir y cerrar", () => {
     ).not.toHaveFocus();
   });
 
+  // Safari pinta el contorno de un foco devuelto por código aunque lo haya
+  // provocado un dedo: la fila quedaba enmarcada y la hoja siguiente se
+  // abría como si fuera con el teclado, con el foco en el asa.
+  it("cerrada con el dedo, la fila recupera el foco sin contorno", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+    await user.click(row("Nerea Ruiz"));
+
+    await user.click(
+      within(sheet("Nerea Ruiz")).getByRole("button", {
+        name: "Close the sheet",
+      }),
+    );
+
+    expect(row("Nerea Ruiz")).toHaveFocus();
+    expect(row("Nerea Ruiz")).toHaveAttribute("data-quiet-focus");
+  });
+
+  it("abierta otra vez con el dedo, el foco tampoco se queda en el asa", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+    await user.click(row("Nerea Ruiz"));
+    await user.click(
+      within(sheet("Nerea Ruiz")).getByRole("button", {
+        name: "Close the sheet",
+      }),
+    );
+
+    await user.click(row("Nerea Ruiz"));
+
+    expect(
+      within(sheet("Nerea Ruiz")).getByRole("button", {
+        name: "Close the sheet",
+      }),
+    ).not.toHaveFocus();
+  });
+
+  it("cerrada con el teclado, la fila recupera el foco con su contorno", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+    row("Nerea Ruiz").focus();
+    await user.keyboard("{Enter}");
+
+    await user.keyboard("{Escape}");
+
+    expect(row("Nerea Ruiz")).toHaveFocus();
+    expect(row("Nerea Ruiz")).not.toHaveAttribute("data-quiet-focus");
+  });
+
   it("abrir con el teclado deja el foco en un control de la hoja", async () => {
     const user = userEvent.setup();
     stubApi();
