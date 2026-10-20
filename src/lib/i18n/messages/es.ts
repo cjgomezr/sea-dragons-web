@@ -448,9 +448,6 @@ export const spanishMessages: MessageCatalog = {
   "account.profile.experienceLevel": "Nivel de experiencia",
   "account.profile.gender": "Género",
   "account.profile.notSet": "Sin indicar",
-  "account.profile.save": "Guardar cambios",
-  "account.profile.saving": "Guardando…",
-  "account.profile.saved": "Cambios guardados.",
   "account.profile.issue.fullNameMissing": "Escribe tu nombre.",
   "account.profile.issue.fullNameTooLong":
     "El nombre puede tener como mucho {max} caracteres.",
@@ -472,13 +469,6 @@ export const spanishMessages: MessageCatalog = {
   "account.profile.auf.title": "Registro AUF",
   "account.profile.auf.number": "Número de AUF",
   "account.profile.auf.expiry": "Vencimiento del AUF",
-  "account.profile.auf.hint":
-    "Un Admin lo revisa antes de darlo por verificado.",
-  "account.profile.auf.pending": "Pendiente de que un Admin lo verifique.",
-  "account.profile.auf.verified":
-    "Verificado por un Admin. Sólo un Admin puede cambiarlo.",
-  "account.profile.auf.summary": "AUF {number} · vence el {date}",
-  "account.profile.auf.withoutExpiry": "AUF {number} · sin vencimiento",
   "account.profile.issue.aufNumberMissing": "Escribe tu número de AUF.",
   "account.profile.issue.aufNumberTooLong":
     "Tu número de AUF no puede pasar de {max} caracteres.",
@@ -548,6 +538,28 @@ export const spanishMessages: MessageCatalog = {
   "profileCard.contact.emergency": "Contacto de emergencia",
   "profileCard.contact.notAdded": "Aún no añadido",
   "profileCard.contact.emergencySummary": "{name} · {relationship}",
+  // Registro AUF y Ficha del club, en el perfil y en la ficha (#773).
+  "profileCard.adminOnly": "Admin",
+  "profileCard.auf.saved": "AUF guardado",
+  "profileCard.auf.number": "Número",
+  "profileCard.auf.expires": "Vence",
+  "profileCard.auf.status": "Estado",
+  "profileCard.auf.verified": "Verificado",
+  "profileCard.auf.pending": "Pendiente",
+  "profileCard.auf.notAdded": "Aún no añadido",
+  "profileCard.auf.inDays": {
+    one: "en {count} día",
+    other: "en {count} días",
+  },
+  "profileCard.auf.expired": "vencido",
+  "profileCard.auf.pendingNote":
+    "Un Admin lo revisará. Hasta entonces se ve como pendiente.",
+  "profileCard.auf.verifiedNote":
+    "Verificado por el club. Pide a un Admin que lo cambie.",
+  "profileCard.clubRecord.title": "Ficha del club",
+  "profileCard.clubRecord.saved": "Ficha del club guardada",
+  "profileCard.clubRecord.dateOfBirth": "Fecha de nacimiento",
+  "profileCard.clubRecord.joined": "Alta",
   // La foto de perfil (#245): el círculo de la cabecera y sus controles.
   "account.photo.alt": "Tu foto de perfil",
   "account.photo.add": "Añadir foto",
@@ -940,7 +952,6 @@ export const spanishMessages: MessageCatalog = {
     "{name} añadió el AUF {number} (vence el {date}). Revísalo y verifícalo.",
   "memberRecord.aufStrip.withoutExpiry":
     "{name} añadió el AUF {number}. Revísalo y verifícalo.",
-  "memberRecord.birth.title": "Datos personales",
   "memberRecord.birth.label": "Fecha de nacimiento",
   "memberRecord.birth.hint":
     "El miembro no puede cambiarla: de ella depende si necesita el consentimiento de un tutor.",
@@ -959,9 +970,6 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.contact.samePhone":
     "Es el teléfono de {name}. El contacto de emergencia debería ser otra persona.",
   "memberRecord.groups.empty": "El club todavía no tiene grupos.",
-  "memberRecord.save": "Guardar la ficha",
-  "memberRecord.saving": "Guardando…",
-  "memberRecord.saved": "Ficha guardada.",
   "memberRecord.issue.aufNumberTooLong":
     "El número de AUF no puede pasar de {max} caracteres.",
   "memberRecord.issue.aufExpiryNotADate":

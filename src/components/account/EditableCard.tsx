@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
+import { LockSimple } from "@phosphor-icons/react/dist/ssr/LockSimple";
 import { PencilSimple } from "@phosphor-icons/react/dist/ssr/PencilSimple";
 import { useEffect, useRef } from "react";
 import type { Translator } from "@/lib/i18n/translator";
@@ -14,7 +15,10 @@ import { focusFieldById } from "./use-open-card";
  * Cancelar vuelve a su Editar. Si se cierra porque se abrió otra, el foco ya
  * está en la otra y no se toca.
  *
- * Lo que va dentro lo pone quien la usa: la lectura o su `CardForm`.
+ * Lo que va dentro lo pone quien la usa: la lectura o su `CardForm`. Una
+ * tarjeta con datos del Admin, como Registro AUF y Ficha del club en la ficha
+ * (#773), lleva junto al título la etiqueta "🔒 Admin", fuera del título
+ * para que no entre en el nombre de la región.
  */
 
 /** Si el foco se perdió con el formulario que se acaba de quitar, o sigue
@@ -31,6 +35,7 @@ export function EditableCard({
   isEditing,
   focusFieldId,
   savedText,
+  isAdminOnly = false,
   onEdit,
   children,
 }: {
@@ -42,6 +47,8 @@ export function EditableCard({
   focusFieldId: string;
   /** El aviso de que se acaba de guardar, o null. */
   savedText: string | null;
+  /** Lleva la etiqueta "🔒 Admin". */
+  isAdminOnly?: boolean;
   /** Null en una tarjeta que sólo se lee. */
   onEdit: (() => void) | null;
   children: React.ReactNode;
@@ -75,7 +82,15 @@ export function EditableCard({
       aria-labelledby={headingId}
     >
       <div className="profile-card-header">
-        <h2 id={headingId}>{title}</h2>
+        <div className="profile-card-title">
+          <h2 id={headingId}>{title}</h2>
+          {isAdminOnly ? (
+            <span className="profile-card-admin">
+              <LockSimple aria-hidden="true" weight="regular" />
+              {translate("profileCard.adminOnly")}
+            </span>
+          ) : null}
+        </div>
         {onEdit === null ? null : (
           <button
             ref={editRef}

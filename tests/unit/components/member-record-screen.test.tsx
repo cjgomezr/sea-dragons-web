@@ -268,11 +268,37 @@ async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
   await screen.findByRole("heading", { level: 1, name: "Paula Player" });
 }
 
-function saveButton(): HTMLElement {
-  return screen.getByRole("button", { name: /save the record|saving/i });
+type User = ReturnType<typeof userEvent.setup>;
+
+function aufCard(name = "AUF registration"): HTMLElement {
+  return screen.getByRole("region", { name });
 }
 
-type User = ReturnType<typeof userEvent.setup>;
+function clubRecordCard(name = "Club record"): HTMLElement {
+  return screen.getByRole("region", { name });
+}
+
+async function openAuf(user: User): Promise<HTMLElement> {
+  const card = aufCard();
+  await user.click(
+    within(card).getByRole("button", { name: "Edit AUF registration" }),
+  );
+  return card;
+}
+
+/** El valor de una de las celdas de una tarjeta (#773). */
+function cellOf(card: HTMLElement, label: string): HTMLElement {
+  const term = within(card).getByText(label, { selector: "dt" });
+  const value = term.nextElementSibling;
+  if (!(value instanceof HTMLElement)) {
+    throw new Error(`Falta el valor de ${label}.`);
+  }
+  return value;
+}
+
+function saveIn(card: HTMLElement): HTMLElement {
+  return within(card).getByRole("button", { name: /^(Save|Saving…)$/ });
+}
 
 /** Las acciones del Admin viven en el menú ⋯ de la cabecera (#775): se abre
  * y se elige una. */
@@ -304,8 +330,7 @@ describe("ficha en pantalla: carga", () => {
 
     await renderScreen();
 
-    expect(screen.getByLabelText("AUF number")).toHaveValue("AUF-1");
-    expect(screen.getByLabelText("Expiry date")).toHaveValue("2027-03-31");
+    expect(cellOf(aufCard(), "Number")).toHaveTextContent("AUF-1");
     expect(screen.getByText("Member since March 2024")).toBeInTheDocument();
     const groups = screen.getByRole("region", { name: "Groups" });
     expect(within(groups).getByText("Senior Squad")).toBeVisible();
@@ -387,13 +412,15 @@ describe("ficha en pantalla: carga", () => {
 
     await renderScreen("es");
 
-    expect(screen.getByLabelText("Número de AUF")).toHaveValue("AUF-1");
-    expect(screen.getByLabelText("Vencimiento")).toBeInTheDocument();
+    expect(cellOf(aufCard("Registro AUF"), "Número")).toHaveTextContent(
+      "AUF-1",
+    );
+    expect(cellOf(aufCard("Registro AUF"), "Estado")).toHaveTextContent(
+      "Verificado",
+    );
+    expect(clubRecordCard("Ficha del club")).toBeInTheDocument();
     expect(screen.getByText("Miembro desde marzo de 2024")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Grupos" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Guardar la ficha" }),
-    ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Directorio" }),
     ).toBeInTheDocument();
@@ -452,21 +479,84 @@ describe("pantalla de la ficha", () => {
 
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getByText("PP")).toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByLabelText("AUF number")).toHaveValue("AUF-1");
-    expect(saveButton()).toBeEnabled();
+    expect(cellOf(aufCard(), "Number")).toHaveTextContent("AUF-1");
+    expect(
+      within(aufCard()).getByRole("button", { name: "Edit AUF registration" }),
+    ).toBeEnabled();
   });
 });
 
-describe("ficha en pantalla: guardado", () => {
-  it("manda el AUF con los grupos guardados en una sola petición", async () => {
+/** Las 13:00 del 20 de octubre de 2026 en Melbourne: el día desde el que se
+ * cuentan los días del vencimiento y la edad. */
+const NOW_IN_CLUB = new Date("2026-10-20T02:00:00.000Z");
+
+describe("ficha en pantalla: Registro AUF (#242, #773)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW_IN_CLUB);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("lee el AUF en tres celdas, con la etiqueta de Admin", async () => {
+    stubApi();
+    await renderScreen();
+
+    const card = aufCard();
+    expect(within(card).getByText("Admin")).toBeInTheDocument();
+    expect(cellOf(card, "Number")).toHaveTextContent("AUF-1");
+    expect(cellOf(card, "Expires")).toHaveTextContent(
+      "31 March 2027 · in 162 days",
+    );
+    expect(cellOf(card, "Status")).toHaveTextContent("Verified");
+    expect(within(card).queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("lee pendiente el AUF que escribió el miembro", async () => {
+    stubApi({ record: PENDING_RECORD });
+    await renderScreen();
+
+    expect(cellOf(aufCard(), "Status")).toHaveTextContent("Pending");
+  });
+
+  it("pone en aviso un vencimiento a menos de 90 días", async () => {
+    stubApi({ record: { ...RECORD, aufExpiry: "2026-12-31" } });
+    await renderScreen();
+
+    expect(
+      within(cellOf(aufCard(), "Expires")).getByText("· in 72 days"),
+    ).toHaveClass("profile-cell-soon");
+  });
+
+  it("Editar abre el número y el vencimiento, con el foco en el número", async () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.clear(screen.getByLabelText("AUF number"));
-    await user.type(screen.getByLabelText("AUF number"), "AUF-99");
-    await user.click(saveButton());
+    const card = await openAuf(user);
 
+    expect(within(card).getByLabelText("AUF number")).toHaveValue("AUF-1");
+    expect(within(card).getByLabelText("Expiry date")).toHaveValue(
+      "2027-03-31",
+    );
+    expect(within(card).getByLabelText("AUF number")).toHaveFocus();
+  });
+
+  it("manda el AUF con los grupos y la fecha guardados, sin el contacto", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    const card = await openAuf(user);
+    await user.clear(within(card).getByLabelText("AUF number"));
+    await user.type(within(card).getByLabelText("AUF number"), "AUF-99");
+    await user.click(saveIn(card));
+
+    expect(await within(card).findByRole("status")).toHaveTextContent(
+      "AUF saved",
+    );
     expect(patches).toEqual([
       {
         method: "PATCH",
@@ -478,9 +568,10 @@ describe("ficha en pantalla: guardado", () => {
         },
       },
     ]);
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Record saved.",
-    );
+    expect(cellOf(card, "Number")).toHaveTextContent("AUF-99");
+    expect(
+      within(card).getByRole("button", { name: "Edit AUF registration" }),
+    ).toHaveFocus();
   });
 
   it("no manda el AUF si no lo tocó: el miembro puede haberlo cambiado entretanto (#274)", async () => {
@@ -488,11 +579,11 @@ describe("ficha en pantalla: guardado", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.click(saveIn(card));
 
-    await screen.findByRole("status");
-    expect(patches[0]?.body).not.toHaveProperty("aufNumber");
-    expect(patches[0]?.body).not.toHaveProperty("aufExpiry");
+    expect(patches).toEqual([]);
+    expect(within(card).queryByLabelText("AUF number")).not.toBeInTheDocument();
   });
 
   it("manda el número y el vencimiento vacíos como null", async () => {
@@ -500,9 +591,10 @@ describe("ficha en pantalla: guardado", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.clear(screen.getByLabelText("AUF number"));
-    await user.clear(screen.getByLabelText("Expiry date"));
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.clear(within(card).getByLabelText("AUF number"));
+    await user.clear(within(card).getByLabelText("Expiry date"));
+    await user.click(saveIn(card));
 
     expect(patches[0]?.body).toMatchObject({
       aufNumber: null,
@@ -510,16 +602,18 @@ describe("ficha en pantalla: guardado", () => {
     });
   });
 
-  it("enseña lo que el servidor guardó: sin número tampoco queda vencimiento", async () => {
+  it("lee lo que el servidor guardó: sin número tampoco queda vencimiento", async () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.clear(screen.getByLabelText("AUF number"));
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.clear(within(card).getByLabelText("AUF number"));
+    await user.click(saveIn(card));
 
-    await screen.findByRole("status");
-    expect(screen.getByLabelText("Expiry date")).toHaveValue("");
+    await within(card).findByRole("status");
+    expect(cellOf(card, "Expires")).toHaveTextContent("Not set");
+    expect(cellOf(card, "Status")).toHaveTextContent("Not added yet");
   });
 
   it("marca vencido lo que el servidor devuelve vencido", async () => {
@@ -532,12 +626,14 @@ describe("ficha en pantalla: guardado", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "0");
+    await user.click(saveIn(card));
 
     expect(await screen.findByText("AUF expired")).toBeInTheDocument();
   });
 
-  it("desactiva el botón mientras guarda", async () => {
+  it("desactiva Guardar mientras guarda", async () => {
     let answer: (response: Response) => void = () => undefined;
     stubApi({
       save: () =>
@@ -548,16 +644,14 @@ describe("ficha en pantalla: guardado", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "0");
+    await user.click(saveIn(card));
 
-    expect(saveButton()).toBeDisabled();
-    expect(saveButton()).toHaveTextContent("Saving…");
-    expect(screen.getByLabelText("AUF number")).toBeDisabled();
-    expect(screen.getByLabelText("Date of birth")).toBeDisabled();
+    expect(saveIn(card)).toBeDisabled();
+    expect(saveIn(card)).toHaveTextContent("Saving…");
     answer(jsonResponse(200, { data: RECORD }));
-    expect(await screen.findByRole("status")).toBeInTheDocument();
-    expect(saveButton()).toBeEnabled();
-    expect(screen.getByLabelText("AUF number")).toBeEnabled();
+    expect(await within(card).findByRole("status")).toBeInTheDocument();
   });
 
   it("no manda un segundo guardado con un doble clic", async () => {
@@ -565,25 +659,46 @@ describe("ficha en pantalla: guardado", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.dblClick(saveButton());
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "0");
+    await user.dblClick(saveIn(card));
 
     expect(patches).toHaveLength(1);
   });
+
+  it("Cancelar vuelve a lectura sin mandar nada, con el foco en Editar", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "0");
+    await user.click(within(card).getByRole("button", { name: "Cancel" }));
+
+    expect(patches).toEqual([]);
+    expect(cellOf(card, "Number")).toHaveTextContent("AUF-1");
+    expect(
+      within(card).getByRole("button", { name: "Edit AUF registration" }),
+    ).toHaveFocus();
+  });
 });
 
-describe("ficha en pantalla: errores", () => {
+describe("ficha en pantalla: errores del AUF", () => {
   it("avisa de un número demasiado largo sin mandar nada", async () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.clear(screen.getByLabelText("AUF number"));
-    await user.type(screen.getByLabelText("AUF number"), "9".repeat(41));
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.clear(within(card).getByLabelText("AUF number"));
+    await user.type(within(card).getByLabelText("AUF number"), "9".repeat(41));
+    await user.click(saveIn(card));
 
     expect(patches).toEqual([]);
     // La ayuda del campo sigue en la descripción, después del aviso.
-    expect(screen.getByLabelText("AUF number")).toHaveAccessibleDescription(
+    expect(
+      within(card).getByLabelText("AUF number"),
+    ).toHaveAccessibleDescription(
       /^The AUF number can have at most 40 characters\./,
     );
   });
@@ -596,9 +711,12 @@ describe("ficha en pantalla: errores", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.clear(within(card).getByLabelText("Expiry date"));
+    await user.type(within(card).getByLabelText("Expiry date"), "2001-01-01");
+    await user.click(saveIn(card));
 
-    const expiry = screen.getByLabelText("Expiry date");
+    const expiry = within(card).getByLabelText("Expiry date");
     await vi.waitFor(() =>
       expect(expiry).toHaveAccessibleDescription(
         "The expiry can't be before the date they joined (6 March 2024).",
@@ -615,30 +733,22 @@ describe("ficha en pantalla: errores", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "0");
+    await user.click(saveIn(card));
 
     await vi.waitFor(() =>
-      expect(screen.getByLabelText("Expiry date")).toHaveAccessibleDescription(
-        "That expiry isn't a valid date.",
-      ),
+      expect(
+        within(card).getByLabelText("Expiry date"),
+      ).toHaveAccessibleDescription("That expiry isn't a valid date."),
     );
   });
 
   it.each([
     [
-      "un miembro dado de baja",
-      () => errorResponse(422, "business_rule", "member_inactive"),
-      "A member with a deactivated account can't be added to groups.",
-    ],
-    [
       "un estado de cuenta que cambió a medias",
       () => errorResponse(409, "conflict", "member_status_changed"),
       "The member's account changed while saving. Reload the record and try again.",
-    ],
-    [
-      "un grupo que ya no existe",
-      () => errorResponse(404, "not_found", "group_not_found"),
-      "One of those groups is no longer in the club. Reload the record.",
     ],
     [
       "un fallo de red",
@@ -650,16 +760,22 @@ describe("ficha en pantalla: errores", () => {
       () => errorResponse(500, "internal_error"),
       "We couldn't save the record. Try again.",
     ],
-  ])("avisa de %s y deja volver a intentarlo", async (_case, save, text) => {
-    stubApi({ save });
-    const user = userEvent.setup();
-    await renderScreen();
+  ])(
+    "avisa de %s en la tarjeta y deja volver a intentarlo",
+    async (_case, save, text) => {
+      stubApi({ save });
+      const user = userEvent.setup();
+      await renderScreen();
 
-    await user.click(saveButton());
+      const card = await openAuf(user);
+      await user.type(within(card).getByLabelText("AUF number"), "0");
+      await user.click(saveIn(card));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(text);
-    expect(saveButton()).toBeEnabled();
-  });
+      expect(await within(card).findByRole("alert")).toHaveTextContent(text);
+      expect(saveIn(card)).toBeEnabled();
+      expect(within(card).getByLabelText("AUF number")).toHaveValue("AUF-10");
+    },
+  );
 });
 
 describe("ficha en pantalla: invitación (#243)", () => {
@@ -1084,37 +1200,108 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
   });
 });
 
-describe("ficha en pantalla: fecha de nacimiento", () => {
-  it("enseña la fecha de nacimiento del miembro", async () => {
-    stubApi();
-
-    await renderScreen();
-
-    expect(screen.getByLabelText("Date of birth")).toHaveValue("1990-05-10");
+describe("ficha en pantalla: Ficha del club (#272, #773)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW_IN_CLUB);
   });
 
-  it("manda la fecha corregida y enseña la guardada", async () => {
-    stubApi();
-    const user = userEvent.setup();
-    await renderScreen();
-
-    await user.clear(screen.getByLabelText("Date of birth"));
-    await user.type(screen.getByLabelText("Date of birth"), "1988-11-02");
-    await user.click(saveButton());
-
-    expect(patches[0]?.body).toMatchObject({ dateOfBirth: "1988-11-02" });
-    await screen.findByRole("status");
-    expect(screen.getByLabelText("Date of birth")).toHaveValue("1988-11-02");
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it("manda null si el miembro todavía no tiene fecha y no se da ninguna", async () => {
+  async function openClubRecord(user: User): Promise<HTMLElement> {
+    const card = clubRecordCard();
+    await user.click(
+      within(card).getByRole("button", { name: "Edit Club record" }),
+    );
+    return card;
+  }
+
+  it("lee la fecha de nacimiento con la edad y el alta, con la etiqueta de Admin", async () => {
+    stubApi();
+    await renderScreen();
+
+    const card = clubRecordCard();
+    expect(within(card).getByText("Admin")).toBeInTheDocument();
+    expect(cellOf(card, "Date of birth")).toHaveTextContent("10 May 1990 · 36");
+    expect(cellOf(card, "Joined")).toHaveTextContent("6 March 2024");
+  });
+
+  it("sin fecha de nacimiento la deja sin indicar", async () => {
     stubApi({ record: { ...RECORD, dateOfBirth: null } });
+    await renderScreen();
+
+    expect(cellOf(clubRecordCard(), "Date of birth")).toHaveTextContent(
+      "Not set",
+    );
+  });
+
+  it("Editar abre sólo la fecha de nacimiento; el alta sigue en lectura (D2)", async () => {
+    stubApi();
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.click(saveButton());
+    const card = await openClubRecord(user);
 
-    expect(patches[0]?.body).toMatchObject({ dateOfBirth: null });
+    expect(within(card).getByLabelText("Date of birth")).toHaveValue(
+      "1990-05-10",
+    );
+    expect(within(card).getByLabelText("Date of birth")).toHaveFocus();
+    expect(within(card).queryByLabelText(/Joined/)).not.toBeInTheDocument();
+    expect(cellOf(card, "Joined")).toHaveTextContent("6 March 2024");
+  });
+
+  it("manda la fecha corregida con los grupos guardados, sin el AUF ni el contacto", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    const card = await openClubRecord(user);
+    await user.clear(within(card).getByLabelText("Date of birth"));
+    await user.type(within(card).getByLabelText("Date of birth"), "1988-11-02");
+    await user.click(saveIn(card));
+
+    expect(await within(card).findByRole("status")).toHaveTextContent(
+      "Club record saved",
+    );
+    expect(patches).toEqual([
+      {
+        method: "PATCH",
+        body: { groupIds: [SENIOR_ID], dateOfBirth: "1988-11-02" },
+      },
+    ]);
+    expect(cellOf(card, "Date of birth")).toHaveTextContent(
+      "2 November 1988 · 37",
+    );
+  });
+
+  it("guardar sin tocar la fecha vuelve a lectura sin mandar nada", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    const card = await openClubRecord(user);
+    await user.click(saveIn(card));
+
+    expect(patches).toEqual([]);
+    expect(
+      within(card).queryByLabelText("Date of birth"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Cancelar vuelve a lectura sin mandar nada", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    const card = await openClubRecord(user);
+    await user.clear(within(card).getByLabelText("Date of birth"));
+    await user.type(within(card).getByLabelText("Date of birth"), "1988-11-02");
+    await user.click(within(card).getByRole("button", { name: "Cancel" }));
+
+    expect(patches).toEqual([]);
+    expect(cellOf(card, "Date of birth")).toHaveTextContent("10 May 1990");
   });
 
   it("avisa antes de guardar que el miembro tendrá que dar el consentimiento de su tutor", async () => {
@@ -1122,10 +1309,13 @@ describe("ficha en pantalla: fecha de nacimiento", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.clear(screen.getByLabelText("Date of birth"));
-    await user.type(screen.getByLabelText("Date of birth"), MINOR_BIRTH);
+    const card = await openClubRecord(user);
+    await user.clear(within(card).getByLabelText("Date of birth"));
+    await user.type(within(card).getByLabelText("Date of birth"), MINOR_BIRTH);
 
-    expect(screen.getByLabelText("Date of birth")).toHaveAccessibleDescription(
+    expect(
+      within(card).getByLabelText("Date of birth"),
+    ).toHaveAccessibleDescription(
       /Paula Player will have to give a guardian's details and consent/,
     );
   });
@@ -1147,8 +1337,9 @@ describe("ficha en pantalla: fecha de nacimiento", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.clear(screen.getByLabelText("Date of birth"));
-    await user.type(screen.getByLabelText("Date of birth"), dateOfBirth);
+    const card = await openClubRecord(user);
+    await user.clear(within(card).getByLabelText("Date of birth"));
+    await user.type(within(card).getByLabelText("Date of birth"), dateOfBirth);
 
     expect(
       screen.queryByText(/will have to give a guardian's details/),
@@ -1172,9 +1363,15 @@ describe("ficha en pantalla: fecha de nacimiento", () => {
       const user = userEvent.setup();
       await renderScreen();
 
-      await user.click(saveButton());
+      const card = await openClubRecord(user);
+      await user.clear(within(card).getByLabelText("Date of birth"));
+      await user.type(
+        within(card).getByLabelText("Date of birth"),
+        "1988-11-02",
+      );
+      await user.click(saveIn(card));
 
-      const dateOfBirth = screen.getByLabelText("Date of birth");
+      const dateOfBirth = within(card).getByLabelText("Date of birth");
       await vi.waitFor(() =>
         expect(dateOfBirth).toHaveAccessibleDescription(
           expect.stringContaining(text),
@@ -1184,16 +1381,40 @@ describe("ficha en pantalla: fecha de nacimiento", () => {
     },
   );
 
+  it("avisa en la tarjeta de un fallo que no es de la fecha", async () => {
+    stubApi({ save: () => errorResponse(500, "internal_error") });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    const card = await openClubRecord(user);
+    await user.clear(within(card).getByLabelText("Date of birth"));
+    await user.type(within(card).getByLabelText("Date of birth"), "1988-11-02");
+    await user.click(saveIn(card));
+
+    expect(await within(card).findByRole("alert")).toHaveTextContent(
+      "We couldn't save the record. Try again.",
+    );
+    expect(saveIn(card)).toBeEnabled();
+  });
+
   it("sale en español", async () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen("es");
 
-    await user.clear(screen.getByLabelText("Fecha de nacimiento"));
-    await user.type(screen.getByLabelText("Fecha de nacimiento"), MINOR_BIRTH);
+    const card = clubRecordCard("Ficha del club");
+    expect(cellOf(card, "Alta")).toHaveTextContent("6 de marzo de 2024");
+    await user.click(
+      within(card).getByRole("button", { name: "Editar Ficha del club" }),
+    );
+    await user.clear(within(card).getByLabelText("Fecha de nacimiento"));
+    await user.type(
+      within(card).getByLabelText("Fecha de nacimiento"),
+      MINOR_BIRTH,
+    );
 
     expect(
-      screen.getByLabelText("Fecha de nacimiento"),
+      within(card).getByLabelText("Fecha de nacimiento"),
     ).toHaveAccessibleDescription(
       /Paula Player tendrá que dar los datos y el consentimiento de su tutor/,
     );
@@ -1273,7 +1494,8 @@ describe("ficha en pantalla: verificar el AUF (#274)", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.type(screen.getByLabelText("AUF number"), "0");
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "0");
 
     expect(
       screen.queryByRole("button", { name: /verify AUF/i }),
@@ -1579,7 +1801,7 @@ describe("ficha en pantalla: grupos (#774)", () => {
     expect(within(groupsRegion()).queryByRole("checkbox")).toBeNull();
   });
 
-  it("después, guardar la ficha manda los grupos nuevos y no los de antes", async () => {
+  it("después, guardar el AUF manda los grupos nuevos y no los de antes", async () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
@@ -1592,7 +1814,9 @@ describe("ficha en pantalla: grupos (#774)", () => {
       within(groupsRegion()).getByRole("button", { name: "Save" }),
     );
     await within(groupsRegion()).findByRole("status");
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "0");
+    await user.click(saveIn(card));
 
     expect(patches[1]?.body).toMatchObject({
       groupIds: [MASTERS_ID, SENIOR_ID],
@@ -1796,14 +2020,16 @@ describe("ficha en pantalla: contacto (#499, #772)", () => {
     expect(within(card).getByLabelText("Relationship")).toHaveValue("Mother");
   });
 
-  it("guardar el resto de la ficha no manda el contacto", async () => {
+  it("guardar el AUF no manda el contacto", async () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.click(saveButton());
+    const card = await openAuf(user);
+    await user.type(within(card).getByLabelText("AUF number"), "0");
+    await user.click(saveIn(card));
 
-    await screen.findByRole("status");
+    await within(card).findByRole("status");
     expect(patches[0]?.body).not.toHaveProperty("phone");
     expect(patches[0]?.body).not.toHaveProperty("emergencyContact");
   });
