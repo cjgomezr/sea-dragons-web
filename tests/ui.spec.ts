@@ -8764,9 +8764,9 @@ test.describe("el perfil propio en el móvil (#777)", () => {
       width: 96,
       height: 96,
     });
-    expect(await sizeOf(header.getByRole("button", { name: /photo/ }))).toEqual(
-      { width: 40, height: 40 },
-    );
+    expect(
+      await sizeOf(header.getByRole("button", { name: "Add photo" })),
+    ).toEqual({ width: 40, height: 40 });
     await expect(header.locator("h1")).toHaveCSS("font-size", "22px");
     await expect(header.locator("h1")).toHaveCSS("text-align", "center");
   });
