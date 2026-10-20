@@ -1,5 +1,6 @@
 "use client";
 
+import { CaretRight } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import { Phone } from "@phosphor-icons/react/dist/ssr/Phone";
 import Link from "next/link";
 import { useId, useState, useSyncExternalStore } from "react";
@@ -24,8 +25,10 @@ import {
  * no bloquea nada. Lleva a la sección "Contacto" del perfil. El del teléfono
  * se cierra; mientras falte el contacto de emergencia, no (D2).
  *
- * En el inicio (#747) es una franja con el tinte de aviso, el icono del
- * teléfono y "Añadir contacto"; en el perfil, la tarjeta de siempre.
+ * En el inicio (#747) es una fila con el tinte de aviso que se toca entera,
+ * como la del equipo de la tarjeta "Próximo": el icono del teléfono en su
+ * cuadro, la frase y la flecha. "Añadir contacto" ya no se ve, pero cierra
+ * el nombre del enlace. En el perfil, la tarjeta de siempre.
  *
  * Es de cliente por el cierre del teléfono, que vive en el navegador.
  */
@@ -99,6 +102,11 @@ export function ContactReminderNotice({
     }
   }
 
+  const texts = {
+    title: translate(TITLE_KEYS[reminder]),
+    why: translate(WHY_KEYS[reminder]),
+    action: translate(LINK_KEYS[variant]),
+  };
   return (
     <div
       className={`contact-reminder contact-reminder-${variant}`}
@@ -106,20 +114,10 @@ export function ContactReminderNotice({
       aria-labelledby={titleId}
     >
       {variant === "strip" ? (
-        <Phone
-          className="contact-reminder-icon"
-          aria-hidden="true"
-          focusable="false"
-          size={18}
-        />
-      ) : null}
-      <div className="contact-reminder-text">
-        <p className="contact-reminder-title" id={titleId}>
-          {translate(TITLE_KEYS[reminder])}
-        </p>
-        <p>{translate(WHY_KEYS[reminder])}</p>
-        <Link href={CONTACT_SECTION_HREF}>{translate(LINK_KEYS[variant])}</Link>
-      </div>
+        <ReminderRow titleId={titleId} texts={texts} />
+      ) : (
+        <ReminderCardText titleId={titleId} texts={texts} />
+      )}
       {isDismissible ? (
         <button
           type="button"
@@ -131,5 +129,74 @@ export function ContactReminderNotice({
         </button>
       ) : null}
     </div>
+  );
+}
+
+type ReminderTexts = {
+  readonly title: string;
+  readonly why: string;
+  readonly action: string;
+};
+
+/** El perfil: el título, el porqué y el enlace debajo. */
+function ReminderCardText({
+  titleId,
+  texts,
+}: {
+  titleId: string;
+  texts: ReminderTexts;
+}): React.JSX.Element {
+  return (
+    <div className="contact-reminder-text">
+      <p className="contact-reminder-title" id={titleId}>
+        {texts.title}
+      </p>
+      <p>{texts.why}</p>
+      <Link href={CONTACT_SECTION_HREF}>{texts.action}</Link>
+    </div>
+  );
+}
+
+/** El inicio: la fila entera es el enlace. Su nombre es el título y, detrás,
+ * la acción, que se dice pero no se pinta; el porqué es su descripción, para
+ * que quien llega con Tab también lo oiga. El botón de cerrar va fuera: uno
+ * dentro de un enlace no se puede pulsar sin seguirlo. */
+function ReminderRow({
+  titleId,
+  texts,
+}: {
+  titleId: string;
+  texts: ReminderTexts;
+}): React.JSX.Element {
+  const actionId = `${titleId}-accion`;
+  const whyId = `${titleId}-porque`;
+  return (
+    <Link
+      href={CONTACT_SECTION_HREF}
+      className="contact-reminder-row"
+      aria-labelledby={`${titleId} ${actionId}`}
+      aria-describedby={whyId}
+    >
+      <span className="contact-reminder-tile" aria-hidden="true">
+        <Phone focusable="false" size={18} />
+      </span>
+      <span className="contact-reminder-text">
+        <span className="contact-reminder-title" id={titleId}>
+          {texts.title}
+        </span>
+        <span className="contact-reminder-why" id={whyId}>
+          {texts.why}
+        </span>
+        <span className="visually-hidden" id={actionId}>
+          {texts.action}
+        </span>
+      </span>
+      <CaretRight
+        className="contact-reminder-chevron"
+        aria-hidden="true"
+        focusable="false"
+        size={16}
+      />
+    </Link>
   );
 }

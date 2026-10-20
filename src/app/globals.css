@@ -18260,68 +18260,76 @@ a.agenda-take-attendance {
   white-space: nowrap;
 }
 
-/* El aviso del contacto en el inicio es una franja con el tinte de aviso al
-   12%: el icono del teléfono, la frase, "Añadir contacto" y cerrar. */
+/* El aviso del contacto en el inicio (#747) es una fila con el tinte de
+   aviso al 12% que se toca entera, como la del equipo de "Próximo": el
+   teléfono en su cuadro, el título y el porqué, y la flecha. La franja no
+   tiene relleno; lo pone el enlace, para que toda ella sea zona táctil. El
+   cierre del teléfono va fuera del enlace, a su derecha. */
 .contact-reminder-strip {
   align-items: center;
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  gap: 0;
+  padding: 0;
   background: color-mix(in srgb, var(--color-warning) 12%, var(--color-panel));
   border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
   border-left-width: 1px;
   border-radius: 10px;
 }
 
-.contact-reminder-icon {
-  flex: none;
-  color: var(--color-warning);
+.contact-reminder-row {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: inherit;
 }
 
-/* En el móvil la frase se parte en varias líneas, y centrado en el alto el
-   teléfono quedaba suelto a media altura, lejos del título: va arriba, con
-   la primera línea (21px de alto, el icono mide 18). */
-@media (width < 768px) {
-  .contact-reminder-strip {
-    align-items: flex-start;
-  }
+.contact-reminder-row:hover .contact-reminder-title {
+  text-decoration: underline;
+}
 
-  .contact-reminder-strip .contact-reminder-icon {
-    margin-top: 2px;
-  }
+.contact-reminder-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 22%, var(--color-panel));
+  border-radius: 9px;
 }
 
 .contact-reminder-strip .contact-reminder-text {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: var(--space-2);
-  row-gap: 0;
+  gap: 2px;
 }
 
 .contact-reminder-strip .contact-reminder-title {
-  font-size: 14px;
+  font-size: 14.5px;
+  font-weight: 700;
 }
 
 /* El secundario sobre el tinte de aviso se quedaba en 4,26:1 en oscuro: va
-   en el texto suave, que pasa AA en los dos temas. */
-.contact-reminder-strip .contact-reminder-text p:not(:first-child) {
+   en el texto suave, que pasa AA en los dos temas. La flecha también. */
+.contact-reminder-why,
+.contact-reminder-chevron {
   color: var(--color-text-soft);
 }
 
-/* El acento lo elige el club y sólo se comprueba contra el panel: sobre el
-   tinte de aviso puede no llegar a AA (un morado da 3,6:1 en oscuro). El
-   enlace va en el color del texto, en negrita. */
-.contact-reminder-strip .contact-reminder-text a {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--touch-target-min);
-  margin-left: auto;
-  font-weight: 700;
-  color: var(--color-text);
-  text-decoration: none;
+.contact-reminder-why {
+  font-size: 13px;
+}
+
+.contact-reminder-chevron {
+  flex: none;
 }
 
 .contact-reminder-strip .contact-reminder-dismiss {
-  margin-top: 0;
+  margin: 0 var(--space-1) 0 0;
 }
 
 /* El aviso de la membresía (D8): el tinte de peligro al 14% con el borde al

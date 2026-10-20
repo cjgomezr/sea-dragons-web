@@ -1108,7 +1108,11 @@ function withReminder(
 const EMERGENCY_NOTE = "Add your emergency contact";
 const PHONE_NOTE = "Add your phone number";
 const BOTH_NOTE = "Add your phone number and emergency contact";
-const CONTACT_LINK = "Add contact";
+/** En el inicio la fila entera es el enlace (#747): se lee el título y,
+ * detrás, la acción. */
+function contactLink(title: string, action = "Add contact"): string {
+  return `${title} ${action}`;
+}
 
 describe("el aviso del contacto (#498)", () => {
   it("sin contacto de emergencia explica para qué es, enlaza a Contacto y no se puede cerrar", async () => {
@@ -1122,10 +1126,32 @@ describe("el aviso del contacto (#498)", () => {
         "So the club knows who to call if something happens to you at the pool.",
       ),
     ).toBeInTheDocument();
-    expect(
-      within(note).getByRole("link", { name: CONTACT_LINK }),
-    ).toHaveAttribute("href", "/cuenta#perfil-contacto");
+    const link = within(note).getByRole("link", {
+      name: contactLink(EMERGENCY_NOTE),
+    });
+    expect(link).toHaveAttribute("href", "/cuenta#perfil-contacto");
+    // Quien llega con Tab oye también el porqué, no sólo el título.
+    expect(link).toHaveAccessibleDescription(
+      "So the club knows who to call if something happens to you at the pool.",
+    );
     expect(within(note).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("es una sola fila que se toca entera, sin un enlace aparte para añadir", async () => {
+    stubDashboard(withReminder("emergency_contact"));
+
+    await renderScreen();
+
+    const note = screen.getByRole("note", { name: EMERGENCY_NOTE });
+    expect(within(note).getAllByRole("link")).toHaveLength(1);
+    expect(
+      within(within(note).getByRole("link")).getByText(
+        "So the club knows who to call if something happens to you at the pool.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Add contact" }),
+    ).not.toBeInTheDocument();
   });
 
   it("sin teléfono avisa con un aviso que se puede cerrar", async () => {
@@ -1134,12 +1160,15 @@ describe("el aviso del contacto (#498)", () => {
     await renderScreen();
 
     const note = screen.getByRole("note", { name: PHONE_NOTE });
-    expect(
-      within(note).getByRole("link", { name: CONTACT_LINK }),
-    ).toHaveAttribute("href", "/cuenta#perfil-contacto");
+    const link = within(note).getByRole("link", {
+      name: contactLink(PHONE_NOTE),
+    });
+    expect(link).toHaveAttribute("href", "/cuenta#perfil-contacto");
     expect(
       within(note).getByRole("button", { name: "Dismiss phone reminder" }),
     ).toBeInTheDocument();
+    // Un botón dentro de un enlace no se puede pulsar sin seguir el enlace.
+    expect(within(link).queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("cerrado, el aviso del teléfono no vuelve en ese navegador", async () => {
@@ -1282,7 +1311,7 @@ describe("el aviso del contacto (#498)", () => {
     ).toBeInTheDocument();
     expect(
       within(note).getByRole("link", {
-        name: "Añadir contacto",
+        name: contactLink("Añade tu contacto de emergencia", "Añadir contacto"),
       }),
     ).toBeInTheDocument();
     expect(requests).toHaveLength(requestsBefore);

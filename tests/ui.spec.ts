@@ -23467,10 +23467,23 @@ test.describe("el aviso del contacto en el inicio (#498)", () => {
     await expect(note).toBeHidden();
   });
 
-  test("el enlace lleva a la sección Contacto del perfil", async ({ page }) => {
+  test("la fila entera es el enlace a la sección Contacto del perfil", async ({
+    page,
+  }) => {
+    const TOUCH_TARGET_MIN_PX = 44;
     await goToDashboard(page, { dashboard: CONTACT_REMINDER_DASHBOARD });
+    const row = page
+      .getByRole("note", {
+        name: "Add your phone number and emergency contact",
+      })
+      .getByRole("link", {
+        name: "Add your phone number and emergency contact Add contact",
+      });
 
-    await page.getByRole("link", { name: "Add contact" }).click();
+    const box = await row.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
+    await row.click();
 
     await expect(page).toHaveURL(/\/cuenta#perfil-contacto$/);
     await expect(page.getByRole("heading", { name: "Contact" })).toBeVisible();
