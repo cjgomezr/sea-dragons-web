@@ -3510,8 +3510,10 @@ a.auth-brand-header:focus-visible {
   /* Sobre mí y Contacto: Editar de 44 px, filas de lectura de al menos
      46 px con la etiqueta a la izquierda y el valor a la derecha, y las de
      Contacto de 58 px. */
+  /* Con Editar o sin él, la cabecera mide lo mismo: 44 px. */
   .profile-card-header {
-    padding: 0 0 0 14px;
+    min-height: var(--touch-target-min);
+    padding: 0 4px 0 14px;
   }
 
   .profile-card-edit {

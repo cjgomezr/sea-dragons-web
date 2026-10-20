@@ -2590,13 +2590,32 @@ type AccountState = {
   /** Qué hacer antes de abrir la pantalla, como elegir el idioma. */
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
+  /** Sin ellos, los tres. Con ellos, axe también corre en el primero. */
+  readonly viewports?: readonly (typeof viewports)[number][];
 };
+
+/** Lo que sólo existe en el móvil del perfil y de la ficha (#777). */
+const PHONE_ONLY_VIEWPORTS = viewports.filter((vp) => vp.name === "mobile");
+
+/** Un estado que sólo existe en unos anchos pasa axe en el primero de ellos;
+ * los demás, en el ancho por defecto. */
+async function useFirstStateViewport(
+  page: Page,
+  stateViewports: readonly (typeof viewports)[number][] | undefined,
+): Promise<void> {
+  const first = stateViewports?.at(0);
+  if (first !== undefined) {
+    await page.setViewportSize({ width: first.width, height: first.height });
+  }
+}
 
 /** `/cuenta` llega entera del servidor: hasta que React la hidrata, lo que se
  * escriba o pulse en ella no lo escucha nadie (#557). Desde #774 el
- * formulario lo abre Solicitar, en la tarjeta Rol. */
-const ROLE_REQUEST_BUTTON_SELECTOR = ".profile-role-request";
-const ROLE_REQUEST_BUTTON = /^(Request|Solicitar)$/;
+ * formulario lo abre Solicitar, en la tarjeta Rol; en el móvil (#777), la
+ * fila Solicitar un cambio de rol, que sólo existe ya hidratada. */
+const ROLE_REQUEST_BUTTON_SELECTOR = ".profile-role-request, .profile-role-row";
+const ROLE_REQUEST_BUTTON =
+  /^(Request|Solicitar|Request a role change|Solicitar un cambio de rol)$/;
 
 async function openRoleRequestForm(page: Page): Promise<void> {
   await waitForHydration(page, ROLE_REQUEST_BUTTON_SELECTOR);
@@ -2642,6 +2661,20 @@ async function openAboutCard(page: Page): Promise<void> {
 
 async function openContactCard(page: Page): Promise<void> {
   await openProfileCard(page, CONTACT_CARD);
+}
+
+/** En el móvil (#777), la fila del contacto de emergencia de la tarjeta Casi
+ * listo abre Contacto en edición. La fila sólo existe ya hidratada. */
+async function openMissingEmergencyContact(page: Page): Promise<void> {
+  await page
+    .getByRole("note", { name: /^(Almost there|Casi listo)/ })
+    .getByRole("button", {
+      name: /^(Emergency contact|Contacto de emergencia)$/,
+    })
+    .click();
+  await expect(
+    page.getByRole("region", { name: CONTACT_CARD }).locator("form"),
+  ).toBeVisible();
 }
 
 /** Guarda Sobre mí tal como está. Escribe lo que ya había, así que las
@@ -2858,6 +2891,14 @@ const ACCOUNT_STATES: readonly AccountState[] = [
     storageState: roleRequestStorageStatePath("perfil-contacto-completo"),
     prepare: openContactCard,
   },
+  // El móvil (#777): el socio compartido, al que le faltan datos, abre
+  // Contacto desde la tarjeta Casi listo. Los campos van apilados, de 48 px.
+  {
+    name: "perfil-movil-editando",
+    storageState: E2E_STORAGE_STATE_PATH,
+    viewports: PHONE_ONLY_VIEWPORTS,
+    prepare: openMissingEmergencyContact,
+  },
   {
     name: "perfil-editando-contacto-es",
     storageState: roleRequestStorageStatePath("perfil-contacto-completo"),
@@ -2945,7 +2986,7 @@ for (const state of ACCOUNT_STATES) {
     quietNotificationBell();
     test.use({ storageState: state.storageState });
 
-    for (const vp of viewports) {
+    for (const vp of state.viewports ?? viewports) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -2983,6 +3024,7 @@ for (const state of ACCOUNT_STATES) {
     }
 
     test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await useFirstStateViewport(page, state.viewports);
       await state.beforeVisit?.(page);
       await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
       await state.prepare?.(page);
@@ -8120,6 +8162,22 @@ function askToDeactivate(labels: {
   };
 }
 
+/** Deja abierta la hoja del ⋯ en el móvil (#777), con su última opción a
+ * la vista. */
+function openRecordSheet(menuLabel: string, lastAction: string) {
+  return async (page: Page): Promise<void> => {
+    await page
+      .getByRole("navigation")
+      .getByRole("button", { name: menuLabel })
+      .click();
+    await expect(
+      page
+        .getByRole("dialog", { name: menuLabel })
+        .getByRole("button", { name: lastAction, exact: true }),
+    ).toBeVisible();
+  };
+}
+
 /** Abre el diálogo de la exención (#457) desde el ⋯ (#775) y lo deja
  * escrito, sin confirmar. */
 function fillWaiverDialog(labels: {
@@ -8144,7 +8202,7 @@ type MemberRecordState = {
   readonly saveRejection?: StubbedSaveRejection;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
-  /** Sin ellos, los tres. El móvil de la cabecera es otro ticket (#777). */
+  /** Sin ellos, los tres. Con ellos, axe también corre en el primero. */
   readonly viewports?: readonly (typeof viewports)[number][];
 };
 
@@ -8252,6 +8310,13 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
     record: CURRENT_RECORD,
     viewports: RECORD_DESKTOP_VIEWPORTS,
     prepare: openRecordMenu(ENGLISH_RECORD_MENU, "Deactivate member"),
+  },
+  // #777: en el móvil, el ⋯ de la barra sube una hoja inferior.
+  {
+    name: "ficha-movil-menu",
+    record: CURRENT_RECORD,
+    viewports: PHONE_ONLY_VIEWPORTS,
+    prepare: openRecordSheet(ENGLISH_RECORD_MENU, "Deactivate member"),
   },
   {
     name: "ficha-desactivar-confirmacion",
@@ -8382,6 +8447,7 @@ for (const state of MEMBER_RECORD_STATES) {
     }
 
     test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await useFirstStateViewport(page, state.viewports);
       await goToMemberRecord(page, state);
       await expectNoAxeViolations(page);
     });
@@ -8515,18 +8581,19 @@ const STAFF_RECORD_SHARED = {
 type StaffRecordState = {
   readonly name: string;
   readonly reading: Readonly<Record<string, unknown>>;
+  /** Sin ellos, la tableta y el escritorio. */
+  readonly viewports?: readonly (typeof viewports)[number][];
 };
 
+const COMMITTEE_READING = {
+  ...STAFF_RECORD_SHARED,
+  view: "committee",
+  email: "socia.de.prueba@example.test",
+  phone: CURRENT_RECORD.phone,
+} as const;
+
 const STAFF_RECORD_STATES: readonly StaffRecordState[] = [
-  {
-    name: "ficha-committee",
-    reading: {
-      ...STAFF_RECORD_SHARED,
-      view: "committee",
-      email: "socia.de.prueba@example.test",
-      phone: CURRENT_RECORD.phone,
-    },
-  },
+  { name: "ficha-committee", reading: COMMITTEE_READING },
   {
     name: "ficha-coach",
     reading: { ...STAFF_RECORD_SHARED, view: "coach" },
@@ -8534,6 +8601,18 @@ const STAFF_RECORD_STATES: readonly StaffRecordState[] = [
   {
     name: "ficha-coach-sin-emergencia",
     reading: { ...STAFF_RECORD_SHARED, view: "coach", emergencyContact: null },
+  },
+  // El móvil (#777, docs/design/design_handoff_profile/screenshots/07): la
+  // barra sin ⋯, los botones de contacto a lo ancho y la ficha sin AUF.
+  {
+    name: "ficha-movil-committee",
+    reading: COMMITTEE_READING,
+    viewports: PHONE_ONLY_VIEWPORTS,
+  },
+  {
+    name: "ficha-movil-coach",
+    reading: { ...STAFF_RECORD_SHARED, view: "coach" },
+    viewports: PHONE_ONLY_VIEWPORTS,
   },
 ];
 
@@ -8568,7 +8647,7 @@ for (const state of STAFF_RECORD_STATES) {
     skipWithoutSession();
     quietNotificationBell();
     test.use({ storageState: RECORD_READER_STORAGE_STATE });
-    for (const vp of RECORD_DESKTOP_VIEWPORTS) {
+    for (const vp of state.viewports ?? RECORD_DESKTOP_VIEWPORTS) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
         for (const theme of themes) {
@@ -8604,6 +8683,313 @@ for (const state of STAFF_RECORD_STATES) {
     }
   });
 }
+
+/* ---------------------------------------------------------------------------
+   El perfil y la ficha en el móvil (#777, RF-7 y D14 del PRD de E30), de
+   docs/design/design_handoff_profile/screenshots/05, 06 y 07. Los estados
+   nuevos de arriba se fotografían a 375; aquí, axe en claro y en oscuro, las
+   medidas del ticket y que ninguna vista se salga por el lado a 320 px.
+   --------------------------------------------------------------------------- */
+
+const NARROWEST_PHONE = { width: 320, height: 640 } as const;
+const PHONE_VIEWPORT = { width: 375, height: 812 } as const;
+
+/** Alto y ancho pintados, redondeados al píxel. */
+async function sizeOf(
+  locator: Locator,
+): Promise<{ width: number; height: number }> {
+  const box = await locator.boundingBox();
+  if (box === null) {
+    throw new Error("El elemento no se pinta.");
+  }
+  return { width: Math.round(box.width), height: Math.round(box.height) };
+}
+
+function memberRecordState(name: string): MemberRecordState {
+  const state = MEMBER_RECORD_STATES.find((each) => each.name === name);
+  if (state === undefined) {
+    throw new Error(`Falta el estado ${name}.`);
+  }
+  return state;
+}
+
+function staffRecordState(name: string): StaffRecordState {
+  const state = STAFF_RECORD_STATES.find((each) => each.name === name);
+  if (state === undefined) {
+    throw new Error(`Falta el estado ${name}.`);
+  }
+  return state;
+}
+
+const PHONE_BAR = /^(My profile|Mi perfil|Member|Miembro)$/;
+
+test.describe("el perfil propio en el móvil (#777)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  // El socio compartido, al que le faltan datos y no tiene solicitudes.
+  test.use({ storageState: E2E_STORAGE_STATE_PATH, viewport: PHONE_VIEWPORT });
+
+  for (const theme of themes) {
+    test(`perfil-movil-editando (${theme}) no tiene violaciones`, async ({
+      page,
+    }) => {
+      await goToWithTheme(page, ACCOUNT_PATH, theme);
+      await openMissingEmergencyContact(page);
+      await expectNoAxeViolations(page);
+    });
+  }
+
+  test("la barra mide 52 px, con Volver de 44 px y el título", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    const bar = page.getByRole("navigation", { name: PHONE_BAR });
+
+    expect((await sizeOf(bar)).height).toBe(52);
+    expect(await sizeOf(bar.getByRole("button", { name: "Back" }))).toEqual({
+      width: 44,
+      height: 44,
+    });
+    await expect(bar.getByText("My profile")).toBeVisible();
+  });
+
+  test("la cabecera va centrada, con la foto de 96 px, la cámara de 40 y el nombre de 22", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    // Dentro de `main`, el `<header>` de la cabecera no es un `banner`.
+    const header = page.locator(".profile-hero");
+
+    expect(await sizeOf(header.locator(".profile-hero-photo"))).toEqual({
+      width: 96,
+      height: 96,
+    });
+    expect(await sizeOf(header.getByRole("button", { name: /photo/ }))).toEqual(
+      { width: 40, height: 40 },
+    );
+    await expect(header.locator("h1")).toHaveCSS("font-size", "22px");
+    await expect(header.locator("h1")).toHaveCSS("text-align", "center");
+  });
+
+  test("lo que falta: una fila de 44 px por dato, y la de rol al final de 56", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    const missing = page.getByRole("note", { name: /^Almost there · / });
+    const rows = missing.getByRole("button");
+
+    await expect(rows.first()).toBeVisible();
+    for (const row of await rows.all()) {
+      expect((await sizeOf(row)).height).toBe(44);
+    }
+    expect(
+      (
+        await sizeOf(
+          page.getByRole("button", { name: "Request a role change" }),
+        )
+      ).height,
+    ).toBe(56);
+  });
+
+  test("Sobre mí y Contacto: Editar de 44 px, filas de 46 y de 58 px", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    const about = page.getByRole("region", { name: ABOUT_CARD });
+    const contact = page.getByRole("region", { name: CONTACT_CARD });
+
+    expect(
+      (await sizeOf(about.getByRole("button", { name: EDIT_CARD_BUTTON })))
+        .height,
+    ).toBe(44);
+    for (const row of await about.locator(".profile-detail").all()) {
+      expect((await sizeOf(row)).height).toBeGreaterThanOrEqual(46);
+    }
+    for (const row of await contact.locator(".profile-contact-half").all()) {
+      expect((await sizeOf(row)).height).toBeGreaterThanOrEqual(58);
+    }
+    expect(
+      (await sizeOf(page.locator(".profile-auf-cells"))).height,
+    ).toBeGreaterThanOrEqual(58);
+  });
+
+  test("editando: campos de 48 px con texto de 16, y Cancelar y Guardar de 48", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    await openAboutCard(page);
+    const about = page.getByRole("region", { name: ABOUT_CARD });
+    const name = about.getByLabel("Full name");
+
+    expect((await sizeOf(name)).height).toBe(48);
+    await expect(name).toHaveCSS("font-size", "16px");
+    expect(
+      (await sizeOf(about.locator(".segmented-choice-option span").first()))
+        .height,
+    ).toBe(40);
+    for (const label of ["Cancel", "Save"]) {
+      expect(
+        (await sizeOf(about.getByRole("button", { name: label }))).height,
+      ).toBe(48);
+    }
+  });
+
+  test("Asistencia y Membresía van lado a lado", async ({ page }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    const membership = await page
+      .getByRole("region", { name: /^(Membership|Membresía)$/ })
+      .boundingBox();
+    const attendance = await page
+      .getByRole("region", { name: /^(Attendance|Asistencia)$/ })
+      .boundingBox();
+
+    expect(membership?.y).toBe(attendance?.y);
+    expect(membership?.x).not.toBe(attendance?.x);
+  });
+
+  test("a 320 px no tiene scroll horizontal, tampoco editando", async ({
+    page,
+  }) => {
+    await page.setViewportSize(NARROWEST_PHONE);
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    await expectNoHorizontalScroll(page);
+
+    await openMissingEmergencyContact(page);
+
+    await expectNoHorizontalScroll(page);
+  });
+});
+
+test.describe("la ficha del Admin en el móvil (#777)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE, viewport: PHONE_VIEWPORT });
+
+  for (const theme of themes) {
+    test(`ficha-movil-menu (${theme}) no tiene violaciones`, async ({
+      page,
+    }) => {
+      await goToMemberRecord(
+        page,
+        memberRecordState("ficha-movil-menu"),
+        theme,
+      );
+      await expectNoAxeViolations(page);
+    });
+  }
+
+  test("la barra lleva el ⋯ de 44 px y la cabecera, tres botones iguales de 48", async ({
+    page,
+  }) => {
+    await goToMemberRecord(page, memberRecordState("ficha-auf-vigente"));
+    const bar = page.getByRole("navigation", { name: PHONE_BAR });
+    const contact = page.getByRole("group", { name: /^Contact / });
+    const buttons = await contact.locator(".directory-contact-action").all();
+
+    expect(
+      await sizeOf(bar.getByRole("button", { name: ENGLISH_RECORD_MENU })),
+    ).toEqual({ width: 44, height: 44 });
+    expect(buttons).toHaveLength(3);
+    const sizes = await Promise.all(buttons.map((button) => sizeOf(button)));
+    for (const size of sizes) {
+      expect(size).toEqual(sizes[0]);
+      expect(size.height).toBe(48);
+    }
+  });
+
+  test("Verificar AUF va a lo ancho, de 46 px", async ({ page }) => {
+    await goToMemberRecord(page, memberRecordState("ficha-auf-sin-verificar"));
+    const verify = page.getByRole("button", { name: "Verify AUF" });
+    const strip = page.getByRole("note").filter({ has: verify });
+
+    const button = await sizeOf(verify);
+    const card = await sizeOf(strip);
+    expect(button.height).toBe(46);
+    // El relleno de 12 px y el borde de 1 a cada lado.
+    expect(button.width).toBe(card.width - 26);
+  });
+
+  test("Grupos en fichas de 30 px y Abrir la evaluación de al menos 44", async ({
+    page,
+  }) => {
+    await goToMemberRecord(page, memberRecordState("ficha-auf-vigente"));
+    const groups = page.getByRole("region", { name: /^(Groups|Grupos)$/ });
+
+    // El nombre largo del stub se parte en dos líneas; el de una mide 30.
+    const heights = await Promise.all(
+      (await groups.locator(".profile-group-chips li").all()).map(
+        async (chip) => (await sizeOf(chip)).height,
+      ),
+    );
+    expect(Math.min(...heights)).toBe(30);
+    expect(
+      (
+        await sizeOf(
+          page
+            .getByRole("region", { name: /^(Evaluation|Evaluación)$/ })
+            .getByRole("link"),
+        )
+      ).height,
+    ).toBeGreaterThanOrEqual(44);
+  });
+
+  test("la hoja del ⋯: radio 20, asa, fondo atenuado y filas de 52 px", async ({
+    page,
+  }) => {
+    const state = memberRecordState("ficha-movil-menu");
+    await goToMemberRecord(page, state);
+    const sheet = page.getByRole("dialog", { name: ENGLISH_RECORD_MENU });
+
+    await expect(sheet).toHaveCSS("border-top-left-radius", "20px");
+    await expect(
+      sheet.getByRole("button", { name: "Close actions" }),
+    ).toBeVisible();
+    const backdrop = await sheet.evaluate(
+      (element) => getComputedStyle(element, "::backdrop").backgroundColor,
+    );
+    expect(backdrop).not.toBe("rgba(0, 0, 0, 0)");
+    for (const name of [
+      "Change role",
+      "Waive membership fee",
+      "Deactivate member",
+    ]) {
+      expect(
+        (await sizeOf(sheet.getByRole("button", { name, exact: true }))).height,
+      ).toBe(52);
+    }
+  });
+
+  for (const name of ["ficha-auf-sin-verificar", "ficha-movil-menu"]) {
+    test(`${name} a 320 px no tiene scroll horizontal`, async ({ page }) => {
+      await page.setViewportSize(NARROWEST_PHONE);
+      await goToMemberRecord(page, memberRecordState(name));
+
+      await expectNoHorizontalScroll(page);
+    });
+  }
+});
+
+test.describe("la ficha del Committee y del Coach a 320 px (#777)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: RECORD_READER_STORAGE_STATE,
+    viewport: NARROWEST_PHONE,
+  });
+
+  for (const name of ["ficha-movil-committee", "ficha-movil-coach"]) {
+    test(`${name} no tiene scroll horizontal`, async ({ page }) => {
+      await goToStaffRecord(page, staffRecordState(name));
+
+      await expect(
+        page
+          .getByRole("navigation", { name: PHONE_BAR })
+          .getByRole("button", { name: ENGLISH_RECORD_MENU }),
+      ).toHaveCount(0);
+      await expectNoHorizontalScroll(page);
+    });
+  }
+});
 
 function openOwnRecordLink(page: Page) {
   return page.getByRole("link", {
