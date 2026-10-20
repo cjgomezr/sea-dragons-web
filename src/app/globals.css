@@ -2938,6 +2938,16 @@ a.auth-brand-header:focus-visible {
   flex: none;
 }
 
+/* La fecha de alta sigue en lectura mientras se edita la de nacimiento (D2):
+   dentro del formulario, sin la raya ni el relleno de la tarjeta. */
+.profile-card-form .profile-cells {
+  border-top: 0;
+}
+
+.profile-card-form .profile-cell {
+  padding: 0;
+}
+
 /* La nota de debajo de las celdas del AUF del perfil. */
 .profile-card-note {
   margin: 0;

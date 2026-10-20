@@ -952,7 +952,6 @@ export const spanishMessages: MessageCatalog = {
     "{name} añadió el AUF {number} (vence el {date}). Revísalo y verifícalo.",
   "memberRecord.aufStrip.withoutExpiry":
     "{name} añadió el AUF {number}. Revísalo y verifícalo.",
-  "memberRecord.birth.title": "Datos personales",
   "memberRecord.birth.label": "Fecha de nacimiento",
   "memberRecord.birth.hint":
     "El miembro no puede cambiarla: de ella depende si necesita el consentimiento de un tutor.",
@@ -971,9 +970,6 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.contact.samePhone":
     "Es el teléfono de {name}. El contacto de emergencia debería ser otra persona.",
   "memberRecord.groups.empty": "El club todavía no tiene grupos.",
-  "memberRecord.save": "Guardar la ficha",
-  "memberRecord.saving": "Guardando…",
-  "memberRecord.saved": "Ficha guardada.",
   "memberRecord.issue.aufNumberTooLong":
     "El número de AUF no puede pasar de {max} caracteres.",
   "memberRecord.issue.aufExpiryNotADate":

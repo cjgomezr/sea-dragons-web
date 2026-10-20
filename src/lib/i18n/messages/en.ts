@@ -958,7 +958,6 @@ export const englishMessages = {
     "{name} added AUF {number} (expires {date}). Check it and verify.",
   "memberRecord.aufStrip.withoutExpiry":
     "{name} added AUF {number}. Check it and verify.",
-  "memberRecord.birth.title": "Personal details",
   "memberRecord.birth.label": "Date of birth",
   "memberRecord.birth.hint":
     "The member can't change it: it decides whether they need a guardian's consent.",
@@ -977,9 +976,6 @@ export const englishMessages = {
   "memberRecord.contact.samePhone":
     "This is {name}'s own phone. The emergency contact should be someone else.",
   "memberRecord.groups.empty": "The club has no groups yet.",
-  "memberRecord.save": "Save the record",
-  "memberRecord.saving": "Saving…",
-  "memberRecord.saved": "Record saved.",
   "memberRecord.issue.aufNumberTooLong":
     "The AUF number can have at most {max} characters.",
   "memberRecord.issue.aufExpiryNotADate": "That expiry isn't a valid date.",

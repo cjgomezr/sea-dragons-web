@@ -6,171 +6,41 @@ import { type HeroMember, ProfileHero } from "@/components/account/ProfileHero";
 import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
-import {
-  type MemberRecord,
-  type MemberRecordField,
-  type MemberRecordIssueCode,
-  type MemberRecordSubmission,
-  correctionRequiresGuardianConsent,
-  isAufNumberTooLong,
-} from "@/lib/members/member-record";
+import type { MemberRecord } from "@/lib/members/member-record";
 import { AufPendingStrip, type PendingAuf } from "./AufPendingStrip";
 import { MemberRecordAbout } from "./MemberRecordAbout";
 import { MemberRecordActions } from "./MemberRecordActions";
-import {
-  FIELD_OF_CONTACT_ISSUE,
-  MemberRecordContact,
-} from "./MemberRecordContact";
 import { MemberRecordAside } from "./MemberRecordAside";
-import { TextField } from "./record-fields";
+import { MemberRecordAuf } from "./MemberRecordAuf";
+import { MemberRecordClubRecord } from "./MemberRecordClubRecord";
+import { MemberRecordContact } from "./MemberRecordContact";
 import {
   type MemberRecordFailure,
-  type MemberRecordSave,
   describeMemberRecordFailure,
-  describeMemberRecordIssue,
-  readIssueCode,
-  saveMemberRecord,
   verifyMemberRecordAuf,
 } from "./member-record-client";
 
 /**
- * El formulario de la ficha reservada al Admin (#242): número de AUF,
- * vencimiento y fecha de nacimiento (#272), guardados juntos en una sola
- * petición para que dos Admin a la vez no dejen la fila a medias. Los grupos
- * se editan desde su tarjeta de la columna derecha (#774), y este formulario
- * manda los que hay guardados.
+ * La ficha reservada al Admin (#242) bajo su cabecera (#771). A la izquierda,
+ * sus tarjetas: Sobre mí, para leer; Contacto (#499, #772), Registro AUF y
+ * Ficha del club (#773), que el Admin edita cada una aparte y guarda con su
+ * propio envío. A la derecha, su columna (#774).
  *
- * Da un cambio por hecho sólo cuando el servidor lo confirma, y entonces
- * enseña lo que el servidor guardó, no lo que se escribió: si el número se
- * borró, el vencimiento también desaparece.
+ * Cada tarjeta da un cambio por hecho sólo cuando el servidor lo confirma, y
+ * entonces la ficha enseña lo que el servidor guardó, no lo que se escribió:
+ * si el número del AUF se borró, el vencimiento también desaparece.
  *
  * Un AUF que escribió el miembro llega sin verificar (#274). El Admin lo
  * verifica desde la franja de debajo de la cabecera (#771), que manda el AUF
  * guardado y no el de los controles; por eso su botón desaparece en cuanto el
  * número o el vencimiento se editan: entonces guardar ya lo deja verificado.
- *
- * Encima van Sobre mí, para leer, y Contacto (#499), que el Admin edita en
- * su tarjeta y guarda aparte (#772). Este formulario no lo manda nunca.
  */
 
-type Status =
-  | { readonly kind: "editing" }
-  | { readonly kind: "sending" }
+type VerifyStatus =
+  | { readonly kind: "idle" }
   | { readonly kind: "verifying" }
-  | { readonly kind: "saved" }
-  | { readonly kind: "aufVerified" }
-  | (MemberRecordFailure & { readonly during: Request });
-
-/** Lo que se manda: guardar el formulario o verificar el AUF de la franja.
- * Cada desenlace se enseña junto a lo que lo pidió. */
-type Request = "sending" | "verifying";
-
-/** Lo que hay en los controles. Una cadena vacía es "sin valor", y se manda
- * como null. */
-type Draft = {
-  readonly aufNumber: string;
-  readonly aufExpiry: string;
-  readonly dateOfBirth: string;
-};
-
-/** Un aviso que va junto a su campo y no en el aviso general. */
-type FieldIssue = {
-  readonly field: MemberRecordField;
-  readonly code: MemberRecordIssueCode;
-};
-
-const AUF_NUMBER_ID = "ficha-auf-numero";
-const AUF_EXPIRY_ID = "ficha-auf-vencimiento";
-const AUF_HINT_ID = "ficha-auf-ayuda";
-const BIRTH_ID = "ficha-nacimiento";
-const BIRTH_HINT_ID = "ficha-nacimiento-ayuda";
-const GUARDIAN_NOTICE_ID = "ficha-nacimiento-tutor";
-
-function toDraft(record: MemberRecord): Draft {
-  return {
-    aufNumber: record.aufNumber ?? "",
-    aufExpiry: record.aufExpiry ?? "",
-    dateOfBirth: record.dateOfBirth ?? "",
-  };
-}
-
-function orNull(value: string): string | null {
-  return value.trim() === "" ? null : value;
-}
-
-/** Si los controles siguen enseñando el AUF guardado. */
-function isAufUntouched(record: MemberRecord, draft: Draft): boolean {
-  return (
-    draft.aufNumber === (record.aufNumber ?? "") &&
-    draft.aufExpiry === (record.aufExpiry ?? "")
-  );
-}
-
-/** Un AUF sin tocar no se manda: el miembro puede haberlo cambiado desde
- * que se abrió la ficha, y mandar el de entonces lo pisaría verificado. */
-function toSubmission(
-  draft: Draft,
-  record: MemberRecord,
-): MemberRecordSubmission {
-  return {
-    auf: isAufUntouched(record, draft)
-      ? null
-      : {
-          aufNumber: orNull(draft.aufNumber),
-          aufExpiry: orNull(draft.aufExpiry),
-        },
-    groupIds: record.groups.map((group) => group.id),
-    dateOfBirth: orNull(draft.dateOfBirth),
-    contact: null,
-  };
-}
-
-const FIELD_OF_ISSUE: Readonly<
-  Record<MemberRecordIssueCode, FieldIssue["field"]>
-> = {
-  auf_number_too_long: "aufNumber",
-  auf_expiry_not_a_date: "aufExpiry",
-  auf_expiry_before_joined: "aufExpiry",
-  date_of_birth_not_a_date: "dateOfBirth",
-  date_of_birth_in_future: "dateOfBirth",
-  date_of_birth_too_early: "dateOfBirth",
-  date_of_birth_required: "dateOfBirth",
-  ...FIELD_OF_CONTACT_ISSUE,
-};
-
-function toFieldIssue(code: MemberRecordIssueCode): FieldIssue {
-  return { field: FIELD_OF_ISSUE[code], code };
-}
-
-function SaveOutcome({
-  translate,
-  status,
-}: {
-  translate: Translator;
-  status: Status;
-}): React.JSX.Element | null {
-  if (status.kind === "saved") {
-    return (
-      <p className="profile-strip profile-strip-success" role="status">
-        <CheckCircle aria-hidden="true" weight="regular" />
-        {translate("memberRecord.saved")}
-      </p>
-    );
-  }
-  // Un 400 de un campo ya se enseña junto a ese campo.
-  if (
-    status.kind === "failed" &&
-    status.during === "sending" &&
-    readIssueCode(status) === null
-  ) {
-    return (
-      <p className="auth-error" role="alert">
-        {describeMemberRecordFailure(translate, status)}
-      </p>
-    );
-  }
-  return null;
-}
+  | { readonly kind: "verified" }
+  | MemberRecordFailure;
 
 /** Lo que pasó al verificar desde la franja, debajo de la cabecera. */
 function VerifyOutcome({
@@ -178,9 +48,9 @@ function VerifyOutcome({
   status,
 }: {
   translate: Translator;
-  status: Status;
+  status: VerifyStatus;
 }): React.JSX.Element | null {
-  if (status.kind === "aufVerified") {
+  if (status.kind === "verified") {
     return (
       <p className="profile-strip profile-strip-success" role="status">
         <CheckCircle aria-hidden="true" weight="regular" />
@@ -188,7 +58,7 @@ function VerifyOutcome({
       </p>
     );
   }
-  if (status.kind === "failed" && status.during === "verifying") {
+  if (status.kind === "failed") {
     return (
       <p className="auth-error" role="alert">
         {describeMemberRecordFailure(translate, status)}
@@ -224,65 +94,6 @@ function heroMemberOf(
   };
 }
 
-/** Si guardar la fecha que hay en el control dejaría al miembro pidiendo el
- * consentimiento de su tutor. Se avisa antes de guardar para que no sea una
- * sorpresa para nadie. Una fecha a medio escribir no avisa: el control de
- * fecha la entrega vacía hasta que está completa. */
-function isGuardianNoticeDue(
-  record: MemberRecord,
-  dateOfBirth: string,
-): boolean {
-  return (
-    dateOfBirth !== "" &&
-    dateOfBirth !== record.dateOfBirth &&
-    correctionRequiresGuardianConsent(record, dateOfBirth)
-  );
-}
-
-function DateOfBirthSection({
-  translate,
-  record,
-  value,
-  issueText,
-  onChange,
-}: {
-  translate: Translator;
-  record: MemberRecord;
-  value: string;
-  issueText: string | null;
-  onChange: (dateOfBirth: string) => void;
-}): React.JSX.Element {
-  const isNoticeDue = isGuardianNoticeDue(record, value);
-  return (
-    <section className="auth-fields" aria-labelledby="ficha-nacimiento-titulo">
-      <h2 id="ficha-nacimiento-titulo">
-        {translate("memberRecord.birth.title")}
-      </h2>
-      <TextField
-        id={BIRTH_ID}
-        label={translate("memberRecord.birth.label")}
-        type="date"
-        value={value}
-        issueText={issueText}
-        hintIds={
-          isNoticeDue ? [GUARDIAN_NOTICE_ID, BIRTH_HINT_ID] : [BIRTH_HINT_ID]
-        }
-        onChange={onChange}
-      />
-      {isNoticeDue ? (
-        <p className="member-record-warning" id={GUARDIAN_NOTICE_ID}>
-          {translate("memberRecord.birth.guardianNotice", {
-            name: record.fullName,
-          })}
-        </p>
-      ) : null}
-      <p className="auth-hint" id={BIRTH_HINT_ID}>
-        {translate("memberRecord.birth.hint")}
-      </p>
-    </section>
-  );
-}
-
 /** El AUF que escribió el miembro y nadie ha verificado, o null. */
 function pendingAufOf(record: MemberRecord): PendingAuf | null {
   if (record.aufNumber === null || record.isAufVerified) {
@@ -293,23 +104,6 @@ function pendingAufOf(record: MemberRecord): PendingAuf | null {
     aufNumber: record.aufNumber,
     aufExpiry: record.aufExpiry,
   };
-}
-
-/** El aviso de campo que trajo el último envío, si el servidor rechazó uno. */
-function serverIssuesOf(status: Status): readonly FieldIssue[] {
-  if (status.kind !== "failed") {
-    return [];
-  }
-  const code = readIssueCode(status);
-  return code === null ? [] : [toFieldIssue(code)];
-}
-
-/** Lo que se puede avisar antes de mandar nada: el largo del AUF. */
-function localIssuesOf(submission: MemberRecordSubmission): FieldIssue[] {
-  const aufNumber = submission.auf?.aufNumber ?? "";
-  return isAufNumberTooLong(aufNumber)
-    ? [toFieldIssue("auf_number_too_long")]
-    : [];
 }
 
 export function MemberRecordForm({
@@ -329,78 +123,37 @@ export function MemberRecordForm({
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [record, setRecord] = useState(initialRecord);
-  const [draft, setDraft] = useState<Draft>(() => toDraft(initialRecord));
-  const [status, setStatus] = useState<Status>({ kind: "editing" });
-  const [localIssues, setLocalIssues] = useState<readonly FieldIssue[]>([]);
+  const [verifyStatus, setVerifyStatus] = useState<VerifyStatus>({
+    kind: "idle",
+  });
+  const [isAufEdited, setIsAufEdited] = useState(false);
   // El estado desactiva el botón en el siguiente pintado, pero un doble clic
   // llega antes. La referencia cambia en el acto.
-  const isSendingRef = useRef(false);
+  const isVerifyingRef = useRef(false);
 
-  function update(change: Partial<Draft>): void {
-    setDraft((current) => ({ ...current, ...change }));
-    setLocalIssues([]);
-    // Un aviso habla del envío anterior. Mientras se envía no se toca, o el
-    // botón volvería a activarse.
-    setStatus((current) =>
-      current.kind === "sending" ? current : { kind: "editing" },
-    );
-  }
-
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>,
-  ): Promise<void> {
-    event.preventDefault();
-    if (isSendingRef.current) {
+  async function handleVerify(): Promise<void> {
+    if (isVerifyingRef.current || record.aufNumber === null) {
       return;
     }
-    const submission = toSubmission(draft, record);
-    const issues = localIssuesOf(submission);
-    if (issues.length > 0) {
-      setLocalIssues(issues);
-      return;
-    }
-    await send("sending", () => saveMemberRecord(record.userId, submission));
-  }
-
-  /** Guardar y verificar comparten el candado y el desenlace: los dos
-   * devuelven la ficha tal como quedó. */
-  async function send(
-    kind: Request,
-    request: () => Promise<MemberRecordSave>,
-  ): Promise<void> {
-    isSendingRef.current = true;
-    setStatus({ kind });
-    const result = await request();
-    isSendingRef.current = false;
+    isVerifyingRef.current = true;
+    setVerifyStatus({ kind: "verifying" });
+    const shown = { aufNumber: record.aufNumber, aufExpiry: record.aufExpiry };
+    const result = await verifyMemberRecordAuf(record.userId, shown);
+    isVerifyingRef.current = false;
     if (result.kind === "failed") {
-      setStatus({ ...result, during: kind });
+      setVerifyStatus(result);
       return;
     }
     setRecord(result.record);
-    setDraft(toDraft(result.record));
-    setStatus({ kind: kind === "sending" ? "saved" : "aufVerified" });
+    setVerifyStatus({ kind: "verified" });
   }
 
-  async function handleVerify(): Promise<void> {
-    if (isSendingRef.current || record.aufNumber === null) {
-      return;
-    }
-    const shown = { aufNumber: record.aufNumber, aufExpiry: record.aufExpiry };
-    await send("verifying", () => verifyMemberRecordAuf(record.userId, shown));
+  function handleCardSaved(saved: MemberRecord): void {
+    setRecord(saved);
+    // Un aviso de la franja habla de la ficha de antes.
+    setVerifyStatus({ kind: "idle" });
   }
 
-  const issues = localIssues.length > 0 ? localIssues : serverIssuesOf(status);
-  const issueTextFor = (field: MemberRecordField): string | null => {
-    const issue = issues.find((candidate) => candidate.field === field);
-    return issue === undefined
-      ? null
-      : describeMemberRecordIssue(translate, {
-          code: issue.code,
-          locale,
-          joinedOn: record.joinedOn,
-        });
-  };
-  const isSending = status.kind === "sending" || status.kind === "verifying";
   const pendingAuf = pendingAufOf(record);
 
   return (
@@ -424,12 +177,12 @@ export function MemberRecordForm({
         <AufPendingStrip
           translate={translate}
           auf={pendingAuf}
-          isVerifying={status.kind === "verifying"}
-          canVerify={isAufUntouched(record, draft)}
+          isVerifying={verifyStatus.kind === "verifying"}
+          canVerify={!isAufEdited}
           onVerify={handleVerify}
         />
       )}
-      <VerifyOutcome translate={translate} status={status} />
+      <VerifyOutcome translate={translate} status={verifyStatus} />
       <div className="profile-layout">
         <div className="profile-main">
           <MemberRecordAbout translate={translate} record={record} />
@@ -437,56 +190,21 @@ export function MemberRecordForm({
             translate={translate}
             locale={locale}
             record={record}
-            onSaved={setRecord}
+            onSaved={handleCardSaved}
           />
-          <form
-            className="auth-pending member-record-form"
-            onSubmit={handleSubmit}
-            noValidate
-          >
-            {/* Mientras se guarda no se edita: lo que se escribiera ahora lo
-                pisaría la ficha que devuelva el servidor. */}
-            <fieldset className="member-record-fields" disabled={isSending}>
-              <section className="auth-fields" aria-labelledby="ficha-auf">
-                <h2 id="ficha-auf">{translate("memberRecord.auf.title")}</h2>
-                <TextField
-                  id={AUF_NUMBER_ID}
-                  label={translate("memberRecord.auf.number")}
-                  type="text"
-                  value={draft.aufNumber}
-                  issueText={issueTextFor("aufNumber")}
-                  hintIds={[AUF_HINT_ID]}
-                  onChange={(aufNumber) => update({ aufNumber })}
-                />
-                <TextField
-                  id={AUF_EXPIRY_ID}
-                  label={translate("memberRecord.auf.expiry")}
-                  type="date"
-                  value={draft.aufExpiry}
-                  issueText={issueTextFor("aufExpiry")}
-                  onChange={(aufExpiry) => update({ aufExpiry })}
-                />
-                <p className="auth-hint" id={AUF_HINT_ID}>
-                  {translate("memberRecord.auf.hint")}
-                </p>
-              </section>
-              <DateOfBirthSection
-                translate={translate}
-                record={record}
-                value={draft.dateOfBirth}
-                issueText={issueTextFor("dateOfBirth")}
-                onChange={(dateOfBirth) => update({ dateOfBirth })}
-              />
-            </fieldset>
-            <SaveOutcome translate={translate} status={status} />
-            <button type="submit" className="auth-submit" disabled={isSending}>
-              {translate(
-                status.kind === "sending"
-                  ? "memberRecord.saving"
-                  : "memberRecord.save",
-              )}
-            </button>
-          </form>
+          <MemberRecordAuf
+            translate={translate}
+            locale={locale}
+            record={record}
+            onSaved={handleCardSaved}
+            onChanges={setIsAufEdited}
+          />
+          <MemberRecordClubRecord
+            translate={translate}
+            locale={locale}
+            record={record}
+            onSaved={handleCardSaved}
+          />
         </div>
         <MemberRecordAside
           translate={translate}
