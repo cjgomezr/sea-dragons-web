@@ -21783,6 +21783,15 @@ for (const state of TEAMS_STATES) {
     }
 
     test("has no accessibility violations (axe-core)", async ({ page }) => {
+      // Un estado sólo del móvil (#762) no existe en escritorio: sus
+      // pestañas no se pintan. axe lo mira en el primero de sus tamaños.
+      const viewport = state.viewports?.at(0);
+      if (viewport !== undefined) {
+        await page.setViewportSize({
+          width: viewport.width,
+          height: viewport.height,
+        });
+      }
       await goToTeams(page, state);
       await expectNoAxeViolations(page);
     });
