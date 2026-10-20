@@ -1,3 +1,6 @@
+import { ArrowsLeftRight } from "@phosphor-icons/react/dist/ssr/ArrowsLeftRight";
+import { X } from "@phosphor-icons/react/dist/ssr/X";
+import { Icon } from "@/components/Icon";
 import { MemberAvatar } from "@/components/MemberAvatar";
 import { positionName } from "@/lib/club/club-positions";
 import { formatOverallRating } from "@/lib/i18n/format";
@@ -12,13 +15,17 @@ import type { Destination, RosterPlayer } from "./team-draft";
  * móvil no manda los eventos de arrastre de HTML5).
  *
  * Los botones van en un grupo con el nombre del jugador, como el segmento de
- * Asistencia, y cada uno dice además a quién mueve y a dónde.
+ * Asistencia, y cada uno dice además a quién mueve y a dónde. En un equipo
+ * son de icono (#759): Cambiar y Quitar sólo tienen nombre accesible.
  */
 
 /** En píxeles, como `.team-avatar` y `.team-avatar-ringed`: en un equipo el
  * avatar crece para el anillo de su color (#757); en el banco no lo lleva. */
 const BENCH_AVATAR_SIZE = 32;
 const TEAM_AVATAR_SIZE = 34;
+
+/** Lo que ocupa el OVR de quien no tiene evaluación. */
+const UNRATED_MARK = "—";
 
 /** El tipo que viaja en el arrastre: el `userId` del jugador. */
 export const PLAYER_DRAG_TYPE = "text/plain";
@@ -66,27 +73,57 @@ function MoveButtons({
     <>
       <button
         type="button"
-        className="team-move"
-        aria-label={translate("teams.move.switchNamed", {
+        className="team-icon-move"
+        aria-label={translate("teams.move.toNamed", {
           ...named,
           team: teams[otherTeam(team)].name,
         })}
         onClick={() => onMove(otherTeam(team))}
       >
-        {translate("teams.move.switch")}
+        <Icon glyph={ArrowsLeftRight} />
       </button>
       <button
         type="button"
-        className="team-move"
+        className="team-icon-move team-icon-remove"
         aria-label={translate("teams.move.removeNamed", {
           ...named,
           team: teams[team].name,
         })}
         onClick={() => onMove("bench")}
       >
-        {translate("teams.move.remove")}
+        <Icon glyph={X} />
       </button>
     </>
+  );
+}
+
+/** En un equipo el no evaluado lleva una raya (#759) y el lector oye "Sin
+ * evaluar"; en el banco, la marca con la palabra. */
+function PlayerRating({
+  translate,
+  player,
+  isInTeam,
+}: {
+  readonly translate: Translator;
+  readonly player: RosterPlayer;
+  readonly isInTeam: boolean;
+}): React.JSX.Element {
+  const unrated = translate("teams.player.unrated");
+  if (!player.isUnrated) {
+    return (
+      <span className="team-rating">
+        {formatOverallRating(translate.locale, player.rating)}
+      </span>
+    );
+  }
+  if (!isInTeam) {
+    return <span className="team-unrated">{unrated}</span>;
+  }
+  return (
+    <span className="team-rating team-rating-missing">
+      <span aria-hidden="true">{UNRATED_MARK}</span>
+      <span className="visually-hidden">{unrated}</span>
+    </span>
   );
 }
 
@@ -106,7 +143,9 @@ export function TeamPlayerRow({
   const ringColor = team === null ? null : teams[team].color;
   return (
     <li
-      className="team-player"
+      className={
+        ringColor === null ? "team-player" : "team-player team-player-assigned"
+      }
       draggable
       onDragStart={(event) => {
         event.dataTransfer.setData(PLAYER_DRAG_TYPE, player.userId);
@@ -137,15 +176,11 @@ export function TeamPlayerRow({
           ) : null}
         </span>
       </div>
-      {player.isUnrated ? (
-        <span className="team-unrated">
-          {translate("teams.player.unrated")}
-        </span>
-      ) : (
-        <span className="team-rating">
-          {formatOverallRating(translate.locale, player.rating)}
-        </span>
-      )}
+      <PlayerRating
+        translate={translate}
+        player={player}
+        isInTeam={ringColor !== null}
+      />
       <div className="team-moves" role="group" aria-label={player.fullName}>
         <MoveButtons
           translate={translate}

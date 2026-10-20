@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { formatOverallRating } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
+import { countTeamCoverage } from "@/lib/teams/position-coverage";
 import { TEAM_IDS, type TeamId } from "@/lib/teams/team-ids";
 import type { TeamTotals } from "@/lib/teams/team-totals";
 import {
@@ -10,11 +11,13 @@ import {
   benchPlayers,
   teamPlayers,
 } from "./team-draft";
+import { TeamCoverage } from "./TeamCoverage";
 import { PLAYER_DRAG_TYPE, TeamPlayerRow } from "./TeamPlayerRow";
 
 /**
- * Las dos columnas del mockup (`docs/mockups/team-light.png`) y las dos
- * listas que el mockup no dibuja: los disponibles y los "Quizás" (#402).
+ * Las dos tarjetas de equipo del handoff de E28
+ * (`docs/design/design_handoff_teams/screenshots/01-desktop-builder.png`,
+ * #759) y las dos listas del banco: los disponibles y los "Quizás" (#402).
  * Cada una es una región con su título y admite que le suelten un jugador.
  */
 
@@ -22,24 +25,26 @@ export type MovePlayer = (userId: string, destination: Destination) => void;
 
 function DropZone({
   className,
-  title,
+  labelledBy,
   destination,
   onMove,
   canMove,
+  style,
   children,
 }: {
   readonly className: string;
-  readonly title: React.ReactNode;
+  readonly labelledBy: string;
   readonly destination: Destination;
   readonly onMove: MovePlayer;
   readonly canMove: (userId: string) => boolean;
+  readonly style?: React.CSSProperties;
   readonly children: React.ReactNode;
 }): React.JSX.Element {
-  const titleId = useId();
   return (
     <section
       className={className}
-      aria-labelledby={titleId}
+      style={style}
+      aria-labelledby={labelledBy}
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
@@ -50,9 +55,6 @@ function DropZone({
         }
       }}
     >
-      <h2 id={titleId} className="team-list-title">
-        {title}
-      </h2>
       {children}
     </section>
   );
@@ -115,6 +117,59 @@ function ColumnSummary({
   return <p className="team-column-summary">{`${players} · ${average}`}</p>;
 }
 
+/** La tarjeta de un equipo (#759): la tira de su color arriba, el muestrario,
+ * el nombre con cuántos son y su media, la cobertura y sus jugadores. */
+function TeamCard({
+  translate,
+  draft,
+  team,
+  totals,
+  onMove,
+}: {
+  readonly translate: Translator;
+  readonly draft: TeamDraft;
+  readonly team: TeamId;
+  readonly totals: TeamTotals;
+  readonly onMove: MovePlayer;
+}): React.JSX.Element {
+  const titleId = useId();
+  const { name, color } = draft.teams[team];
+  const players = teamPlayers(draft, team);
+  return (
+    <DropZone
+      className="team-column"
+      labelledBy={titleId}
+      destination={team}
+      onMove={onMove}
+      canMove={isInRoster(draft)}
+      style={{ "--team-color": color } as React.CSSProperties}
+    >
+      <div className="team-column-header">
+        <span className="team-column-swatch" aria-hidden="true" />
+        <div className="team-column-heading">
+          <h2 id={titleId} className="team-column-title">
+            {name}
+          </h2>
+          <ColumnSummary translate={translate} totals={totals} />
+        </div>
+      </div>
+      <TeamCoverage
+        translate={translate}
+        coverage={countTeamCoverage(players)}
+        hasPlayers={players.length > 0}
+      />
+      <PlayerList
+        translate={translate}
+        draft={draft}
+        players={players}
+        team={team}
+        emptyText={translate("teams.column.empty")}
+        onMove={onMove}
+      />
+    </DropZone>
+  );
+}
+
 export function TeamColumns({
   translate,
   draft,
@@ -129,35 +184,51 @@ export function TeamColumns({
   return (
     <div className="team-columns">
       {TEAM_IDS.map((team) => (
-        <DropZone
+        <TeamCard
           key={team}
-          className="team-column"
-          destination={team}
+          translate={translate}
+          draft={draft}
+          team={team}
+          totals={totals[team]}
           onMove={onMove}
-          canMove={isInRoster(draft)}
-          title={
-            <>
-              <span
-                className="team-swatch"
-                style={{ backgroundColor: draft.teams[team].color }}
-                aria-hidden="true"
-              />
-              {draft.teams[team].name}
-            </>
-          }
-        >
-          <ColumnSummary translate={translate} totals={totals[team]} />
-          <PlayerList
-            translate={translate}
-            draft={draft}
-            players={teamPlayers(draft, team)}
-            team={team}
-            emptyText={translate("teams.column.empty")}
-            onMove={onMove}
-          />
-        </DropZone>
+        />
       ))}
     </div>
+  );
+}
+
+function BenchList({
+  translate,
+  draft,
+  origin,
+  onMove,
+}: {
+  readonly translate: Translator;
+  readonly draft: TeamDraft;
+  readonly origin: "available" | "maybe";
+  readonly onMove: MovePlayer;
+}): React.JSX.Element {
+  const titleId = useId();
+  return (
+    <DropZone
+      className="team-bench-list"
+      labelledBy={titleId}
+      destination="bench"
+      onMove={onMove}
+      canMove={isInRoster(draft)}
+    >
+      <h2 id={titleId} className="team-list-title">
+        {translate(`teams.${origin}.title`)}
+      </h2>
+      <PlayerList
+        translate={translate}
+        draft={draft}
+        players={benchPlayers(draft, origin)}
+        team={null}
+        emptyText={translate(`teams.${origin}.empty`)}
+        onMove={onMove}
+      />
+    </DropZone>
   );
 }
 
@@ -173,23 +244,13 @@ export function BenchLists({
   return (
     <div className="team-bench">
       {(["available", "maybe"] as const).map((origin) => (
-        <DropZone
+        <BenchList
           key={origin}
-          className="team-bench-list"
-          destination="bench"
+          translate={translate}
+          draft={draft}
+          origin={origin}
           onMove={onMove}
-          canMove={isInRoster(draft)}
-          title={translate(`teams.${origin}.title`)}
-        >
-          <PlayerList
-            translate={translate}
-            draft={draft}
-            players={benchPlayers(draft, origin)}
-            team={null}
-            emptyText={translate(`teams.${origin}.empty`)}
-            onMove={onMove}
-          />
-        </DropZone>
+        />
       ))}
     </div>
   );

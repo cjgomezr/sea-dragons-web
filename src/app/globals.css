@@ -17001,11 +17001,91 @@ a.agenda-take-attendance {
   border-radius: 3px;
 }
 
+/* La tarjeta de un equipo (#759): la tira de 4 px de su color arriba y, por
+   dentro, la cabecera, la cobertura y las filas a todo el ancho. El color
+   llega en línea como `--team-color`, igual que en `.event-teams`. */
+.team-column {
+  padding: 0;
+  overflow: hidden;
+  border-top: 4px solid var(--team-color);
+  border-radius: 12px;
+}
+
+.team-column-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+}
+
+.team-column-swatch {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  background: var(--team-color);
+  border-radius: 6px;
+}
+
+.team-column-heading {
+  min-width: 0;
+}
+
+.team-column-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
 .team-column-summary {
-  margin: var(--space-1) 0 var(--space-2);
-  font-family: var(--font-family-mono);
-  font-size: 12px;
+  margin: 2px 0 0;
+  font-size: 12.5px;
   color: var(--color-text-secondary);
+}
+
+.team-coverage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
+  list-style: none;
+}
+
+.team-coverage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 24px;
+  padding: 0 var(--space-2);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+/* El amarillo del tema claro no llega a AA como texto sobre el panel (ver
+   `.directory-mark-warning`): el texto se mezcla con el del tema, como
+   `.team-totals-apart`, y el aviso puro va en el fondo y el borde. */
+.team-coverage-missing {
+  color: color-mix(in srgb, var(--color-warning) 50%, var(--color-text));
+  background: color-mix(in srgb, var(--color-warning) 18%, var(--color-panel));
+  border-color: var(--color-warning);
+}
+
+.team-column .team-list {
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.team-column .team-list-empty {
+  margin: 0;
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
 }
 
 .team-list {
@@ -17129,6 +17209,82 @@ a.agenda-take-attendance {
   border-color: var(--color-accent);
 }
 
+/* La fila de un jugador dentro de un equipo (#759): avatar, nombre y
+   posición, OVR y los dos botones de icono. Por debajo de 1200px la tarjeta
+   es estrecha y los botones bajan a su línea, a la derecha, para que el
+   nombre no se quede en tres letras; a 1200px va todo en una sola. Lleva
+   las dos clases para ganarle a la rejilla de `.team-player`. */
+.team-player.team-player-assigned {
+  grid-template-columns: 36px minmax(0, 1fr) 40px;
+  gap: 2px 10px;
+  min-height: 48px;
+  padding: 6px var(--space-2) 6px var(--space-4);
+}
+
+.team-player-assigned:hover {
+  background: var(--color-hover);
+}
+
+.team-player-assigned .team-avatar {
+  justify-self: center;
+}
+
+.team-player-assigned .team-player-name {
+  overflow: hidden;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-player-assigned .team-position {
+  padding: 0;
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+  background: none;
+}
+
+.team-player-assigned .team-rating {
+  font-size: 14px;
+  text-align: right;
+}
+
+.team-rating-missing {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.team-player-assigned .team-moves {
+  grid-column: 2 / -1;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.team-icon-move {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.team-icon-move:hover {
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.team-icon-remove:hover {
+  color: var(--color-danger);
+}
+
 .team-suggestion {
   display: flex;
   flex-wrap: wrap;
@@ -17249,6 +17405,11 @@ a.agenda-take-attendance {
   .team-move {
     min-height: 32px;
   }
+
+  .team-icon-move {
+    width: 32px;
+    height: 32px;
+  }
 }
 
 /* Con las columnas anchas, los botones caben en la fila del jugador. */
@@ -17260,6 +17421,15 @@ a.agenda-take-attendance {
   .team-moves {
     grid-column: auto;
     flex-wrap: nowrap;
+  }
+
+  .team-player.team-player-assigned {
+    grid-template-columns: 36px minmax(0, 1fr) 40px auto;
+    gap: 0 10px;
+  }
+
+  .team-player-assigned .team-moves {
+    grid-column: auto;
   }
 }
 

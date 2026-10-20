@@ -47,3 +47,21 @@ export function countCoverageGaps(split: TeamSplit): number {
     0,
   );
 }
+
+export type TeamCoverage = Readonly<Record<PositionCoverage, number>>;
+
+/**
+ * Cuántos porteros, defensas y atacantes tiene un equipo (#759, D9 del PRD
+ * de E28): lo que enseña su tarjeta. Quien no tiene función no cuenta.
+ */
+export function countTeamCoverage(
+  team: readonly Pick<SquadPlayer, "coverage">[],
+): TeamCoverage {
+  const countOf = (coverage: PositionCoverage): number =>
+    team.filter((player) => player.coverage === coverage).length;
+  return {
+    goalkeeper: countOf("goalkeeper"),
+    defender: countOf("defender"),
+    forward: countOf("forward"),
+  };
+}

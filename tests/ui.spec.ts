@@ -21274,6 +21274,20 @@ const MANUAL_BUILDER = {
   },
 };
 
+/** A mano y sin portero en Tide (#759): su ficha de portero dice Sin
+ * portero. Tide lleva además el nombre largo, que se corta en su fila. */
+const NO_GOALKEEPER_BUILDER = {
+  ...MANUAL_BUILDER,
+  split: {
+    mode: "manual",
+    publishedAt: null,
+    assignments: [
+      ...assignedTo("a", [P.mateo, P.valentina, P.isabella, P.ethan]),
+      ...assignedTo("b", [P.camila, P.liam, P.long]),
+    ],
+  },
+};
+
 /** Sin reparto: los doce del mockup dijeron Sí y el nombre largo, Quizás. */
 const OPEN_BUILDER = {
   event: TEAMS_EVENT,
@@ -21408,6 +21422,7 @@ async function publishTeams(page: Page): Promise<void> {
 type TeamsState = TeamsReads & {
   readonly name: string;
   readonly isSpanish?: boolean;
+  readonly viewports?: readonly (typeof viewports)[number][];
   readonly ready: (page: Page) => Promise<void>;
 };
 
@@ -21442,6 +21457,18 @@ const TEAMS_STATES: readonly TeamsState[] = [
     builder: OPEN_BUILDER,
     ready: balanceTeams,
   }),
+  {
+    name: "equipos-sin-portero",
+    events: TEAMS_EVENTS,
+    builder: NO_GOALKEEPER_BUILDER,
+    viewports: viewports.filter((vp) => vp.name !== "mobile"),
+    ready: async (page) => {
+      await waitForTeamBuilder(page);
+      await expect(
+        teamsRegion(page, "Team Tide").getByText("No goalkeeper"),
+      ).toBeVisible();
+    },
+  },
   ...teamsWithSpanish({
     name: "equipos-confirmar-publicar",
     events: TEAMS_EVENTS,
@@ -21481,7 +21508,7 @@ for (const state of TEAMS_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of state.viewports ?? viewports) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -21565,9 +21592,7 @@ test.describe("equipos en el navegador", () => {
       builder: OPEN_BUILDER,
     });
     await balanceTeams(page);
-    await expect(
-      teamsPlayerRow(page, "Ethan Brown").getByText("Unrated"),
-    ).toBeVisible();
+    await expect(teamsPlayerRow(page, "Ethan Brown")).toContainText("—");
     await page.getByRole("button", { name: TEAMS_PUBLISH }).click();
 
     await teamsConfirmPublish(page).dblclick();
