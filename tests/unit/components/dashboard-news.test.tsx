@@ -177,6 +177,13 @@ describe("las noticias de un socio al día", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("sin extracto no deja un párrafo vacío en la destacada", () => {
+    renderNews(memberNews([{ ...SHORTLIST, excerpt: "" }]));
+
+    const featured = featuredCard(SHORTLIST.title);
+    expect(within(featured).queryAllByRole("paragraph")).toHaveLength(1);
+  });
+
   it("pinta las otras dos en pequeño con su categoría y hace cuánto", () => {
     renderNews(memberNews([SHORTLIST, SCHEDULE, POLICY]));
 

@@ -27,6 +27,8 @@ import type { Translator } from "@/lib/i18n/translator";
 
 const PIN_ICON_SIZE = 14;
 const LOCK_ICON_SIZE = 18;
+const FEATURED_FALLBACK_ICON_SIZE = 64;
+const MINI_FALLBACK_ICON_SIZE = 32;
 
 type NewsSectionProps<Item> = {
   readonly translate: Translator;
@@ -142,7 +144,11 @@ function FeaturedNews({
   return (
     <article className="dashboard-news-featured" aria-labelledby={titleId}>
       <div className="dashboard-news-featured-cover">
-        <NewsCover url={post.coverUrl} category={post.category} iconSize={64} />
+        <NewsCover
+          url={post.coverUrl}
+          category={post.category}
+          iconSize={FEATURED_FALLBACK_ICON_SIZE}
+        />
       </div>
       <div className="dashboard-news-featured-body">
         <p className="dashboard-news-meta">
@@ -174,7 +180,11 @@ function MiniNews({
   return (
     <li className="dashboard-news-mini">
       <div className="dashboard-news-thumbnail">
-        <NewsCover url={post.coverUrl} category={post.category} iconSize={32} />
+        <NewsCover
+          url={post.coverUrl}
+          category={post.category}
+          iconSize={MINI_FALLBACK_ICON_SIZE}
+        />
       </div>
       <div className="dashboard-news-mini-body">
         <p className="dashboard-news-meta">

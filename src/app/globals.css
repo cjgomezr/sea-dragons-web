@@ -17216,11 +17216,6 @@ a.dashboard-tile:hover {
   min-width: 0;
 }
 
-.dashboard-panels {
-  display: grid;
-  gap: var(--space-4);
-}
-
 .dashboard-panel {
   display: flex;
   flex-direction: column;
@@ -17338,11 +17333,6 @@ a.dashboard-tile:hover {
 @media (min-width: 1024px) {
   .dashboard-tile-list {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .dashboard-panels {
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-    align-items: start;
   }
 }
 
