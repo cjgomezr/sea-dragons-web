@@ -383,11 +383,22 @@ export const englishMessages = {
   "account.adminNote":
     "As an Admin you already have every capability, so there is no role to request.",
   // Mis grupos (#229). Sólo los grupos propios, sin sus demás miembros.
-  "account.groups.title": "My groups",
-  "account.groups.empty": "You don't belong to any group yet.",
   "account.evaluation.title": "Evaluation",
   "account.evaluation.staffOnly":
-    "Evaluation ratings are only visible to the coaching staff.",
+    "Your coaches keep evaluations private this season. Ask them if you'd like feedback.",
+  // La tarjeta Rol de la columna derecha del perfil (#774, D12).
+  "account.role.title": "Role · {role}",
+  "account.role.hint": "Coach or committee? Ask an Admin.",
+  "account.role.request": "Request",
+  // Grupos en la columna derecha del perfil y de la ficha (#774).
+  "profileAside.groups.title": "Groups",
+  "profileAside.groups.empty": "No groups",
+  "profileAside.groups.edit": "Edit",
+  "profileAside.groups.editLabel": "Edit Groups",
+  "profileAside.groups.cancel": "Cancel",
+  "profileAside.groups.save": "Save",
+  "profileAside.groups.saving": "Saving…",
+  "profileAside.groups.saved": "Groups saved",
   "account.error.pending":
     "You already have a request waiting for an answer. Reload the page to see it.",
   "account.error.roleAlreadyHeld": "You already have that role.",
@@ -726,11 +737,16 @@ export const englishMessages = {
   // perfil propio y la ficha. El prefijo sólo lo oye un lector de pantalla.
   "memberAttendance.title": "Attendance",
   "memberAttendance.noData": "No data",
-  "memberAttendance.spokenPrefix": "Attendance: ",
-  "memberAttendance.sessions": {
-    one: "{count} session",
-    other: "{count} sessions",
+  // La asistencia de la temporada en el perfil y la ficha (#774, D9).
+  "seasonAttendance.season": "This season",
+  "seasonAttendance.sessions": {
+    one: "{attended} of {count} session",
+    other: "{attended} of {count} sessions",
   },
+  "seasonAttendance.last10": "Last 10",
+  "seasonAttendance.legend": "Legend",
+  "seasonAttendance.session": "{date}: {status}",
+  "seasonAttendance.none": "There are no sessions this season yet.",
   // #283: por debajo de 768px la tabla es una lista de tarjetas, sin
   // cabeceras. Cada dato lleva su etiqueta y el orden tiene su propio control.
   "directory.field.country": "Country",
@@ -870,7 +886,11 @@ export const englishMessages = {
   "memberRecord.loading": "Loading the member's record…",
   "memberRecord.evaluation.title": "Evaluation",
   "memberRecord.evaluation.loading": "Loading the evaluation…",
-  "memberRecord.evaluation.open": "Open in Evaluations",
+  "memberRecord.evaluation.open": "Open",
+  "memberRecord.evaluation.openLabel": "Open the full evaluation",
+  "memberRecord.evaluation.overall": "overall · {date}",
+  "memberRecord.evaluation.categories": "Categories",
+  "memberRecord.evaluation.notEvaluated": "Not evaluated",
   "memberRecord.photoAlt": "Photo of {name}",
   "photoViewer.open": "Open the photo of {name}",
   "photoViewer.close": "Close the photo",
@@ -1111,7 +1131,7 @@ export const englishMessages = {
     "{name} hasn't activated their account yet. The invitation link expires after an hour, so you can send a new one.",
   "memberRecord.invitation.resent": "We sent {name} a new invitation.",
   // Desactivar y reactivar la cuenta desde la ficha (#244, RF-6 del PRD de E5).
-  "memberStatus.title": "Membership",
+  "memberStatus.title": "Account status",
   "memberStatus.lead.active":
     "{name} is a member of the club. Deactivating their account keeps their history, but they can no longer sign in or appear in the directory.",
   "memberStatus.lead.inactive":
@@ -1506,9 +1526,17 @@ export const englishMessages = {
   "payments.planChange.failed":
     "We couldn't change your plan. Reload the page and try again.",
   "account.membership.title": "Membership",
-  "account.membership.type": "Membership type: {plan}",
-  "account.membership.none": "You haven't chosen a membership type yet.",
-  "account.membership.change": "Change it in Payments",
+  // La tarjeta Membresía de la columna derecha (#774).
+  "account.membership.payments": "Payments",
+  "account.membership.noPlan": "No plan chosen yet",
+  "account.membership.renews": "{status} · renews {date}",
+  "account.membership.status.none": "No membership yet",
+  "account.membership.status.pending": "Pending",
+  "account.membership.status.trialing": "On trial",
+  "account.membership.status.active": "Active",
+  "account.membership.status.pastDue": "Payment overdue",
+  "account.membership.status.cancelled": "Expired",
+  "account.membership.status.waived": "Waived",
   "calendar.rsvp.error.unexpected": "We couldn't save your answer. Try again.",
   "calendar.create.open": "Event",
   "calendar.create.created": "Event created. We let the members know.",

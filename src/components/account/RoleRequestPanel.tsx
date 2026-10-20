@@ -58,10 +58,13 @@ export function RoleRequestPanel({
   locale,
   role,
   latestRequest,
+  onCreated,
 }: {
   locale: Locale;
   role: Role;
   latestRequest: RoleRequest | null;
+  /** Avisa a quien la acoge de que ya hay una solicitud pendiente. */
+  onCreated?: () => void;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [latest, setLatest] = useState(latestRequest);
@@ -71,6 +74,7 @@ export function RoleRequestPanel({
   function handleCreated(request: RoleRequest): void {
     setLatest(request);
     setWasJustCreated(true);
+    onCreated?.();
   }
 
   switch (availability.kind) {

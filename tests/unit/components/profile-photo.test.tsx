@@ -86,9 +86,10 @@ function renderScreen(
       photoUrl={options.photoUrl === undefined ? OLD_URL : options.photoUrl}
       groups={[]}
       evaluation={{ visibility: "staff_only" }}
-      attendance={{ kind: "no_data" }}
+      attendance={null}
       membershipPlan="Full"
       membershipStatus="active"
+      membershipRenewsOn={null}
       joinedOn="2024-03-06"
       countries={listCountryOptions(locale)}
     />,

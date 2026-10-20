@@ -682,6 +682,7 @@ const SHARED_RECORD_FIELDS = [
   "fullName",
   "groups",
   "membershipPlan",
+  "membershipRenewsOn",
   "membershipStatus",
   "photoUrl",
   "positionName",

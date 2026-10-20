@@ -3,7 +3,6 @@
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MemberAttendanceSummary } from "@/components/attendance/MemberAttendanceSummary";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
 import { DIRECTORY_PATH } from "@/lib/auth/routes";
@@ -16,7 +15,6 @@ import {
   loadMemberRecord,
 } from "./member-record-client";
 import { InvitationResend } from "./InvitationResend";
-import { MemberRecordEvaluation } from "./MemberRecordEvaluation";
 import { MemberRecordForm } from "./MemberRecordForm";
 import { MemberRecordRole } from "./MemberRecordRole";
 import { MemberStatusControl } from "./MemberStatusControl";
@@ -26,7 +24,8 @@ import { MembershipWaiverControl } from "./MembershipWaiverControl";
  * La ficha reservada al Admin de un miembro (#242, RF-4 del PRD de E5), que se
  * abre desde su fila del directorio: su número de AUF, su vencimiento y sus
  * grupos, su asistencia (#396), su evaluación para leer (#324) y su rol
- * (#549).
+ * (#549). La membresía, la asistencia de la temporada, los grupos y la
+ * evaluación van en la columna derecha del formulario (#774).
  *
  * La frontera ya mandó al panel a quien no es Admin; si alguien deja de serlo
  * con la pantalla abierta, el 403 del endpoint lo dice aquí. Es de cliente
@@ -105,7 +104,7 @@ export function MemberRecordScreen({
   }
 
   return (
-    <div className="member-record">
+    <div className="member-record member-record-wide">
       <Link href={DIRECTORY_PATH} className="member-record-back">
         <ArrowLeft aria-hidden="true" weight="bold" />
         {translate("memberRecord.back")}
@@ -150,18 +149,6 @@ export function MemberRecordScreen({
             })}
           />
         </section>
-      ) : null}
-      {state.kind === "loaded" ? (
-        <MemberAttendanceSummary
-          translate={translate}
-          locale={locale}
-          attendance={state.record.attendance}
-          headingId="ficha-asistencia"
-          className="admin-section"
-        />
-      ) : null}
-      {state.kind === "loaded" ? (
-        <MemberRecordEvaluation translate={translate} userId={userId} />
       ) : null}
       {state.kind === "loaded" ? (
         <MemberRecordRole

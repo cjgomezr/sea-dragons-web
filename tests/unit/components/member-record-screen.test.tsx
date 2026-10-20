@@ -52,8 +52,17 @@ const RECORD: MemberRecord = {
   },
   photoUrl: null,
   isAufExpired: false,
+  membershipRenewsOn: "2027-06-30",
   groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
-  attendance: { kind: "rate", percent: 90, sessions: 9 },
+  attendance: {
+    percent: 90,
+    attended: 9,
+    sessions: 10,
+    last10: [
+      { eventId: "e1", startsOn: "2026-09-01", status: "present" },
+      { eventId: "e2", startsOn: "2026-09-08", status: "absent" },
+    ],
+  },
 };
 
 const PHOTO_URL = `https://storage.test/member-photos/${MEMBER_ID}/foto.webp?token=a`;
@@ -285,13 +294,9 @@ describe("ficha en pantalla: carga", () => {
     expect(screen.getByLabelText("AUF number")).toHaveValue("AUF-1");
     expect(screen.getByLabelText("Expiry date")).toHaveValue("2027-03-31");
     expect(screen.getByText("Member since March 2024")).toBeInTheDocument();
-    const groups = screen.getByRole("group", { name: "Groups" });
-    expect(
-      within(groups).getByRole("checkbox", { name: "Senior Squad" }),
-    ).toBeChecked();
-    expect(
-      within(groups).getByRole("checkbox", { name: "Masters Squad" }),
-    ).not.toBeChecked();
+    const groups = screen.getByRole("region", { name: "Groups" });
+    expect(within(groups).getByText("Senior Squad")).toBeVisible();
+    expect(within(groups).queryByText("Masters Squad")).toBeNull();
   });
 
   it("marca el AUF vencido", async () => {
@@ -317,7 +322,9 @@ describe("ficha en pantalla: carga", () => {
 
     await renderScreen();
 
-    expect(screen.getByText("Payment overdue")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).getByText("Payment overdue"),
+    ).toBeInTheDocument();
   });
 
   it("dice que no tiene membresía quien no la tiene (#453)", async () => {
@@ -370,7 +377,7 @@ describe("ficha en pantalla: carga", () => {
     expect(screen.getByLabelText("Número de AUF")).toHaveValue("AUF-1");
     expect(screen.getByLabelText("Vencimiento")).toBeInTheDocument();
     expect(screen.getByText("Miembro desde marzo de 2024")).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Grupos" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Grupos" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Guardar la ficha" }),
     ).toBeInTheDocument();
@@ -438,15 +445,13 @@ describe("pantalla de la ficha", () => {
 });
 
 describe("ficha en pantalla: guardado", () => {
-  it("manda el AUF y la lista entera de grupos en una sola petición", async () => {
+  it("manda el AUF con los grupos guardados en una sola petición", async () => {
     stubApi();
     const user = userEvent.setup();
     await renderScreen();
 
     await user.clear(screen.getByLabelText("AUF number"));
     await user.type(screen.getByLabelText("AUF number"), "AUF-99");
-    await user.click(screen.getByRole("checkbox", { name: "Masters Squad" }));
-    await user.click(screen.getByRole("checkbox", { name: "Senior Squad" }));
     await user.click(saveButton());
 
     expect(patches).toEqual([
@@ -455,7 +460,7 @@ describe("ficha en pantalla: guardado", () => {
         body: {
           aufNumber: "AUF-99",
           aufExpiry: "2027-03-31",
-          groupIds: [MASTERS_ID],
+          groupIds: [SENIOR_ID],
           dateOfBirth: "1990-05-10",
         },
       },
@@ -463,9 +468,6 @@ describe("ficha en pantalla: guardado", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(
       "Record saved.",
     );
-    expect(
-      screen.getByRole("checkbox", { name: "Masters Squad" }),
-    ).toBeChecked();
   });
 
   it("no manda el AUF si no lo tocó: el miembro puede haberlo cambiado entretanto (#274)", async () => {
@@ -473,7 +475,6 @@ describe("ficha en pantalla: guardado", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.click(screen.getByRole("checkbox", { name: "Masters Squad" }));
     await user.click(saveButton());
 
     await screen.findByRole("status");
@@ -539,9 +540,7 @@ describe("ficha en pantalla: guardado", () => {
     expect(saveButton()).toBeDisabled();
     expect(saveButton()).toHaveTextContent("Saving…");
     expect(screen.getByLabelText("AUF number")).toBeDisabled();
-    expect(
-      screen.getByRole("checkbox", { name: "Masters Squad" }),
-    ).toBeDisabled();
+    expect(screen.getByLabelText("Date of birth")).toBeDisabled();
     answer(jsonResponse(200, { data: RECORD }));
     expect(await screen.findByRole("status")).toBeInTheDocument();
     expect(saveButton()).toBeEnabled();
@@ -823,7 +822,7 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     await renderScreen("es");
 
     expect(
-      screen.getByRole("heading", { level: 2, name: "Membresía" }),
+      screen.getByRole("heading", { level: 2, name: "Estado de la cuenta" }),
     ).toBeInTheDocument();
     await userEvent
       .setup()
@@ -1318,64 +1317,94 @@ describe("ficha en pantalla: verificar el AUF (#274)", () => {
   });
 });
 
-describe("ficha en pantalla: evaluación (#324)", () => {
+/** La evaluación del Admin en la columna derecha (#774, D10): la nota global
+ * con su fecha, hasta cuatro categorías con su barra y "Abrir". */
+describe("ficha en pantalla: evaluación (#324, #774)", () => {
   function evaluationSection(name = "Evaluation"): HTMLElement {
     return screen.getByRole("region", { name });
   }
 
-  it("enseña al Admin el OVR y las categorías del miembro", async () => {
+  function ratingOf(index: number, name: string, rating: number) {
+    return {
+      categoryId: `ca7e0000-0000-4000-8000-00000000000${index}`,
+      name,
+      rating,
+      isRetired: false,
+    };
+  }
+
+  function evaluated(ratings: ReturnType<typeof ratingOf>[]): () => Response {
+    return () =>
+      jsonResponse(200, {
+        data: {
+          status: "evaluated",
+          memberId: MEMBER_ID,
+          updatedAt: "2026-09-12T01:02:03.123456+00:00",
+          overallRating: 7.2,
+          ratings,
+          isCurrent: true,
+        },
+      });
+  }
+
+  it("enseña al Admin la nota global con su fecha y las categorías con su nota", async () => {
     stubApi({
-      evaluation: () =>
-        jsonResponse(200, {
-          data: {
-            status: "evaluated",
-            memberId: MEMBER_ID,
-            updatedAt: "2026-09-27T01:02:03.123456+00:00",
-            overallRating: 7.5,
-            ratings: [
-              {
-                categoryId: "ca7e0000-0000-4000-8000-000000000001",
-                name: "Fitness",
-                rating: 8,
-                isRetired: false,
-              },
-              {
-                categoryId: "ca7e0000-0000-4000-8000-000000000002",
-                name: "Speed",
-                rating: 7,
-                isRetired: false,
-              },
-            ],
-            isCurrent: true,
-          },
-        }),
+      evaluation: evaluated([
+        ratingOf(1, "Technique", 7.5),
+        ratingOf(2, "Fitness", 6.8),
+      ]),
     });
     await renderScreen();
 
     const section = evaluationSection();
-    expect(await within(section).findByText("7.5")).toBeVisible();
+    expect(await within(section).findByText("7.2")).toBeVisible();
+    expect(within(section).getByText("overall · 12 Sept")).toBeVisible();
     expect(
-      within(
-        within(section).getByRole("list", { name: "Skill ratings" }),
-      ).getAllByRole("listitem"),
-    ).toHaveLength(2);
-    expect(
-      screen.queryByText(
-        "Evaluation ratings are only visible to the coaching staff.",
-      ),
-    ).toBeNull();
+      within(within(section).getByRole("list", { name: "Categories" }))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Technique7.5", "Fitness6.8"]);
   });
 
-  it("dice que no tiene evaluación y lleva a crearla", async () => {
+  it("enseña como mucho cuatro categorías", async () => {
+    stubApi({
+      evaluation: evaluated([
+        ratingOf(1, "Technique", 7),
+        ratingOf(2, "Fitness", 7),
+        ratingOf(3, "Game sense", 7),
+        ratingOf(4, "Attitude", 7),
+        ratingOf(5, "Speed", 7),
+      ]),
+    });
+    await renderScreen();
+
+    const section = evaluationSection();
+    const categories = await within(section).findByRole("list", {
+      name: "Categories",
+    });
+    expect(within(categories).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(categories).queryByText("Speed")).toBeNull();
+  });
+
+  it("lleva Abrir a la evaluación entera", async () => {
+    stubApi({ evaluation: evaluated([ratingOf(1, "Technique", 7)]) });
+    await renderScreen();
+
+    const section = evaluationSection();
+    await within(section).findByText("7.2");
+    expect(
+      within(section).getByRole("link", { name: "Open the full evaluation" }),
+    ).toHaveAttribute("href", `/evaluaciones?miembro=${MEMBER_ID}`);
+  });
+
+  it("dice sin evaluar a quien no tiene evaluación, y deja abrirla", async () => {
     stubApi();
     await renderScreen();
 
     const section = evaluationSection();
+    expect(await within(section).findByText("Not evaluated")).toBeVisible();
     expect(
-      await within(section).findByText("No evaluation yet."),
-    ).toBeVisible();
-    expect(
-      within(section).getByRole("link", { name: "Open in Evaluations" }),
+      within(section).getByRole("link", { name: "Open the full evaluation" }),
     ).toHaveAttribute("href", `/evaluaciones?miembro=${MEMBER_ID}`);
   });
 
@@ -1389,40 +1418,53 @@ describe("ficha en pantalla: evaluación (#324)", () => {
   });
 
   it("se escribe en español", async () => {
-    stubApi();
+    stubApi({ evaluation: evaluated([ratingOf(1, "Técnica", 7)]) });
     await renderScreen("es");
 
     const section = evaluationSection("Evaluación");
+    expect(await within(section).findByText("7,2")).toBeVisible();
+    expect(within(section).getByText("global · 12 sept")).toBeVisible();
     expect(
-      await within(section).findByText("Todavía no hay evaluación."),
+      within(section).getByRole("link", { name: "Abrir la evaluación entera" }),
     ).toBeVisible();
+  });
+
+  it("dice sin evaluar en español", async () => {
+    stubApi();
+    await renderScreen("es");
+
     expect(
-      within(section).getByRole("link", { name: "Abrir en Evaluaciones" }),
+      await within(evaluationSection("Evaluación")).findByText("Sin evaluar"),
     ).toBeVisible();
   });
 });
 
-/** La asistencia en la ficha (#396): el mismo bloque que el perfil propio,
- * con lo que la ficha ya trae desde #394. */
-describe("ficha en pantalla: asistencia", () => {
-  it("enseña el porcentaje y cuántas sesiones lleva el miembro", async () => {
+/** La asistencia en la ficha (#774, D9): la de la temporada, la misma
+ * tarjeta que el perfil propio. */
+describe("ficha en pantalla: asistencia de la temporada (#774)", () => {
+  it("enseña el porcentaje, cuántas de cuántas sesiones y las últimas", async () => {
     stubApi();
 
     await renderScreen();
 
     const region = screen.getByRole("region", { name: "Attendance" });
-    expect(region).toHaveTextContent("Attendance: 90%");
-    expect(within(region).getByText("9 sessions")).toBeVisible();
+    expect(within(region).getByText("This season")).toBeVisible();
+    expect(within(region).getByText("90%")).toBeVisible();
+    expect(within(region).getByText("9 of 10 sessions")).toBeVisible();
+    expect(
+      within(region).getByRole("list", { name: "Last 10" }),
+    ).toHaveTextContent("1 September 2026: Present8 September 2026: Absent");
   });
 
-  it("dice sin datos a quien no tiene sesiones elegibles", async () => {
-    stubApi({ record: { ...RECORD, attendance: { kind: "no_data" } } });
+  it("dice que no hay sesiones esta temporada", async () => {
+    stubApi({ record: { ...RECORD, attendance: null } });
 
     await renderScreen();
 
     const region = screen.getByRole("region", { name: "Attendance" });
-    expect(region).toHaveTextContent("Attendance: No data");
-    expect(within(region).queryByText(/sessions/)).toBeNull();
+    expect(
+      within(region).getByText("There are no sessions this season yet."),
+    ).toBeVisible();
   });
 
   it("sale en español", async () => {
@@ -1431,8 +1473,191 @@ describe("ficha en pantalla: asistencia", () => {
     await renderScreen("es");
 
     const region = screen.getByRole("region", { name: "Asistencia" });
-    expect(region.textContent).toContain("Asistencia: 90 %");
-    expect(within(region).getByText("9 sesiones")).toBeVisible();
+    expect(within(region).getByText("90 %")).toBeVisible();
+    expect(within(region).getByText("9 de 10 sesiones")).toBeVisible();
+  });
+});
+
+describe("ficha en pantalla: membresía (#774)", () => {
+  it("enseña el plan y cuándo se renueva, sin el enlace a Pagos", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    const region = screen.getByRole("region", { name: "Membership" });
+    expect(within(region).getByText("Full")).toBeVisible();
+    expect(
+      within(region).getByText("Active · renews 30 June 2027"),
+    ).toBeVisible();
+    expect(within(region).queryByRole("link")).toBeNull();
+  });
+
+  it("enseña la exención que el Admin acaba de dar", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(
+      screen.getByRole("button", { name: "Waive membership fee" }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Waive Paula Player's membership fee",
+    });
+    await user.type(within(dialog).getByLabelText("Reason"), "Volunteer");
+    await user.click(within(dialog).getByRole("button", { name: "Waive fee" }));
+    await screen.findByText("Paula Player's membership fee is waived.");
+
+    const region = screen.getByRole("region", { name: "Membership" });
+    expect(await within(region).findByText("Waived")).toBeVisible();
+  });
+});
+
+describe("ficha en pantalla: grupos (#774)", () => {
+  function groupsRegion(): HTMLElement {
+    return screen.getByRole("region", { name: "Groups" });
+  }
+
+  it("enseña los grupos como fichas, y sin grupos lo dice", async () => {
+    stubApi({ record: { ...RECORD, groups: [] } });
+
+    await renderScreen();
+
+    expect(within(groupsRegion()).getByText("No groups")).toBeVisible();
+  });
+
+  it("Editar abre la lista de casillas de los grupos del club", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(
+      within(groupsRegion()).getByRole("button", { name: "Edit Groups" }),
+    );
+
+    const field = within(groupsRegion()).getByRole("group", { name: "Groups" });
+    expect(
+      within(field).getByRole("checkbox", { name: "Senior Squad" }),
+    ).toBeChecked();
+    expect(
+      within(field).getByRole("checkbox", { name: "Masters Squad" }),
+    ).not.toBeChecked();
+  });
+
+  it("guarda la lista entera de grupos sin tocar el AUF ni el contacto, y enseña lo guardado", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(
+      within(groupsRegion()).getByRole("button", { name: "Edit Groups" }),
+    );
+    await user.click(screen.getByRole("checkbox", { name: "Masters Squad" }));
+    await user.click(screen.getByRole("checkbox", { name: "Senior Squad" }));
+    await user.click(
+      within(groupsRegion()).getByRole("button", { name: "Save" }),
+    );
+
+    expect(patches).toEqual([
+      {
+        method: "PATCH",
+        body: { groupIds: [MASTERS_ID], dateOfBirth: "1990-05-10" },
+      },
+    ]);
+    expect(await within(groupsRegion()).findByRole("status")).toHaveTextContent(
+      "Groups saved",
+    );
+    expect(within(groupsRegion()).getByText("Masters Squad")).toBeVisible();
+    expect(within(groupsRegion()).queryByRole("checkbox")).toBeNull();
+  });
+
+  it("después, guardar la ficha manda los grupos nuevos y no los de antes", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(
+      within(groupsRegion()).getByRole("button", { name: "Edit Groups" }),
+    );
+    await user.click(screen.getByRole("checkbox", { name: "Masters Squad" }));
+    await user.click(
+      within(groupsRegion()).getByRole("button", { name: "Save" }),
+    );
+    await within(groupsRegion()).findByRole("status");
+    await user.click(saveButton());
+
+    expect(patches[1]?.body).toMatchObject({
+      groupIds: [MASTERS_ID, SENIOR_ID],
+    });
+  });
+
+  it("Cancelar vuelve a la lectura sin mandar nada", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(
+      within(groupsRegion()).getByRole("button", { name: "Edit Groups" }),
+    );
+    await user.click(screen.getByRole("checkbox", { name: "Masters Squad" }));
+    await user.click(
+      within(groupsRegion()).getByRole("button", { name: "Cancel" }),
+    );
+
+    expect(patches).toEqual([]);
+    expect(within(groupsRegion()).queryByText("Masters Squad")).toBeNull();
+    expect(
+      within(groupsRegion()).getByRole("button", { name: "Edit Groups" }),
+    ).toHaveFocus();
+  });
+
+  it("si falla, avisa y deja la lista abierta con lo elegido", async () => {
+    stubApi({
+      save: () => errorResponse(422, "business_rule", "member_inactive"),
+    });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(
+      within(groupsRegion()).getByRole("button", { name: "Edit Groups" }),
+    );
+    await user.click(screen.getByRole("checkbox", { name: "Masters Squad" }));
+    await user.click(
+      within(groupsRegion()).getByRole("button", { name: "Save" }),
+    );
+
+    expect(await within(groupsRegion()).findByRole("alert")).toHaveTextContent(
+      "A member with a deactivated account can't be added to groups.",
+    );
+    expect(
+      screen.getByRole("checkbox", { name: "Masters Squad" }),
+    ).toBeChecked();
+  });
+
+  it("no manda un segundo guardado con un doble clic", async () => {
+    stubApi({ save: () => new Promise<Response>(() => undefined) });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(
+      within(groupsRegion()).getByRole("button", { name: "Edit Groups" }),
+    );
+    await user.dblClick(
+      within(groupsRegion()).getByRole("button", { name: "Save" }),
+    );
+
+    expect(patches).toHaveLength(1);
+  });
+
+  it("se escribe en español", async () => {
+    stubApi({ record: { ...RECORD, groups: [] } });
+
+    await renderScreen("es");
+
+    const region = screen.getByRole("region", { name: "Grupos" });
+    expect(within(region).getByText("Sin grupos")).toBeVisible();
+    expect(
+      within(region).getByRole("button", { name: "Editar Grupos" }),
+    ).toBeVisible();
   });
 });
 /** La etiqueta de la lista de lectura, sin lo que la acompaña (el candado
@@ -1567,7 +1792,6 @@ describe("ficha en pantalla: contacto (#499, #772)", () => {
     const user = userEvent.setup();
     await renderScreen();
 
-    await user.click(screen.getByRole("checkbox", { name: "Masters Squad" }));
     await user.click(saveButton());
 
     await screen.findByRole("status");
@@ -2082,5 +2306,20 @@ describe("ficha en pantalla: la franja del AUF pendiente (#771)", () => {
     ).toHaveTextContent(
       "Paula Player añadió el AUF AUF-1 (vence el 31 de marzo de 2027). Revísalo y verifícalo.",
     );
+  });
+});
+
+describe("ficha en pantalla: sin la tarjeta Rol (#774)", () => {
+  it("no ofrece al staff pedir un rol en la ficha de otro", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(
+      screen.queryByRole("region", { name: /^Role · / }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Request" }),
+    ).not.toBeInTheDocument();
   });
 });

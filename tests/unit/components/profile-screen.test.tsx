@@ -5,7 +5,13 @@ import { ProfileScreen } from "@/components/account/ProfileScreen";
 import { ACCOUNT_PROFILE_API_PATH } from "@/lib/auth/routes";
 import { listCountryOptions } from "@/lib/geo/countries";
 import type { Locale } from "@/lib/i18n/locale";
-import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
+import type {
+  AttendedSession,
+  SeasonAttendance,
+} from "@/lib/attendance/season-attendance";
+import type { RoleRequest } from "@/lib/auth/role-request";
+import type { ProfileEvaluation } from "@/lib/evaluations/profile-evaluation";
+import type { MemberGroup } from "@/lib/groups/member-groups";
 import type {
   EmergencyContactProposal,
   OwnAuf,
@@ -116,15 +122,33 @@ const UTILITY: ClubPosition = {
   isArchived: true,
 };
 
+const SEASON_SESSIONS: readonly AttendedSession[] = [
+  { eventId: "e1", startsOn: "2026-09-01", status: "present" },
+  { eventId: "e2", startsOn: "2026-09-08", status: "late" },
+  { eventId: "e3", startsOn: "2026-09-15", status: "absent" },
+  { eventId: "e4", startsOn: "2026-09-22", status: "present" },
+];
+
+const SEASON_ATTENDANCE: SeasonAttendance = {
+  percent: 75,
+  attended: 3,
+  sessions: 4,
+  last10: SEASON_SESSIONS,
+};
+
 function renderScreen(
   options: {
     readonly locale?: Locale;
     readonly profile?: OwnProfile;
     readonly positionOptions?: ClubPositions;
-    readonly attendance?: MemberAttendance;
+    readonly attendance?: SeasonAttendance | null;
     readonly membershipPlan?: MembershipPlan | null;
     readonly membershipStatus?: MembershipStatus | null;
+    readonly membershipRenewsOn?: string | null;
     readonly emergencyContactProposal?: EmergencyContactProposal | null;
+    readonly groups?: readonly MemberGroup[];
+    readonly evaluation?: ProfileEvaluation;
+    readonly latestRequest?: RoleRequest | null;
   } = {},
 ): ReturnType<typeof render> {
   return render(profileScreen(options));
@@ -139,14 +163,22 @@ function profileScreen(
       locale={locale}
       userId="cccccccc-0000-4000-8000-00000000000c"
       email="nerea@example.com"
-      account={{ fullName: "Nerea Ruiz", role: "Player", latestRequest: null }}
+      account={{
+        fullName: "Nerea Ruiz",
+        role: "Player",
+        latestRequest: options.latestRequest ?? null,
+      }}
       profile={options.profile ?? PROFILE}
       positionOptions={options.positionOptions ?? SEEDED_POSITIONS}
       emergencyContactProposal={options.emergencyContactProposal ?? null}
       photoUrl={null}
-      groups={[{ id: "g1", name: "Senior Squad" }]}
-      evaluation={{ visibility: "staff_only" }}
-      attendance={options.attendance ?? { kind: "no_data" }}
+      groups={options.groups ?? [{ id: "g1", name: "Senior Squad" }]}
+      evaluation={options.evaluation ?? { visibility: "staff_only" }}
+      attendance={
+        options.attendance === undefined
+          ? SEASON_ATTENDANCE
+          : options.attendance
+      }
       countries={listCountryOptions(locale)}
       membershipPlan={
         options.membershipPlan === undefined ? "Full" : options.membershipPlan
@@ -155,6 +187,11 @@ function profileScreen(
         options.membershipStatus === undefined
           ? "active"
           : options.membershipStatus
+      }
+      membershipRenewsOn={
+        options.membershipRenewsOn === undefined
+          ? "2027-06-30"
+          : options.membershipRenewsOn
       }
       joinedOn="2024-03-06"
     />
@@ -223,39 +260,63 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-describe("pantalla de perfil: el tipo de membresía (#456)", () => {
-  it("enseña el tipo de membresía sin dejar editarlo, y enlaza a Pagos", () => {
+describe("pantalla de perfil: la membresía (#456, #774)", () => {
+  function membershipRegion(name = "Membership"): HTMLElement {
+    return screen.getByRole("region", { name });
+  }
+
+  it("enseña el plan, cuándo se renueva y el enlace a Pagos, sin dejar editarlo", () => {
     renderScreen({ membershipPlan: "Student" });
 
-    const membership = screen.getByRole("region", { name: "Membership" });
+    const membership = membershipRegion();
+    expect(within(membership).getByText("Student")).toBeVisible();
     expect(
-      within(membership).getByText("Membership type: Student"),
-    ).toBeInTheDocument();
+      within(membership).getByText("Active · renews 30 June 2027"),
+    ).toBeVisible();
     expect(
-      within(membership).getByRole("link", { name: "Change it in Payments" }),
+      within(membership).getByRole("link", { name: "Payments" }),
     ).toHaveAttribute("href", "/pagos");
     expect(screen.queryByLabelText(/membership type/i)).toBeNull();
   });
 
-  it("dice que aún no hay tipo a quien no lo eligió", () => {
+  it("dice activa a secas cuando no hay cobro a la vista", () => {
+    renderScreen({ membershipPlan: "Casual", membershipRenewsOn: null });
+
+    expect(within(membershipRegion()).getByText("Active")).toBeVisible();
+  });
+
+  it.each<[MembershipStatus | null, string]>([
+    ["cancelled", "Expired"],
+    ["pending", "Pending"],
+    ["past_due", "Payment overdue"],
+    ["waived", "Waived"],
+    [null, "No membership yet"],
+  ])("con la membresía %s dice su estado", (membershipStatus, text) => {
+    renderScreen({ membershipStatus, membershipRenewsOn: null });
+
+    expect(within(membershipRegion()).getByText(text)).toBeVisible();
+  });
+
+  it("dice que aún no hay plan a quien no lo eligió", () => {
     renderScreen({ membershipPlan: null });
 
     expect(
-      within(screen.getByRole("region", { name: "Membership" })).getByText(
-        "You haven't chosen a membership type yet.",
-      ),
-    ).toBeInTheDocument();
+      within(membershipRegion()).getByText("No plan chosen yet"),
+    ).toBeVisible();
   });
 
   it("lo dice en español", () => {
     renderScreen({ locale: "es", membershipPlan: "Full" });
 
-    const membership = screen.getByRole("region", { name: "Membresía" });
+    const membership = membershipRegion("Membresía");
+    expect(within(membership).getByText("Full")).toBeVisible();
     expect(
-      within(membership).getByText("Tipo de membresía: Full"),
-    ).toBeInTheDocument();
+      within(membership).getByText(
+        "Activa · se renueva el 30 de junio de 2027",
+      ),
+    ).toBeVisible();
     expect(
-      within(membership).getByRole("link", { name: "Cambiarlo en Pagos" }),
+      within(membership).getByRole("link", { name: "Pagos" }),
     ).toHaveAttribute("href", "/pagos");
   });
 
@@ -273,34 +334,18 @@ describe("pantalla de perfil: el tipo de membresía (#456)", () => {
 });
 
 describe("pantalla de perfil", () => {
-  it("explica a un Player que sus notas sólo las ve el personal de entrenamiento", () => {
-    renderScreen();
-
-    expect(
-      within(screen.getByRole("region", { name: "Evaluation" })).getByText(
-        "Evaluation ratings are only visible to the coaching staff.",
-      ),
-    ).toBeVisible();
-    expect(screen.queryByText("Overall score")).toBeNull();
-  });
-
   it("no ofrece cambiar la fecha de nacimiento, que sólo corrige un Admin", () => {
     renderScreen();
 
     expect(screen.queryByLabelText(/date of birth/i)).not.toBeInTheDocument();
   });
 
-  it("sigue mostrando el rol, la solicitud de rol y los grupos propios", () => {
+  it("sigue mostrando el rol en la cabecera", () => {
     renderScreen();
 
     expect(
       within(screen.getByRole("banner")).getByText("Player"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Request a role" }),
-    ).toBeInTheDocument();
-    const groups = screen.getByRole("region", { name: "My groups" });
-    expect(within(groups).getByText("Senior Squad")).toBeInTheDocument();
   });
 });
 
@@ -928,60 +973,233 @@ describe("perfil propio: las posiciones del club (#299)", () => {
   });
 });
 
-/** La asistencia en el perfil propio (#396, FR-022): el porcentaje grande y
- * las sesiones debajo, o "Sin datos" a quien no tiene sesiones elegibles. */
-describe("perfil propio: la asistencia", () => {
+/** La asistencia en el perfil propio (#774, D9): la de la temporada con
+ * las últimas 10, con el cálculo del inicio (#746). */
+describe("perfil propio: la asistencia de la temporada (#774)", () => {
   function attendanceRegion(name = "Attendance"): HTMLElement {
     return screen.getByRole("region", { name });
   }
 
-  it("enseña el porcentaje y cuántas sesiones lleva", () => {
-    renderScreen({
-      attendance: { kind: "rate", percent: 90, sessions: 18 },
+  it("enseña la temporada, el porcentaje y cuántas de cuántas sesiones", () => {
+    renderScreen();
+
+    const region = attendanceRegion();
+    expect(within(region).getByText("This season")).toBeVisible();
+    expect(within(region).getByText("75%")).toBeVisible();
+    expect(within(region).getByText("3 of 4 sessions")).toBeVisible();
+  });
+
+  it("pinta las últimas sesiones como bloques que un lector de pantalla oye con su fecha y su estado", () => {
+    renderScreen();
+
+    const blocks = within(attendanceRegion()).getByRole("list", {
+      name: "Last 10",
     });
-
-    expect(within(attendanceRegion()).getByText("90%")).toBeVisible();
-    expect(within(attendanceRegion()).getByText("18 sessions")).toBeVisible();
+    expect(
+      within(blocks)
+        .getAllByRole("listitem")
+        .map((block) => block.textContent),
+    ).toEqual([
+      "1 September 2026: Present",
+      "8 September 2026: Late",
+      "15 September 2026: Absent",
+      "22 September 2026: Present",
+    ]);
   });
 
-  it("dice una sesión en singular", () => {
-    renderScreen({ attendance: { kind: "rate", percent: 100, sessions: 1 } });
+  it("lleva la leyenda de los tres estados", () => {
+    renderScreen();
 
-    expect(within(attendanceRegion()).getByText("1 session")).toBeVisible();
-  });
-
-  it("un lector de pantalla oye el porcentaje con su nombre", () => {
-    renderScreen({
-      attendance: { kind: "rate", percent: 90, sessions: 18 },
+    const legend = within(attendanceRegion()).getByRole("list", {
+      name: "Legend",
     });
-
-    expect(attendanceRegion()).toHaveTextContent("Attendance: 90%");
+    expect(
+      within(legend)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Present", "Late", "Absent"]);
   });
 
-  it("sin sesiones elegibles dice sin datos, no un 0", () => {
-    renderScreen({ attendance: { kind: "no_data" } });
+  it("sin sesiones esta temporada lo dice, sin un 0", () => {
+    renderScreen({ attendance: null });
 
-    expect(attendanceRegion()).toHaveTextContent("Attendance: No data");
-    expect(within(attendanceRegion()).queryByText(/0%|sessions/)).toBeNull();
+    const region = attendanceRegion();
+    expect(
+      within(region).getByText("There are no sessions this season yet."),
+    ).toBeVisible();
+    expect(within(region).queryByText(/0%|sessions$/)).toBeNull();
+    expect(within(region).queryByRole("list", { name: "Last 10" })).toBeNull();
   });
 
   it("en español, con el símbolo separado y las sesiones en español", () => {
-    renderScreen({
-      locale: "es",
-      attendance: { kind: "rate", percent: 90, sessions: 18 },
-    });
+    renderScreen({ locale: "es" });
 
     const region = attendanceRegion("Asistencia");
-    expect(region.textContent).toContain("Asistencia: 90 %");
-    expect(within(region).getByText("18 sesiones")).toBeVisible();
+    expect(within(region).getByText("Esta temporada")).toBeVisible();
+    expect(within(region).getByText("75 %")).toBeVisible();
+    expect(within(region).getByText("3 de 4 sesiones")).toBeVisible();
+    expect(
+      within(region).getByRole("list", { name: "Últimas 10" }),
+    ).toHaveTextContent("1 de septiembre de 2026: Presente");
   });
 
-  it("en español, sin datos", () => {
-    renderScreen({ locale: "es", attendance: { kind: "no_data" } });
+  it("en español, sin sesiones", () => {
+    renderScreen({ locale: "es", attendance: null });
 
-    expect(attendanceRegion("Asistencia")).toHaveTextContent(
-      "Asistencia: Sin datos",
+    expect(
+      within(attendanceRegion("Asistencia")).getByText(
+        "Todavía no hay sesiones esta temporada.",
+      ),
+    ).toBeVisible();
+  });
+});
+
+describe("perfil propio: los grupos (#774)", () => {
+  it("enseña los grupos del socio como fichas, sin dejar editarlos", () => {
+    renderScreen({
+      groups: [
+        { id: "g1", name: "Senior Squad" },
+        { id: "g2", name: "Sunday social" },
+      ],
+    });
+
+    const groups = screen.getByRole("region", { name: "Groups" });
+    expect(
+      within(groups)
+        .getAllByRole("listitem")
+        .map((group) => group.textContent),
+    ).toEqual(["Senior Squad", "Sunday social"]);
+    expect(within(groups).queryByRole("button")).toBeNull();
+  });
+
+  it("sin grupos dice que no tiene", () => {
+    renderScreen({ groups: [] });
+
+    expect(
+      within(screen.getByRole("region", { name: "Groups" })).getByText(
+        "No groups",
+      ),
+    ).toBeVisible();
+  });
+});
+
+describe("perfil propio: la evaluación (#774, D10)", () => {
+  it("explica al socio que sus coaches la mantienen en privado", () => {
+    renderScreen();
+
+    const evaluation = screen.getByRole("region", { name: "Evaluation" });
+    expect(
+      within(evaluation).getByText(
+        "Your coaches keep evaluations private this season. Ask them if you'd like feedback.",
+      ),
+    ).toBeVisible();
+    expect(within(evaluation).queryByText("Overall score")).toBeNull();
+  });
+
+  it("en español", () => {
+    renderScreen({ locale: "es" });
+
+    expect(
+      within(screen.getByRole("region", { name: "Evaluación" })).getByText(
+        "Tus coaches mantienen las evaluaciones en privado esta temporada. Pregúntales si quieres saber cómo vas.",
+      ),
+    ).toBeVisible();
+  });
+
+  it("enseña la evaluación entera cuando la regla de hoy se la deja ver", () => {
+    renderScreen({
+      evaluation: {
+        visibility: "visible",
+        evaluation: {
+          status: "evaluated",
+          memberId: "cccccccc-0000-4000-8000-00000000000c",
+          updatedAt: "2026-09-12T08:00:00.000Z",
+          overallRating: 7.5,
+          ratings: [
+            {
+              categoryId: "c1",
+              name: "Technique",
+              rating: 7,
+              isRetired: false,
+            },
+          ],
+          isCurrent: true,
+        },
+      },
+    });
+
+    const evaluation = screen.getByRole("region", { name: "Evaluation" });
+    expect(within(evaluation).getByText("Overall score")).toBeVisible();
+    expect(within(evaluation).getByText("7.5")).toBeVisible();
+    expect(
+      within(evaluation).queryByText(/keep evaluations private/),
+    ).toBeNull();
+  });
+});
+
+describe("perfil propio: el rol (#774, D12)", () => {
+  const PENDING_REQUEST: RoleRequest = {
+    id: "r1",
+    requestedRole: "Coach",
+    status: "pending",
+    createdAt: "2026-10-01T09:00:00.000Z",
+  };
+
+  function roleRegion(): HTMLElement {
+    return screen.getByRole("region", { name: "Role · Player" });
+  }
+
+  it("dice el rol, a quién pedir otro y ofrece Solicitar", () => {
+    renderScreen();
+
+    const role = roleRegion();
+    expect(
+      within(role).getByText("Coach or committee? Ask an Admin."),
+    ).toBeVisible();
+    expect(
+      within(role).getByRole("button", { name: "Request" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("heading", { name: "Request a role" }),
+    ).toBeNull();
+  });
+
+  it("Solicitar abre el formulario de la solicitud", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(
+      within(roleRegion()).getByRole("button", { name: "Request" }),
     );
+
+    expect(
+      within(roleRegion()).getByRole("heading", { name: "Request a role" }),
+    ).toBeVisible();
+    expect(
+      within(roleRegion()).getByRole("button", { name: "Request" }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("con una solicitud pendiente enseña su estado en lugar del botón", () => {
+    renderScreen({ latestRequest: PENDING_REQUEST });
+
+    const role = roleRegion();
+    expect(
+      within(role).getByRole("heading", { name: "Request pending" }),
+    ).toBeVisible();
+    expect(within(role).queryByRole("button", { name: "Request" })).toBeNull();
+  });
+
+  it("en español", () => {
+    renderScreen({ locale: "es" });
+
+    const role = screen.getByRole("region", { name: "Rol · Jugador" });
+    expect(
+      within(role).getByText("¿Coach o committee? Pídeselo a un Admin."),
+    ).toBeVisible();
+    expect(
+      within(role).getByRole("button", { name: "Solicitar" }),
+    ).toBeVisible();
   });
 });
 

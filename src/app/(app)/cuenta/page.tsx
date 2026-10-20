@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ProfileScreen } from "@/components/account/ProfileScreen";
-import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
-import { readOwnAttendance } from "@/lib/attendance/own-attendance";
-import { createSupabaseOwnAttendanceGateways } from "@/lib/attendance/supabase-attendance-stats";
+import { readOwnSeasonAttendance } from "@/lib/attendance/own-attendance";
+import type { SeasonAttendance } from "@/lib/attendance/season-attendance";
+import { createSupabaseOwnSeasonAttendanceGateways } from "@/lib/attendance/supabase-season-attendance";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import {
   type RoleRequestAccount,
@@ -42,15 +42,17 @@ import {
   type MembershipStatus,
   readMembership,
 } from "@/lib/membership/membership";
+import { nextChargeOf } from "@/lib/membership/membership-view";
+import { clubCalendarDate } from "@/lib/time/club-calendar";
 import { createMembershipGateway } from "@/lib/membership/supabase-membership-gateways";
 
 /**
  * El perfil propio (#241), que antes era Mi cuenta (#209): la ficha que el
  * miembro edita (FR-084), el rol de quien la abre, los grupos a los que
  * pertenece (#229) y, si le toca, el formulario para pedir Coach o Committee
- * (FR-010), la foto de perfil (#245), su asistencia (#396), su evaluación
- * o el aviso de que sólo la ve el personal de entrenamiento (#324), y el
- * tipo de membresía, que se cambia en Pagos (#456). La
+ * (FR-010), la foto de perfil (#245), su asistencia de la temporada (#774),
+ * su evaluación o el aviso de que sólo la ve el personal de entrenamiento
+ * (#324), y el tipo de membresía, que se cambia en Pagos (#456). La
  * dirección sigue siendo `/cuenta`, la del enlace de la cabecera.
  *
  * Quién llega lo decide la frontera: cualquier cuenta activa, de cualquier
@@ -116,10 +118,12 @@ async function readProfile({
 }
 
 /** Lo que el perfil enseña de la membresía: el plan, que se cambia en Pagos
- * (#456), y el estado, que va en la cabecera (#771). Null sin membresía. */
+ * (#456), el estado, que va en la cabecera (#771), y el día del próximo
+ * cobro (#774). Null sin membresía. */
 type MembershipSummary = {
   readonly plan: MembershipPlan | null;
   readonly status: MembershipStatus;
+  readonly renewsOn: string | null;
 };
 
 /** Con la sesión: `memberships_select_own` le deja leer su propia membresía. */
@@ -131,9 +135,16 @@ async function readMembershipSummary({
     userId,
     now: new Date(),
   });
-  return reading.kind === "found"
-    ? { plan: reading.membership.plan, status: reading.membership.status }
-    : null;
+  if (reading.kind !== "found") {
+    return null;
+  }
+  const { membership } = reading;
+  const nextCharge = nextChargeOf(membership);
+  return {
+    plan: membership.plan,
+    status: membership.status,
+    renewsOn: nextCharge === null ? null : clubCalendarDate(nextCharge),
+  };
 }
 
 /** La foto se firma con la llave de servicio: el bucket es privado (#245). */
@@ -178,16 +189,21 @@ async function readEvaluation(userId: string): Promise<ProfileEvaluation> {
   }
 }
 
-/** Con la llave de servicio: el porcentaje lo cuenta una función de la base
- * que no se concede a `authenticated` (#394). Se lee siempre sobre quien
- * tiene la sesión, nunca sobre otro. */
-async function readAttendance(userId: string): Promise<MemberAttendance> {
-  const wiring = createSupabaseOwnAttendanceGateways(process.env);
+/** Con la llave de servicio: las sesiones las lee una función de la base que
+ * no se concede a `authenticated` (#746). Se lee siempre sobre quien tiene la
+ * sesión, nunca sobre otro, con el día de hoy en el club (NFR-003). */
+async function readAttendance(
+  userId: string,
+): Promise<SeasonAttendance | null> {
+  const wiring = createSupabaseOwnSeasonAttendanceGateways(process.env);
   if (wiring.kind === "unconfigured") {
     throw new Error(describeMissingAuthKeys(wiring.missingKeys));
   }
   try {
-    return await readOwnAttendance(wiring.gateways, userId);
+    return await readOwnSeasonAttendance(wiring.gateways, {
+      userId,
+      today: clubCalendarDate(new Date()),
+    });
   } catch (error) {
     // La misma carrera con la frontera que en `readAccount`.
     if (error instanceof MemberNotFoundError) {
@@ -245,6 +261,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
       countries={listCountryOptions(locale)}
       membershipPlan={membership === null ? null : membership.plan}
       membershipStatus={membership === null ? null : membership.status}
+      membershipRenewsOn={membership === null ? null : membership.renewsOn}
       joinedOn={profile.joinedOn}
     />
   );

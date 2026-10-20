@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
+import type {
+  AttendedSession,
+  SeasonAttendance,
+} from "@/lib/attendance/season-attendance";
 import type { AuditLogInsertRow } from "@/lib/audit/audit-log";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { ClubPositions } from "@/lib/club/club-positions";
@@ -85,8 +88,10 @@ type FakeOptions = {
   /** Cómo responde Storage al firmarla: `unsigned` es que no firmó esa
    * ruta, `failed` que la llamada entera falló. */
   readonly photoSigning?: "signed" | "unsigned" | "failed";
-  /** Lo que la base cuenta de su asistencia (#394). */
-  readonly attendance?: MemberAttendance;
+  /** Sus sesiones elegibles, de la más vieja a la más nueva (#774). */
+  readonly sessions?: readonly AttendedSession[];
+  /** El día de la renovación (#774); sin decirlo, el 30 de junio de 2027. */
+  readonly membershipRenewsOn?: string | null;
   /** El estado de su membresía (#453); sin decirlo, activa. */
   readonly membershipStatus?: MembershipStatus | null;
   readonly membershipWaiver?: MembershipWaiverView | null;
@@ -106,11 +111,45 @@ const CLUB_POSITIONS: ClubPositions = [
 ];
 const MEMBER_EMAIL = "paula@example.com";
 
-const MEMBER_ATTENDANCE: MemberAttendance = {
-  kind: "rate",
-  percent: 90,
-  sessions: 9,
+/** `season_starts_on` del club: la temporada empieza el 1 de julio. */
+const SEASON_STARTS_ON = "2026-07-01";
+const LAST_SEASON_SESSION: AttendedSession = {
+  eventId: "e0e0e0e0-0000-4000-8000-000000000001",
+  startsOn: "2026-06-20",
+  status: "absent",
 };
+const SEASON_SESSIONS: readonly AttendedSession[] = [
+  {
+    eventId: "e0e0e0e0-0000-4000-8000-000000000002",
+    startsOn: "2026-07-04",
+    status: "present",
+  },
+  {
+    eventId: "e0e0e0e0-0000-4000-8000-000000000003",
+    startsOn: "2026-07-11",
+    status: "late",
+  },
+  {
+    eventId: "e0e0e0e0-0000-4000-8000-000000000004",
+    startsOn: "2026-07-18",
+    status: "absent",
+  },
+  {
+    eventId: "e0e0e0e0-0000-4000-8000-000000000005",
+    startsOn: "2026-07-25",
+    status: "present",
+  },
+];
+const MEMBER_SESSIONS = [LAST_SEASON_SESSION, ...SEASON_SESSIONS];
+
+/** Tres de cuatro en la temporada; la de junio sólo cuenta en las 10. */
+const MEMBER_ATTENDANCE: SeasonAttendance = {
+  percent: 75,
+  attended: 3,
+  sessions: 4,
+  last10: MEMBER_SESSIONS,
+};
+const RENEWS_ON = "2027-06-30";
 
 type Fake = {
   readonly gateways: MemberRecordGateways;
@@ -181,6 +220,10 @@ function fake(options: FakeOptions = {}): Fake {
                 options.membershipPlan === undefined
                   ? "Full"
                   : options.membershipPlan,
+              membershipRenewsOn:
+                options.membershipRenewsOn === undefined
+                  ? RENEWS_ON
+                  : options.membershipRenewsOn,
               email: MEMBER_EMAIL,
               country: "AU",
               experienceLevel: "Intermediate",
@@ -251,13 +294,15 @@ function fake(options: FakeOptions = {}): Fake {
       },
     },
     attendance: {
-      findMemberAttendance: async (clubId, userIds) => {
-        reads.push(`attendance ${clubId} ${userIds.join(",")}`);
-        return new Map(
-          userIds
-            .filter((userId) => isClubMember(clubId, userId))
-            .map((userId) => [userId, options.attendance ?? MEMBER_ATTENDANCE]),
-        );
+      findSeasonStartsOn: async (clubId) => {
+        reads.push(`season ${clubId}`);
+        return SEASON_STARTS_ON;
+      },
+      findMemberSessions: async ({ clubId, userId, since, until }) => {
+        reads.push(`attendance ${clubId} ${userId} ${since} ${until}`);
+        return isClubMember(clubId, userId)
+          ? (options.sessions ?? MEMBER_SESSIONS)
+          : [];
       },
     },
     positions: {
@@ -436,6 +481,7 @@ describe("ficha reservada al Admin: lectura", () => {
       hasGuardianConsent: false,
       membershipPlan: "Full",
       membershipStatus: "active",
+      membershipRenewsOn: RENEWS_ON,
       membershipWaiver: null,
       phone: null,
       emergencyContact: null,
@@ -449,25 +495,31 @@ describe("ficha reservada al Admin: lectura", () => {
     });
   });
 
-  it("trae el porcentaje y el total de asistencia, contados en el club del Admin (FR-022)", async () => {
+  it("trae la asistencia de la temporada con las últimas 10, contada en el club del Admin (#774, D9)", async () => {
     const { gateways, reads } = fake();
 
     const record = await readAsAdmin(gateways);
 
-    expect(record.attendance).toEqual({
-      kind: "rate",
-      percent: 90,
-      sessions: 9,
-    });
-    expect(reads).toContain(`attendance ${CLUB_ID} ${MEMBER_ID}`);
+    expect(record.attendance).toEqual(MEMBER_ATTENDANCE);
+    expect(reads).toContain(
+      `attendance ${CLUB_ID} ${MEMBER_ID} ${SEASON_STARTS_ON} ${TODAY_IN_CLUB}`,
+    );
   });
 
-  it("dice sin datos de asistencia a quien no tiene sesiones elegibles (AC-017b)", async () => {
-    const { gateways } = fake({ attendance: { kind: "no_data" } });
+  it("trae la asistencia en null a quien no tiene sesiones esta temporada (AC-017b)", async () => {
+    const { gateways } = fake({ sessions: [LAST_SEASON_SESSION] });
 
     const record = await readAsAdmin(gateways);
 
-    expect(record.attendance).toEqual({ kind: "no_data" });
+    expect(record.attendance).toBeNull();
+  });
+
+  it("trae el día en que se renueva la membresía (#774)", async () => {
+    const { gateways } = fake();
+
+    const record = await readAsAdmin(gateways);
+
+    expect(record.membershipRenewsOn).toBe(RENEWS_ON);
   });
 
   it("marca vencido un AUF que caducó antes de hoy", async () => {
@@ -540,6 +592,7 @@ describe("la ficha por rol (#770, D1, D3, D4 y D11 del PRD de E30)", () => {
       },
       membershipPlan: "Full",
       membershipStatus: "active",
+      membershipRenewsOn: RENEWS_ON,
       attendance: MEMBER_ATTENDANCE,
       groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
     });
@@ -565,6 +618,7 @@ describe("la ficha por rol (#770, D1, D3, D4 y D11 del PRD de E30)", () => {
       emergencyContact: null,
       membershipPlan: "Full",
       membershipStatus: "active",
+      membershipRenewsOn: RENEWS_ON,
       attendance: MEMBER_ATTENDANCE,
       groups: [],
     });

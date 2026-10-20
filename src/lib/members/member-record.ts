@@ -1,8 +1,8 @@
 import {
-  type MemberAttendance,
-  type MemberAttendanceGateway,
-  attendanceOf,
-} from "@/lib/attendance/attendance-stats";
+  type SeasonAttendance,
+  type SeasonAttendanceGateway,
+  readSeasonAttendance,
+} from "@/lib/attendance/season-attendance";
 import {
   type AuditActor,
   type AuditLogWriter,
@@ -127,6 +127,9 @@ export type StoredMemberRecord = ProfileContact & {
   readonly membershipWaiver: MembershipWaiverView | null;
   /** Su plan, o `null` si todavía no eligió ninguno (#770). */
   readonly membershipPlan: MembershipPlan | null;
+  /** YYYY-MM-DD, el día del club del próximo cobro, o `null` si no hay
+   * ninguno a la vista (#774). */
+  readonly membershipRenewsOn: string | null;
   /** El correo de su cuenta (#770). */
   readonly email: string;
   /** Lo que la cabecera pinta como "posición · experiencia · país" (#770). */
@@ -153,9 +156,11 @@ type SharedMemberRecordFields = {
   readonly emergencyContact: ProfileContact["emergencyContact"];
   readonly membershipPlan: MembershipPlan | null;
   readonly membershipStatus: MembershipStatus | null;
+  readonly membershipRenewsOn: string | null;
   readonly groups: readonly MemberGroup[];
-  /** Su porcentaje y su total de asistencia, o sin datos (#394, FR-022). */
-  readonly attendance: MemberAttendance;
+  /** La de la temporada con las últimas 10, la misma del inicio (#774, D9),
+   * o null sin sesiones esta temporada. */
+  readonly attendance: SeasonAttendance | null;
 };
 
 /** La ficha que lee el Admin: todo lo que se guarda de ella. Es también lo
@@ -316,7 +321,7 @@ export type MemberRecordGateways = Pick<
     /** Null si Storage no firmó esa ruta; lanza si la llamada falla. */
     signPhotoUrl(photoPath: string): Promise<string | null>;
   };
-  readonly attendance: MemberAttendanceGateway;
+  readonly attendance: SeasonAttendanceGateway;
   readonly audit: AuditLogWriter;
 };
 
@@ -557,7 +562,10 @@ async function composeRecord(
       { listGroupsOf: () => gateways.records.findMemberGroups(scope) },
       scope.userId,
     ),
-    gateways.attendance.findMemberAttendance(scope.clubId, [scope.userId]),
+    readSeasonAttendance(gateways.attendance, {
+      ...scope,
+      today: todayInClub,
+    }),
   ]);
   const { photoPath, positionId, ...fields } = record;
   const [photoUrl, positionName] = await Promise.all([
@@ -571,7 +579,7 @@ async function composeRecord(
     positionName,
     isAufExpired: isAufExpired(record.aufExpiry, todayInClub),
     groups,
-    attendance: attendanceOf(attendance, scope.userId),
+    attendance,
   };
 }
 
@@ -589,6 +597,7 @@ function sharedFieldsOf(record: MemberRecord): SharedMemberRecordFields {
     emergencyContact: record.emergencyContact,
     membershipPlan: record.membershipPlan,
     membershipStatus: record.membershipStatus,
+    membershipRenewsOn: record.membershipRenewsOn,
     groups: record.groups,
     attendance: record.attendance,
   };
