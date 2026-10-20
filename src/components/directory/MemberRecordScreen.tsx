@@ -16,18 +16,21 @@ import {
 import { type AdminAction, MemberAdminMenu } from "./MemberAdminMenu";
 import { type AdminPanel, MemberAdminPanel } from "./MemberAdminPanel";
 import { MemberRecordForm } from "./MemberRecordForm";
+import { MemberRecordReadOnly } from "./MemberRecordReadOnly";
 import { useMemberStatusChange } from "./MemberStatusControl";
 
 /**
- * La ficha reservada al Admin de un miembro (#242, RF-4 del PRD de E5), que se
- * abre desde su fila del directorio: su número de AUF, su vencimiento y sus
- * grupos, su asistencia (#396), su evaluación para leer (#324) y su rol
+ * La ficha de un miembro (#242, RF-4 del PRD de E5), que se abre desde su
+ * fila del directorio. El Admin la edita: su número de AUF, su vencimiento y
+ * sus grupos, su asistencia (#396), su evaluación para leer (#324) y su rol
  * (#549). La membresía, la asistencia de la temporada, los grupos y la
  * evaluación van en la columna derecha del formulario (#774). El rol, la
  * exención, la invitación y la baja se piden en el ⋯ de la cabecera (#775).
+ * El Committee y el Coach la leen sin editar nada (#776), en la vista que el
+ * endpoint recorta para su rol.
  *
- * La frontera ya mandó al panel a quien no es Admin; si alguien deja de serlo
- * con la pantalla abierta, el 403 del endpoint lo dice aquí. Es de cliente
+ * La frontera ya mandó al panel al Player; si alguien pierde el rol con la
+ * pantalla abierta, el 403 del endpoint lo dice aquí. Es de cliente
  * porque lee y guarda por la API v1, la misma que usará la aplicación nativa
  * de Release 2 (CON-002). El idioma llega como prop porque el traductor no
  * puede cruzar del servidor al navegador.
@@ -107,6 +110,9 @@ export function MemberRecordScreen({
           loaded={state}
           onRecordChanged={applyChange}
         />
+      ) : null}
+      {state.kind === "readOnly" ? (
+        <MemberRecordReadOnly locale={locale} record={state.record} />
       ) : null}
     </div>
   );

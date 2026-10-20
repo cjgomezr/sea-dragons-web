@@ -239,7 +239,7 @@ async function withHome(run: (home: Home) => Promise<void>): Promise<void> {
 
 describeRls("el dashboard en Supabase", () => {
   it(
-    "junta las cuatro teselas, el entrenamiento, la noticia y la marca de visita",
+    "junta el próximo, la semana, la noticia y la marca de visita",
     async () => {
       await withHome(async (home) => {
         const reported: DashboardSource[] = [];
@@ -259,28 +259,16 @@ describeRls("el dashboard en Supabase", () => {
         if (fresh.kind !== "member") {
           throw new Error("Un socio al día recibe el inicio de socio.");
         }
-        expect(fresh.tiles).toEqual({
-          attendance: {
-            kind: "own_attendance",
-            attendance: { kind: "no_data" },
-          },
-          members: { kind: "members", active: 1, joinedRecently: 1 },
-          nextTraining: {
-            kind: "training",
-            training: expect.objectContaining({
-              id: home.trainingId,
-              title: "Entrenamiento del inicio",
-              startTime: "19:00",
-              location: "MSAC",
-              myResponse: null,
-            }),
-          },
-          unreadNews: { kind: "unread", count: 1, announcements: 1 },
+        expect(fresh.nextUp).toMatchObject({
+          kind: "event",
+          id: home.trainingId,
+          title: "Entrenamiento del inicio",
+          startTime: "19:00",
+          location: "MSAC",
+          myResponse: null,
         });
-        expect(fresh.upcomingEvents).toEqual({
-          kind: "events",
-          events: [expect.objectContaining({ id: home.trainingId })],
-        });
+        expect(fresh).not.toHaveProperty("tiles");
+        expect(fresh).not.toHaveProperty("upcomingEvents");
         expect(fresh.latestNews).toEqual({
           kind: "news",
           posts: [
@@ -288,6 +276,7 @@ describeRls("el dashboard en Supabase", () => {
               id: home.postId,
               category: "announcement",
               title: "Cambio de piscina",
+              isUnread: true,
             }),
           ],
         });
@@ -298,13 +287,12 @@ describeRls("el dashboard en Supabase", () => {
         });
         const afterVisit = await readDashboard(gateways, request);
 
-        expect(afterVisit).toMatchObject({ kind: "member" });
-        expect(
-          afterVisit.kind === "member" && afterVisit.tiles.unreadNews,
-        ).toEqual({
-          kind: "unread",
-          count: 0,
-          announcements: 0,
+        expect(afterVisit).toMatchObject({
+          kind: "member",
+          latestNews: {
+            kind: "news",
+            posts: [expect.objectContaining({ isUnread: false })],
+          },
         });
       });
     },
@@ -369,10 +357,6 @@ describeRls("el dashboard en Supabase", () => {
           kind: "restricted",
           viewer: { firstName: "Pía" },
           block: "past_due",
-          nextTraining: {
-            kind: "training",
-            training: expect.objectContaining({ id: home.trainingId }),
-          },
           contactReminder: { kind: "reminder", reminder: "both" },
           me: { attendance: null },
           nextUp: expect.objectContaining({ id: home.trainingId }),

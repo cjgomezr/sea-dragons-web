@@ -23,6 +23,12 @@ vi.mock("@/lib/auth/caller-role", () => ({
   }),
   readCallerId: async () => "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d",
 }));
+vi.mock("@/lib/auth/caller-identity", () => ({
+  readCallerIdentity: async () => ({
+    fullName: "Alba Ferrer",
+    email: "alba@example.com",
+  }),
+}));
 const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
 const { default: PagosPage } = await import("@/app/(app)/pagos/page");
 const { default: HomePage } = await import("@/app/(app)/page");
@@ -138,16 +144,17 @@ describe("panel principal", () => {
 
       await renderIn("en", Page);
 
+      // El saludo no espera al dashboard: el nombre lo lee la página (#752).
       expect(
-        screen.getByRole("heading", { level: 1, name: "Dashboard" }),
+        screen.getByRole("heading", { level: 1, name: /, Alba$/ }),
       ).toBeInTheDocument();
       expect(screen.queryByText("Service status")).not.toBeInTheDocument();
       expect(screen.queryByText(/under construction/i)).not.toBeInTheDocument();
     },
   );
 
-  /** Un dashboard vacío pero cargado: la cabecera, donde vive el botón, sólo
-   * se pinta cuando la petición ya llegó. */
+  /** Un dashboard vacío pero cargado: la tarjeta "Próximo" vacía también
+   * ofrece el botón. */
   function stubLoadedDashboard(): void {
     vi.stubGlobal(
       "fetch",
@@ -160,13 +167,6 @@ describe("panel principal", () => {
                 column: "player",
                 viewer: { firstName: "Alba" },
                 me: { attendance: null },
-                tiles: {
-                  attendance: { kind: "unavailable" },
-                  members: { kind: "unavailable" },
-                  nextTraining: { kind: "none" },
-                  unreadNews: { kind: "unavailable" },
-                },
-                upcomingEvents: { kind: "events", events: [] },
                 latestNews: { kind: "news", posts: [] },
                 contactReminder: { kind: "reminder", reminder: "none" },
                 nextUp: { kind: "none" },
@@ -189,9 +189,10 @@ describe("panel principal", () => {
       await renderIn("en", HomePage);
 
       // Sin nada próximo, la tarjeta "Próximo" también lo ofrece (#747).
-      expect(
-        await screen.findAllByRole("link", { name: "New event" }),
-      ).toHaveLength(2);
+      await screen.findByRole("region", { name: "Next up" });
+      expect(screen.getAllByRole("link", { name: "New event" })).toHaveLength(
+        2,
+      );
     },
   );
 
@@ -203,9 +204,9 @@ describe("panel principal", () => {
 
       await renderIn("en", HomePage);
 
-      // Con la petición sin responder el botón no estaría para nadie: hay que
-      // esperar al saludo, que llega con la misma respuesta que la cabecera.
-      await screen.findByRole("heading", { level: 1, name: /Alba/ });
+      // Hay que esperar a la respuesta: sin ella la tarjeta "Próximo", que
+      // también lo ofrece, no estaría para nadie.
+      await screen.findByRole("region", { name: "Next up" });
       expect(
         screen.queryByRole("link", { name: "New event" }),
       ).not.toBeInTheDocument();

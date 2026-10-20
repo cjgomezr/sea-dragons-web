@@ -30,19 +30,13 @@ export function greetingPeriodAt(moment: ClubMoment): GreetingPeriod {
   return "evening";
 }
 
-/** "hoy 19:00", "5 h" o "2 d", como en la tesela del mockup. */
-export type TimeUntil =
-  | { readonly kind: "today"; readonly time: string }
-  | { readonly kind: "hours"; readonly hours: number }
-  | { readonly kind: "days"; readonly days: number };
-
 const MINUTES_PER_HOUR = 60;
 const HOURS_PER_DAY = 24;
 const MILLISECONDS_PER_MINUTE = 60 * 1000;
 
 /** Los minutos de pared entre dos momentos del club. Se cuentan como si
  * fueran UTC: en la noche del cambio de horario la cuenta se desvía una
- * hora, y para decir "5 h" en una tesela eso sobra. */
+ * hora, y para contar días de calendario eso no cambia nada. */
 function wallClockMinutesBetween(from: ClubMoment, to: ClubMoment): number {
   const toWallClock = (moment: ClubMoment): number =>
     Date.parse(`${moment.date}T${moment.time}:00.000Z`);
@@ -57,22 +51,6 @@ function calendarDaysBetween(from: string, to: string): number {
     ) /
       (MINUTES_PER_HOUR * HOURS_PER_DAY),
   );
-}
-
-/** Cuánto falta para `start`, que va por delante de `now`. El mismo día del
- * club dice la hora; a menos de 24 horas, las horas que faltan redondeadas
- * hacia arriba; desde ahí, los días de calendario. */
-export function timeUntil(start: ClubMoment, now: ClubMoment): TimeUntil {
-  if (start.date === now.date) {
-    return { kind: "today", time: start.time };
-  }
-  const hours = Math.ceil(
-    wallClockMinutesBetween(now, start) / MINUTES_PER_HOUR,
-  );
-  if (hours < HOURS_PER_DAY) {
-    return { kind: "hours", hours };
-  }
-  return { kind: "days", days: calendarDaysBetween(now.date, start.date) };
 }
 
 /** Lo que dice la píldora de la tarjeta "Próximo" (#747, RF-3 del PRD de
@@ -93,4 +71,11 @@ export function nextUpDistance(
     return { kind: "today" };
   }
   return days === 1 ? { kind: "tomorrow" } : { kind: "days", days };
+}
+
+/** La primera palabra del nombre completo: el saludo dice "Alba", no
+ * "Alba Ferrer". */
+export function firstNameOf(fullName: string): string {
+  const [firstName = fullName] = fullName.trim().split(/\s+/);
+  return firstName;
 }

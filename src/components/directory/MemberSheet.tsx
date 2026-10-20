@@ -18,7 +18,12 @@ import {
   attendanceFactOf,
   positionFactOf,
 } from "./MemberQuickCard";
-import { type SelectedMember, cardTagsOf, contactOf } from "./selected-member";
+import {
+  type SelectedMember,
+  canOpenRecord,
+  cardTagsOf,
+  contactOf,
+} from "./selected-member";
 import type { PendingRoleRequests } from "./use-pending-role-requests";
 
 /**
@@ -30,8 +35,9 @@ import type { PendingRoleRequests } from "./use-pending-role-requests";
  * Cambia lo que en la piscina se usa con una mano: el contacto son tres
  * botones redondos que llaman o escriben, en vez de líneas que se copian.
  * Lo demás es la misma ficha, con lo mismo para cada rol (D4): el rol, la
- * invitación, la solicitud, el AUF, la membresía y la ficha completa, sólo
- * para el Admin.
+ * invitación, la solicitud, el AUF y la membresía, sólo para el Admin. La
+ * ficha completa la abren también el Committee y el Coach, en lectura
+ * (#776).
  */
 
 /** El círculo de la ficha, en píxeles; `.directory-sheet-avatar` dice lo
@@ -141,7 +147,7 @@ export function MemberSheet({
             translate={translate}
             facts={sheetFactsOf(translate, locale, selected)}
           />
-          {selected.kind === "admin" ? (
+          {canOpenRecord(selected) ? (
             <Link
               href={memberRecordHref(member.userId)}
               className="directory-sheet-open"

@@ -329,8 +329,7 @@ export function OwnContactCard({
       ) : (
         <ContactSummary
           translate={translate}
-          phone={profile.phone}
-          email={email}
+          reachableAt={{ phone: profile.phone, email }}
           emergencyContact={profile.emergencyContact}
         />
       )}

@@ -8473,6 +8473,138 @@ test.describe("la ficha con una foto que no carga", () => {
   });
 });
 
+/* ---------------------------------------------------------------------------
+   La ficha en lectura del Committee y del Coach (#776, D1 y D3 del PRD de
+   E30). Mockup del Committee:
+   docs/design/design_handoff_profile/screenshots/04-desktop-committee.png,
+   sin la ficha AUF que dibuja (manda D1). El Coach no está dibujado: se
+   revisa contra design-system.md con la del Committee de referencia.
+
+   La vista la finge `page.route`, como las de la ficha del Admin. La sesión
+   es la del Committee sembrado también para la del Coach: la frontera deja
+   pasar a los dos, y sembrar un Coach sólo para esto costaría una identidad
+   de Auth más (#415). Lo que la pantalla pinta lo decide la vista.
+   --------------------------------------------------------------------------- */
+
+/** Declarado aquí y no reutilizando el de la configuración del club, que
+ * está más abajo: `test.use` lo lee al recorrer el archivo. */
+const RECORD_READER_STORAGE_STATE = roleRequestStorageStatePath(
+  "committee-de-configuracion",
+);
+
+const GROUPS_CARD = /^(Groups|Grupos)$/;
+
+/** Lo que las dos vistas en lectura traen (#770): ni AUF, ni fechas, ni
+ * nada de la cuenta. */
+const STAFF_RECORD_SHARED = {
+  userId: RECORD_MEMBER_ID,
+  fullName: LONG_MEMBER_NAME,
+  photoUrl: null,
+  role: "Player",
+  positionName: { en: "Goalkeeper", es: "Portero" },
+  experienceLevel: "Intermediate",
+  country: "AU",
+  emergencyContact: CURRENT_RECORD.emergencyContact,
+  membershipPlan: "Full",
+  membershipStatus: "active",
+  membershipRenewsOn: "2027-06-30",
+  groups: CURRENT_RECORD.groups,
+  attendance: CURRENT_RECORD.attendance,
+} as const;
+
+type StaffRecordState = {
+  readonly name: string;
+  readonly reading: Readonly<Record<string, unknown>>;
+};
+
+const STAFF_RECORD_STATES: readonly StaffRecordState[] = [
+  {
+    name: "ficha-committee",
+    reading: {
+      ...STAFF_RECORD_SHARED,
+      view: "committee",
+      email: "socia.de.prueba@example.test",
+      phone: CURRENT_RECORD.phone,
+    },
+  },
+  {
+    name: "ficha-coach",
+    reading: { ...STAFF_RECORD_SHARED, view: "coach" },
+  },
+  {
+    name: "ficha-coach-sin-emergencia",
+    reading: { ...STAFF_RECORD_SHARED, view: "coach", emergencyContact: null },
+  },
+];
+
+async function goToStaffRecord(
+  page: Page,
+  state: StaffRecordState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === MEMBER_RECORD_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: state.reading }),
+      }),
+  );
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${MEMBER_RECORD_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, MEMBER_RECORD_SCREEN_PATH, theme);
+  }
+  await expect(
+    page.getByRole("heading", { level: 1, name: LONG_MEMBER_NAME }),
+  ).toBeVisible();
+  await expect(page.getByRole("region", { name: GROUPS_CARD })).toBeVisible();
+  await waitForAccountInitials(page);
+}
+
+for (const state of STAFF_RECORD_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: RECORD_READER_STORAGE_STATE });
+    for (const vp of RECORD_DESKTOP_VIEWPORTS) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToStaffRecord(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+          test(`has no accessibility violations (${theme})`, async ({
+            page,
+          }) => {
+            await goToStaffRecord(page, state, theme);
+            await expectNoAxeViolations(page);
+          });
+        }
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToStaffRecord(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+  });
+}
+
 function openOwnRecordLink(page: Page) {
   return page.getByRole("link", {
     name: `Open ${ADMINISTRATION_ADMIN_NAME}'s record`,
@@ -22180,61 +22312,29 @@ test.describe("la búsqueda global con los datos de verdad", () => {
    llega con #427.
 
    Las capturas leen un dashboard fijo, servido por `page.route`, y un reloj
-   fijo: el saludo, "2 d" y "hace N" salen de la hora en que se pinta. Lo que
-   el endpoint de verdad responde se prueba en sus tests de Vitest (#424); el
+   fijo: el saludo, "mañana" y "hace N" salen de la hora en que se pinta. El
+   nombre del saludo es el de la cuenta, que lee la página (#752). Lo que el
+   endpoint de verdad responde se prueba en sus tests de Vitest (#424); el
    RSVP con datos de verdad, al final de esta sección.
    --------------------------------------------------------------------------- */
 
 const DASHBOARD_ENDPOINT = "/api/v1/dashboard";
 const HOME_SCREEN_PATH = "/";
 const DASHBOARD_NARROW_WIDTHS = [320, 375, 768] as const;
-const DASHBOARD_GREETING = /^(Good|Buenos|Buenas) .+, Liam$/;
+const DASHBOARD_GREETING = /^(Good|Buenos|Buenas) .+, \S+$/;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 function dashboardDaysAgo(days: number): string {
   return new Date(HOME_NOW.getTime() - days * DAY_IN_MS).toISOString();
 }
 
-const DASHBOARD_TRAINING = {
-  id: "d0d0d0d0-0000-4000-8000-0000000000d1",
-  title: "Pool Training",
-  startsOn: "2026-10-02",
-  startTime: "19:00",
-  location: "MSAC",
-  goingCount: 14,
-  maybeCount: 2,
-  myResponse: "yes",
-} as const;
-
-function dashboardEvent(overrides: {
-  readonly id: string;
-  readonly title: string;
-  readonly startsOn: string;
-  readonly startTime: string;
-  readonly eventType: string;
-  readonly location: string;
-}): object {
-  return {
-    endTime: null,
-    endsOn: null,
-    place: null,
-    placeDetail: null,
-    status: "scheduled",
-    seriesId: null,
-    goingCount: 0,
-    maybeCount: 0,
-    myResponse: null,
-    inAudience: true,
-    coverThumbUrl: null,
-    ...overrides,
-  };
-}
+const DASHBOARD_POOL_TRAINING_ID = "d0d0d0d0-0000-4000-8000-0000000000d1";
 
 // El próximo evento de la tarjeta "Próximo" (#747): un entrenamiento con
 // hora de fin y lugar con coordenadas, como el del handoff de E27.
 const DASHBOARD_NEXT_UP = {
   kind: "event",
-  id: DASHBOARD_TRAINING.id,
+  id: DASHBOARD_POOL_TRAINING_ID,
   title: "Saturday scrimmage",
   eventType: "training",
   startsOn: "2026-10-03",
@@ -22264,33 +22364,6 @@ const DASHBOARD_MY_TEAM = {
     names: { en: "Full back", es: "Defensa" },
   },
 } as const;
-
-const DASHBOARD_UPCOMING = [
-  dashboardEvent({
-    id: DASHBOARD_TRAINING.id,
-    title: "Pool Training",
-    startsOn: "2026-10-02",
-    startTime: "19:00",
-    eventType: "training",
-    location: "MSAC Dive Pool",
-  }),
-  dashboardEvent({
-    id: "d0d0d0d0-0000-4000-8000-0000000000d2",
-    title: "Skills & Conditioning",
-    startsOn: "2026-10-04",
-    startTime: "19:30",
-    eventType: "training",
-    location: "Fitzroy Pool",
-  }),
-  dashboardEvent({
-    id: "d0d0d0d0-0000-4000-8000-0000000000d3",
-    title: "Scrimmage vs Geelong Krakens",
-    startsOn: "2026-10-06",
-    startTime: "10:00",
-    eventType: "competition",
-    location: "Geelong Aquatic Centre",
-  }),
-];
 
 // Las noticias del inicio (#751): la fijada con extracto, que va destacada
 // aunque no sea la más nueva, y una de las pequeñas sin leer, como en las
@@ -22347,7 +22420,7 @@ const DASHBOARD_WEEK = {
   kind: "week",
   events: [
     {
-      id: DASHBOARD_TRAINING.id,
+      id: DASHBOARD_POOL_TRAINING_ID,
       title: "Pool Training",
       eventType: "training",
       startsOn: "2026-10-02",
@@ -22446,16 +22519,6 @@ const ADMIN_DASHBOARD = {
   me: {
     attendance: { percent: 85, attended: 11, sessions: 13, last10: [] },
   },
-  tiles: {
-    attendance: {
-      kind: "club_rate",
-      rate: { kind: "rate", percent: 86, records: 42 },
-    },
-    members: { kind: "members", active: 48, joinedRecently: 3 },
-    nextTraining: { kind: "training", training: DASHBOARD_TRAINING },
-    unreadNews: { kind: "unread", count: 3, announcements: 1 },
-  },
-  upcomingEvents: { kind: "events", events: DASHBOARD_UPCOMING },
   latestNews: { kind: "news", posts: DASHBOARD_LATEST_NEWS },
   contactReminder: { kind: "reminder", reminder: "none" },
   nextUp: { ...DASHBOARD_NEXT_UP, teamsStatus: "none" },
@@ -22496,13 +22559,6 @@ const PLAYER_DASHBOARD = {
   column: "player",
   me: { attendance: DASHBOARD_SEASON_ATTENDANCE },
   membership: { status: "active", plan: "Full", renewsOn: "2027-06-30" },
-  tiles: {
-    ...ADMIN_DASHBOARD.tiles,
-    attendance: {
-      kind: "own_attendance",
-      attendance: { kind: "rate", percent: 90, sessions: 10 },
-    },
-  },
   nextUp: DASHBOARD_NEXT_UP,
 };
 
@@ -22557,26 +22613,6 @@ const NOTHING_NEXT_DASHBOARD = {
   nextUp: { kind: "none" },
 };
 
-// Un club recién creado: lo que el PRD describe en sus casos borde.
-const EMPTY_DASHBOARD = {
-  kind: "member",
-  column: "player",
-  viewer: { firstName: "Liam" },
-  me: { attendance: null },
-  tiles: {
-    attendance: { kind: "club_rate", rate: { kind: "no_data" } },
-    members: { kind: "members", active: 1, joinedRecently: 0 },
-    nextTraining: { kind: "none" },
-    unreadNews: { kind: "unread", count: 0, announcements: 0 },
-  },
-  upcomingEvents: { kind: "events", events: [] },
-  latestNews: { kind: "news", posts: [] },
-  contactReminder: { kind: "reminder", reminder: "none" },
-  nextUp: { kind: "none" },
-  week: { kind: "week", events: [] },
-  membership: { status: "active", plan: "Full", renewsOn: null },
-};
-
 // El inicio reducido de quien no tiene la membresía al día (#453): el aviso
 // de la membresía vencida con su fecha y la tarjeta "Próximo" con la fila del
 // candado en lugar del RSVP (#747).
@@ -22585,10 +22621,6 @@ const RESTRICTED_DASHBOARD = {
   viewer: { firstName: "Liam" },
   me: { attendance: DASHBOARD_SEASON_ATTENDANCE },
   block: "cancelled",
-  nextTraining: {
-    kind: "training",
-    training: { ...DASHBOARD_TRAINING, myResponse: null },
-  },
   contactReminder: { kind: "reminder", reminder: "none" },
   nextUp: { ...DASHBOARD_NEXT_UP, myResponse: null },
   week: DASHBOARD_WEEK,
@@ -22687,7 +22719,6 @@ const DASHBOARD_STATES: readonly DashboardScreenState[] = [
     NO_SESSIONS_DASHBOARD,
     E2E_STORAGE_STATE_PATH,
   ),
-  ...dashboardStates("inicio-vacio", EMPTY_DASHBOARD, ADMIN_STORAGE_STATE),
   ...dashboardStates(
     "inicio-sin-membresia",
     RESTRICTED_DASHBOARD,
@@ -22759,6 +22790,7 @@ async function goToDashboard(
   await expect(
     page.getByRole("heading", { level: 1, name: DASHBOARD_GREETING }),
   ).toBeVisible();
+  await expect(page.locator(".dashboard-skeleton")).toHaveCount(0);
 }
 
 for (const state of DASHBOARD_STATES) {
@@ -22784,6 +22816,15 @@ for (const state of DASHBOARD_STATES) {
                 fullPage: true,
                 maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
               });
+            });
+
+            // Cada ancho reordena el inicio y cada tema cambia los
+            // contrastes: axe mira los seis (#752).
+            test(`has no accessibility violations (${theme}, axe-core)`, async ({
+              page,
+            }) => {
+              await goToDashboard(page, state, theme);
+              await expectNoAxeViolations(page);
             });
           }
         }
@@ -22956,6 +22997,183 @@ test.describe("la columna de gestión en el navegador (#750)", () => {
     await expect(page).toHaveURL(
       `${APP_URL}/asistencia?sesion=${TODO_ATTENDANCE_MISSING.eventId}`,
     );
+  });
+});
+
+test.describe("el orden del inicio en el navegador (#752)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+
+  type Box = { x: number; y: number; width: number; height: number };
+
+  /** La caja de un elemento que se ve, o un fallo que dice cuál faltaba. */
+  async function boxOf(locator: Locator): Promise<Box> {
+    const box = await locator.boundingBox();
+    if (box === null) {
+      throw new Error(`${locator.toString()} no se ve.`);
+    }
+    return box;
+  }
+
+  function regionBox(page: Page, name: string): Promise<Box> {
+    return boxOf(page.getByRole("region", { name }));
+  }
+
+  /** Cada caja empieza debajo de donde acaba la anterior. */
+  function expectStacked(boxes: readonly Box[]): void {
+    boxes.reduce((above, box) => {
+      expect(box.y).toBeGreaterThanOrEqual(above.y + above.height);
+      return box;
+    });
+  }
+
+  /** Lo que queda libre entre el final de una caja y el principio de otra. */
+  function gapBetween(
+    first: Box,
+    second: Box,
+    axis: "horizontal" | "vertical",
+  ): number {
+    return axis === "horizontal"
+      ? Math.round(second.x - (first.x + first.width))
+      : Math.round(second.y - (first.y + first.height));
+  }
+
+  test.describe("un Player", () => {
+    test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+    test("en el móvil va Próximo, Esta semana, su columna lado a lado y Noticias", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await goToDashboard(page, { dashboard: PLAYER_DASHBOARD });
+
+      const [nextUp, week, attendance, membership, news] = await Promise.all([
+        regionBox(page, "Next up"),
+        regionBox(page, "This week"),
+        regionBox(page, "My attendance"),
+        regionBox(page, "Membership"),
+        regionBox(page, "News"),
+      ]);
+
+      expectStacked([nextUp, week, attendance, news]);
+      expect(membership.y).toBe(attendance.y);
+    });
+
+    test("en el móvil el inicio lleva 14px de margen y 16px entre bloques", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await goToDashboard(page, { dashboard: PLAYER_DASHBOARD });
+
+      const [dashboard, nextUp, week] = await Promise.all([
+        boxOf(page.locator(".dashboard")),
+        regionBox(page, "Next up"),
+        regionBox(page, "This week"),
+      ]);
+
+      expect(Math.round(dashboard.x)).toBe(14);
+      expect(Math.round(dashboard.width)).toBe(375 - 2 * 14);
+      expect(gapBetween(nextUp, week, "vertical")).toBe(16);
+    });
+
+    test("en escritorio va la cuadrícula de 1fr y 340px con 18px de hueco, y Noticias a lo ancho debajo", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await goToDashboard(page, { dashboard: PLAYER_DASHBOARD });
+
+      const [dashboard, nextUp, week, attendance, news] = await Promise.all([
+        boxOf(page.locator(".dashboard")),
+        regionBox(page, "Next up"),
+        regionBox(page, "This week"),
+        regionBox(page, "My attendance"),
+        regionBox(page, "News"),
+      ]);
+
+      expect(Math.round(attendance.width)).toBe(340);
+      expect(gapBetween(nextUp, attendance, "horizontal")).toBe(18);
+      expect(gapBetween(nextUp, week, "vertical")).toBe(18);
+      expectStacked([week, news]);
+      expect(Math.round(news.width)).toBe(Math.round(dashboard.width));
+    });
+
+    test("mientras espera la respuesta saluda y enseña el esqueleto de cada bloque", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await page.clock.setFixedTime(HOME_NOW);
+      let answer: () => void = () => undefined;
+      const answered = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      await page.route(
+        (url) => url.pathname === DASHBOARD_ENDPOINT,
+        async (route) => {
+          await answered;
+          await route.fulfill(jsonBody(PLAYER_DASHBOARD));
+        },
+      );
+      await page.goto(`${APP_URL}${HOME_SCREEN_PATH}`);
+
+      await expect(
+        page.getByRole("heading", { level: 1, name: DASHBOARD_GREETING }),
+      ).toBeVisible();
+      const skeleton = page.locator(".dashboard-skeleton");
+      await expect(skeleton.locator(".section-loading-block")).toHaveCount(4);
+      await expect(page.getByRole("region", { name: "Next up" })).toHaveCount(
+        0,
+      );
+      await expectNoAxeViolations(page);
+      answer();
+
+      await expect(page.getByRole("region", { name: "Next up" })).toBeVisible();
+      await expect(skeleton).toHaveCount(0);
+    });
+  });
+
+  test.describe("la gestión", () => {
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    test("en escritorio la columna de gestión mide 340px y Noticias va a lo ancho debajo", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
+
+      const [dashboard, nextUp, todos, club, news] = await Promise.all([
+        boxOf(page.locator(".dashboard")),
+        regionBox(page, "Next up"),
+        regionBox(page, "To do"),
+        regionBox(page, "Club numbers"),
+        regionBox(page, "News"),
+      ]);
+
+      expect(Math.round(todos.width)).toBe(340);
+      expect(todos.y).toBe(nextUp.y);
+      expectStacked([todos, club, news]);
+      expect(Math.round(news.width)).toBe(Math.round(dashboard.width));
+    });
+  });
+
+  test.describe("un socio restringido", () => {
+    test.use({ storageState: UNPAID_MEMBER_STORAGE_STATE_PATH });
+
+    test("en el móvil va el aviso, Próximo, Esta semana, su columna y Noticias", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await goToDashboard(page, { dashboard: RESTRICTED_DASHBOARD });
+
+      const boxes = await Promise.all([
+        boxOf(page.getByRole("note", { name: /Your membership expired/ })),
+        regionBox(page, "Next up"),
+        regionBox(page, "This week"),
+        regionBox(page, "My attendance"),
+        regionBox(page, "News"),
+      ]);
+
+      expectStacked(boxes);
+    });
   });
 });
 

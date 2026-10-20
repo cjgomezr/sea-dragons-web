@@ -30,6 +30,7 @@ import { QuickCardRole } from "./QuickCardRole";
 import {
   type CardTag,
   type SelectedMember,
+  canOpenRecord,
   cardTagsOf,
   contactOf,
 } from "./selected-member";
@@ -74,13 +75,13 @@ function CardHeader({
   translate,
   locale,
   member,
-  isAdmin,
+  opensRecord,
   onClose,
 }: {
   translate: Translator;
   locale: Locale;
   member: DirectoryMember;
-  isAdmin: boolean;
+  opensRecord: boolean;
   onClose: () => void;
 }): React.JSX.Element {
   const closeLabel = translate("directory.panel.close");
@@ -95,7 +96,7 @@ function CardHeader({
       />
       <div className="directory-identity">
         <h2 className="directory-card-name">
-          {isAdmin ? (
+          {opensRecord ? (
             <Link
               href={memberRecordHref(member.userId)}
               aria-label={translate("memberRecord.openLabel", {
@@ -335,6 +336,7 @@ export function MemberQuickCard({
 }): React.JSX.Element {
   const { member } = selected;
   const isAdmin = selected.kind === "admin";
+  const opensRecord = canOpenRecord(selected);
   const contact = contactOf(selected);
   return (
     <>
@@ -342,7 +344,7 @@ export function MemberQuickCard({
         translate={translate}
         locale={locale}
         member={member}
-        isAdmin={isAdmin}
+        opensRecord={opensRecord}
         onClose={onClose}
       />
       <CardTags translate={translate} tags={cardTagsOf(translate, selected)} />
@@ -366,7 +368,7 @@ export function MemberQuickCard({
         translate={translate}
         facts={factsOf(translate, locale, selected)}
       />
-      {isAdmin ? (
+      {opensRecord ? (
         <Link
           href={memberRecordHref(member.userId)}
           className="directory-card-open"
