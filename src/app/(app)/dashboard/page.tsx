@@ -1,6 +1,12 @@
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
-import { readCallerId, readCallerRole } from "@/lib/auth/caller-role";
+import type { OpenableSections } from "@/components/dashboard/ManagementColumn";
+import { readCallerAccess, readCallerId } from "@/lib/auth/caller-role";
 import { type Role, hasCapability } from "@/lib/auth/roles";
+import { ATTENDANCE_PATH, DIRECTORY_PATH, NEWS_PATH } from "@/lib/auth/routes";
+import {
+  type ActiveAccess,
+  isAllowedForAccess,
+} from "@/lib/auth/session-boundary";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 
 // El dashboard (#426, RF-1 a RF-4 del PRD de E14). Es también la pantalla de
@@ -14,17 +20,28 @@ function canCreateEventsFromHome(role: Role): boolean {
   return hasCapability(role, "createEvents");
 }
 
+/** Los números del club enlazan a la sección sólo si quien mira la abre
+ * (#750, D11): la misma regla que la frontera de la sesión. */
+function openableSectionsFor(access: ActiveAccess): OpenableSections {
+  return {
+    attendance: isAllowedForAccess(ATTENDANCE_PATH, access),
+    directory: isAllowedForAccess(DIRECTORY_PATH, access),
+    news: isAllowedForAccess(NEWS_PATH, access),
+  };
+}
+
 export default async function DashboardPage(): Promise<React.JSX.Element> {
-  const [locale, role, userId] = await Promise.all([
+  const [locale, access, userId] = await Promise.all([
     readRequestLocale(),
-    readCallerRole(),
+    readCallerAccess(),
     readCallerId(),
   ]);
   return (
     <DashboardScreen
       locale={locale}
       userId={userId}
-      canCreateEvents={canCreateEventsFromHome(role)}
+      canCreateEvents={canCreateEventsFromHome(access.role)}
+      openableSections={openableSectionsFor(access)}
     />
   );
 }
