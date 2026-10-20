@@ -118,7 +118,7 @@ The page container is about 1080px wide.
   - **Admin:** an "Edit" button that opens the existing `GroupsField`, as a checkbox list.
 - **Evaluation**
   - **Admin:** the overall score (30px, mono) with its date, and up to 4 category bars (6px, accent). "Open" goes to the full evaluation.
-  - **Me:** an `eye-slash` icon and "Your coaches keep evaluations private this season. Ask them if you'd like feedback.", or the existing `ReadOnlyEvaluation` when it's visible.
+  - **Me:** an `eye-slash` icon and "Your coaches keep evaluations private this season. Ask them if you'd like feedback.", or, when it's visible, the same summary as the record (overall, date and bars) with every category.
 - **Role** (Me only): a row reading "Role · Player" and "Coach or committee? Ask an Admin.", with a **Request** button. It reuses the `RoleRequestPanel` logic; if there's a pending request, show its status instead.
 
 ## Layout: mobile `#2a`

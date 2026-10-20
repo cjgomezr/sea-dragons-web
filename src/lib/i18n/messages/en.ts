@@ -2312,7 +2312,6 @@ export const englishMessages = {
   "evaluations.list.empty": "There's nobody in the club to evaluate yet.",
   "evaluations.list.noMatches": "No member matches that name.",
   "evaluations.list.notEvaluated": "Not evaluated",
-  "evaluations.notEvaluatedYet": "No evaluation yet.",
   "evaluations.list.noRatings": "No ratings yet",
   "evaluations.list.overall": "OVR {rating}",
   "evaluations.sheet.label": "Evaluation of {name}",

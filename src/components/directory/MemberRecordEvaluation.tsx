@@ -8,13 +8,8 @@ import {
   describeEvaluationFailure,
   loadMemberEvaluation,
 } from "@/components/evaluations/evaluations-client";
-import {
-  type EvaluationRating,
-  type MemberEvaluation,
-  RATING_MAX,
-} from "@/lib/evaluations/member-evaluation";
+import { EvaluationSummary } from "@/components/evaluations/EvaluationSummary";
 import { memberEvaluationHref } from "@/lib/evaluations/member-evaluation-href";
-import { formatClubShortDay, formatOverallRating } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
@@ -34,69 +29,6 @@ const HEADING_ID = "ficha-evaluacion";
 const SHOWN_CATEGORIES = 4;
 
 type EvaluationState = { readonly kind: "loading" } | EvaluationLoad;
-
-type Evaluated = Extract<MemberEvaluation, { status: "evaluated" }>;
-
-function CategoryBar({
-  translate,
-  entry,
-}: {
-  translate: Translator;
-  entry: EvaluationRating;
-}): React.JSX.Element {
-  const share = (entry.rating / RATING_MAX) * 100;
-  return (
-    <li>
-      <span className="profile-evaluation-name">{entry.name}</span>
-      <span className="profile-evaluation-bar" aria-hidden="true">
-        <span style={{ width: `${share}%` }} />
-      </span>
-      <span className="profile-evaluation-value">
-        {formatOverallRating(translate.locale, entry.rating)}
-      </span>
-    </li>
-  );
-}
-
-function EvaluationSummary({
-  translate,
-  evaluation,
-}: {
-  translate: Translator;
-  evaluation: Evaluated;
-}): React.JSX.Element {
-  return (
-    <>
-      <p className="profile-evaluation-overall">
-        <span className="profile-evaluation-score">
-          {evaluation.overallRating === null
-            ? translate("evaluations.overall.noData")
-            : formatOverallRating(translate.locale, evaluation.overallRating)}
-        </span>
-        <span>
-          {translate("memberRecord.evaluation.overall", {
-            date: formatClubShortDay(
-              translate.locale,
-              new Date(evaluation.updatedAt),
-            ),
-          })}
-        </span>
-      </p>
-      <ul
-        className="profile-evaluation-categories"
-        aria-label={translate("memberRecord.evaluation.categories")}
-      >
-        {evaluation.ratings.slice(0, SHOWN_CATEGORIES).map((entry) => (
-          <CategoryBar
-            key={entry.categoryId}
-            translate={translate}
-            entry={entry}
-          />
-        ))}
-      </ul>
-    </>
-  );
-}
 
 function EvaluationContent({
   translate,
@@ -127,6 +59,7 @@ function EvaluationContent({
         <EvaluationSummary
           translate={translate}
           evaluation={state.evaluation}
+          shownCategories={SHOWN_CATEGORIES}
         />
       );
   }
