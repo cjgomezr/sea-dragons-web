@@ -5,12 +5,13 @@ import { ProfileEvaluation } from "@/components/account/ProfileEvaluation";
 /**
  * La sección de evaluación del perfil propio (#324, RF-5 del PRD de E9). Qué
  * le llega lo decide el dominio: aquí se prueba que un aviso se pinta como
- * aviso y una evaluación como evaluación, sin mezclar las dos.
+ * aviso y una evaluación como evaluación, sin mezclar las dos. El aviso es
+ * el del rediseño (#774, D10).
  */
 
 const MEMBER_ID = "cccccccc-0000-4000-8000-00000000000c";
 const STAFF_ONLY_NOTICE =
-  "Evaluation ratings are only visible to the coaching staff.";
+  "Your coaches keep evaluations private this season. Ask them if you'd like feedback.";
 
 function section(name: string): HTMLElement {
   return screen.getByRole("region", { name });
@@ -102,7 +103,7 @@ describe("notas privadas en el perfil", () => {
 
     expect(
       within(section("Evaluación")).getByText(
-        "Las notas de las evaluaciones solo las ve el personal de entrenamiento.",
+        "Tus coaches mantienen las evaluaciones en privado esta temporada. Pregúntales si quieres saber cómo vas.",
       ),
     ).toBeVisible();
   });

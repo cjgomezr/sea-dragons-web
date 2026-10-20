@@ -1996,7 +1996,8 @@ a.auth-brand-header:focus-visible {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  max-width: 560px;
+  /* El ancho del diseño del rediseño, con su columna derecha (#774). */
+  max-width: 1080px;
 }
 
 .account-avatar {
@@ -2315,6 +2316,359 @@ a.auth-brand-header:focus-visible {
   outline: 2px solid var(--color-accent-text);
   outline-offset: 2px;
 }
+/* La columna derecha del perfil y de la ficha (#774, RF-5 del PRD de E30),
+   de docs/design/design_handoff_profile/screenshots/01 y 03: la rejilla
+   `1fr | 340px` con 16px de hueco desde 768px; por debajo, una columna (el
+   móvil es otro ticket). */
+.profile-layout {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (min-width: 768px) {
+  .profile-layout {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+.profile-main,
+.profile-aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.profile-side-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.profile-side-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.app-main .profile-side-card h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.profile-side-card-note {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* "Pagos", "Editar" y "Abrir": texto de acento. El margen negativo deja el
+   objetivo en 44px sin alargar la cabecera. */
+.profile-side-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--touch-target-min);
+  margin: calc(-1 * var(--space-3)) 0;
+  padding: 0 var(--space-1);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.profile-side-card-link:hover {
+  text-decoration: underline;
+}
+
+.profile-side-card-link:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.profile-side-card-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.profile-side-card-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-text-soft);
+}
+
+.profile-side-card-notice svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: var(--color-text-secondary);
+}
+
+.profile-side-card-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.profile-side-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* La tarjeta ya se titula Grupos: el `legend` sigue nombrando las casillas
+   para un lector de pantalla. Son las declaraciones de `.visually-hidden`. */
+.profile-side-card .member-record-groups legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Membresía: la baldosa de 38px con el tinte de éxito, como la ficha de
+   estado de la cabecera, el plan y su estado. */
+.profile-membership {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.profile-membership-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 18%, var(--color-panel));
+  border-radius: var(--radius);
+}
+
+.profile-membership-tile svg {
+  width: 20px;
+  height: 20px;
+}
+
+.profile-membership-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-membership-text p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.profile-membership-text .profile-membership-plan {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* Asistencia: el porcentaje en mono de 30px, las sesiones al lado y las
+   últimas 10 como bloques de 18px con su leyenda. */
+.season-attendance-figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.season-attendance-percent {
+  font-family: var(--font-family-mono);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+.season-attendance-blocks {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.season-attendance-block {
+  height: 18px;
+  border-radius: 4px;
+}
+
+.season-attendance-block.season-attendance-present,
+.season-attendance-legend .season-attendance-present::before {
+  background: var(--color-success);
+}
+
+.season-attendance-block.season-attendance-late,
+.season-attendance-legend .season-attendance-late::before {
+  background: var(--color-warning);
+}
+
+.season-attendance-block.season-attendance-absent,
+.season-attendance-legend .season-attendance-absent::before {
+  background: var(--color-danger);
+}
+
+.season-attendance-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.season-attendance-legend ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.season-attendance-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.season-attendance-legend li::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+/* Grupos: fichas de 28px. */
+.profile-group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-group-chips li {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  font-size: 13.5px;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  overflow-wrap: anywhere;
+}
+
+/* Evaluación del Admin: la nota global en mono de 30px y hasta cuatro
+   categorías con su barra de 6px de acento. */
+.profile-evaluation-overall {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.profile-evaluation-score {
+  font-family: var(--font-family-mono);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+.profile-evaluation-categories {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-evaluation-categories li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 13.5px;
+  color: var(--color-text);
+}
+
+.profile-evaluation-name {
+  overflow-wrap: anywhere;
+}
+
+.profile-evaluation-bar {
+  height: 6px;
+  overflow: hidden;
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+.profile-evaluation-bar span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 3px;
+}
+
+.profile-evaluation-value {
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+}
+
+/* El panel de la solicitud de rol, dentro de su tarjeta: sin el recuadro
+   propio, que ya lo pone la tarjeta. */
+.profile-role-panel .auth-pending {
+  padding: 0;
+  border: none;
+}
+
+.profile-role-panel .app-lead {
+  margin: 0;
+}
 
 /* La foto de perfil (#245). La imagen ocupa el mismo círculo que las
    iniciales y se recorta a él sin deformarse. */
@@ -2481,85 +2835,6 @@ a.auth-brand-header:focus-visible {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-
-/* Mis grupos (#229): la tarjeta de "Skill ratings" del mismo mockup, con la
-   etiqueta en mayúsculas y una fila por grupo. La evaluación del perfil
-   (#324) va en una tarjeta igual, debajo. */
-.account-groups,
-.account-evaluation {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-}
-
-.app-main .account-groups h2,
-.app-main .account-evaluation h2 {
-  margin: 0;
-  font-family: var(--font-family-mono);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1.3;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-}
-
-.account-groups ul {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.account-groups li {
-  color: var(--color-text);
-  overflow-wrap: anywhere;
-}
-
-.account-groups p,
-.account-evaluation > p {
-  margin: 0;
-  color: var(--color-text-secondary);
-}
-
-/* El enlace del tipo de membresía a Pagos (#456), con el color del aviso de
-   la puerta, que lleva al mismo sitio. */
-.account-evaluation a {
-  color: var(--color-accent-text);
-  font-weight: 600;
-}
-
-/* La asistencia (#396): la cifra grande del mockup del perfil, con las
-   sesiones debajo. La ficha del Admin usa el mismo bloque. */
-.member-attendance .member-attendance-figure {
-  margin: 0;
-  font-family: var(--font-family-mono);
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--color-text);
-}
-
-/* Sin datos no es una cifra: se escribe con la letra del texto y más
-   pequeño, para que no se lea como un resultado. */
-.member-attendance .member-attendance-empty {
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: 400;
-  color: var(--color-text-secondary);
-}
-
-.member-attendance .member-attendance-sessions {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-text-secondary);
 }
 
 /* La textarea de la justificación hereda el campo de .auth-field y sólo
@@ -5768,6 +6043,12 @@ a.auth-brand-header:focus-visible {
   flex-direction: column;
   gap: var(--space-6);
   max-width: 640px;
+}
+
+/* La ficha de un socio, con su columna derecha (#774): el ancho del perfil.
+   El alta de un socio se queda en el de arriba. */
+.member-record-wide {
+  max-width: 1080px;
 }
 
 .member-record-back {

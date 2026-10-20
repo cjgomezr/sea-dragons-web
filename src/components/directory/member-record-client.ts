@@ -36,9 +36,9 @@ import {
 } from "@/lib/members/profile-contact";
 import { loadGroups } from "@/components/groups/groups-client";
 import { describeContactIssue } from "@/components/account/profile-client";
+import { ATTENDANCE_STATUSES } from "@/lib/attendance/attendance-status";
 import {
   emergencyContactSchema,
-  memberAttendanceSchema,
   membershipStatusSchema,
 } from "./directory-client";
 import { EXPERIENCE_LEVELS } from "@/lib/members/profile-fields";
@@ -55,6 +55,23 @@ import { membershipWaiverSchema } from "./membership-waiver-client";
  * De un error se guarda el código y no la frase, para que el aviso cambie de
  * idioma con el interruptor (E17).
  */
+
+/** La asistencia de la temporada con las últimas 10 (#774, D9), o null sin
+ * sesiones esta temporada. */
+const seasonAttendanceSchema = z
+  .object({
+    percent: z.number().int(),
+    attended: z.number().int(),
+    sessions: z.number().int(),
+    last10: z.array(
+      z.object({
+        eventId: z.string(),
+        startsOn: z.iso.date(),
+        status: z.enum(ATTENDANCE_STATUSES),
+      }),
+    ),
+  })
+  .nullable();
 
 const recordSchema = z.object({
   // La pantalla es la del Admin; la vista del Committee y la del Coach las
@@ -77,13 +94,14 @@ const recordSchema = z.object({
   registeredAt: z.string(),
   hasGuardianConsent: z.boolean(),
   membershipStatus: membershipStatusSchema,
+  membershipRenewsOn: z.iso.date().nullable(),
   membershipWaiver: membershipWaiverSchema,
   phone: z.string().nullable(),
   emergencyContact: emergencyContactSchema,
   photoUrl: z.url().nullable(),
   isAufExpired: z.boolean(),
   groups: z.array(z.object({ id: z.uuid(), name: z.string() })),
-  attendance: memberAttendanceSchema,
+  attendance: seasonAttendanceSchema,
 });
 
 const responseSchema = z.object({ data: recordSchema });

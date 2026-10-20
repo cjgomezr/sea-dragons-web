@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
+import type {
+  AttendedSession,
+  SeasonAttendance,
+} from "@/lib/attendance/season-attendance";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
 import {
@@ -31,11 +34,38 @@ const UNKNOWN_MEMBER_ID = "b1b1b1b1-0000-4000-8000-0000000000ff";
 const SENIOR_ID = "9a9a9a9a-0000-4000-8000-000000000001";
 const UNKNOWN_GROUP_ID = "9a9a9a9a-0000-4000-8000-0000000000ff";
 const JOINED_ON = "2024-03-06";
-const MEMBER_ATTENDANCE: MemberAttendance = {
-  kind: "rate",
+/** Una temporada que empezó hace mucho: todas las sesiones cuentan, sea
+ * cual sea el día en que corra el test. */
+const SEASON_STARTS_ON = "2000-01-01";
+const MEMBER_SESSIONS: readonly AttendedSession[] = [
+  {
+    eventId: "e0e0e0e0-0000-4000-8000-000000000001",
+    startsOn: "2024-04-01",
+    status: "present",
+  },
+  {
+    eventId: "e0e0e0e0-0000-4000-8000-000000000002",
+    startsOn: "2024-04-08",
+    status: "late",
+  },
+  {
+    eventId: "e0e0e0e0-0000-4000-8000-000000000003",
+    startsOn: "2024-04-15",
+    status: "present",
+  },
+  {
+    eventId: "e0e0e0e0-0000-4000-8000-000000000004",
+    startsOn: "2024-04-22",
+    status: "absent",
+  },
+];
+const MEMBER_ATTENDANCE: SeasonAttendance = {
   percent: 75,
-  sessions: 3,
+  attended: 3,
+  sessions: 4,
+  last10: MEMBER_SESSIONS,
 };
+const RENEWS_ON = "2027-06-30";
 const REGISTERED_AT = "2024-03-06T01:00:00.000Z";
 const MEMBER_EMAIL = "paula@example.com";
 const ADULT_BIRTH = "1990-05-10";
@@ -106,6 +136,7 @@ function memberRecordGateways(
               membershipStatus: "active",
               membershipWaiver: null,
               membershipPlan: "Student",
+              membershipRenewsOn: RENEWS_ON,
               email: MEMBER_EMAIL,
               country: "NZ",
               experienceLevel: "Beginner",
@@ -145,8 +176,8 @@ function memberRecordGateways(
       },
     },
     attendance: {
-      findMemberAttendance: async (_clubId, userIds) =>
-        new Map(userIds.map((userId) => [userId, MEMBER_ATTENDANCE])),
+      findSeasonStartsOn: async () => SEASON_STARTS_ON,
+      findMemberSessions: async () => MEMBER_SESSIONS,
     },
     positions: { findClubPositions: async () => [] },
     photos: {
@@ -301,6 +332,7 @@ describe("PATCH /api/v1/members/{id}/record", () => {
         hasGuardianConsent: false,
         membershipPlan: "Student",
         membershipStatus: "active",
+        membershipRenewsOn: RENEWS_ON,
         membershipWaiver: null,
         phone: null,
         emergencyContact: null,
@@ -466,11 +498,11 @@ describe("GET /api/v1/members/{id}/record", () => {
     });
   });
 
-  it("trae el porcentaje y el total de asistencia del miembro (FR-022)", async () => {
+  it("trae la asistencia de la temporada con las últimas 10 y el día de la renovación (#774)", async () => {
     const response = await getRecord();
 
     await expect(response.json()).resolves.toMatchObject({
-      data: { attendance: { kind: "rate", percent: 75, sessions: 3 } },
+      data: { attendance: MEMBER_ATTENDANCE, membershipRenewsOn: RENEWS_ON },
     });
   });
 

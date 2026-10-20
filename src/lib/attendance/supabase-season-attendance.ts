@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
+import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { ATTENDANCE_STATUSES } from "./attendance-status";
+import type { OwnSeasonAttendanceGateways } from "./own-attendance";
 import type {
   AttendedSession,
   MemberSessionsQuery,
@@ -75,5 +79,31 @@ export function createSeasonAttendanceGateway(
   return {
     findSeasonStartsOn: (clubId) => findSeasonStartsOn(serviceClient, clubId),
     findMemberSessions: (query) => findMemberSessions(serviceClient, query),
+  };
+}
+
+type Environment = Readonly<Record<string, string | undefined>>;
+
+export type OwnSeasonAttendanceGatewaysResult =
+  | { readonly kind: "ready"; readonly gateways: OwnSeasonAttendanceGateways }
+  | { readonly kind: "unconfigured"; readonly missingKeys: readonly string[] };
+
+/** Raíz de composición de la asistencia de la temporada del perfil propio
+ * (#774). Con la llave de servicio aunque pregunte el propio socio, como la
+ * del inicio: el club sale de su fila. */
+export function createSupabaseOwnSeasonAttendanceGateways(
+  env: Environment,
+): OwnSeasonAttendanceGatewaysResult {
+  const config = readSupabaseServiceRoleConfig(env);
+  if (config.kind === "missing") {
+    return { kind: "unconfigured", missingKeys: config.missingKeys };
+  }
+  const serviceClient = createServiceRoleClient(env);
+  return {
+    kind: "ready",
+    gateways: {
+      members: createRoleRequestGateways(serviceClient).members,
+      season: createSeasonAttendanceGateway(serviceClient),
+    },
   };
 }
