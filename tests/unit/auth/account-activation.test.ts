@@ -6,6 +6,7 @@ import {
   MemberNotFoundError,
   type MemberProfile,
   activateAccountIfComplete,
+  ageOn,
   isMinorOn,
   resolveAccountStatus,
 } from "@/lib/auth/account-activation";
@@ -34,6 +35,14 @@ describe("edad del socio", () => {
 
   it("no confunde el mes con el día", () => {
     expect(isMinorOn("2008-12-01", "2026-09-12")).toBe(true);
+  });
+
+  it("cuenta los años cumplidos, sin el que aún no cumple (#773)", () => {
+    expect(ageOn("1996-02-14", "2026-02-13")).toBe(29);
+  });
+
+  it("suma el año el día del cumpleaños (#773)", () => {
+    expect(ageOn("1996-02-14", "2026-02-14")).toBe(30);
   });
 });
 

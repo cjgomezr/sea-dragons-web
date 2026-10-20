@@ -62,6 +62,16 @@ export function addClubDays(date: string, days: number): string {
   return day.toISOString().slice(0, ISO_DATE_LENGTH);
 }
 
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/** Los días que van de `from` a `to` (YYYY-MM-DD), negativos si `to` es
+ * anterior. Con la misma aritmética de calendario en UTC que `addClubDays`. */
+export function clubDaysBetween(from: string, to: string): number {
+  const start = Date.parse(`${from}T00:00:00.000Z`);
+  const end = Date.parse(`${to}T00:00:00.000Z`);
+  return Math.round((end - start) / MILLISECONDS_PER_DAY);
+}
+
 const CLUB_WALL_CLOCK_FORMATTER = new Intl.DateTimeFormat("en-CA", {
   timeZone: CLUB_TIME_ZONE,
   year: "numeric",
