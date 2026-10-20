@@ -21386,7 +21386,7 @@ async function stubTeams(page: Page, reads: TeamsReads): Promise<TeamsWrite[]> {
   return writes;
 }
 
-const TEAMS_AVAILABLE = /^(Available|Disponibles)$/;
+const TEAMS_AVAILABLE = /^(Available · Going|Disponibles · Van)$/;
 const TEAMS_BALANCE = /^Auto-balance$/;
 const TEAMS_PUBLISH = /^(Publish|Publicar)$/;
 const TEAMS_PUBLISH_QUESTION = /^(Publish teams\?|¿Publicar equipos\?)/;
@@ -21603,7 +21603,7 @@ test.describe("equipos en el navegador", () => {
     await expect(totals).toContainText("Even");
 
     await page
-      .getByRole("button", { name: "Move Daniela Vargas to Team Kelp" })
+      .getByRole("button", { name: "Add Daniela Vargas to Team Kelp" })
       .click();
 
     await expect(totals).toContainText("Team Kelp 31.2");

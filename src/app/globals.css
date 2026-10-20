@@ -17052,7 +17052,6 @@ a.agenda-take-attendance {
 
 .team-totals,
 .team-column,
-.team-bench-list,
 .team-confirm {
   padding: var(--space-3) var(--space-4);
   background: var(--color-panel);
@@ -17123,12 +17122,41 @@ a.agenda-take-attendance {
   gap: var(--space-4);
 }
 
-.team-list-title {
+/* El banco (#761): el título va fuera de la tarjeta, en mono y mayúsculas,
+   con cuántos quedan; las filas y el texto de vacía van en la tarjeta. */
+.team-bench-list {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--space-2);
+  min-width: 0;
+}
+
+.team-bench-title {
   margin: 0;
-  font-size: 16px;
+  font-family: var(--font-family-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.team-bench-count {
+  font-weight: 400;
+}
+
+.team-bench-list .team-list,
+.team-bench-list .team-list-empty {
+  margin: 0;
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.team-bench-list .team-list-empty {
+  padding: var(--space-4);
 }
 
 .team-swatch {
@@ -17534,14 +17562,6 @@ a.agenda-take-attendance {
   font-weight: 700;
 }
 
-.team-unrated {
-  padding: 0 var(--space-2);
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  border: 1px solid currentcolor;
-  border-radius: var(--radius);
-}
-
 /* En el móvil los botones van en su propia línea, debajo del nombre. */
 .team-moves {
   display: flex;
@@ -17550,44 +17570,62 @@ a.agenda-take-attendance {
   gap: var(--space-2);
 }
 
-.team-move {
+/* Añadir del banco (#761): el punto del color del equipo y su nombre corto.
+   El nombre accesible dice a quién y a qué equipo. */
+.team-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: var(--touch-target-min);
-  padding: 0 var(--space-3);
+  padding: 0 10px;
   font-family: inherit;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-text);
-  background: var(--color-panel);
+  white-space: nowrap;
+  background: var(--color-background);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: 8px;
   cursor: pointer;
 }
 
-.team-move:hover {
+.team-add:hover {
   border-color: var(--color-accent);
 }
 
-/* La fila de un jugador dentro de un equipo (#759): avatar, nombre y
-   posición, OVR y los dos botones de icono. Por debajo de 1200px la tarjeta
-   es estrecha y los botones bajan a su línea, a la derecha, para que el
-   nombre no se quede en tres letras; a 1200px va todo en una sola. Lleva
-   las dos clases para ganarle a la rejilla de `.team-player`. */
-.team-player.team-player-assigned {
+.team-add-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+/* La fila de un jugador dentro de un equipo (#759), y la del banco con la
+   misma rejilla (#761): avatar, nombre y posición, OVR y los botones. Por
+   debajo de 1200px la tarjeta es estrecha y los botones bajan a su línea, a
+   la derecha, para que el nombre no se quede en tres letras; a 1200px va
+   todo en una sola. Llevan las dos clases para ganarle a la rejilla de
+   `.team-player`. */
+.team-player.team-player-assigned,
+.team-player.team-player-benched {
   grid-template-columns: 36px minmax(0, 1fr) 40px;
   gap: 2px 10px;
   min-height: 48px;
   padding: 6px var(--space-2) 6px var(--space-4);
 }
 
-.team-player-assigned:hover {
+.team-player-assigned:hover,
+.team-player-benched:hover {
   background: var(--color-hover);
 }
 
-.team-player-assigned .team-avatar {
+.team-player-assigned .team-avatar,
+.team-player-benched .team-avatar {
   justify-self: center;
 }
 
-.team-player-assigned .team-player-name {
+.team-player-assigned .team-player-name,
+.team-player-benched .team-player-name {
   overflow: hidden;
   font-size: 14.5px;
   font-weight: 600;
@@ -17595,14 +17633,16 @@ a.agenda-take-attendance {
   white-space: nowrap;
 }
 
-.team-player-assigned .team-position {
+.team-player-assigned .team-position,
+.team-player-benched .team-position {
   padding: 0;
   font-size: 11.5px;
   color: var(--color-text-secondary);
   background: none;
 }
 
-.team-player-assigned .team-rating {
+.team-player-assigned .team-rating,
+.team-player-benched .team-rating {
   font-size: 14px;
   text-align: right;
 }
@@ -17612,11 +17652,16 @@ a.agenda-take-attendance {
   color: var(--color-text-secondary);
 }
 
-.team-player-assigned .team-moves {
+.team-player-assigned .team-moves,
+.team-player-benched .team-moves {
   grid-column: 2 / -1;
   justify-content: flex-end;
   flex-wrap: nowrap;
   gap: 2px;
+}
+
+.team-player-benched .team-moves {
+  gap: var(--space-1);
 }
 
 .team-icon-move {
@@ -17643,22 +17688,37 @@ a.agenda-take-attendance {
   color: var(--color-danger);
 }
 
+/* La sugerencia (#761): borde de acento discontinuo y la bombilla en el
+   color de aviso, mezclado con el texto como `.team-totals-apart`. */
 .team-suggestion {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-accent);
-  border-radius: var(--radius);
+  border: 1px dashed var(--color-accent);
+  border-radius: 12px;
+}
+
+.team-suggestion-icon {
+  display: inline-flex;
+  flex: none;
+  font-size: 18px;
+  color: color-mix(in srgb, var(--color-warning) 50%, var(--color-text));
 }
 
 .team-suggestion-text {
+  flex: 1 1 16rem;
   margin: 0;
+  font-size: 14px;
   overflow-wrap: anywhere;
+}
+
+.team-suggestion-apply {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 /* Como `.attendance-notice`: vacía no ocupa sitio, pero sigue en el DOM para
@@ -17760,8 +17820,14 @@ a.agenda-take-attendance {
     cursor: grab;
   }
 
-  .team-move {
-    min-height: 32px;
+  .team-add {
+    min-height: 30px;
+  }
+
+  .team-suggestion-apply {
+    min-height: 36px;
+    padding: 0 var(--space-4);
+    font-size: 14px;
   }
 
   .team-icon-move {
@@ -17781,12 +17847,14 @@ a.agenda-take-attendance {
     flex-wrap: nowrap;
   }
 
-  .team-player.team-player-assigned {
+  .team-player.team-player-assigned,
+  .team-player.team-player-benched {
     grid-template-columns: 36px minmax(0, 1fr) 40px auto;
     gap: 0 10px;
   }
 
-  .team-player-assigned .team-moves {
+  .team-player-assigned .team-moves,
+  .team-player-benched .team-moves {
     grid-column: auto;
   }
 }

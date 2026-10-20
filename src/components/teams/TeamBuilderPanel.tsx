@@ -261,6 +261,7 @@ function SplitBoard({
       {suggestion === null ? null : (
         <SwapSuggestion
           translate={translate}
+          teams={draft.teams}
           suggestion={suggestion}
           onApply={() =>
             controls.swap(suggestion.fromA.userId, suggestion.fromB.userId)
