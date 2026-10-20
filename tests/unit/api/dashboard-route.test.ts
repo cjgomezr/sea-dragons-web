@@ -41,21 +41,11 @@ function dashboardGateways(): DashboardGateways {
   return {
     members,
     clubRate: {
-      members,
-      clubRate: {
-        findClubAttendanceRate: async () => {
-          if (clubRateFails) {
-            throw new Error("la base no contesta");
-          }
-          return { kind: "rate", percent: 86, records: 42 };
-        },
-      },
-    },
-    ownAttendance: {
-      members,
-      attendance: {
-        findMemberAttendance: async () =>
-          new Map([[USER_ID, { kind: "no_data" } as const]]),
+      findClubAttendanceRate: async () => {
+        if (clubRateFails) {
+          throw new Error("la base no contesta");
+        }
+        return { kind: "rate", percent: 86, records: 42 };
       },
     },
     agenda: {
@@ -198,26 +188,31 @@ describe("GET /api/v1/dashboard", () => {
 
       expect(response.status).toBe(200);
       const body = await response.json();
-      expect(body.data.tiles.members).toEqual({
-        kind: "members",
-        active: 1,
-        joinedRecently: 1,
+      expect(body.data).toMatchObject({
+        kind: "member",
+        viewer: { firstName: "Alba" },
       });
     },
   );
 
-  it("sirve la tasa del club a un Coach", async () => {
-    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
-    role = "Coach";
+  it.each<Role>(["Admin", "Coach", "Committee", "Player"])(
+    "ya no le manda a un %s las teselas, los próximos ni el próximo entrenamiento (#752)",
+    async (sessionRole) => {
+      givenSession({
+        kind: "active",
+        role: sessionRole,
+        membershipCurrent: true,
+      });
+      role = sessionRole;
 
-    const response = await getDashboard();
+      const response = await getDashboard();
 
-    const body = await response.json();
-    expect(body.data.tiles.attendance).toEqual({
-      kind: "club_rate",
-      rate: { kind: "rate", percent: 86, records: 42 },
-    });
-  });
+      const body = await response.json();
+      expect(body.data).not.toHaveProperty("tiles");
+      expect(body.data).not.toHaveProperty("upcomingEvents");
+      expect(body.data).not.toHaveProperty("nextTraining");
+    },
+  );
 
   it("un club recién creado recibe cada parte vacía", async () => {
     givenSession({ kind: "active", role: "Player", membershipCurrent: true });
@@ -230,16 +225,6 @@ describe("GET /api/v1/dashboard", () => {
         column: "player",
         viewer: { firstName: "Alba" },
         me: { attendance: null },
-        tiles: {
-          attendance: {
-            kind: "own_attendance",
-            attendance: { kind: "no_data" },
-          },
-          members: { kind: "members", active: 1, joinedRecently: 1 },
-          nextTraining: { kind: "none" },
-          unreadNews: { kind: "unread", count: 0, announcements: 0 },
-        },
-        upcomingEvents: { kind: "events", events: [] },
         latestNews: { kind: "news", posts: [] },
         contactReminder: { kind: "reminder", reminder: "both" },
         nextUp: { kind: "none" },
@@ -249,7 +234,7 @@ describe("GET /api/v1/dashboard", () => {
     });
   });
 
-  it("responde 200 con la tesela caída marcada como no disponible", async () => {
+  it("responde 200 con la parte caída marcada como no disponible", async () => {
     givenSession({ kind: "active", role: "Admin", membershipCurrent: true });
     role = "Admin";
     clubRateFails = true;
@@ -258,7 +243,7 @@ describe("GET /api/v1/dashboard", () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.data.tiles.attendance).toEqual({ kind: "unavailable" });
+    expect(body.data.club.attendance).toEqual({ kind: "unavailable" });
     expect(body.data.latestNews).toEqual({ kind: "news", posts: [] });
   });
 
@@ -323,7 +308,7 @@ describe("GET /api/v1/dashboard", () => {
 });
 
 describe("GET /api/v1/dashboard sin la membresía al día (#453)", () => {
-  it("sirve el inicio reducido, sin teselas y con las noticias sólo en título", async () => {
+  it("sirve el inicio reducido, sin el próximo entrenamiento y con las noticias sólo en título", async () => {
     givenSession({ kind: "active", role: "Player", membershipCurrent: false });
     membershipStatus = "past_due";
 
@@ -336,7 +321,6 @@ describe("GET /api/v1/dashboard sin la membresía al día (#453)", () => {
         viewer: { firstName: "Alba" },
         me: { attendance: null },
         block: "past_due",
-        nextTraining: { kind: "none" },
         contactReminder: { kind: "reminder", reminder: "both" },
         nextUp: { kind: "none" },
         week: { kind: "week", events: [] },
