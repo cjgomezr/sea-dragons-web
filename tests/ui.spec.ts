@@ -2593,11 +2593,18 @@ type AccountState = {
 };
 
 /** `/cuenta` llega entera del servidor: hasta que React la hidrata, lo que se
- * escriba o pulse en ella no lo escucha nadie (#557). */
-const JUSTIFICATION_SELECTOR = "#rol-justificacion";
+ * escriba o pulse en ella no lo escucha nadie (#557). Desde #774 el
+ * formulario lo abre Solicitar, en la tarjeta Rol. */
+const ROLE_REQUEST_BUTTON_SELECTOR = ".profile-role-request";
+const ROLE_REQUEST_BUTTON = /^(Request|Solicitar)$/;
+
+async function openRoleRequestForm(page: Page): Promise<void> {
+  await waitForHydration(page, ROLE_REQUEST_BUTTON_SELECTOR);
+  await page.getByRole("button", { name: ROLE_REQUEST_BUTTON }).click();
+}
 
 async function writeTooLongJustification(page: Page): Promise<void> {
-  await waitForHydration(page, JUSTIFICATION_SELECTOR);
+  await openRoleRequestForm(page);
   await page
     .getByLabel("Why do you want this role? (optional)")
     .fill(TOO_LONG_JUSTIFICATION);
@@ -2683,8 +2690,9 @@ async function failProfileSaveOnNetwork(page: Page): Promise<void> {
 
 const ACCOUNT_STATES: readonly AccountState[] = [
   { name: "cuenta-formulario", storageState: E2E_STORAGE_STATE_PATH },
+  // La tarjeta Rol con la solicitud pendiente en lugar de Solicitar (#774).
   {
-    name: "cuenta-pendiente",
+    name: "perfil-rol-pendiente",
     storageState: roleRequestStorageStatePath("con-solicitud-pendiente"),
   },
   {
@@ -2944,10 +2952,13 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
   quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
-  test("ve su rol y el formulario con Coach y Committee", async ({ page }) => {
+  test("ve su rol y, al pulsar Solicitar, el formulario con Coach y Committee", async ({
+    page,
+  }) => {
     await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
 
     await expect(page.getByText("Player", { exact: true })).toBeVisible();
+    await openRoleRequestForm(page);
     await expect(page.getByRole("radio", { name: "Coach" })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Committee" })).toBeVisible();
   });
@@ -2957,6 +2968,7 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
     await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
 
     await expect(page.getByText("Jugador", { exact: true })).toBeVisible();
+    await openRoleRequestForm(page);
     await expect(page.getByRole("radio", { name: "Comité" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Enviar solicitud" }),
@@ -3110,7 +3122,7 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
    --------------------------------------------------------------------------- */
 
 const STAFF_ONLY_NOTICE =
-  "Evaluation ratings are only visible to the coaching staff.";
+  "Your coaches keep evaluations private this season. Ask them if you'd like feedback.";
 
 test.describe("notas privadas en el perfil de un Player", () => {
   skipWithoutSession();
@@ -3136,7 +3148,7 @@ test.describe("notas privadas en el perfil de un Player", () => {
       page
         .getByRole("region", { name: "Evaluación" })
         .getByText(
-          "Las notas de las evaluaciones solo las ve el personal de entrenamiento.",
+          "Tus coaches mantienen las evaluaciones en privado esta temporada. Pregúntales si quieres saber cómo vas.",
         ),
     ).toBeVisible();
   });
@@ -3165,7 +3177,7 @@ test.describe("Mi cuenta con grupos", () => {
   test("ve sus grupos en orden alfabético", async ({ page }) => {
     await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
 
-    const section = page.getByRole("region", { name: "My groups" });
+    const section = page.getByRole("region", { name: "Groups" });
     await expect(section.getByRole("listitem")).toHaveText(
       [...GROUPED_MEMBER_GROUP_NAMES].sort(),
     );
@@ -3175,9 +3187,7 @@ test.describe("Mi cuenta con grupos", () => {
     await chooseSpanish(page);
     await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
 
-    await expect(
-      page.getByRole("region", { name: "Mis grupos" }),
-    ).toBeVisible();
+    await expect(page.getByRole("region", { name: "Grupos" })).toBeVisible();
   });
 
   test("el endpoint devuelve sólo sus grupos, con id y nombre", async ({
@@ -3206,10 +3216,8 @@ test.describe("Mi cuenta sin grupos", () => {
   test("dice que no pertenece a ninguno", async ({ page }) => {
     await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
 
-    const section = page.getByRole("region", { name: "My groups" });
-    await expect(
-      section.getByText("You don't belong to any group yet."),
-    ).toBeVisible();
+    const section = page.getByRole("region", { name: "Groups" });
+    await expect(section.getByText("No groups")).toBeVisible();
     await expect(section.getByRole("listitem")).toHaveCount(0);
   });
 
@@ -3485,6 +3493,7 @@ test.describe("un socio que pide un rol desde Mi cuenta", () => {
     page,
   }) => {
     await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    await openRoleRequestForm(page);
     await page.getByRole("radio", { name: "Coach" }).check();
     await page
       .getByLabel("Why do you want this role? (optional)")
@@ -7677,7 +7686,8 @@ const RECORD_MEMBER_ID = MEMBER_WITHOUT_DATA.userId;
 const MEMBER_RECORD_SCREEN_PATH = `${DIRECTORY_SCREEN_PATH}/${RECORD_MEMBER_ID}`;
 const MEMBER_RECORD_ENDPOINT = `/api/v1/members/${RECORD_MEMBER_ID}/record`;
 const MEMBER_RECORD_EVALUATION_ENDPOINT = `/api/v1/evaluations/${RECORD_MEMBER_ID}`;
-const MEMBER_RECORD_RATINGS = /^(Skill ratings|Valoraciones)$/;
+/** Las categorías de la evaluación en la columna derecha (#774). */
+const MEMBER_RECORD_RATINGS = /^(Categories|Categorías)$/;
 
 /** Tres categorías bastan para ver la sección (#324): la pantalla entera de
  * Evaluaciones ya tiene sus propias capturas con las diez. */
@@ -7718,16 +7728,45 @@ const STUBBED_CLUB_GROUPS = [
   },
 ] as const;
 
-/** Lo que la ficha del Admin trae desde #770 y las capturas no enseñan
- * todavía: la vista y los datos de la cabecera de E30. */
+/** Lo que la ficha del Admin trae desde #770: la vista y los datos de la
+ * cabecera de E30. El plan y su renovación los pinta la tarjeta Membresía
+ * (#774). */
 const STUBBED_RECORD_ADMIN_VIEW = {
   view: "admin",
   positionName: null,
   experienceLevel: null,
   country: null,
   email: "socia.de.prueba@example.test",
-  membershipPlan: null,
+  membershipPlan: "Full",
+  membershipRenewsOn: "2027-06-30",
 } as const;
+
+type StubbedSession = {
+  readonly eventId: string;
+  readonly startsOn: string;
+  readonly status: "present" | "late" | "absent";
+};
+
+/** Las últimas 10 de la tarjeta Asistencia (#774): ocho a tiempo, una tarde
+ * y una ausencia, de la más vieja a la más nueva. */
+const STUBBED_LAST_SESSIONS: readonly StubbedSession[] = (
+  [
+    "present",
+    "present",
+    "late",
+    "present",
+    "absent",
+    "present",
+    "present",
+    "present",
+    "present",
+    "present",
+  ] as const
+).map((status, index) => ({
+  eventId: `e5e5e5e5-0000-4000-8000-${String(index).padStart(12, "0")}`,
+  startsOn: `2026-08-${String(index * 3 + 1).padStart(2, "0")}`,
+  status,
+}));
 
 type StubbedMemberRecord = {
   readonly userId: string;
@@ -7751,13 +7790,13 @@ type StubbedMemberRecord = {
   readonly photoUrl: string | null;
   readonly isAufExpired: boolean;
   readonly groups: readonly { readonly id: string; readonly name: string }[];
-  readonly attendance:
-    | {
-        readonly kind: "rate";
-        readonly percent: number;
-        readonly sessions: number;
-      }
-    | { readonly kind: "no_data" };
+  /** La de la temporada (#774), o null sin sesiones esta temporada. */
+  readonly attendance: {
+    readonly percent: number;
+    readonly attended: number;
+    readonly sessions: number;
+    readonly last10: readonly StubbedSession[];
+  } | null;
 };
 
 /** El nombre más largo de la lista, para el caso de contenido largo. Sin
@@ -7784,7 +7823,12 @@ const CURRENT_RECORD: StubbedMemberRecord = {
   },
   photoUrl: null,
   isAufExpired: false,
-  attendance: { kind: "rate", percent: 90, sessions: 9 },
+  attendance: {
+    percent: 90,
+    attended: 18,
+    sessions: 20,
+    last10: STUBBED_LAST_SESSIONS,
+  },
   groups: [STUBBED_CLUB_GROUPS[0], STUBBED_CLUB_GROUPS[2]].map(
     ({ id, name }) => ({ id, name }),
   ),
@@ -7802,8 +7846,8 @@ const PHOTO_RECORD: StubbedMemberRecord = {
 const PENDING_RECORD: StubbedMemberRecord = {
   ...CURRENT_RECORD,
   accountStatus: "incomplete",
-  // Quien no entró nunca no tiene sesiones: la ficha dice "Sin datos" (#396).
-  attendance: STUBBED_ATTENDANCE,
+  // Quien no entró nunca no tiene sesiones: la ficha lo dice, sin un 0.
+  attendance: null,
 };
 
 /** Quien tiene la cuenta desactivada: la ficha ofrece reactivarla (#273). */

@@ -1078,7 +1078,7 @@ export const spanishMessages: MessageCatalog = {
     "{name} todavía no activó su cuenta. El enlace de la invitación caduca a la hora, así que puedes mandarle uno nuevo.",
   "memberRecord.invitation.resent":
     "Le mandamos una invitación nueva a {name}.",
-  "memberStatus.title": "Cuenta",
+  "memberStatus.title": "Estado de la cuenta",
   "memberStatus.lead.active":
     "{name} es miembro del club. Si desactivas su cuenta, su historial se conserva, pero {name} deja de entrar y de aparecer en el directorio.",
   "memberStatus.lead.inactive":

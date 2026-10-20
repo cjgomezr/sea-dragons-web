@@ -124,7 +124,7 @@ export function MemberRecordGroups({
 }): React.JSX.Element {
   const [mode, setMode] = useState<Mode>({ kind: "reading", hasSaved: false });
   const editRef = useRef<HTMLButtonElement>(null);
-  const firstCheckboxRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
   // Un doble clic llega antes de que el botón se desactive.
   const isSendingRef = useRef(false);
   const isReading = mode.kind === "reading";
@@ -137,7 +137,7 @@ export function MemberRecordGroups({
       editRef.current?.focus();
     }
     if (!isReading && wasReading) {
-      firstCheckboxRef.current?.querySelector("input")?.focus();
+      formRef.current?.querySelector("input")?.focus();
     }
   }, [isReading]);
 
@@ -205,7 +205,7 @@ export function MemberRecordGroups({
           <GroupChips translate={translate} groups={record.groups} />
         </>
       ) : (
-        <div ref={firstCheckboxRef}>
+        <div ref={formRef}>
           <GroupsForm
             translate={translate}
             clubGroups={clubGroups}

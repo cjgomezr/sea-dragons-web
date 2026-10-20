@@ -50,7 +50,7 @@ export function RoleCard({
         canRequest ? (
           <button
             type="button"
-            className="admin-secondary profile-side-card-button"
+            className="admin-secondary profile-role-request"
             aria-expanded={isOpen}
             aria-controls={isOpen ? PANEL_ID : undefined}
             onClick={() => setIsOpen((current) => !current)}

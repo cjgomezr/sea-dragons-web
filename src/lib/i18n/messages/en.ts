@@ -1082,7 +1082,7 @@ export const englishMessages = {
     "{name} hasn't activated their account yet. The invitation link expires after an hour, so you can send a new one.",
   "memberRecord.invitation.resent": "We sent {name} a new invitation.",
   // Desactivar y reactivar la cuenta desde la ficha (#244, RF-6 del PRD de E5).
-  "memberStatus.title": "Account",
+  "memberStatus.title": "Account status",
   "memberStatus.lead.active":
     "{name} is a member of the club. Deactivating their account keeps their history, but they can no longer sign in or appear in the directory.",
   "memberStatus.lead.inactive":

@@ -822,7 +822,7 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     await renderScreen("es");
 
     expect(
-      screen.getByRole("heading", { level: 2, name: "Cuenta" }),
+      screen.getByRole("heading", { level: 2, name: "Estado de la cuenta" }),
     ).toBeInTheDocument();
     await userEvent
       .setup()
