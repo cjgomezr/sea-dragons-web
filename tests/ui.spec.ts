@@ -3102,20 +3102,20 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
   // #292: el nombre sale de la base y admite hasta 60 caracteres. Se pone en
   // la página y no en la base compartida de desarrollo: cambiarlo allí lo
   // vería cualquier otra corrida a la vez. Lo que se prueba es que el CSS lo
-  // aguanta: una sola fila, sin tapar los controles ni salirse, y el texto
-  // entero en el árbol aunque se vea recortado. El `title` que pone la cáscara
-  // lo prueba `tests/unit/app-shell.test.tsx`.
+  // aguanta: dos líneas como mucho junto al logo, sin tapar los controles ni
+  // salirse, y el texto entero en el árbol aunque se vea recortado. El
+  // `title` que pone la cáscara lo prueba `tests/unit/app-shell.test.tsx`.
   const LONGEST_CLUB_NAME =
     "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania";
   for (const width of [360, 375]) {
-    test(`un nombre de 60 caracteres se recorta en una sola fila a ${width}px`, async ({
+    test(`un nombre de 60 caracteres se recorta en dos líneas a ${width}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
       const brandLocator = page.locator(".app-brand");
-      const singleLineHeight = await brandLocator.evaluate(
-        (element) => element.getBoundingClientRect().height,
+      const lineHeight = await brandLocator.evaluate((element) =>
+        parseFloat(getComputedStyle(element).lineHeight),
       );
       await brandLocator.evaluate((element, name) => {
         element.textContent = name;
@@ -3133,8 +3133,8 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
         throw new Error("la cabecera no dibujó el nombre o algún control");
       }
 
-      expect(brand.height, "el nombre se parte en dos filas").toBe(
-        singleLineHeight,
+      expect(brand.height, "el nombre pasa de dos líneas").toBeLessThanOrEqual(
+        2 * lineHeight + SUBPIXEL_TOLERANCE_PX,
       );
       const brandMiddle = brand.y + brand.height / 2;
       for (const box of boxes) {
@@ -11982,6 +11982,9 @@ const CLUB_SETTINGS_LOGO_BOX_PX = 56 - 2;
 function clubLogoField(page: Page): Locator {
   return page.locator(".club-logo-field");
 }
+/** En la cabecera del móvil el logo va junto al nombre y no pasa de 48px de
+ * ancho, para que no deje el nombre en unas pocas letras. */
+const PHONE_HEADER_LOGO_MAX_WIDTH_PX = LOGO_BOX_HEIGHT_PX * 1.5;
 /** En la barra lateral de escritorio el logo va junto al nombre y su tope
  * baja a 2,5 veces el alto, para que el nombre conserve 120px (#352). */
 const SIDEBAR_LOGO_MAX_WIDTH_PX = 80;
@@ -12134,7 +12137,7 @@ const SIDEBAR_BRAND_SCREEN: BrandScreen = {
   logoMaxWidthAt: (viewportWidth) =>
     viewportWidth >= SIDEBAR_MIN_VIEWPORT_PX
       ? SIDEBAR_LOGO_MAX_WIDTH_PX
-      : LOGO_BOX_MAX_WIDTH_PX,
+      : PHONE_HEADER_LOGO_MAX_WIDTH_PX,
 };
 
 const BRAND_SCREENS: readonly BrandScreen[] = [

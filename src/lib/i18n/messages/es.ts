@@ -1914,7 +1914,7 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.sections.positions": "Posiciones",
   "clubSettings.sections.packs": "Packs de sesiones",
   "clubSettings.list.adminsOnly": "Solo los Admin ven esto.",
-  "clubSettings.list.backToAccount": "Volver a Mi cuenta",
+  "clubSettings.list.back": "Volver",
   "clubSettings.list.backToList": "Configuración",
   "clubSettings.draft.unsaved.general":
     "Cambios sin guardar en los datos del club",

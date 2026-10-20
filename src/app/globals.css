@@ -226,14 +226,12 @@ h6 {
   border-bottom: 1px solid var(--color-sidebar-border);
 }
 
-/* En el móvil el nombre y los tres controles (lupa, campana y cuenta)
-   comparten una sola fila, también a 360px: el resto vive en el menú de la
-   cuenta (#287). Con la lupa (#427) los tres botones de 44px ocupan 132px, y
-   al nombre le quedan 176px a 360 con los huecos de antes. Con la fuente del
-   sistema de Linux (la de CI; Archivo no se carga) el nombre sembrado mide
-   203px a 18px, así que en el móvil el nombre baja a 16px (180px), la
-   cabecera acolcha 12px a los lados y los iconos van pegados: sus 44px ya
-   los separan. En la barra lateral todo vuelve a su medida. */
+/* En el móvil la marca y los tres controles (lupa, campana y cuenta)
+   comparten una sola fila, también a 320px: el resto vive en el menú de la
+   cuenta (#287). Los tres botones de 44px van separados por 8px (148px en
+   total), la cabecera acolcha 12px a los lados y deja 12px entre la marca y
+   los botones: a 360px a la marca le quedan 176px. Pegados, los iconos se
+   leían como una sola pieza. En la barra lateral todo vuelve a su medida. */
 .app-sidebar-header {
   display: flex;
   align-items: center;
@@ -241,18 +239,24 @@ h6 {
   gap: var(--space-3);
 }
 
-/* En el móvil el logo va encima del nombre (#295): al lado, uno apaisado
-   dejaba el nombre en unas pocas letras junto a la campana y el menú a 375px.
-   En la barra lateral va en la misma fila (#352, más abajo). Sin logo el
-   contenedor sólo lleva el nombre, y se comporta como él: puede encogerse
-   para que recorte. */
+/* El logo va al lado del nombre, también en el móvil: encima, la cabecera
+   salía el doble de alta. Para que uno apaisado no deje el nombre en unas
+   pocas letras, en el móvil el logo no pasa de 48px de ancho y el nombre
+   puede partirse en dos líneas. Sin logo el contenedor sólo lleva el
+   nombre, y se comporta como él: puede encogerse para que recorte. Es el
+   enlace al inicio, así que no lleva el color ni el subrayado de un enlace. */
 .app-brand-lockup {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-2);
   min-width: 0;
   max-width: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-brand-lockup .club-logo {
+  max-width: calc(var(--space-8) * 1.5);
 }
 
 /* El logo ocupa el alto del recuadro de iniciales. Uno apaisado se ensancha
@@ -266,18 +270,22 @@ h6 {
   object-fit: contain;
 }
 
-/* El nombre sale de la base y admite hasta 60 caracteres (#292). En el móvil
-   va en una sola línea, recortado con puntos suspensivos, para que no parta la
-   cabecera en dos filas ni empuje los controles fuera de la pantalla a 360px. */
+/* El nombre sale de la base y admite hasta 60 caracteres (#292). Junto al
+   logo se parte entre palabras hasta en dos líneas, y sólo más allá se
+   recorta: dos líneas de 20px caben en el alto de los botones de 44px, así
+   que la cabecera no crece ni empuja los controles fuera de la pantalla. */
 .app-brand {
+  display: -webkit-box;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: 16px;
   font-weight: 700;
+  line-height: 1.25;
   color: var(--color-sidebar-text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-clamp: 2;
 }
 
 /* Below 768px the sections live in the bottom tab bar, so the sidebar list is
@@ -435,7 +443,7 @@ h6 {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 0;
+  gap: var(--space-2);
 }
 
 /* La campana y el botón de la cuenta, los dos iconos de la misma esquina. */
@@ -1411,8 +1419,6 @@ button.notification-item-content:hover {
 
   /* El logo y el nombre en una fila, como en el mockup del panel (#352). */
   .app-brand-lockup {
-    flex-direction: row;
-    align-items: center;
     align-self: stretch;
   }
 
@@ -1426,16 +1432,12 @@ button.notification-item-content:hover {
     );
   }
 
-  /* Junto al logo, una línea recortada dejaba el nombre en pocas letras: se
-     parte entre palabras hasta en dos líneas, y sólo más allá se recorta. */
+  /* En la barra lateral el nombre ocupa lo que deja el logo, con su letra y
+     su interlineado de siempre. */
   .app-brand {
-    display: -webkit-box;
     flex: 1 1 0;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
     font-size: 18px;
-    line-clamp: 2;
-    white-space: normal;
+    line-height: inherit;
   }
 
   .app-nav {
@@ -5025,6 +5027,13 @@ a.auth-brand-header:focus-visible {
   outline-offset: -2px;
 }
 
+/* El foco que vuelve a la fila al cerrar su ficha tras un toque llega sin
+   contorno (`input-modality.ts`): Safari lo pintaba aunque nadie usara el
+   teclado. Con el teclado la fila sigue enmarcada. */
+.directory-row[data-quiet-focus]:focus-visible {
+  outline: none;
+}
+
 .directory-card-header {
   display: flex;
   gap: var(--space-3);
@@ -5905,6 +5914,10 @@ a.auth-brand-header:focus-visible {
     inset: 0 0 0 46px;
     pointer-events: none;
     border: 2px solid var(--color-accent-text);
+  }
+
+  .directory-row[data-quiet-focus]:focus-visible::after {
+    content: none;
   }
 
   .directory-name {
@@ -17587,6 +17600,19 @@ a.dashboard-tile:hover {
 .contact-reminder-icon {
   flex: none;
   color: var(--color-warning);
+}
+
+/* En el móvil la frase se parte en varias líneas, y centrado en el alto el
+   teléfono quedaba suelto a media altura, lejos del título: va arriba, con
+   la primera línea (21px de alto, el icono mide 18). */
+@media (width < 768px) {
+  .contact-reminder-strip {
+    align-items: flex-start;
+  }
+
+  .contact-reminder-strip .contact-reminder-icon {
+    margin-top: 2px;
+  }
 }
 
 .contact-reminder-strip .contact-reminder-text {
