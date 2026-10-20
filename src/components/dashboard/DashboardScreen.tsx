@@ -20,7 +20,8 @@ import {
 } from "./dashboard-client";
 import { DashboardMembershipNotice } from "./DashboardMembershipNotice";
 import { DashboardWeek } from "./DashboardWeek";
-import { LatestNewsPanel, UpcomingPanel } from "./DashboardLists";
+import { UpcomingPanel } from "./DashboardLists";
+import { DashboardNews, DashboardRestrictedNews } from "./DashboardNews";
 import { NewEventLink } from "./NewEventLink";
 import { NextUpCard } from "./NextUpCard";
 import { PlayerColumn } from "./PlayerColumn";
@@ -30,8 +31,8 @@ import { PlayerColumn } from "./PlayerColumn";
  * por partes. De arriba abajo: la cabecera con el día y el saludo, los avisos
  * y la tarjeta "Próximo" con el RSVP y el equipo (#747, RF-3 y RF-8 del PRD
  * de E27), con la columna del Player a su derecha (#749, RF-5) y "Esta
- * semana" (#748, RF-4) bajo "Próximo"; debajo, de momento, los próximos
- * eventos y las últimas noticias.
+ * semana" (#748, RF-4) bajo "Próximo"; debajo, las noticias (#751, RF-7) y,
+ * de momento, los próximos eventos.
  *
  * Es de cliente porque responde al RSVP sin recargar y porque la hora del
  * saludo y de "hace N" es la del momento en que se pintó. Lo lee todo de
@@ -41,7 +42,8 @@ import { PlayerColumn } from "./PlayerColumn";
  *
  * A quien no tiene la membresía al día el endpoint le sirve el inicio
  * reducido (#453): la cabecera, el aviso que lleva a Pagos, la tarjeta
- * "Próximo" sin RSVP y la semana sin "Responder". El aviso del contacto que
+ * "Próximo" sin RSVP, la semana sin "Responder" y sólo los títulos de las
+ * noticias (D2). El aviso del contacto que
  * falta (#498) sólo sale en el inicio de un socio al día, para no competir
  * con el de la membresía. Se pide al montar, así que al volver del perfil con
  * el contacto guardado el aviso ya no está.
@@ -194,6 +196,12 @@ function RestrictedContent({
           onRetry={onRetry}
         />
       </div>
+      <DashboardRestrictedNews
+        translate={translate}
+        news={dashboard.latestNews}
+        now={loadedAt}
+        onRetry={onRetry}
+      />
     </>
   );
 }
@@ -246,17 +254,16 @@ function MemberContent({
           />
         ) : null}
       </div>
-      <div className="dashboard-panels">
-        <UpcomingPanel
-          translate={translate}
-          upcoming={dashboard.upcomingEvents}
-        />
-        <LatestNewsPanel
-          translate={translate}
-          news={dashboard.latestNews}
-          now={loadedAt}
-        />
-      </div>
+      <DashboardNews
+        translate={translate}
+        news={dashboard.latestNews}
+        now={loadedAt}
+        onRetry={onRetry}
+      />
+      <UpcomingPanel
+        translate={translate}
+        upcoming={dashboard.upcomingEvents}
+      />
     </>
   );
 }

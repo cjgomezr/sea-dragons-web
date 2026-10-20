@@ -275,9 +275,14 @@ export const englishMessages = {
   "dashboard.upcoming.title": "Upcoming",
   "dashboard.upcoming.all": "Calendar",
   "dashboard.upcoming.empty": "No upcoming events.",
-  "dashboard.news.title": "Latest news",
-  "dashboard.news.all": "All",
+  // Las noticias del inicio (#751, RF-7 del PRD de E27).
+  "dashboard.news.title": "News",
+  "dashboard.news.all": "All news",
   "dashboard.news.empty": "No news yet.",
+  "dashboard.news.unavailable": "We couldn't load the news.",
+  "dashboard.news.unread": "Unread",
+  "dashboard.news.locked": "News is for current members.",
+  "dashboard.news.renew": "Renew",
   // La cabecera, los avisos y la tarjeta "Próximo" (#747, RF-3 y RF-8 del
   // PRD de E27).
   "dashboard.eyebrow.dated": "{date} · {section}",

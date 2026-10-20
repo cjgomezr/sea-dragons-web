@@ -2,21 +2,16 @@ import Link from "next/link";
 import { useId } from "react";
 import { DateBlock } from "@/components/calendar/AgendaRow";
 import { EventTypeTag } from "@/components/calendar/EventTypeTag";
-import { NewsCategoryLabel } from "@/components/news/NewsCategoryLabel";
-import { CALENDAR_PATH, NEWS_PATH, NEWS_POST_PATH } from "@/lib/auth/routes";
-import type {
-  LatestNews,
-  LatestNewsItem,
-  UpcomingEvents,
-} from "@/lib/dashboard/dashboard";
+import { CALENDAR_PATH } from "@/lib/auth/routes";
+import type { UpcomingEvents } from "@/lib/dashboard/dashboard";
 import type { AgendaEvent } from "@/lib/events/event-agenda";
-import { formatClockTime, formatRelativeTime } from "@/lib/i18n/format";
+import { formatClockTime } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
- * "Próximos" y "Últimas noticias" del inicio (#426, RF-2 del PRD de E14):
- * hasta tres de cada, con el enlace a la sección completa. Un evento lleva al
- * calendario, como los avisos de eventos; una noticia, a su publicación.
+ * "Próximos" del inicio (#426, RF-2 del PRD de E14): hasta tres, con el
+ * enlace al calendario, adonde lleva también cada evento, como los avisos de
+ * eventos. Las noticias del inicio están en `DashboardNews` (#751).
  */
 
 function DashboardPanel({
@@ -94,69 +89,6 @@ export function UpcomingPanel({
         <ul className="dashboard-event-list">
           {upcoming.events.map((event) => (
             <UpcomingRow key={event.id} translate={translate} event={event} />
-          ))}
-        </ul>
-      ) : null}
-    </DashboardPanel>
-  );
-}
-
-function NewsRow({
-  translate,
-  post,
-  now,
-}: {
-  readonly translate: Translator;
-  readonly post: LatestNewsItem;
-  readonly now: Date;
-}): React.JSX.Element {
-  return (
-    <li className="dashboard-news">
-      <NewsCategoryLabel translate={translate} category={post.category} />
-      <Link
-        href={NEWS_POST_PATH.replace("[id]", encodeURIComponent(post.id))}
-        className="dashboard-news-link"
-      >
-        {post.title}
-      </Link>
-      <time className="dashboard-news-when" dateTime={post.publishedAt}>
-        {formatRelativeTime(translate.locale, new Date(post.publishedAt), now)}
-      </time>
-    </li>
-  );
-}
-
-export function LatestNewsPanel({
-  translate,
-  news,
-  now,
-}: {
-  readonly translate: Translator;
-  readonly news: LatestNews;
-  /** El instante con el que se calcula "hace N". */
-  readonly now: Date;
-}): React.JSX.Element {
-  return (
-    <DashboardPanel
-      title={translate("dashboard.news.title")}
-      allLabel={translate("dashboard.news.all")}
-      allHref={NEWS_PATH}
-    >
-      {news.kind === "unavailable" ? (
-        <p className="admin-empty">{translate("dashboard.unavailable")}</p>
-      ) : null}
-      {news.kind === "news" && news.posts.length === 0 ? (
-        <p className="admin-empty">{translate("dashboard.news.empty")}</p>
-      ) : null}
-      {news.kind === "news" && news.posts.length > 0 ? (
-        <ul className="dashboard-news-list">
-          {news.posts.map((post) => (
-            <NewsRow
-              key={post.id}
-              translate={translate}
-              post={post}
-              now={now}
-            />
           ))}
         </ul>
       ) : null}

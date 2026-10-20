@@ -21974,26 +21974,30 @@ const DASHBOARD_UPCOMING = [
   }),
 ];
 
+// Las noticias del inicio (#751): la fijada con extracto, que va destacada
+// aunque no sea la más nueva, y una de las pequeñas sin leer, como en las
+// capturas 01 y 02 del handoff de E27.
 const DASHBOARD_LATEST_NEWS = [
   {
     id: "d0d0d0d0-0000-4000-8000-0000000000d4",
     category: "announcement",
-    title: "Nationals squad shortlist announced",
+    title: "Season launch night: food, awards and the new kit",
     publishedAt: dashboardDaysAgo(2),
     coverUrl: null,
-    excerpt: "",
-    isPinned: false,
+    excerpt:
+      "Friday 30 Oct at the clubhouse. Bring the family and RSVP in the calendar so we know how much food to order.",
+    isPinned: true,
     isUnread: false,
   },
   {
     id: "d0d0d0d0-0000-4000-8000-0000000000d5",
     category: "news",
-    title: "Winter training schedule is live",
-    publishedAt: dashboardDaysAgo(4),
+    title: "New training times from November",
+    publishedAt: dashboardDaysAgo(1),
     coverUrl: null,
-    excerpt: "",
+    excerpt: "Thursday sessions move to 8pm.",
     isPinned: false,
-    isUnread: false,
+    isUnread: true,
   },
   {
     id: "d0d0d0d0-0000-4000-8000-0000000000d6",
@@ -22001,11 +22005,21 @@ const DASHBOARD_LATEST_NEWS = [
     title: "Updated pool safety & dive policy",
     publishedAt: dashboardDaysAgo(8),
     coverUrl: null,
-    excerpt: "",
+    excerpt: "Read it before your next session.",
     isPinned: false,
     isUnread: false,
   },
 ];
+
+// Lo que ve de las mismas noticias quien no tiene la membresía al día (D2).
+const DASHBOARD_NEWS_TITLES = DASHBOARD_LATEST_NEWS.map(
+  ({ id, category, title, publishedAt }) => ({
+    id,
+    category,
+    title,
+    publishedAt,
+  }),
+);
 
 // "Esta semana" (#748): con el inicio el 30 de septiembre, la franja va del
 // 30 al 6 de octubre. El sábado 3 es el del Próximo y lleva dos tipos; la
@@ -22161,6 +22175,12 @@ const NO_SESSIONS_DASHBOARD = {
   me: { attendance: null },
 };
 
+// Un Player sin noticias publicadas (#751).
+const NO_NEWS_DASHBOARD = {
+  ...PLAYER_DASHBOARD,
+  latestNews: { kind: "news", posts: [] },
+};
+
 const NOTHING_NEXT_DASHBOARD = {
   ...PLAYER_DASHBOARD,
   nextUp: { kind: "none" },
@@ -22206,7 +22226,7 @@ const RESTRICTED_DASHBOARD = {
     block: "cancelled",
     endedOn: "2026-09-15",
   },
-  latestNews: { kind: "news", posts: [] },
+  latestNews: { kind: "news", posts: DASHBOARD_NEWS_TITLES },
 };
 
 // "Esta semana" (#748) de un Player. Con el Próximo en la franja sale marcado
@@ -22314,6 +22334,11 @@ const DASHBOARD_STATES: readonly DashboardScreenState[] = [
   ...dashboardStates(
     "inicio-proximo-vacio",
     NOTHING_NEXT_DASHBOARD,
+    E2E_STORAGE_STATE_PATH,
+  ),
+  ...dashboardStates(
+    "inicio-noticias-vacio",
+    NO_NEWS_DASHBOARD,
     E2E_STORAGE_STATE_PATH,
   ),
   ...dashboardStates("inicio-semana", WEEK_DASHBOARD, E2E_STORAGE_STATE_PATH),
