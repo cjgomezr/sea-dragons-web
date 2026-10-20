@@ -17435,8 +17435,9 @@ a.agenda-take-attendance {
 
 /* La pantalla de inicio (#426), que E27 rehizo (docs/design/
    design_handoff_dashboard, #1a y #2a). En el móvil va todo en una columna
-   con 14px de margen y 16px de hueco (#752, RF-9); con sitio para las dos
-   columnas, el hueco es el de la cuadrícula, 18px. */
+   con 14px de margen y 16px de hueco (#752, RF-9). Desde 768px los bloques
+   de fuera de la cuadrícula se separan 18px, como en #1a; dentro, los 18px
+   llegan cuando caben las dos columnas. */
 .dashboard {
   display: flex;
   flex-direction: column;
