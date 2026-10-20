@@ -362,7 +362,9 @@ describe("la escuadra", () => {
 
     await openScreen();
 
-    expect(region("Team Kelp")).toHaveTextContent("No one on this team yet.");
+    expect(region("Team Kelp")).toHaveTextContent(
+      "Drag players here or use Add on the bench.",
+    );
     expect(region("Team Tide")).toBeInTheDocument();
     expect(screen.getByText("Edited by hand")).toBeInTheDocument();
     expect(balanceButton()).toBeInTheDocument();
@@ -616,7 +618,7 @@ describe("mover a mano", () => {
 
     await userEvent.click(
       screen.getByRole("button", {
-        name: "Switch Mateo Restrepo to Team Tide",
+        name: "Move Mateo Restrepo to Team Tide",
       }),
     );
 
@@ -1190,6 +1192,201 @@ describe("la cabecera, la barra y los totales (#758)", () => {
 
     expect(await screen.findByRole("status")).toHaveTextContent(
       "Publicado · 3 jugadores avisados",
+    );
+  });
+});
+
+describe("las columnas de equipo (#759)", () => {
+  const GOALKEEPER = {
+    id: "f0f0f0f0-0000-4000-8000-000000000001",
+    names: { en: "Goalkeeper", es: "Portero" },
+  };
+  const FULL_BACK = {
+    id: "f0f0f0f0-0000-4000-8000-000000000002",
+    names: { en: "Full back", es: "Defensa" },
+  };
+  const VALENTINA = entry(6, "Valentina Gómez", {
+    position: GOALKEEPER,
+    coverage: "goalkeeper",
+    rating: 7.4,
+  });
+  const ISABELLA = entry(7, "Isabella Muñoz", {
+    position: FULL_BACK,
+    coverage: "defender",
+    rating: 7.2,
+  });
+
+  /** Kelp con portero, defensa y ataque; Tide con Ethan solo, sin portero. */
+  const COVERED = builderFor(SCRIMMAGE, {
+    available: [DANIELA, ETHAN, MATEO, VALENTINA, ISABELLA],
+    split: {
+      mode: "manual",
+      publishedAt: null,
+      assignments: [
+        assigned(VALENTINA, "a"),
+        assigned(ISABELLA, "a"),
+        assigned(MATEO, "a"),
+        assigned(ETHAN, "b"),
+      ],
+    },
+  });
+
+  function coverage(team: string): HTMLElement {
+    return within(region(team)).getByRole("list", {
+      name: "Position coverage",
+    });
+  }
+
+  it("pone en la cabecera el nombre como título y cuántos son con su media", async () => {
+    stubClub({ builders: [COVERED] });
+
+    await openScreen();
+
+    const kelp = region("Team Kelp");
+    expect(
+      within(kelp).getByRole("heading", { level: 2, name: "Team Kelp" }),
+    ).toBeInTheDocument();
+    expect(within(kelp).getByText("3 players · avg 7.9")).toBeInTheDocument();
+  });
+
+  it("cuenta porteros, defensas y atacantes del equipo", async () => {
+    stubClub({ builders: [COVERED] });
+
+    await openScreen();
+
+    const chips = within(coverage("Team Kelp")).getAllByRole("listitem");
+    expect(chips.map((chip) => chip.textContent)).toEqual([
+      "GK 11 goalkeeper",
+      "DEF 11 defender",
+      "ATT 11 forward",
+    ]);
+  });
+
+  it("dice Sin portero con su aviso cuando el equipo tiene jugadores y ningún portero", async () => {
+    stubClub({ builders: [COVERED] });
+
+    await openScreen();
+
+    const chips = within(coverage("Team Tide")).getAllByRole("listitem");
+    expect(chips[0]).toHaveTextContent("No goalkeeper");
+    expect(chips[0]).not.toHaveTextContent("GK");
+    expect(chips[0]).toHaveClass("team-coverage-missing");
+    expect(
+      within(coverage("Team Kelp")).queryByText("No goalkeeper"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("a un equipo vacío no le dice Sin portero y le explica cómo llenarlo", async () => {
+    stubClub();
+
+    await openScreen();
+
+    const kelp = region("Team Kelp");
+    expect(kelp).toHaveTextContent(
+      "Drag players here or use Add on the bench.",
+    );
+    expect(within(kelp).queryByText("No goalkeeper")).not.toBeInTheDocument();
+    expect(within(kelp).getByText("0 players")).toBeInTheDocument();
+  });
+
+  it("pinta la fila con la posición y el OVR del evaluado", async () => {
+    stubClub({ builders: [COVERED] });
+
+    await openScreen();
+
+    const row = playerRow(region("Team Kelp"), VALENTINA.fullName);
+    expect(within(row).getByText("Goalkeeper")).toBeInTheDocument();
+    expect(within(row).getByText("7.4")).toBeInTheDocument();
+  });
+
+  it("pinta una raya en vez del OVR del no evaluado, y dice Sin evaluar al lector", async () => {
+    stubClub({ builders: [COVERED] });
+
+    await openScreen();
+
+    const row = playerRow(region("Team Tide"), ETHAN.fullName);
+    expect(within(row).getByText("—")).toHaveAttribute("aria-hidden", "true");
+    expect(within(row).getByText("Unrated")).toHaveClass("visually-hidden");
+  });
+
+  it("lleva botones de icono que dicen a quién mueven y a dónde", async () => {
+    stubClub({ builders: [COVERED] });
+
+    await openScreen();
+
+    const row = playerRow(region("Team Kelp"), MATEO.fullName);
+    const buttons = within(row).getAllByRole("button");
+    expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Move Mateo Restrepo to Team Tide",
+      "Remove Mateo Restrepo from Team Kelp",
+    ]);
+    for (const button of buttons) {
+      expect(button).toHaveTextContent("");
+      expect(button.querySelector("svg")).not.toBeNull();
+    }
+  });
+
+  it("anuncia a dónde fue el que se cambió con el botón de icono", async () => {
+    stubClub({ builders: [COVERED] });
+    await openScreen();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Move Mateo Restrepo to Team Tide" }),
+    );
+
+    expect(region("Team Tide")).toHaveTextContent("Mateo Restrepo");
+    expect(
+      screen.getByText(/^Mateo Restrepo moved to Team Tide\./),
+    ).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("todavía no lleva el botón de editar el equipo", async () => {
+    stubClub({ builders: [COVERED] });
+
+    await openScreen();
+
+    expect(
+      within(region("Team Kelp")).queryByRole("button", { name: /edit/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("escribe en español la cabecera, la cobertura y los nombres de los botones", async () => {
+    stubClub({ builders: [COVERED] });
+
+    await openScreen("es");
+
+    const kelp = region("Team Kelp");
+    expect(
+      within(kelp).getByText("3 jugadores · media 7,9"),
+    ).toBeInTheDocument();
+    const chips = within(kelp)
+      .getByRole("list", { name: "Cobertura de puestos" })
+      .querySelectorAll("li");
+    expect(Array.from(chips, (chip) => chip.textContent)).toEqual([
+      "POR 11 portero",
+      "DEF 11 defensa",
+      "ATA 11 atacante",
+    ]);
+    expect(region("Team Tide")).toHaveTextContent("Sin portero");
+    expect(
+      screen.getByRole("button", {
+        name: "Mover a Mateo Restrepo a Team Tide",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Sacar a Mateo Restrepo de Team Kelp",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("le dice al equipo vacío en español cómo llenarlo", async () => {
+    stubClub();
+
+    await openScreen("es");
+
+    expect(region("Team Kelp")).toHaveTextContent(
+      "Arrastra jugadores aquí o usa Añadir en el banco.",
     );
   });
 });
