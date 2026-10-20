@@ -830,6 +830,36 @@ describe("sugerencia", () => {
     ).toHaveAttribute("aria-live", "polite");
   });
 
+  it("dice que el intercambio cubre los puestos cuando cierra un hueco", async () => {
+    const goalkeeper = { coverage: "goalkeeper" as const };
+    const keeperOne = entry(8, "Olivia Park", { ...goalkeeper, rating: 7 });
+    const keeperTwo = entry(9, "Noah Lee", { ...goalkeeper, rating: 7 });
+    stubClub({
+      builders: [
+        builderFor(SCRIMMAGE, {
+          available: [keeperOne, keeperTwo, DANIELA, RUBY],
+          maybe: [],
+          split: {
+            mode: "manual",
+            publishedAt: null,
+            assignments: [
+              assigned(keeperOne, "a"),
+              assigned(keeperTwo, "a"),
+              assigned(DANIELA, "b"),
+              assigned(RUBY, "b"),
+            ],
+          },
+        }),
+      ],
+    });
+
+    await openScreen();
+
+    expect(region("Suggestion")).toHaveTextContent(
+      /^Suggestion: swap (Olivia Park|Noah Lee) \(Team Kelp\) with (Daniela Vargas|Ruby Tan) \(Team Tide\) to cover the positions on both teams\.Swap$/,
+    );
+  });
+
   it("no enseña nada cuando no hay intercambio que mejore", async () => {
     stubClub();
 
