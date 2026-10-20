@@ -8694,10 +8694,13 @@ for (const state of STAFF_RECORD_STATES) {
 const NARROWEST_PHONE = { width: 320, height: 640 } as const;
 const PHONE_VIEWPORT = { width: 375, height: 812 } as const;
 
-/** Alto y ancho pintados, redondeados al píxel. */
+/** Alto y ancho pintados, redondeados al píxel. Espera a que se vea:
+ * `boundingBox` no espera, y justo después de `goto` el perfil puede no
+ * haberse pintado todavía (en CI la foto salía sin caja). */
 async function sizeOf(
   locator: Locator,
 ): Promise<{ width: number; height: number }> {
+  await expect(locator).toBeVisible();
   const box = await locator.boundingBox();
   if (box === null) {
     throw new Error("El elemento no se pinta.");
