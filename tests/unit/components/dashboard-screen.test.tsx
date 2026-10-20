@@ -856,6 +856,76 @@ describe("el equipo en la tarjeta Próximo (#747)", () => {
   });
 });
 
+const WEEK_TRAINING = {
+  id: POOL_TRAINING.id,
+  title: "Saturday scrimmage",
+  eventType: "training",
+  startsOn: "2026-10-02",
+  endsOn: null,
+  startTime: "09:00",
+  endTime: "11:00",
+  location: "Princes Park · Field 2",
+  myResponse: null,
+} as const;
+
+function weekSection(): HTMLElement {
+  return screen.getByRole("region", { name: "This week" });
+}
+
+describe("Esta semana en el inicio (#748)", () => {
+  it("marca el día del Próximo y pinta sus eventos con Responder", async () => {
+    stubDashboard({
+      ...PLAYER_DASHBOARD,
+      week: { kind: "week", events: [WEEK_TRAINING] },
+    });
+
+    await renderScreen();
+
+    const week = weekSection();
+    expect(
+      within(week).getByRole("button", { name: /October 2/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const row = within(week).getByRole("link", { name: /Saturday scrimmage/ });
+    expect(row).toHaveTextContent("RSVP");
+  });
+
+  it("a un socio restringido le pinta la semana sin Responder", async () => {
+    stubDashboard({
+      ...RESTRICTED_DASHBOARD,
+      week: { kind: "week", events: [WEEK_TRAINING] },
+    });
+
+    await renderScreen();
+
+    const row = within(weekSection()).getByRole("link", {
+      name: /Saturday scrimmage/,
+    });
+    expect(row).not.toHaveTextContent("RSVP");
+  });
+
+  it("si no se pudo leer lo dice y Reintentar vuelve a pedir el inicio", async () => {
+    let attempts = 0;
+    stubApi(() => {
+      attempts += 1;
+      return jsonResponse(200, {
+        data:
+          attempts === 1
+            ? { ...PLAYER_DASHBOARD, week: { kind: "unavailable" } }
+            : PLAYER_DASHBOARD,
+      });
+    });
+    await renderScreen();
+
+    await userEvent.click(
+      within(weekSection()).getByRole("button", { name: "Try again" }),
+    );
+
+    expect(
+      await within(weekSection()).findByRole("group", { name: "Days" }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("errores", () => {
   it("dice que falló la red y vuelve a pedir al reintentar", async () => {
     let attempts = 0;

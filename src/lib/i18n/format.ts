@@ -224,6 +224,16 @@ export function formatCalendarDayParts(
   };
 }
 
+const NARROW_WEEKDAY_FORMATTERS = calendarDayPartFormatters({
+  weekday: "narrow",
+});
+
+/** La inicial del día de la semana, como la franja de la semana del inicio
+ * en el móvil (#748): "T" el jueves en inglés, "J" en español. */
+export function formatNarrowWeekday(locale: Locale, isoDate: string): string {
+  return NARROW_WEEKDAY_FORMATTERS[locale].format(parseCalendarDay(isoDate));
+}
+
 const AGENDA_DAY_SEPARATOR = " · ";
 
 /** La etiqueta de un día de la agenda (#647): "SAT · OCT 17", y en español

@@ -21793,6 +21793,71 @@ const DASHBOARD_LATEST_NEWS = [
   },
 ];
 
+// "Esta semana" (#748): con el inicio el 30 de septiembre, la franja va del
+// 30 al 6 de octubre. El sábado 3 es el del Próximo y lleva dos tipos; la
+// copa ocupa tres días y uno de ellos tiene además una reunión. El 30 no tiene
+// nada, para el día vacío.
+const DASHBOARD_WEEK = {
+  kind: "week",
+  events: [
+    {
+      id: DASHBOARD_TRAINING.id,
+      title: "Pool Training",
+      eventType: "training",
+      startsOn: "2026-10-02",
+      endsOn: null,
+      startTime: "19:00",
+      endTime: "21:00",
+      location: "MSAC Dive Pool",
+      myResponse: "maybe",
+    },
+    {
+      id: "d0d0d0d0-0000-4000-8000-0000000000e1",
+      title: DASHBOARD_NEXT_UP.title,
+      eventType: "training",
+      startsOn: DASHBOARD_NEXT_UP.startsOn,
+      endsOn: null,
+      startTime: DASHBOARD_NEXT_UP.startTime,
+      endTime: DASHBOARD_NEXT_UP.endTime,
+      location: DASHBOARD_NEXT_UP.location,
+      myResponse: null,
+    },
+    {
+      id: "d0d0d0d0-0000-4000-8000-0000000000e2",
+      title: "Season launch night",
+      eventType: "social",
+      startsOn: DASHBOARD_NEXT_UP.startsOn,
+      endsOn: null,
+      startTime: "18:30",
+      endTime: null,
+      location: "Clubhouse",
+      myResponse: "yes",
+    },
+    {
+      id: "d0d0d0d0-0000-4000-8000-0000000000e3",
+      title: "Island Cup",
+      eventType: "competition",
+      startsOn: "2026-10-04",
+      endsOn: "2026-10-06",
+      startTime: "08:00",
+      endTime: "17:00",
+      location: "Hobart Aquatic Centre",
+      myResponse: null,
+    },
+    {
+      id: "d0d0d0d0-0000-4000-8000-0000000000e4",
+      title: "Committee meeting",
+      eventType: "meeting",
+      startsOn: "2026-10-05",
+      endsOn: null,
+      startTime: "19:00",
+      endTime: "20:00",
+      location: "Online",
+      myResponse: null,
+    },
+  ],
+} as const;
+
 const ADMIN_DASHBOARD = {
   kind: "member",
   column: "management",
@@ -21817,7 +21882,7 @@ const ADMIN_DASHBOARD = {
   latestNews: { kind: "news", posts: DASHBOARD_LATEST_NEWS },
   contactReminder: { kind: "reminder", reminder: "none" },
   nextUp: { ...DASHBOARD_NEXT_UP, teamsStatus: "none" },
-  week: { kind: "week", events: [] },
+  week: DASHBOARD_WEEK,
   membership: { status: "active", plan: "Full", renewsOn: null },
 };
 
@@ -21921,13 +21986,38 @@ const RESTRICTED_DASHBOARD = {
   },
   contactReminder: { kind: "reminder", reminder: "none" },
   nextUp: { ...DASHBOARD_NEXT_UP, myResponse: null },
-  week: { kind: "week", events: [] },
+  week: DASHBOARD_WEEK,
   membership: {
     status: "restricted",
     block: "cancelled",
     endedOn: "2026-09-15",
   },
   latestNews: { kind: "news", posts: [] },
+};
+
+// "Esta semana" (#748) de un Player. Con el Próximo en la franja sale marcado
+// su día: aquí la copa de tres días, para ver la fila de un evento de varios
+// días. Sin Próximo sale marcado hoy, que no tiene nada.
+const WEEK_DASHBOARD = {
+  ...PLAYER_DASHBOARD,
+  nextUp: {
+    ...DASHBOARD_NEXT_UP,
+    id: "d0d0d0d0-0000-4000-8000-0000000000e3",
+    title: "Island Cup",
+    eventType: "competition",
+    startsOn: "2026-10-04",
+    endsOn: "2026-10-06",
+    startTime: "08:00",
+    endTime: "17:00",
+    location: "Hobart Aquatic Centre",
+    place: null,
+    myResponse: null,
+  },
+};
+
+const WEEK_EMPTY_DAY_DASHBOARD = {
+  ...PLAYER_DASHBOARD,
+  nextUp: { kind: "none" },
 };
 
 // El aviso de los datos de contacto que faltan (#498). Sin ninguno de los dos
@@ -22010,6 +22100,12 @@ const DASHBOARD_STATES: readonly DashboardScreenState[] = [
   ...dashboardStates(
     "inicio-proximo-vacio",
     NOTHING_NEXT_DASHBOARD,
+    E2E_STORAGE_STATE_PATH,
+  ),
+  ...dashboardStates("inicio-semana", WEEK_DASHBOARD, E2E_STORAGE_STATE_PATH),
+  ...dashboardStates(
+    "inicio-semana-dia-vacio",
+    WEEK_EMPTY_DAY_DASHBOARD,
     E2E_STORAGE_STATE_PATH,
   ),
   ...dashboardStates(
@@ -22194,6 +22290,58 @@ test.describe("el inicio en el navegador", () => {
     const strip = nextUpCard(page).locator(".dashboard-next-up-team");
 
     expect((await boxOf(strip)).height).toBeGreaterThanOrEqual(52);
+  });
+
+  test("a 375px la semana lleva el día en una letra, la fecha de 16px, puntos de 6px y filas de 56px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: PLAYER_DASHBOARD });
+    const week = page.getByRole("region", { name: "This week" });
+    const saturday = week.getByRole("button", { name: /October 3/ });
+
+    await expect(saturday.locator(".dashboard-week-weekday")).toHaveText("S", {
+      useInnerText: true,
+    });
+    await expect(saturday.locator(".dashboard-week-date")).toHaveCSS(
+      "font-size",
+      "16px",
+    );
+    await expect(saturday.locator(".dashboard-week-dot").first()).toHaveCSS(
+      "width",
+      "6px",
+    );
+    const row = week.getByRole("link", { name: /Saturday scrimmage/ });
+    expect(Math.round((await boxOf(row)).height)).toBe(56);
+    await expect(row).toContainText("11:00 am · Princes Park · Field 2");
+  });
+
+  test("en escritorio la semana lleva el día en tres letras, la fecha de 18px, puntos de 7px y la columna de la hora de 92px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToDashboard(page, { dashboard: PLAYER_DASHBOARD });
+    const week = page.getByRole("region", { name: "This week" });
+    const saturday = week.getByRole("button", { name: /October 3/ });
+
+    await expect(saturday.locator(".dashboard-week-weekday")).toHaveText(
+      "SAT",
+      {
+        useInnerText: true,
+      },
+    );
+    await expect(saturday.locator(".dashboard-week-date")).toHaveCSS(
+      "font-size",
+      "18px",
+    );
+    await expect(saturday.locator(".dashboard-week-dot").first()).toHaveCSS(
+      "width",
+      "7px",
+    );
+    const time = week
+      .getByRole("link", { name: /Saturday scrimmage/ })
+      .locator(".dashboard-week-time");
+    expect(Math.round((await boxOf(time)).width)).toBe(92);
   });
 
   test("en escritorio la tarjeta lleva la imagen en una columna de 280px a la izquierda", async ({

@@ -2,13 +2,12 @@ import type { Role } from "@/lib/auth/roles";
 import { hasCapability } from "@/lib/auth/roles";
 import {
   ACCOUNT_PAGE_PATH,
-  CALENDAR_EVENT_QUERY_PARAM,
   CALENDAR_PATH,
-  CALENDAR_PERIOD_QUERY_PARAM,
   DIRECTORY_PATH,
   MEMBER_RECORD_PATH,
   NEWS_PATH,
   NEWS_POST_PATH,
+  calendarEventHref,
 } from "@/lib/auth/routes";
 import { SEARCH_QUERY_PARAM } from "@/lib/directory/directory-query";
 import type {
@@ -51,13 +50,8 @@ function memberDestination(
     : directoryFilteredBy(member.fullName);
 }
 
-/** El calendario separa próximos de pasados, y desde hoy todo es próximo,
- * como en la agenda: la fila hay que buscarla en su lado. */
 function eventDestination(event: EventSearchResult, now: Date): string {
-  const target = `${CALENDAR_PATH}?${CALENDAR_EVENT_QUERY_PARAM}=${event.id}`;
-  return event.startsOn < clubCalendarDate(now)
-    ? `${target}&${CALENDAR_PERIOD_QUERY_PARAM}=past`
-    : target;
+  return calendarEventHref(event, clubCalendarDate(now));
 }
 
 export function searchResultDestination(
