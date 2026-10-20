@@ -15926,13 +15926,13 @@ a.auth-brand-header:focus-visible {
     inset: 0;
   }
 
+  /* Salta de línea en vez de cortarse: "Sin posición · Desactivada" no
+     cabe a 320px, y cortado se perdería que la cuenta está desactivada. */
   .attendance-member-detail {
-    overflow: hidden;
     font-family: var(--font-family-mono);
     font-size: 11.5px;
     color: var(--color-text-secondary);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   /* Un control unido de unos 106px: tres botones de 34 × 40 sin hueco. */
