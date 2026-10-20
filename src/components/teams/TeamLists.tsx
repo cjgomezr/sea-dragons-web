@@ -123,7 +123,7 @@ function ColumnSummary({
 
 /** La tarjeta de un equipo (#759): la tira de su color arriba, el muestrario,
  * el nombre con cuántos son y su media, la cobertura y sus jugadores. */
-function TeamCard({
+export function TeamCard({
   translate,
   draft,
   team,
