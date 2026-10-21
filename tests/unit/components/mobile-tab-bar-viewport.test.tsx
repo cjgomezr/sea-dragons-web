@@ -114,7 +114,15 @@ function focus(element: HTMLElement): void {
   act(() => element.focus());
 }
 
+/** jsdom no trae `PointerEvent`: basta con un evento de ese tipo. */
+function press(element: HTMLElement, type: string): void {
+  act(() => {
+    element.dispatchEvent(new Event(type, { bubbles: true }));
+  });
+}
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   document.body.innerHTML = "";
@@ -347,6 +355,59 @@ describe("barra de pestañas al escribir", () => {
         new FocusEvent("focusout", { bubbles: true, relatedTarget: second }),
       );
     });
+
+    expect(tabBar()).not.toBeVisible();
+  });
+
+  // Al pulsar Guardar con el teclado abierto, el foco sale del campo en el
+  // `pointerdown`. Si la barra volviera ahí, quedaría encima del botón y el
+  // `pointerup` caería en ella: el clic se perdía.
+  it("no reaparece mientras sigue pulsado el botón al que pasa el foco", () => {
+    stubPhoneScreen(true);
+    renderTabBar();
+    const field = addField("<input>");
+    const button = addField("<button>Guardar</button>");
+    focus(field);
+
+    press(button, "pointerdown");
+    focus(button);
+
+    expect(tabBar()).not.toBeVisible();
+  });
+
+  it.each(["pointerup", "pointercancel"])(
+    "vuelve después del %s, cuando el clic ya llegó al botón",
+    (release) => {
+      vi.useFakeTimers();
+      stubPhoneScreen(true);
+      renderTabBar();
+      const field = addField("<input>");
+      const button = addField("<button>Guardar</button>");
+      focus(field);
+      press(button, "pointerdown");
+      focus(button);
+
+      press(button, release);
+      expect(tabBar()).not.toBeVisible();
+      act(() => vi.runAllTimers());
+
+      expect(tabBar()).toBeVisible();
+    },
+  );
+
+  it("no reaparece tras soltar si el foco volvió a un campo", () => {
+    vi.useFakeTimers();
+    stubPhoneScreen(true);
+    renderTabBar();
+    const field = addField("<input>");
+    const button = addField("<button>Guardar</button>");
+    focus(field);
+    press(button, "pointerdown");
+    focus(button);
+    focus(field);
+
+    press(button, "pointerup");
+    act(() => vi.runAllTimers());
 
     expect(tabBar()).not.toBeVisible();
   });
