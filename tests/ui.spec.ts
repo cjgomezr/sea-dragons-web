@@ -13795,6 +13795,43 @@ const WITHDRAW_QUESTION = /^(Withdraw this post\?|¿Retirar esta publicación\?)
 /** Cuántas veces se alarga la ventana antes de rendirse. */
 const MAX_VIEWPORT_FITS = 5;
 
+/** Lecturas iguales seguidas para dar por quieta la altura de la página. */
+const STABLE_HEIGHT_READINGS = 5;
+
+/** Cada cuánto se vuelve a leer la altura mientras se mueve. */
+const HEIGHT_READING_INTERVAL_MS = 100;
+
+/**
+ * La altura de la página cuando deja de moverse. Justo después de alargar la
+ * ventana la página puede medir de más un instante, y la ventana sólo crece:
+ * con `min-height: 100vh` ese pico se queda como hueco al pie de la captura
+ * (#835, `perfil-con-foto` en el móvil salía 12 px más alta unas veces sí y
+ * otras no).
+ */
+async function settledPageHeight(page: Page): Promise<number> {
+  let readings: readonly number[] = [];
+  await expect
+    .poll(
+      async () => {
+        const height = await page.evaluate(
+          () => document.documentElement.scrollHeight,
+        );
+        readings = [...readings, height].slice(-STABLE_HEIGHT_READINGS);
+        return (
+          readings.length === STABLE_HEIGHT_READINGS &&
+          readings.every((reading) => reading === height)
+        );
+      },
+      { intervals: [HEIGHT_READING_INTERVAL_MS] },
+    )
+    .toBe(true);
+  const settled = readings.at(-1);
+  if (settled === undefined) {
+    throw new Error("No se llegó a leer la altura de la página.");
+  }
+  return settled;
+}
+
 /**
  * Alarga la ventana hasta que quepa la página entera, sin tocar su ancho.
  *
@@ -13814,9 +13851,7 @@ async function fitViewportToPage(page: Page): Promise<void> {
   }
   let height = viewport.height;
   for (let attempt = 0; attempt < MAX_VIEWPORT_FITS; attempt += 1) {
-    const pageHeight = await page.evaluate(
-      () => document.documentElement.scrollHeight,
-    );
+    const pageHeight = await settledPageHeight(page);
     if (pageHeight <= height) {
       return;
     }
