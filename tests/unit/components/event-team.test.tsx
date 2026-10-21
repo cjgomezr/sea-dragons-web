@@ -198,6 +198,7 @@ async function openPanel(
 afterEach(() => {
   requestedPaths.length = 0;
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("el equipo en el panel del evento", () => {
@@ -422,7 +423,7 @@ describe("abrir el evento en sus equipos", () => {
         canTakeAttendance={false}
         canRespond
         focusEventId={event.id}
-        revealTeams
+        shouldRevealTeams
       />,
     );
   }
@@ -484,6 +485,61 @@ describe("abrir el evento en sus equipos", () => {
       expect.objectContaining({ calendarEventScreen: SCRIMMAGE.id }),
       "",
     );
+  });
+
+  it("en escritorio, si el evento no está en la agenda, elige el primero y no lleva el foco a sus equipos", async () => {
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
+
+    renderOpenedInTeams(SOCIAL);
+
+    const panel = await screen.findByRole("complementary", {
+      name: SCRIMMAGE.title,
+    });
+    const teams = await within(panel).findByRole("heading", { name: "Teams" });
+    expect(teams).not.toHaveFocus();
+  });
+
+  it("en el móvil, Volver con algo detrás vuelve atrás, a la página de la que se llegó", async () => {
+    stubPhone();
+    vi.stubGlobal("navigation", { canGoBack: true });
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
+    renderOpenedInTeams(SCRIMMAGE);
+    const eventScreen = await screen.findByRole("article", {
+      name: SCRIMMAGE.title,
+    });
+
+    await userEvent.click(
+      within(eventScreen).getByRole("button", { name: "Back to calendar" }),
+    );
+
+    expect(back).toHaveBeenCalledTimes(1);
+  });
+
+  it("en el móvil, Volver sin nada detrás quita la marca y se queda en la agenda", async () => {
+    stubPhone();
+    vi.stubGlobal("navigation", { canGoBack: false });
+    const back = vi.spyOn(window.history, "back");
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
+    renderOpenedInTeams(SCRIMMAGE);
+    const eventScreen = await screen.findByRole("article", {
+      name: SCRIMMAGE.title,
+    });
+
+    await userEvent.click(
+      within(eventScreen).getByRole("button", { name: "Back to calendar" }),
+    );
+
+    expect(back).not.toHaveBeenCalled();
+    expect(replaceState).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ calendarEventScreen: SCRIMMAGE.id }),
+      "",
+    );
+    expect(
+      await screen.findByRole("heading", { level: 3, name: SCRIMMAGE.title }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
   });
 
   it("en el móvil, si el evento no está en la agenda, se queda en la agenda", async () => {

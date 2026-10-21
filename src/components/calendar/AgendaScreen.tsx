@@ -4,6 +4,7 @@ import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { hasPreviousPage } from "@/components/go-back";
 import { Icon } from "@/components/Icon";
 import { useIsPhone } from "@/components/use-is-phone";
 import { PAYMENTS_PATH } from "@/lib/auth/routes";
@@ -614,7 +615,7 @@ function AgendaView({
   from,
   isActive,
   focusOnLoad,
-  revealTeams,
+  shouldRevealTeams,
   organizer,
   canTakeAttendance,
   rsvpDisabledReasonId,
@@ -630,7 +631,7 @@ function AgendaView({
   /** El evento cuyo título recibe el foco con la primera página. */
   readonly focusOnLoad: string | null;
   /** Si ese evento abre ya en sus equipos (D6 del PRD de E27). */
-  readonly revealTeams: boolean;
+  readonly shouldRevealTeams: boolean;
   readonly organizer: EventOrganizer | null;
   readonly canTakeAttendance: boolean;
   readonly rsvpDisabledReasonId: string | null;
@@ -649,7 +650,7 @@ function AgendaView({
   const [panelSlot, setPanelSlot] = useState<HTMLElement | null>(null);
   const panelId = useId();
   // Sólo al llegar: tras editar o filtrar, la agenda ya no abre en equipos.
-  const teamsEventId = revealTeams && reloads === 0 ? focusOnLoad : null;
+  const teamsEventId = shouldRevealTeams && reloads === 0 ? focusOnLoad : null;
   const hasOpenedInPlaceRef = useRef(false);
 
   // En el móvil el evento se abre en su pantalla en cuanto está en la agenda.
@@ -853,6 +854,13 @@ function MembershipRsvpNotice({
   );
 }
 
+/** El estado de la entrada sin la marca de la pantalla del evento. */
+function withoutScreenMark(state: unknown): object {
+  const rest: Record<string, unknown> = { ...(state as object) };
+  delete rest[SCREEN_HISTORY_KEY];
+  return rest;
+}
+
 function isScreenHistoryEntry(state: unknown): boolean {
   return (
     typeof state === "object" && state !== null && SCREEN_HISTORY_KEY in state
@@ -871,6 +879,7 @@ function usePhoneEventScreen(): {
   const [openedEventId, setOpenedEventId] = useState<string | null>(null);
   const agendaScrollRef = useRef(0);
   const hasOpenedRef = useRef(false);
+  const isInPlaceRef = useRef(false);
   const isOpen = openedEventId !== null;
 
   // Quien sale desde la pantalla (Pasar lista) y vuelve llega a la agenda
@@ -910,6 +919,7 @@ function usePhoneEventScreen(): {
    * estaba quien llegó, y no a una agenda que no llegó a ver. */
   function openInPlace(eventId: string): void {
     hasOpenedRef.current = true;
+    isInPlaceRef.current = true;
     setOpenedEventId(eventId);
     window.history.replaceState(
       { ...window.history.state, [SCREEN_HISTORY_KEY]: eventId },
@@ -919,9 +929,17 @@ function usePhoneEventScreen(): {
 
   function close(): void {
     setOpenedEventId(null);
-    if (isScreenHistoryEntry(window.history.state)) {
-      window.history.back();
+    if (!isScreenHistoryEntry(window.history.state)) {
+      return;
     }
+    // Abierta en su sitio y sin nada detrás (una pestaña nueva), volver
+    // atrás saldría de la app: se quita la marca y se queda en la agenda.
+    if (isInPlaceRef.current && !hasPreviousPage()) {
+      isInPlaceRef.current = false;
+      window.history.replaceState(withoutScreenMark(window.history.state), "");
+      return;
+    }
+    window.history.back();
   }
 
   return { openedEventId, open, openInPlace, close };
@@ -935,7 +953,7 @@ export function AgendaScreen({
   initialPeriod = "upcoming",
   initialTypes = AGENDA_TYPE_CHIPS,
   focusEventId = null,
-  revealTeams = false,
+  shouldRevealTeams = false,
   openCreateWith = null,
 }: {
   readonly locale: Locale;
@@ -961,7 +979,7 @@ export function AgendaScreen({
   /** Si ese evento abre ya en sus equipos: la pantalla entera en el móvil, el
    * panel en escritorio. Es a donde lleva "Ver equipos" del inicio (D6 del
    * PRD de E27). */
-  readonly revealTeams?: boolean;
+  readonly shouldRevealTeams?: boolean;
   /** El tipo con el que el formulario de crear llega ya abierto, como lo
    * pide "Nuevo entrenamiento" desde el inicio (#426). */
   readonly openCreateWith?: EventType | null;
@@ -1125,7 +1143,9 @@ export function AgendaScreen({
                   from={choice === "past" ? pastFrom : null}
                   isActive={choice === period}
                   focusOnLoad={agendaVersion.focusEventId}
-                  revealTeams={revealTeams && agendaVersion.number === 0}
+                  shouldRevealTeams={
+                    shouldRevealTeams && agendaVersion.number === 0
+                  }
                   organizer={organizer}
                   canTakeAttendance={canTakeAttendance}
                   rsvpDisabledReasonId={rsvpDisabledReasonId}

@@ -8,7 +8,7 @@ type BackRouter = {
 
 /** La API de navegación, donde la hay, dice si se puede volver atrás dentro
  * de esta pestaña. Sin ella, la historia con más de una entrada. */
-function hasPreviousPage(): boolean {
+export function hasPreviousPage(): boolean {
   const { navigation } = window as unknown as {
     navigation?: { canGoBack?: boolean };
   };

@@ -62,7 +62,7 @@ export default async function CalendarioPage({
     searchParams,
   ]);
   const focusEventId = readSingle(params[CALENDAR_EVENT_QUERY_PARAM]);
-  const revealTeams =
+  const shouldRevealTeams =
     focusEventId !== null &&
     readSingle(params[CALENDAR_VIEW_QUERY_PARAM]) === CALENDAR_VIEW_TEAMS;
   const initialPeriod = readInitialPeriod(params);
@@ -77,7 +77,7 @@ export default async function CalendarioPage({
         readSingle(params[AGENDA_TYPES_QUERY_PARAM]),
       )}
       focusEventId={focusEventId}
-      revealTeams={revealTeams}
+      shouldRevealTeams={shouldRevealTeams}
       locale={locale}
       canManageEvents={canManageEvents}
       canTakeAttendance={hasCapability(role, "buildTeamsAndTrackAttendance")}

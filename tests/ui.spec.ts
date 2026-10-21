@@ -23703,20 +23703,37 @@ test.describe("Ver equipos desde el inicio", () => {
     await expect(page).toHaveURL(/[?&]ver=equipos/);
   }
 
-  test("en el móvil abre la pantalla del evento en sus equipos y atrás vuelve al inicio", async ({
-    page,
-  }) => {
+  async function openTeamsOnPhone(page: Page): Promise<Locator> {
     await page.setViewportSize({ width: 375, height: 812 });
-
     await goToTeamsFromHome(page);
-
     const eventScreen = page.getByRole("article", {
       name: NEXT_UP_AGENDA_EVENT.title,
     });
     await expect(
       eventScreen.getByRole("heading", { name: "Teams" }),
     ).toBeFocused();
+    return eventScreen;
+  }
+
+  test("en el móvil abre la pantalla del evento con el foco en sus equipos y Volver lleva al inicio", async ({
+    page,
+  }) => {
+    const eventScreen = await openTeamsOnPhone(page);
+
+    await eventScreen.getByRole("button", { name: "Back to calendar" }).click();
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: DASHBOARD_GREETING }),
+    ).toBeVisible();
+  });
+
+  test("en el móvil el atrás del navegador también lleva al inicio", async ({
+    page,
+  }) => {
+    await openTeamsOnPhone(page);
+
     await page.goBack();
+
     await expect(
       page.getByRole("heading", { level: 1, name: DASHBOARD_GREETING }),
     ).toBeVisible();
