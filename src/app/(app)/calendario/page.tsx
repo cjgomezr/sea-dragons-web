@@ -9,6 +9,8 @@ import {
   CALENDAR_EVENT_QUERY_PARAM,
   CALENDAR_NEW_EVENT_QUERY_PARAM,
   CALENDAR_PERIOD_QUERY_PARAM,
+  CALENDAR_VIEW_QUERY_PARAM,
+  CALENDAR_VIEW_TEAMS,
 } from "@/lib/auth/routes";
 import type { AgendaPeriod } from "@/lib/events/event-agenda";
 import { type EventType, isEventType } from "@/lib/events/event-creation";
@@ -60,6 +62,9 @@ export default async function CalendarioPage({
     searchParams,
   ]);
   const focusEventId = readSingle(params[CALENDAR_EVENT_QUERY_PARAM]);
+  const shouldRevealTeams =
+    focusEventId !== null &&
+    readSingle(params[CALENDAR_VIEW_QUERY_PARAM]) === CALENDAR_VIEW_TEAMS;
   const initialPeriod = readInitialPeriod(params);
   const canManageEvents = hasCapability(role, "createEvents");
   return (
@@ -72,6 +77,7 @@ export default async function CalendarioPage({
         readSingle(params[AGENDA_TYPES_QUERY_PARAM]),
       )}
       focusEventId={focusEventId}
+      shouldRevealTeams={shouldRevealTeams}
       locale={locale}
       canManageEvents={canManageEvents}
       canTakeAttendance={hasCapability(role, "buildTeamsAndTrackAttendance")}

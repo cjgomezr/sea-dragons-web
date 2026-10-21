@@ -198,6 +198,7 @@ async function openPanel(
 afterEach(() => {
   requestedPaths.length = 0;
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("el equipo en el panel del evento", () => {
@@ -393,5 +394,161 @@ describe("el equipo en el panel del evento", () => {
     const panel = await openPanel(SCRIMMAGE, locale);
 
     expect(await within(panel).findByText(sentence)).toBeInTheDocument();
+  });
+});
+
+/* "Ver equipos" del inicio (D6 del PRD de E27) abre el evento ya en sus
+   equipos: el panel en escritorio, la pantalla entera en el móvil. */
+describe("abrir el evento en sus equipos", () => {
+  const PHONE_QUERY = "(width < 768px)";
+
+  function stubPhone(): void {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === PHONE_QUERY,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }));
+    // jsdom no implementa el scroll de la ventana.
+    vi.stubGlobal("scrollTo", vi.fn());
+  }
+
+  function renderOpenedInTeams(event: AgendaEvent): void {
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+        focusEventId={event.id}
+        shouldRevealTeams
+      />,
+    );
+  }
+
+  it("en escritorio elige el evento y lleva el foco a sus equipos", async () => {
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP, [SOCIAL]);
+
+    renderOpenedInTeams(SCRIMMAGE);
+
+    const panel = await screen.findByRole("complementary", {
+      name: SCRIMMAGE.title,
+    });
+    const teams = await within(panel).findByRole("heading", { name: "Teams" });
+    await vi.waitFor(() => expect(teams).toHaveFocus());
+  });
+
+  it("sin pedir los equipos el foco se queda en el título, como desde la búsqueda", async () => {
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+        focusEventId={SCRIMMAGE.id}
+      />,
+    );
+
+    const panel = await screen.findByRole("complementary", {
+      name: SCRIMMAGE.title,
+    });
+    const teams = await within(panel).findByRole("heading", { name: "Teams" });
+    const title = screen.getByRole("heading", {
+      level: 3,
+      name: SCRIMMAGE.title,
+    });
+    await vi.waitFor(() => expect(title).toHaveFocus());
+    expect(teams).not.toHaveFocus();
+  });
+
+  it("en el móvil abre la pantalla del evento en sus equipos sin dejar otra entrada en el historial", async () => {
+    stubPhone();
+    const pushState = vi.spyOn(window.history, "pushState");
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
+
+    renderOpenedInTeams(SCRIMMAGE);
+
+    const eventScreen = await screen.findByRole("article", {
+      name: SCRIMMAGE.title,
+    });
+    const teams = await within(eventScreen).findByRole("heading", {
+      name: "Teams",
+    });
+    await vi.waitFor(() => expect(teams).toHaveFocus());
+    expect(pushState).not.toHaveBeenCalled();
+    expect(replaceState).toHaveBeenCalledWith(
+      expect.objectContaining({ calendarEventScreen: SCRIMMAGE.id }),
+      "",
+    );
+  });
+
+  it("en escritorio, si el evento no está en la agenda, elige el primero y no lleva el foco a sus equipos", async () => {
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
+
+    renderOpenedInTeams(SOCIAL);
+
+    const panel = await screen.findByRole("complementary", {
+      name: SCRIMMAGE.title,
+    });
+    const teams = await within(panel).findByRole("heading", { name: "Teams" });
+    expect(teams).not.toHaveFocus();
+  });
+
+  it("en el móvil, Volver con algo detrás vuelve atrás, a la página de la que se llegó", async () => {
+    stubPhone();
+    vi.stubGlobal("navigation", { canGoBack: true });
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
+    renderOpenedInTeams(SCRIMMAGE);
+    const eventScreen = await screen.findByRole("article", {
+      name: SCRIMMAGE.title,
+    });
+
+    await userEvent.click(
+      within(eventScreen).getByRole("button", { name: "Back to calendar" }),
+    );
+
+    expect(back).toHaveBeenCalledTimes(1);
+  });
+
+  it("en el móvil, Volver sin nada detrás quita la marca y se queda en la agenda", async () => {
+    stubPhone();
+    vi.stubGlobal("navigation", { canGoBack: false });
+    const back = vi.spyOn(window.history, "back");
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
+    renderOpenedInTeams(SCRIMMAGE);
+    const eventScreen = await screen.findByRole("article", {
+      name: SCRIMMAGE.title,
+    });
+
+    await userEvent.click(
+      within(eventScreen).getByRole("button", { name: "Back to calendar" }),
+    );
+
+    expect(back).not.toHaveBeenCalled();
+    expect(replaceState).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ calendarEventScreen: SCRIMMAGE.id }),
+      "",
+    );
+    expect(
+      await screen.findByRole("heading", { level: 3, name: SCRIMMAGE.title }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+  });
+
+  it("en el móvil, si el evento no está en la agenda, se queda en la agenda", async () => {
+    stubPhone();
+    stubEvent(SOCIAL, NOT_PUBLISHED);
+
+    renderOpenedInTeams(SCRIMMAGE);
+
+    await screen.findByRole("heading", { level: 3, name: SOCIAL.title });
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
   });
 });

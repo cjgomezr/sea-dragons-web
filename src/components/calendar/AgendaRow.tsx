@@ -473,6 +473,7 @@ export function AgendaRow({
   event,
   period,
   shouldTakeFocus,
+  shouldRevealTeams = false,
   isSelected,
   onSelect,
   target,
@@ -486,6 +487,9 @@ export function AgendaRow({
   /** La primera fila de una página recién cargada: recibe el foco para que
    * quien pulsó "Ver más" siga leyendo desde ahí. */
   readonly shouldTakeFocus: boolean;
+  /** Si su evento abre ya en sus equipos, como desde "Ver equipos" del
+   * inicio (D6 del PRD de E27). */
+  readonly shouldRevealTeams?: boolean;
   /** Si es la fila cuyo evento enseña el panel o la pantalla del móvil. */
   readonly isSelected: boolean;
   readonly onSelect: () => void;
@@ -570,6 +574,7 @@ export function AgendaRow({
         state={teams.team}
         isCancelled={isCancelled}
         onRetry={teams.retry}
+        shouldTakeFocus={shouldRevealTeams}
       />
     ) : null,
     takeAttendance: canTakeAttendance && canTakeAttendanceOf(event),

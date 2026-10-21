@@ -5,42 +5,31 @@ import Link from "next/link";
 import {
   CALENDAR_EVENT_QUERY_PARAM,
   CALENDAR_PATH,
+  CALENDAR_VIEW_QUERY_PARAM,
+  CALENDAR_VIEW_TEAMS,
   TEAMS_EVENT_QUERY_PARAM,
   TEAMS_PATH,
 } from "@/lib/auth/routes";
 import { positionName } from "@/lib/club/club-positions";
 import type { NextUpTeam } from "@/lib/dashboard/dashboard";
 import type { Translator } from "@/lib/i18n/translator";
-import { nameTeamColor } from "@/lib/teams/team-color-name";
 
 /**
  * Lo que la tarjeta "Próximo" (#747, RF-3 y D6 del PRD de E27) dice del
- * reparto: a quien juega, en qué equipo, con qué peto y en qué posición; a
- * Admin y Coach, que lo guardaron sin publicar. El color tiñe la franja, pero
- * el equipo y el nombre de su color van siempre escritos.
+ * reparto: a quien juega, en qué equipo y en qué posición; a Admin y Coach,
+ * que lo guardaron sin publicar. El color del peto sólo tiñe la camiseta: el
+ * nombre del equipo basta. "Ver equipos" abre el evento en sus equipos.
  */
 
 const PART_SEPARATOR = " · ";
 
-function lineupsHref(eventId: string): string {
-  return `${CALENDAR_PATH}?${CALENDAR_EVENT_QUERY_PARAM}=${eventId}`;
+/** "Próximo" nunca es pasado, así que no hace falta `periodo=past`. */
+function eventTeamsHref(eventId: string): string {
+  return `${CALENDAR_PATH}?${CALENDAR_EVENT_QUERY_PARAM}=${eventId}&${CALENDAR_VIEW_QUERY_PARAM}=${CALENDAR_VIEW_TEAMS}`;
 }
 
 function teamBuilderHref(eventId: string): string {
   return `${TEAMS_PATH}?${TEAMS_EVENT_QUERY_PARAM}=${eventId}`;
-}
-
-/** "peto azul · Defensa", o sólo el peto si no tiene posición. */
-function describeBibAndPosition(
-  translate: Translator,
-  team: NextUpTeam,
-): string {
-  const bib = translate("dashboard.nextUp.bib", {
-    color: translate(`calendar.teams.color.${nameTeamColor(team.color)}`),
-  });
-  return team.position === null
-    ? bib
-    : `${bib}${PART_SEPARATOR}${positionName(team.position.names, translate.locale)}`;
 }
 
 export function MyTeamStrip({
@@ -66,12 +55,16 @@ export function MyTeamStrip({
         </p>
         <p className="dashboard-next-up-team-line">
           <strong>{team.name}</strong>
-          {PART_SEPARATOR}
-          {describeBibAndPosition(translate, team)}
+          {team.position === null
+            ? null
+            : `${PART_SEPARATOR}${positionName(team.position.names, translate.locale)}`}
         </p>
       </div>
-      <Link href={lineupsHref(eventId)} className="dashboard-next-up-team-link">
-        {translate("dashboard.nextUp.lineups")}
+      <Link
+        href={eventTeamsHref(eventId)}
+        className="dashboard-next-up-team-link"
+      >
+        {translate("dashboard.nextUp.seeTeams")}
         <CaretRight aria-hidden="true" focusable="false" size={14} />
       </Link>
     </div>
