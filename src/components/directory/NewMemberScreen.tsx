@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DIRECTORY_PATH } from "@/lib/auth/routes";
 import type { CountryOption } from "@/lib/geo/countries";
@@ -13,6 +12,7 @@ import type { NamedPosition } from "@/lib/club/club-positions";
 import { InvitationResend } from "./InvitationResend";
 import type { CreatedMemberView } from "./new-member-client";
 import { NewMemberForm } from "./NewMemberForm";
+import { BackLink } from "@/components/BackLink";
 
 /**
  * El alta de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta desde
@@ -122,9 +122,9 @@ export function NewMemberScreen({
 
   return (
     <div className="member-record">
-      <Link href={DIRECTORY_PATH} className="member-record-back">
+      <BackLink href={DIRECTORY_PATH}>
         {translate("memberRecord.back")}
-      </Link>
+      </BackLink>
       <header className="member-record-header">
         <h1>{translate("newMember.title")}</h1>
         <p className="app-lead">{translate("newMember.lead")}</p>

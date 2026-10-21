@@ -1,7 +1,5 @@
 "use client";
 
-import { ArrowLeft } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ProfilePhoneBar } from "@/components/account/ProfilePhoneBar";
 import { useIsPhone } from "@/components/use-is-phone";
@@ -21,6 +19,7 @@ import { type AdminPanel, MemberAdminPanel } from "./MemberAdminPanel";
 import { MemberRecordForm } from "./MemberRecordForm";
 import { MemberRecordReadOnly } from "./MemberRecordReadOnly";
 import { useMemberStatusChange } from "./MemberStatusControl";
+import { BackLink } from "@/components/BackLink";
 
 /**
  * La ficha de un miembro (#242, RF-4 del PRD de E5), que se abre desde su
@@ -115,10 +114,9 @@ export function MemberRecordScreen({
   return (
     <div className="member-record member-record-wide">
       {isPhone ? null : (
-        <Link href={DIRECTORY_PATH} className="member-record-back">
-          <ArrowLeft aria-hidden="true" weight="bold" />
+        <BackLink href={DIRECTORY_PATH}>
           {translate("memberRecord.back")}
-        </Link>
+        </BackLink>
       )}
       {/* La del Admin la pone la ficha cargada, con su ⋯. */}
       {isPhone && state.kind !== "loaded" ? (
