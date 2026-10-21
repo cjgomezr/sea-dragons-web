@@ -45,7 +45,7 @@ const rosterEntrySchema = z.discriminatedUnion("status", [
   rosterPlayerSchema.extend({
     status: z.literal("evaluated"),
     overall: z.number().nullable(),
-    updatedAt: z.string(),
+    updatedAt: z.iso.datetime({ offset: true }),
     updatedBy: z.string().nullable(),
   }),
 ]);

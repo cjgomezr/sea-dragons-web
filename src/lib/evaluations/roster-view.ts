@@ -11,9 +11,7 @@ import type { EvaluationRosterEntry } from "./evaluation-roster";
  * de jugadores, no miles (D10).
  */
 
-export const ROSTER_FILTERS = ["all", "not_evaluated"] as const;
-
-export type RosterFilter = (typeof ROSTER_FILTERS)[number];
+export type RosterFilter = "all" | "not_evaluated";
 
 export const ROSTER_SORTS = [
   "name",
@@ -143,15 +141,19 @@ export function rosterPositions(
   );
 }
 
-/** El orden no es un filtro: no deja a nadie fuera. */
-export function hasRosterFilters(view: RosterView): boolean {
-  return (
-    view.search.trim() !== "" ||
-    view.filter !== DEFAULT_ROSTER_VIEW.filter ||
-    view.positionId !== null
-  );
+/** Una posición de la dirección que nadie tiene se lee como Todas: si
+ * no, la tabla saldría vacía con el selector diciendo Todas las posiciones. */
+export function withHeldPosition(
+  view: RosterView,
+  positions: readonly NamedPosition[],
+): RosterView {
+  const isHeld = positions.some(({ id }) => id === view.positionId);
+  return view.positionId === null || isHeld
+    ? view
+    : { ...view, positionId: null };
 }
 
+/** El orden no es un filtro: borrar los filtros lo deja como estaba. */
 export function clearRosterFilters(view: RosterView): RosterView {
   return { ...DEFAULT_ROSTER_VIEW, sort: view.sort };
 }

@@ -6,8 +6,8 @@ import {
   applyRosterView,
   clearRosterFilters,
   countNotEvaluated,
-  hasRosterFilters,
   rosterPositions,
+  withHeldPosition,
 } from "@/lib/evaluations/roster-view";
 
 /**
@@ -192,17 +192,18 @@ describe("lo que rodea a la tabla", () => {
     expect(rosterPositions(ROSTER, "es")).toEqual([CENTRE, FORWARD]);
   });
 
-  it("sabe si hay algún filtro puesto", () => {
-    expect(hasRosterFilters(DEFAULT_ROSTER_VIEW)).toBe(false);
-    expect(hasRosterFilters({ ...DEFAULT_ROSTER_VIEW, sort: "oldest" })).toBe(
-      false,
+  it("lee como Todas una posición que nadie tiene", () => {
+    const view = { ...DEFAULT_ROSTER_VIEW, positionId: "nadie-la-tiene" };
+
+    expect(withHeldPosition(view, [FORWARD, CENTRE])).toEqual(
+      DEFAULT_ROSTER_VIEW,
     );
-    expect(hasRosterFilters({ ...DEFAULT_ROSTER_VIEW, search: "  " })).toBe(
-      false,
-    );
-    expect(hasRosterFilters({ ...DEFAULT_ROSTER_VIEW, search: "ana" })).toBe(
-      true,
-    );
+  });
+
+  it("deja la posición que alguien tiene", () => {
+    const view = { ...DEFAULT_ROSTER_VIEW, positionId: FORWARD.id };
+
+    expect(withHeldPosition(view, [FORWARD, CENTRE])).toBe(view);
   });
 
   it("borrar los filtros deja el orden como estaba", () => {

@@ -14,6 +14,7 @@ import {
   clearRosterFilters,
   countNotEvaluated,
   rosterPositions,
+  withHeldPosition,
 } from "@/lib/evaluations/roster-view";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -218,26 +219,28 @@ function PlayersPanel({
   if (members.length === 0) {
     return <p className="admin-empty">{translate("evaluations.list.empty")}</p>;
   }
+  const positions = rosterPositions(members, translate.locale);
+  const shownView = withHeldPosition(view, positions);
   return (
     <>
       <EvaluationRosterToolbar
         translate={translate}
-        view={view}
+        view={shownView}
         counts={{
           all: members.length,
           notEvaluated: countNotEvaluated(members),
         }}
-        positions={rosterPositions(members, translate.locale)}
+        positions={positions}
         onViewChange={onViewChange}
       />
       <div className="evaluations-panes">
         <EvaluationRoster
           translate={translate}
-          members={applyRosterView(members, view)}
+          members={applyRosterView(members, shownView)}
           totalCount={members.length}
           selectedId={selectedId}
           onSelect={onSelect}
-          onClearFilters={() => onViewChange(clearRosterFilters(view))}
+          onClearFilters={() => onViewChange(clearRosterFilters(shownView))}
         />
         {sheet}
       </div>

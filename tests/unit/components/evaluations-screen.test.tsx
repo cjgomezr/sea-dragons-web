@@ -585,6 +585,19 @@ describe("buscar y filtrar", () => {
   });
 });
 
+describe("posición que nadie tiene", () => {
+  it("con una posición de la dirección que nadie tiene enseña a todos", async () => {
+    clubApi();
+
+    await renderScreen({
+      initialView: { positionId: "90510000-0000-4000-8000-0000000000ff" },
+    });
+
+    expect(rowNames()).toEqual(["Camila Ortiz", "José Peña", "Mateo Ruiz"]);
+    expect(screen.getByRole("combobox", { name: "Position" })).toHaveValue("");
+  });
+});
+
 describe("fila elegida", () => {
   it("marca la fila abierta con aria-current", async () => {
     clubApi();
