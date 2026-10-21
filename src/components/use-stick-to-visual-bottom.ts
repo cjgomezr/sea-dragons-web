@@ -2,31 +2,8 @@
 
 import { type RefObject, useEffect } from "react";
 import { useIsPhone } from "@/components/use-is-phone";
+import { isTypingInto } from "@/components/is-typing-into";
 import { tabBarOffset } from "@/lib/tab-bar-offset";
-
-/** Los `<input>` que no sacan el teclado del móvil. */
-const INPUT_TYPES_WITHOUT_KEYBOARD: ReadonlySet<string> = new Set([
-  "button",
-  "checkbox",
-  "color",
-  "file",
-  "hidden",
-  "image",
-  "radio",
-  "range",
-  "reset",
-  "submit",
-]);
-
-function isTypingInto(element: Element | null): boolean {
-  if (element instanceof HTMLInputElement) {
-    return !INPUT_TYPES_WITHOUT_KEYBOARD.has(element.type);
-  }
-  return (
-    element instanceof HTMLTextAreaElement ||
-    (element instanceof HTMLElement && element.isContentEditable)
-  );
-}
 
 function offsetFromTransform(element: HTMLElement): number {
   const match = /translateY\((-?[\d.]+)px\)/.exec(element.style.transform);
@@ -39,7 +16,9 @@ function offsetFromTransform(element: HTMLElement): number {
  * en el móvil: a 768 px o más la barra está oculta y no se escucha nada.
  *
  * El desplazamiento se escribe directo en `style.transform`: llega con cada
- * scroll, y pasarlo por el estado de React repintaría la barra entera.
+ * scroll, y pasarlo por el estado de React repintaría la barra entera. Los
+ * eventos de un mismo cuadro se juntan en un `requestAnimationFrame` (#840):
+ * medir la barra en cada uno fuerza al navegador a maquetar de más.
  */
 export function useStickToVisualBottom(
   elementRef: RefObject<HTMLElement | null>,
@@ -66,12 +45,26 @@ export function useStickToVisualBottom(
       element.style.transform = offset === 0 ? "" : `translateY(${offset}px)`;
     };
 
+    let pendingFrame: number | null = null;
+    const scheduleReposition = (): void => {
+      if (pendingFrame !== null) {
+        return;
+      }
+      pendingFrame = requestAnimationFrame(() => {
+        pendingFrame = null;
+        reposition();
+      });
+    };
+
     reposition();
-    visualViewport.addEventListener("resize", reposition);
-    visualViewport.addEventListener("scroll", reposition);
+    visualViewport.addEventListener("resize", scheduleReposition);
+    visualViewport.addEventListener("scroll", scheduleReposition);
     return () => {
-      visualViewport.removeEventListener("resize", reposition);
-      visualViewport.removeEventListener("scroll", reposition);
+      visualViewport.removeEventListener("resize", scheduleReposition);
+      visualViewport.removeEventListener("scroll", scheduleReposition);
+      if (pendingFrame !== null) {
+        cancelAnimationFrame(pendingFrame);
+      }
       element.style.transform = "";
     };
   }, [elementRef, isPhone]);
