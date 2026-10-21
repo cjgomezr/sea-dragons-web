@@ -2190,7 +2190,7 @@ export const englishMessages = {
   "news.error.signInRequired":
     "Your session ended. Sign in again to see the news.",
   "news.error.unexpected": "We couldn't load the news. Try again.",
-  "news.post.back": "← Back to News",
+  "news.post.back": "Back to News",
   "news.post.loading": "Loading the post…",
   "news.post.published": "Published {date}",
   "news.post.edited": "Edited {date}",
@@ -2214,7 +2214,7 @@ export const englishMessages = {
   "news.publish.metaTitle": "Publish · {club}",
   "news.publish.metaDescription":
     "Write a post for the club, choose who sees it and attach documents.",
-  "news.publish.back": "← Back to News",
+  "news.publish.back": "Back to News",
   "news.publish.title": "New post",
   "news.publish.lead":
     "Write it, choose who sees it and attach any documents. It goes to the top of the feed as soon as you publish.",
@@ -2462,7 +2462,7 @@ export const englishMessages = {
   "news.post.announce.published": "Published again.",
   "news.edit.metaTitle": "Edit post · {club}",
   "news.edit.metaDescription": "Correct a post you published.",
-  "news.edit.back": "← Back to the post",
+  "news.edit.back": "Back to the post",
   "news.edit.title": "Edit post",
   "news.edit.lead":
     "Saving doesn't notify anyone. The post will show that it was edited, and when.",

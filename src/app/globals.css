@@ -7098,13 +7098,28 @@ a.auth-brand-header:focus-visible {
   max-width: 1080px;
 }
 
-.member-record-back {
+/* Volver a la sección de arriba en escritorio (BackLink): un botón
+   discreto, con la flecha de icono y sin subrayado. El margen negativo
+   alinea el texto con el contenido de debajo; el relleno sólo se ve al
+   pasar por encima. */
+.back-link {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  gap: 6px;
+  gap: var(--space-2);
   min-height: var(--touch-target-min);
-  color: var(--color-accent-text);
+  margin-left: calc(-1 * var(--space-3));
+  padding: 0 var(--space-3);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.back-link:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
 }
 
 .member-record-header {
@@ -11409,11 +11424,6 @@ a.auth-brand-header:focus-visible {
 .evaluation-categories-header h1,
 .evaluation-categories-header .app-lead {
   margin: 0;
-}
-
-/* Un enlace flexible se come el espacio junto a la flecha. */
-.evaluation-categories-header .member-record-back {
-  gap: var(--space-2);
 }
 
 .evaluation-categories-group {

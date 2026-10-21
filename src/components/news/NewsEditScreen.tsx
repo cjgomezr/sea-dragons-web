@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { loadGroups } from "@/components/groups/groups-client";
@@ -13,6 +12,7 @@ import type { EditableNewsPost } from "@/lib/news/news-management";
 import { type NewsFormPinning, NewsPublishForm } from "./NewsPublishForm";
 import { loadNewsFormPinning } from "./load-news-form-pinning";
 import { loadEditableNewsPost } from "./news-manage-client";
+import { BackLink } from "@/components/BackLink";
 
 /**
  * Editar una publicación (#331, RF-6 del PRD de E11), abierta desde la
@@ -103,9 +103,7 @@ export function NewsEditScreen({
     <div className="member-record news-publish">
       {hasPhoneBar ? null : (
         <>
-          <Link href={postPath} className="member-record-back">
-            {translate("news.edit.back")}
-          </Link>
+          <BackLink href={postPath}>{translate("news.edit.back")}</BackLink>
           <header className="member-record-header">
             <h1>{translate("news.edit.title")}</h1>
             <p className="app-lead">{translate("news.edit.lead")}</p>

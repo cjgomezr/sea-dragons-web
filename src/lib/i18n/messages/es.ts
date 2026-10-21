@@ -2198,7 +2198,7 @@ export const spanishMessages: MessageCatalog = {
     "Tu sesión terminó. Vuelve a entrar para ver las noticias.",
   "news.error.unexpected":
     "No pudimos cargar las noticias. Vuelve a intentarlo.",
-  "news.post.back": "← Volver a Noticias",
+  "news.post.back": "Volver a Noticias",
   "news.post.loading": "Cargando la publicación…",
   "news.post.published": "Publicada el {date}",
   "news.post.edited": "Editada el {date}",
@@ -2223,7 +2223,7 @@ export const spanishMessages: MessageCatalog = {
   "news.publish.metaTitle": "Publicar · {club}",
   "news.publish.metaDescription":
     "Escribe una publicación para el club, elige quién la ve y adjunta documentos.",
-  "news.publish.back": "← Volver a Noticias",
+  "news.publish.back": "Volver a Noticias",
   "news.publish.title": "Nueva publicación",
   "news.publish.lead":
     "Escríbela, elige quién la ve y adjunta los documentos que hagan falta. Sale arriba del feed en cuanto la publicas.",
@@ -2478,7 +2478,7 @@ export const spanishMessages: MessageCatalog = {
   "news.post.announce.published": "Publicada otra vez.",
   "news.edit.metaTitle": "Editar publicación · {club}",
   "news.edit.metaDescription": "Corrige una publicación tuya.",
-  "news.edit.back": "← Volver a la publicación",
+  "news.edit.back": "Volver a la publicación",
   "news.edit.title": "Editar publicación",
   "news.edit.lead":
     "Guardar no avisa a nadie. La publicación dirá que se editó y cuándo.",

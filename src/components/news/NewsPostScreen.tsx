@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { NEWS_PATH } from "@/lib/auth/routes";
 import { formatClubMoment } from "@/lib/i18n/format";
@@ -24,6 +23,7 @@ import { NewsCover } from "./NewsCover";
 import { NewsMarkdown } from "./NewsMarkdown";
 import { NewsPostActions } from "./NewsPostActions";
 import { NewsPostBar } from "./NewsPostBar";
+import { BackLink } from "@/components/BackLink";
 
 /**
  * Una publicación abierta (#329, RF-5 del PRD de E11), con el diseño 1c de
@@ -244,9 +244,7 @@ export function NewsPostScreen({
           onChanged={showChange}
         />
       ) : (
-        <Link href={NEWS_PATH} className="member-record-back">
-          {translate("news.post.back")}
-        </Link>
+        <BackLink href={NEWS_PATH}>{translate("news.post.back")}</BackLink>
       )}
       <p className="visually-hidden" role="status">
         {announcement}

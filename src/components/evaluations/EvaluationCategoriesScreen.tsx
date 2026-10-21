@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePendingAction } from "@/components/groups/use-pending-action";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
@@ -30,6 +29,7 @@ import {
   reorderCategories,
   setCategoryActive,
 } from "./evaluation-categories-client";
+import { BackLink } from "@/components/BackLink";
 
 /**
  * Las categorías de evaluación (#323, RF-3 del PRD de E9). Vive dentro de
@@ -145,10 +145,9 @@ function ActionFailure({
 function Header({ translate }: { translate: Translator }): React.JSX.Element {
   return (
     <header className="evaluation-categories-header">
-      <Link href={EVALUATIONS_PATH} className="member-record-back">
-        <span aria-hidden="true">←</span>
+      <BackLink href={EVALUATIONS_PATH}>
         {translate("evaluations.categories.back")}
-      </Link>
+      </BackLink>
       <h1>{translate("evaluations.categories.title")}</h1>
       <p className="app-lead">{translate("evaluations.categories.lead")}</p>
     </header>

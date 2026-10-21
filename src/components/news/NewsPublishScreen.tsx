@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { loadGroups } from "@/components/groups/groups-client";
@@ -11,6 +10,7 @@ import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
 import { type NewsFormPinning, NewsPublishForm } from "./NewsPublishForm";
 import { loadNewsFormPinning } from "./load-news-form-pinning";
+import { BackLink } from "@/components/BackLink";
 
 /**
  * Publicar en Noticias (#330), abierto desde la cabecera del feed.
@@ -82,9 +82,7 @@ export function NewsPublishScreen({
     <div className="member-record news-publish">
       {hasPhoneBar ? null : (
         <>
-          <Link href={NEWS_PATH} className="member-record-back">
-            {translate("news.publish.back")}
-          </Link>
+          <BackLink href={NEWS_PATH}>{translate("news.publish.back")}</BackLink>
           <header className="member-record-header">
             <h1>{translate("news.publish.title")}</h1>
             <p className="app-lead">{translate("news.publish.lead")}</p>
