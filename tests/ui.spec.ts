@@ -16485,19 +16485,18 @@ test.describe("categorías de evaluación en el navegador", () => {
   quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
-  test("se llega desde la cabecera de Evaluaciones", async ({ page }) => {
+  // Desde #818 las categorías son una pestaña de Evaluaciones, no un enlace a
+  // su propia pantalla: la pestaña abierta va en la URL.
+  test("se llega desde la pestaña de Evaluaciones", async ({ page }) => {
     await goToEvaluations(page, EVALUATIONS_LIST);
+    const categoriesTab = page.getByRole("tab", { name: /^Categories/ });
 
-    await page.getByRole("link", { name: "Categories" }).click();
+    await categoriesTab.click();
 
-    await expect(page).toHaveURL(
-      new RegExp(`${EVALUATION_CATEGORIES_SCREEN_PATH}$`),
-    );
+    await expect(page).toHaveURL(/[?&]tab=categories(&|$)/);
+    await expect(categoriesTab).toHaveAttribute("aria-selected", "true");
     await expect(
-      page.getByRole("heading", {
-        level: 1,
-        name: EVALUATION_CATEGORIES_HEADING,
-      }),
+      page.getByRole("list", { name: ACTIVE_CATEGORIES_LIST }),
     ).toBeVisible();
   });
 
