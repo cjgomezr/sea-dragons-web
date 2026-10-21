@@ -150,6 +150,9 @@ type PhoneScreen = {
   readonly openedEventId: string | null;
   readonly slot: HTMLElement | null;
   readonly onOpen: (eventId: string) => void;
+  /** Abre la pantalla sin dejar otra entrada en el historial: al llegar de
+   * otra página, volver atrás lleva a esa página y no a la agenda. */
+  readonly onOpenInPlace: (eventId: string) => void;
   readonly onBack: () => void;
 };
 
@@ -308,6 +311,7 @@ function AgendaList({
   period,
   events,
   focusEventId,
+  teamsEventId,
   selection,
   organizer,
   canTakeAttendance,
@@ -317,6 +321,8 @@ function AgendaList({
   readonly period: AgendaPeriod;
   readonly events: readonly AgendaEvent[];
   readonly focusEventId: string | null;
+  /** El evento que abre ya en sus equipos, o `null`. */
+  readonly teamsEventId: string | null;
   readonly selection: AgendaSelection;
   readonly organizer: EventOrganizer | null;
   readonly canTakeAttendance: boolean;
@@ -340,6 +346,7 @@ function AgendaList({
                 event={event}
                 period={period}
                 shouldTakeFocus={event.id === focusEventId}
+                shouldRevealTeams={event.id === teamsEventId}
                 isSelected={event.id === selection.selectedEventId}
                 onSelect={() => selection.onSelect(event.id)}
                 target={selection.target}
@@ -607,6 +614,7 @@ function AgendaView({
   from,
   isActive,
   focusOnLoad,
+  revealTeams,
   organizer,
   canTakeAttendance,
   rsvpDisabledReasonId,
@@ -621,6 +629,8 @@ function AgendaView({
   readonly isActive: boolean;
   /** El evento cuyo título recibe el foco con la primera página. */
   readonly focusOnLoad: string | null;
+  /** Si ese evento abre ya en sus equipos (D6 del PRD de E27). */
+  readonly revealTeams: boolean;
   readonly organizer: EventOrganizer | null;
   readonly canTakeAttendance: boolean;
   readonly rsvpDisabledReasonId: string | null;
@@ -638,6 +648,28 @@ function AgendaView({
   });
   const [panelSlot, setPanelSlot] = useState<HTMLElement | null>(null);
   const panelId = useId();
+  // Sólo al llegar: tras editar o filtrar, la agenda ya no abre en equipos.
+  const teamsEventId = revealTeams && reloads === 0 ? focusOnLoad : null;
+  const hasOpenedInPlaceRef = useRef(false);
+
+  // En el móvil el evento se abre en su pantalla en cuanto está en la agenda.
+  // Si no está, la agenda se queda como desde la búsqueda.
+  useEffect(() => {
+    const isListed =
+      state.kind === "ready" &&
+      state.events.some((event) => event.id === teamsEventId);
+    if (
+      hasOpenedInPlaceRef.current ||
+      phoneScreen === null ||
+      !isActive ||
+      teamsEventId === null ||
+      !isListed
+    ) {
+      return;
+    }
+    hasOpenedInPlaceRef.current = true;
+    phoneScreen.onOpenInPlace(teamsEventId);
+  }, [state, phoneScreen, isActive, teamsEventId]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -754,6 +786,7 @@ function AgendaView({
               period={period}
               events={state.events}
               focusEventId={state.focusEventId}
+              teamsEventId={teamsEventId}
               selection={selectionOf(state.events)}
               organizer={organizer}
               canTakeAttendance={canTakeAttendance}
@@ -832,6 +865,7 @@ function isScreenHistoryEntry(state: unknown): boolean {
 function usePhoneEventScreen(): {
   readonly openedEventId: string | null;
   readonly open: (eventId: string) => void;
+  readonly openInPlace: (eventId: string) => void;
   readonly close: () => void;
 } {
   const [openedEventId, setOpenedEventId] = useState<string | null>(null);
@@ -872,6 +906,17 @@ function usePhoneEventScreen(): {
     window.history.pushState({ [SCREEN_HISTORY_KEY]: eventId }, "");
   }
 
+  /** La marca va en la entrada de la página: cerrar vuelve atrás, a donde
+   * estaba quien llegó, y no a una agenda que no llegó a ver. */
+  function openInPlace(eventId: string): void {
+    hasOpenedRef.current = true;
+    setOpenedEventId(eventId);
+    window.history.replaceState(
+      { ...window.history.state, [SCREEN_HISTORY_KEY]: eventId },
+      "",
+    );
+  }
+
   function close(): void {
     setOpenedEventId(null);
     if (isScreenHistoryEntry(window.history.state)) {
@@ -879,7 +924,7 @@ function usePhoneEventScreen(): {
     }
   }
 
-  return { openedEventId, open, close };
+  return { openedEventId, open, openInPlace, close };
 }
 
 export function AgendaScreen({
@@ -890,6 +935,7 @@ export function AgendaScreen({
   initialPeriod = "upcoming",
   initialTypes = AGENDA_TYPE_CHIPS,
   focusEventId = null,
+  revealTeams = false,
   openCreateWith = null,
 }: {
   readonly locale: Locale;
@@ -912,6 +958,10 @@ export function AgendaScreen({
   /** El evento cuyo título recibe el foco al llegar, como el que se abrió
    * desde la búsqueda global (#427). */
   readonly focusEventId?: string | null;
+  /** Si ese evento abre ya en sus equipos: la pantalla entera en el móvil, el
+   * panel en escritorio. Es a donde lleva "Ver equipos" del inicio (D6 del
+   * PRD de E27). */
+  readonly revealTeams?: boolean;
   /** El tipo con el que el formulario de crear llega ya abierto, como lo
    * pide "Nuevo entrenamiento" desde el inicio (#426). */
   readonly openCreateWith?: EventType | null;
@@ -983,6 +1033,7 @@ export function AgendaScreen({
         openedEventId: eventScreen.openedEventId,
         slot: screenSlot,
         onOpen: eventScreen.open,
+        onOpenInPlace: eventScreen.openInPlace,
         onBack: eventScreen.close,
       }
     : null;
@@ -1074,6 +1125,7 @@ export function AgendaScreen({
                   from={choice === "past" ? pastFrom : null}
                   isActive={choice === period}
                   focusOnLoad={agendaVersion.focusEventId}
+                  revealTeams={revealTeams && agendaVersion.number === 0}
                   organizer={organizer}
                   canTakeAttendance={canTakeAttendance}
                   rsvpDisabledReasonId={rsvpDisabledReasonId}

@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { type NamedPosition, positionName } from "@/lib/club/club-positions";
 import type { Translator } from "@/lib/i18n/translator";
 import type { MyTeam, PublishedTeam } from "@/lib/teams/my-team";
@@ -114,17 +114,30 @@ function PublishedTeams({
   translate,
   published,
   isCancelled,
+  shouldTakeFocus,
 }: {
   readonly translate: Translator;
   readonly published: Published;
   readonly isCancelled: boolean;
+  readonly shouldTakeFocus: boolean;
 }): React.JSX.Element {
   const headingId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // Llegar desde "Ver equipos" del inicio deja el foco en el título: el
+  // navegador lo trae a la vista y el lector de pantalla empieza aquí.
+  useEffect(() => {
+    if (shouldTakeFocus) {
+      headingRef.current?.focus();
+    }
+  }, [shouldTakeFocus]);
   const { me, teams } = published;
   return (
     <section className="event-teams" aria-labelledby={headingId}>
       <div className="event-teams-heading">
-        <h3 id={headingId}>{translate("calendar.teams.heading")}</h3>
+        <h3 id={headingId} ref={headingRef} tabIndex={-1}>
+          {translate("calendar.teams.heading")}
+        </h3>
         {isCancelled ? (
           <span className="agenda-cancelled">
             {translate("calendar.event.cancelled")}
@@ -156,11 +169,14 @@ export function EventTeams({
   state,
   isCancelled,
   onRetry,
+  shouldTakeFocus = false,
 }: {
   readonly translate: Translator;
   readonly state: EventTeamState;
   readonly isCancelled: boolean;
   readonly onRetry: () => void;
+  /** Si el título recibe el foco al llegar, como desde "Ver equipos". */
+  readonly shouldTakeFocus?: boolean;
 }): React.JSX.Element | null {
   switch (state.kind) {
     case "idle":
@@ -185,6 +201,7 @@ export function EventTeams({
           translate={translate}
           published={state.team}
           isCancelled={isCancelled}
+          shouldTakeFocus={shouldTakeFocus}
         />
       );
   }

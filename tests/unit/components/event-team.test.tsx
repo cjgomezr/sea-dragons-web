@@ -395,3 +395,104 @@ describe("el equipo en el panel del evento", () => {
     expect(await within(panel).findByText(sentence)).toBeInTheDocument();
   });
 });
+
+/* "Ver equipos" del inicio (D6 del PRD de E27) abre el evento ya en sus
+   equipos: el panel en escritorio, la pantalla entera en el móvil. */
+describe("abrir el evento en sus equipos", () => {
+  const PHONE_QUERY = "(width < 768px)";
+
+  function stubPhone(): void {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === PHONE_QUERY,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }));
+    // jsdom no implementa el scroll de la ventana.
+    vi.stubGlobal("scrollTo", vi.fn());
+  }
+
+  function renderOpenedInTeams(event: AgendaEvent): void {
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+        focusEventId={event.id}
+        revealTeams
+      />,
+    );
+  }
+
+  it("en escritorio elige el evento y lleva el foco a sus equipos", async () => {
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP, [SOCIAL]);
+
+    renderOpenedInTeams(SCRIMMAGE);
+
+    const panel = await screen.findByRole("complementary", {
+      name: SCRIMMAGE.title,
+    });
+    const teams = await within(panel).findByRole("heading", { name: "Teams" });
+    await vi.waitFor(() => expect(teams).toHaveFocus());
+  });
+
+  it("sin pedir los equipos el foco se queda en el título, como desde la búsqueda", async () => {
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+        focusEventId={SCRIMMAGE.id}
+      />,
+    );
+
+    const panel = await screen.findByRole("complementary", {
+      name: SCRIMMAGE.title,
+    });
+    const teams = await within(panel).findByRole("heading", { name: "Teams" });
+    const title = screen.getByRole("heading", {
+      level: 3,
+      name: SCRIMMAGE.title,
+    });
+    await vi.waitFor(() => expect(title).toHaveFocus());
+    expect(teams).not.toHaveFocus();
+  });
+
+  it("en el móvil abre la pantalla del evento en sus equipos sin dejar otra entrada en el historial", async () => {
+    stubPhone();
+    const pushState = vi.spyOn(window.history, "pushState");
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
+
+    renderOpenedInTeams(SCRIMMAGE);
+
+    const eventScreen = await screen.findByRole("article", {
+      name: SCRIMMAGE.title,
+    });
+    const teams = await within(eventScreen).findByRole("heading", {
+      name: "Teams",
+    });
+    await vi.waitFor(() => expect(teams).toHaveFocus());
+    expect(pushState).not.toHaveBeenCalled();
+    expect(replaceState).toHaveBeenCalledWith(
+      expect.objectContaining({ calendarEventScreen: SCRIMMAGE.id }),
+      "",
+    );
+  });
+
+  it("en el móvil, si el evento no está en la agenda, se queda en la agenda", async () => {
+    stubPhone();
+    stubEvent(SOCIAL, NOT_PUBLISHED);
+
+    renderOpenedInTeams(SCRIMMAGE);
+
+    await screen.findByRole("heading", { level: 3, name: SOCIAL.title });
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+  });
+});

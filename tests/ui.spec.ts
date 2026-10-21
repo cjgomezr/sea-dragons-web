@@ -23676,6 +23676,66 @@ test.describe("el orden del inicio en el navegador (#752)", () => {
   });
 });
 
+/* "Ver equipos" de la franja del equipo (D6 del PRD de E27) abre el evento
+   ya en sus equipos: la pantalla entera en el móvil, el panel en escritorio.
+   Volver atrás lleva al inicio, de donde se vino. */
+test.describe("Ver equipos desde el inicio", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const NEXT_UP_AGENDA_EVENT = {
+    ...STUBBED_AGENDA_EVENTS[0],
+    id: DASHBOARD_POOL_TRAINING_ID,
+    title: "Saturday scrimmage",
+  };
+
+  async function goToTeamsFromHome(page: Page): Promise<void> {
+    await stubCalendarReads(page, {
+      events: [NEXT_UP_AGENDA_EVENT],
+      teams: PUBLISHED_TEAMS,
+    });
+    await goToDashboard(page, { dashboard: MY_TEAM_DASHBOARD });
+    await page
+      .getByRole("region", { name: "Next up" })
+      .getByRole("link", { name: "See teams" })
+      .click();
+    await expect(page).toHaveURL(/[?&]ver=equipos/);
+  }
+
+  test("en el móvil abre la pantalla del evento en sus equipos y atrás vuelve al inicio", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+
+    await goToTeamsFromHome(page);
+
+    const eventScreen = page.getByRole("article", {
+      name: NEXT_UP_AGENDA_EVENT.title,
+    });
+    await expect(
+      eventScreen.getByRole("heading", { name: "Teams" }),
+    ).toBeFocused();
+    await page.goBack();
+    await expect(
+      page.getByRole("heading", { level: 1, name: DASHBOARD_GREETING }),
+    ).toBeVisible();
+  });
+
+  test("en escritorio elige el evento en el panel con el foco en sus equipos", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    await goToTeamsFromHome(page);
+
+    const panel = page.getByRole("complementary", {
+      name: NEXT_UP_AGENDA_EVENT.title,
+    });
+    await expect(panel.getByRole("heading", { name: "Teams" })).toBeFocused();
+  });
+});
+
 test.describe("el inicio en el navegador", () => {
   skipWithoutSession();
   quietNotificationBell();

@@ -269,8 +269,7 @@ export const englishMessages = {
   "dashboard.nextUp.unavailable": "We couldn't load the next event.",
   "dashboard.nextUp.locked": "RSVP is for current members.",
   "dashboard.nextUp.renew": "Renew",
-  "dashboard.nextUp.bib": "{color} bib",
-  "dashboard.nextUp.lineups": "Lineups",
+  "dashboard.nextUp.seeTeams": "See teams",
   // La frase va en tres trozos para poner en negrita el del medio; el último
   // lleva su espacio delante porque en español no lo hay.
   "dashboard.nextUp.draft.start": "Teams are saved but",

@@ -62,6 +62,15 @@ export const CALENDAR_PATH = "/calendario";
  * lleva un evento encontrado en la búsqueda (#427). */
 export const CALENDAR_EVENT_QUERY_PARAM = "evento";
 
+/** Con `equipos` y un evento, el calendario abre ese evento (la pantalla
+ * entera en el móvil, el panel en escritorio) y baja hasta sus equipos: es a
+ * donde lleva "Ver equipos" del inicio. Sin él, `?evento=` sólo marca la
+ * fila, como hace la búsqueda. */
+export const CALENDAR_VIEW_QUERY_PARAM = "ver";
+
+/** El valor de `CALENDAR_VIEW_QUERY_PARAM` que abre el evento en sus equipos. */
+export const CALENDAR_VIEW_TEAMS = "equipos";
+
 /** `past` abre el calendario en los pasados, donde está la fila de un evento
  * que ya ocurrió. Sin él, en los próximos. */
 export const CALENDAR_PERIOD_QUERY_PARAM = "periodo";

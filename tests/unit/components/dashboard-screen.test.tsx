@@ -756,7 +756,7 @@ describe("el RSVP de la tarjeta Próximo (#747)", () => {
 });
 
 describe("el equipo en la tarjeta Próximo (#747)", () => {
-  it("con el reparto publicado dice en qué equipo juega, su peto y su posición", async () => {
+  it("con el reparto publicado dice en qué equipo juega y su posición, sin el peto", async () => {
     stubDashboard(withNextUp({ ...NEXT_UP, myTeam: KELP_TEAM }));
 
     await renderScreen();
@@ -764,11 +764,10 @@ describe("el equipo en la tarjeta Próximo (#747)", () => {
     const card = nextUpCard();
     expect(within(card).getByText("You're playing in")).toBeInTheDocument();
     const strip = within(card).getByText("Team Kelp").closest("p");
-    expect(strip).toHaveTextContent("Team Kelp · blue bib · Full back");
-    expect(within(card).getByRole("link", { name: "Lineups" })).toHaveAttribute(
-      "href",
-      `/calendario?evento=${NEXT_UP.id}`,
-    );
+    expect(strip).toHaveTextContent(/^Team Kelp · Full back$/);
+    expect(
+      within(card).getByRole("link", { name: "See teams" }),
+    ).toHaveAttribute("href", `/calendario?evento=${NEXT_UP.id}&ver=equipos`);
   });
 
   it("sin posición no la dice", async () => {
@@ -779,10 +778,10 @@ describe("el equipo en la tarjeta Próximo (#747)", () => {
     await renderScreen();
 
     const strip = within(nextUpCard()).getByText("Team Kelp").closest("p");
-    expect(strip).toHaveTextContent(/^Team Kelp · blue bib$/);
+    expect(strip).toHaveTextContent(/^Team Kelp$/);
   });
 
-  it("dice el peto y la posición en español", async () => {
+  it("dice la posición y Ver equipos en español", async () => {
     stubDashboard(withNextUp({ ...NEXT_UP, myTeam: KELP_TEAM }));
 
     await renderScreen({ locale: "es" });
@@ -790,7 +789,10 @@ describe("el equipo en la tarjeta Próximo (#747)", () => {
     const card = screen.getByRole("region", { name: "Próximo" });
     expect(within(card).getByText("Juegas en")).toBeInTheDocument();
     const strip = within(card).getByText("Team Kelp").closest("p");
-    expect(strip).toHaveTextContent("Team Kelp · peto azul · Defensa");
+    expect(strip).toHaveTextContent(/^Team Kelp · Defensa$/);
+    expect(
+      within(card).getByRole("link", { name: "Ver equipos" }),
+    ).toBeInTheDocument();
   });
 
   it("sin equipo no hay franja", async () => {
