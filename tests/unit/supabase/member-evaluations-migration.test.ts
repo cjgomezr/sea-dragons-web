@@ -196,6 +196,8 @@ describeConPostgres("migración de las evaluaciones", () => {
       "created_at timestamp with time zone null=NO",
       "id uuid null=NO",
       "updated_at timestamp with time zone null=NO",
+      // Quién la tocó por última vez (#817, 0078). Vacía en las de antes.
+      "updated_by uuid null=YES",
       "user_id uuid null=NO",
     ]);
   });

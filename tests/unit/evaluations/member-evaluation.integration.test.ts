@@ -311,6 +311,7 @@ describeRls("la evaluación de un miembro en Supabase", () => {
         await assertDenied(playerClient, (client) =>
           client.rpc("save_member_evaluation_ratings", {
             acting_club_id: null,
+            acting_user_id: null,
             target_user_id: player.id,
             expected_updated_at: null,
             ratings: [],
@@ -322,14 +323,32 @@ describeRls("la evaluación de un miembro en Supabase", () => {
   );
 
   it(
-    "la lista del club trae a cada miembro con su OVR en una consulta (#322)",
+    "la lista del club trae a cada miembro con su OVR, quién lo evaluó y el resumen (#322, #817)",
     async () => {
       await withCoachAndPlayer(async ({ coach, player }) => {
         const serviceClient = createServiceRoleTestClient(process.env);
-        await createMemberEvaluation(
-          createMemberEvaluationGateways(serviceClient.client),
-          { callerId: coach.id, memberId: player.id },
+        const gateways = createMemberEvaluationGateways(serviceClient.client);
+        const request = { callerId: coach.id, memberId: player.id };
+        const created = asEvaluated(
+          await createMemberEvaluation(gateways, request),
         );
+        const [fitness] = created.ratings;
+        const saved = asEvaluated(
+          await saveEvaluationRatings(gateways, {
+            ...request,
+            expectedUpdatedAt: created.updatedAt,
+            ratings: [{ categoryId: String(fitness?.categoryId), rating: 9 }],
+          }),
+        );
+        const { data: stored, error } = await serviceClient.client
+          .from("member_evaluations")
+          .select("updated_by")
+          .eq("user_id", player.id)
+          .single();
+        if (error) {
+          throw new Error(`No se pudo leer la evaluación: ${error.message}`);
+        }
+        expect(stored.updated_by).toBe(coach.id);
 
         const roster = await listEvaluationRoster(
           createEvaluationRosterGateways(serviceClient.client),
@@ -341,14 +360,33 @@ describeRls("la evaluación de un miembro en Supabase", () => {
             status: "not_evaluated",
             userId: coach.id,
             fullName: "Socia Coach de prueba",
+            position: null,
+            photoUrl: null,
           },
           {
             status: "evaluated",
             userId: player.id,
             fullName: "Socia Player de prueba",
-            overallRating: 5,
+            position: null,
+            photoUrl: null,
+            overall: 5.4,
+            updatedAt: saved.updatedAt,
+            updatedBy: "Socia Coach de prueba",
           },
         ]);
+        expect(roster.summary).toMatchObject({
+          evaluatedCount: 1,
+          playerCount: 2,
+          averageOverall: 5.4,
+        });
+        expect(roster.summary.categoryAverages).toHaveLength(
+          DEFAULT_CATEGORY_COUNT,
+        );
+        expect(roster.summary.categoryAverages[0]).toEqual({
+          categoryId: fitness?.categoryId,
+          name: "Fitness",
+          average: 9,
+        });
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS * 2,

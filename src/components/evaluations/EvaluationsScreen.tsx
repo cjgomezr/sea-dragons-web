@@ -3,10 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EVALUATION_CATEGORIES_PATH } from "@/lib/auth/routes";
-import type {
-  EvaluationRoster as Roster,
-  EvaluationRosterEntry,
-} from "@/lib/evaluations/evaluation-roster";
 import type { MemberEvaluation } from "@/lib/evaluations/member-evaluation";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -14,6 +10,8 @@ import { EvaluationRoster, rosterButtonId } from "./EvaluationRoster";
 import { EvaluationSheet } from "./EvaluationSheet";
 import {
   type EvaluationFailure,
+  type ScreenRoster as Roster,
+  type ScreenRosterEntry,
   describeEvaluationFailure,
   loadEvaluationRoster,
 } from "./evaluations-client";
@@ -66,16 +64,16 @@ function LoadFailure({
 
 /** La fila de la lista con lo que el servidor acaba de confirmar. */
 function toRosterEntry(
-  entry: EvaluationRosterEntry,
+  entry: ScreenRosterEntry,
   evaluation: MemberEvaluation,
-): EvaluationRosterEntry {
+): ScreenRosterEntry {
   const { userId, fullName } = entry;
   return evaluation.status === "evaluated"
     ? {
         status: "evaluated",
         userId,
         fullName,
-        overallRating: evaluation.overallRating,
+        overall: evaluation.overallRating,
       }
     : { status: "not_evaluated", userId, fullName };
 }

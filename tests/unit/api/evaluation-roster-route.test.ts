@@ -19,11 +19,36 @@ const CONTINUE_HEADER = "x-middleware-next";
 const CALLER_ID = "c0c0c0c0-0000-4000-8000-00000000000c";
 const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
 
+const FITNESS_ID = "ca7e0000-0000-4000-8000-000000000001";
+const SPEED_ID = "ca7e0000-0000-4000-8000-000000000002";
+const UPDATED_AT = "2026-10-01T09:00:00.123456+00:00";
+
 const PLAYER: RosterMemberRecord = {
   userId: "4e4e4e4e-0000-4000-8000-000000000001",
   fullName: "Pía Player",
   status: "active",
-  ratings: [7, 8],
+  position: null,
+  photoPath: null,
+  evaluation: {
+    updatedAt: UPDATED_AT,
+    updatedBy: "Carla Coach",
+    ratings: [
+      {
+        categoryId: FITNESS_ID,
+        categoryName: "Fitness",
+        sortOrder: 1,
+        isRetired: false,
+        rating: 7,
+      },
+      {
+        categoryId: SPEED_ID,
+        categoryName: "Speed",
+        sortOrder: 2,
+        isRetired: false,
+        rating: 8,
+      },
+    ],
+  },
 };
 
 const readSessionState = vi.fn();
@@ -39,6 +64,7 @@ function rosterGateways(): EvaluationRosterGateways {
       }),
     },
     roster: { findRosterMembers: async () => [PLAYER] },
+    photos: { signPhotoUrls: async () => new Map() },
   };
 }
 
@@ -88,7 +114,7 @@ beforeEach(() => {
 
 describe("GET /api/v1/evaluations", () => {
   it.each<Role>(["Coach", "Admin"])(
-    "sirve a un %s los miembros con su OVR",
+    "sirve a un %s los miembros con su OVR y el resumen de la plantilla",
     async (role) => {
       givenSession({ kind: "active", role, membershipCurrent: true });
 
@@ -102,9 +128,29 @@ describe("GET /api/v1/evaluations", () => {
               status: "evaluated",
               userId: PLAYER.userId,
               fullName: PLAYER.fullName,
-              overallRating: 7.5,
+              position: null,
+              photoUrl: null,
+              overall: 7.5,
+              updatedAt: UPDATED_AT,
+              updatedBy: "Carla Coach",
             },
           ],
+          summary: {
+            evaluatedCount: 1,
+            playerCount: 1,
+            categoryAverages: [
+              { categoryId: FITNESS_ID, name: "Fitness", average: 7 },
+              { categoryId: SPEED_ID, name: "Speed", average: 8 },
+            ],
+            averageOverall: 7.5,
+            longestUnreviewed: [
+              {
+                userId: PLAYER.userId,
+                fullName: PLAYER.fullName,
+                updatedAt: UPDATED_AT,
+              },
+            ],
+          },
         },
       });
     },

@@ -127,6 +127,9 @@ function setActive(
   );
 }
 
+// Desde `0078` las escrituras reciben también a quien llama, y tiene que ser
+// del club. Aquí da igual quién: se pasa al propio miembro, y lo que se apunta
+// lo prueba `member-evaluation-updated-by-migration.test.ts`.
 function refreshEvaluation(
   database: TemporaryDatabase,
   clubId: string,
@@ -134,7 +137,7 @@ function refreshEvaluation(
 ): Promise<Outcome> {
   return callFunction(
     database,
-    `refresh_member_evaluation('${clubId}', '${userId}')`,
+    `refresh_member_evaluation('${clubId}', '${userId}', '${userId}')`,
   );
 }
 
@@ -147,7 +150,7 @@ async function evaluatedMember(database: TemporaryDatabase): Promise<{
   expect(
     await callFunction(
       database,
-      `create_member_evaluation('${clubId}', '${userId}')`,
+      `create_member_evaluation('${clubId}', '${userId}', '${userId}')`,
     ),
   ).toEqual({ outcome: "created" });
   return { clubId, userId };
@@ -480,7 +483,7 @@ describeConPostgres("quién puede llamar a las funciones", () => {
     "rename_evaluation_category(uuid, uuid, text)",
     "reorder_evaluation_categories(uuid, uuid[])",
     "set_evaluation_category_active(uuid, uuid, boolean)",
-    "refresh_member_evaluation(uuid, uuid)",
+    "refresh_member_evaluation(uuid, uuid, uuid)",
   ])("sólo service_role ejecuta %s", async (signature) => {
     const database = await migratedDatabase();
 

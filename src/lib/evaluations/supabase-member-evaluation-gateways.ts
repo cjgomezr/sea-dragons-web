@@ -12,6 +12,7 @@ import type {
   EvaluationCreation,
   EvaluationRefresh,
   EvaluationScope,
+  EvaluationWriteScope,
   MemberEvaluationGateways,
   RatingsSave,
   RatingsSubmission,
@@ -24,7 +25,8 @@ import type {
  * Va por la llave de servicio: `0031_member_evaluations.sql` no da ningún
  * privilegio a `authenticated` (FR-055), y las escrituras son las funciones de
  * `0032_member_evaluation_writes.sql` y la puesta al día de
- * `0033_manage_evaluation_categories.sql`, que sólo ejecuta `service_role`. El
+ * `0033_manage_evaluation_categories.sql`, que sólo ejecuta `service_role` y
+ * que desde `0078` apuntan a quien escribe. El
  * servidor ya comprobó que quien pide es Admin o Coach, y cada consulta va
  * acotada a su club.
  */
@@ -226,10 +228,11 @@ async function callEvaluationFunction(
 
 async function createEvaluation(
   serviceClient: SupabaseClient,
-  scope: EvaluationScope,
+  scope: EvaluationWriteScope,
 ): Promise<EvaluationCreation> {
   const data = await callEvaluationFunction(serviceClient, CREATE_FUNCTION, {
     acting_club_id: scope.clubId,
+    acting_user_id: scope.evaluatorId,
     target_user_id: scope.userId,
   });
   return {
@@ -239,11 +242,12 @@ async function createEvaluation(
 
 async function saveRatings(
   serviceClient: SupabaseClient,
-  scope: EvaluationScope,
+  scope: EvaluationWriteScope,
   submission: RatingsSubmission,
 ): Promise<RatingsSave> {
   const data = await callEvaluationFunction(serviceClient, SAVE_FUNCTION, {
     acting_club_id: scope.clubId,
+    acting_user_id: scope.evaluatorId,
     target_user_id: scope.userId,
     expected_updated_at: submission.expectedUpdatedAt,
     ratings: submission.ratings.map(({ categoryId, rating }) => ({
@@ -259,10 +263,11 @@ async function saveRatings(
 
 async function refreshEvaluation(
   serviceClient: SupabaseClient,
-  scope: EvaluationScope,
+  scope: EvaluationWriteScope,
 ): Promise<EvaluationRefresh> {
   const data = await callEvaluationFunction(serviceClient, REFRESH_FUNCTION, {
     acting_club_id: scope.clubId,
+    acting_user_id: scope.evaluatorId,
     target_user_id: scope.userId,
   });
   const result = parseRow(refreshResultSchema, data, REFRESH_FUNCTION);

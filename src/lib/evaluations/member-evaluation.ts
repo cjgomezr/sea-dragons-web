@@ -78,6 +78,12 @@ export type EvaluationScope = {
   readonly userId: string;
 };
 
+/** Una escritura lleva además a quien la hace: la base lo apunta como la
+ * última edición (D6 del PRD de E31). */
+export type EvaluationWriteScope = EvaluationScope & {
+  readonly evaluatorId: string;
+};
+
 export type RatingChange = {
   readonly categoryId: string;
   readonly rating: number;
@@ -139,16 +145,17 @@ export type MemberEvaluationGateways = {
     findEvaluation(scope: EvaluationScope): Promise<StoredEvaluation | null>;
     /** Todas las categorías activas del club en su valor inicial, en una
      * sola escritura. */
-    createEvaluation(scope: EvaluationScope): Promise<EvaluationCreation>;
+    createEvaluation(scope: EvaluationWriteScope): Promise<EvaluationCreation>;
     /** Aplica todas las valoraciones o ninguna, y sólo si la evaluación
      * sigue en `expectedUpdatedAt`. */
     saveRatings(
-      scope: EvaluationScope,
+      scope: EvaluationWriteScope,
       submission: RatingsSubmission,
     ): Promise<RatingsSave>;
     /** Las categorías activas que le faltan entran en 5 y las desactivadas
-     * salen, en una sola escritura. Ya al día, no toca nada. */
-    refreshEvaluation(scope: EvaluationScope): Promise<EvaluationRefresh>;
+     * salen, en una sola escritura. Ya al día, no toca nada, tampoco quién
+     * la editó. */
+    refreshEvaluation(scope: EvaluationWriteScope): Promise<EvaluationRefresh>;
   };
   readonly audit: AuditLogWriter;
 };
@@ -356,6 +363,15 @@ type EvaluationRequest = {
   readonly memberId: string;
 };
 
+/** A quien se escribe, y quién lo escribe. Las lecturas que siguen a la
+ * escritura usan el mismo, porque también es un `EvaluationScope`. */
+function writeScopeOf(
+  actor: AuditActor,
+  memberId: string,
+): EvaluationWriteScope {
+  return { clubId: actor.clubId, userId: memberId, evaluatorId: actor.id };
+}
+
 export async function readMemberEvaluation(
   gateways: MemberEvaluationGateways,
   request: EvaluationRequest,
@@ -390,7 +406,7 @@ export async function createMemberEvaluation(
   request: EvaluationRequest,
 ): Promise<MemberEvaluation> {
   const actor = await findEvaluatorActor(gateways, request.callerId);
-  const scope = { clubId: actor.clubId, userId: request.memberId };
+  const scope = writeScopeOf(actor, request.memberId);
   await findWritableMember(gateways, scope);
   assertCreated(await gateways.evaluations.createEvaluation(scope));
   await recordEvaluationEvent(gateways, {
@@ -432,7 +448,7 @@ export async function saveEvaluationRatings(
   if (issues.length > 0) {
     throw new EvaluationValidationError(issues);
   }
-  const scope = { clubId: actor.clubId, userId: request.memberId };
+  const scope = writeScopeOf(actor, request.memberId);
   await findWritableMember(gateways, scope);
   assertSaved(
     await gateways.evaluations.saveRatings(scope, {
@@ -472,7 +488,7 @@ export async function refreshMemberEvaluation(
   request: EvaluationRequest,
 ): Promise<RefreshedEvaluation> {
   const actor = await findEvaluatorActor(gateways, request.callerId);
-  const scope = { clubId: actor.clubId, userId: request.memberId };
+  const scope = writeScopeOf(actor, request.memberId);
   const outcome = assertRefreshed(
     await gateways.evaluations.refreshEvaluation(scope),
   );

@@ -58,11 +58,12 @@ const RESPONSES_FUNCTION = "live_event_rsvps";
 const SAVE_SPLIT_FUNCTION = "save_team_split";
 const PUBLISH_SPLIT_FUNCTION = "publish_team_split";
 
-/** La posición por la clave compuesta que la ata al club (`0025`). */
+/** La posición por la clave compuesta que la ata al club (`0025`), y la
+ * evaluación por la del evaluado: desde `0078` hay otra, la de quien editó. */
 const PLAYER_COLUMNS = [
   "user_id, full_name, position_id, account_status, photo_path",
   "position:club_positions!members_position_same_club_fkey(coverage)",
-  "member_evaluations(member_evaluation_ratings(rating))",
+  "member_evaluations!member_evaluations_member_same_club_fkey(member_evaluation_ratings(rating))",
   MEMBERSHIP_STANDING_EMBED,
 ].join(", ");
 

@@ -95,7 +95,7 @@ function fakeGateways(options: FakeOptions = {}): Fake {
         options.memberStatus === undefined ? "active" : options.memberStatus,
       findEvaluation: async () => stored,
       createEvaluation: async (scope) => {
-        writes.push(`create ${scope.userId}`);
+        writes.push(`create ${scope.userId} por ${scope.evaluatorId}`);
         stored = {
           updatedAt: READ_AT,
           missingCategoryCount: 0,
@@ -112,7 +112,7 @@ function fakeGateways(options: FakeOptions = {}): Fake {
       },
       saveRatings: async (scope, save) => {
         writes.push(
-          `save ${scope.userId} ${save.expectedUpdatedAt} ${save.ratings
+          `save ${scope.userId} por ${scope.evaluatorId} ${save.expectedUpdatedAt} ${save.ratings
             .map((change) => `${change.categoryId}=${change.rating}`)
             .join(",")}`,
         );
@@ -123,7 +123,7 @@ function fakeGateways(options: FakeOptions = {}): Fake {
         return result;
       },
       refreshEvaluation: async (scope) => {
-        writes.push(`refresh ${scope.userId}`);
+        writes.push(`refresh ${scope.userId} por ${scope.evaluatorId}`);
         const result = options.refresh ?? { kind: "already_current" };
         if (result.kind === "refreshed") {
           stored = REFRESHED;
@@ -270,7 +270,7 @@ describe("crear una evaluación", () => {
       memberId: MEMBER_ID,
     });
 
-    expect(writes).toEqual([`create ${MEMBER_ID}`]);
+    expect(writes).toEqual([`create ${MEMBER_ID} por ${COACH_ID}`]);
     expect(evaluation).toMatchObject({ status: "evaluated", overallRating: 5 });
   });
 
@@ -345,7 +345,9 @@ describe("guardar valoraciones", () => {
 
     const evaluation = await saveEvaluationRatings(gateways, SAVE_REQUEST);
 
-    expect(writes).toEqual([`save ${MEMBER_ID} ${READ_AT} ${FITNESS_ID}=9`]);
+    expect(writes).toEqual([
+      `save ${MEMBER_ID} por ${COACH_ID} ${READ_AT} ${FITNESS_ID}=9`,
+    ]);
     expect(evaluation).toMatchObject({
       status: "evaluated",
       updatedAt: SAVED_AT,
@@ -490,7 +492,7 @@ describe("poner al día una evaluación", () => {
 
     const result = await refreshMemberEvaluation(gateways, REFRESH_REQUEST);
 
-    expect(writes).toEqual([`refresh ${MEMBER_ID}`]);
+    expect(writes).toEqual([`refresh ${MEMBER_ID} por ${COACH_ID}`]);
     expect(result).toEqual({
       outcome: { kind: "refreshed", addedCount: 1, removedCount: 1 },
       evaluation: {
