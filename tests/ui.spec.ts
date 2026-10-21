@@ -15689,10 +15689,11 @@ test.describe("publicar en el móvil: la barra y las medidas (#602)", () => {
 });
 
 /* ---------------------------------------------------------------------------
-   Evaluaciones (#322): la lista, la ficha, la ficha en edición y el miembro
-   sin evaluar. Mockup: docs/mockups/evaluations-light.png y
-   evaluations-dark.png, que es de escritorio; en el móvil la lista y la ficha
-   son dos pasos. La tarjeta "Position score" del mockup no se construye.
+   Evaluaciones (#322): la tabla, la ficha, la ficha en edición y el miembro
+   sin evaluar. Desde #818 la tabla sigue el diseño #1a del handoff de E31
+   (docs/design/design_handoff_evaluations/screenshots/02-desktop-player.png),
+   con la búsqueda, las fichas, la posición y el orden; en el móvil la tabla
+   y la ficha son dos pasos hasta #822.
 
    Los datos son fijos, servidos por `page.route` como en Noticias: lo que
    los endpoints responden se prueba contra la base (#319 y #322).
@@ -15707,59 +15708,108 @@ const EVALUATED_AT = "2026-09-27T01:02:03.123456+00:00";
 const CAMILA_ID = "e1e1e1e1-0000-4000-8000-0000000000e1";
 const MATEO_ID = "e1e1e1e1-0000-4000-8000-0000000000e2";
 
-/** Lo que la lista trae de cada fila desde #817 y la pantalla de hoy no
- * pinta todavía: la tabla nueva de E31 lo usará. */
-const STUBBED_ROSTER_EXTRAS = { position: null, photoUrl: null } as const;
-const STUBBED_EVALUATION_EXTRAS = {
-  ...STUBBED_ROSTER_EXTRAS,
-  updatedAt: EVALUATED_AT,
-  updatedBy: "Carla Coach",
+/** Las posiciones del club, como las trae la lista desde #817. */
+const STUBBED_FORWARD = {
+  id: "905e0000-0000-4000-8000-000000000001",
+  names: { en: "Forward", es: "Delantero" },
+} as const;
+const STUBBED_CENTRE = {
+  id: "905e0000-0000-4000-8000-000000000002",
+  names: { en: "Centre", es: "Centro" },
+} as const;
+const STUBBED_HALF_BACK = {
+  id: "905e0000-0000-4000-8000-000000000003",
+  names: { en: "Half back", es: "Medio" },
 } as const;
 
+/** La foto la pinta `MemberAvatar`, ya probado: aquí van las iniciales. */
+const STUBBED_ROSTER_EXTRAS = { photoUrl: null } as const;
+
 /** Una con un nombre de tres veces lo normal, para el caso de contenido
- * largo, y una evaluada sin categorías, que no tiene media. */
+ * largo, una evaluada sin categorías, que no tiene media, y dos sin evaluar
+ * para la ficha Sin evaluar. */
 const STUBBED_ROSTER = [
   {
     status: "evaluated",
     userId: CAMILA_ID,
     fullName: "Camila Ortiz",
+    position: STUBBED_FORWARD,
     overall: 7.9,
-    ...STUBBED_EVALUATION_EXTRAS,
+    updatedAt: EVALUATED_AT,
+    updatedBy: "Carla Coach",
+    ...STUBBED_ROSTER_EXTRAS,
   },
   {
     status: "evaluated",
     userId: "e1e1e1e1-0000-4000-8000-0000000000e3",
     fullName: "Chloe Nguyen",
+    position: STUBBED_CENTRE,
     overall: 8.3,
-    ...STUBBED_EVALUATION_EXTRAS,
+    updatedAt: "2026-08-28T03:00:00+00:00",
+    updatedBy: "Carla Coach",
+    ...STUBBED_ROSTER_EXTRAS,
+  },
+  {
+    status: "not_evaluated",
+    userId: "e1e1e1e1-0000-4000-8000-0000000000e6",
+    fullName: "Grace Lee",
+    position: STUBBED_HALF_BACK,
+    ...STUBBED_ROSTER_EXTRAS,
   },
   {
     status: "not_evaluated",
     userId: MATEO_ID,
     fullName: "Mateo Fernández",
+    position: STUBBED_HALF_BACK,
     ...STUBBED_ROSTER_EXTRAS,
   },
   {
     status: "evaluated",
     userId: "e1e1e1e1-0000-4000-8000-0000000000e4",
     fullName: "Ruby Walsh",
+    position: null,
     overall: null,
-    ...STUBBED_EVALUATION_EXTRAS,
+    updatedAt: EVALUATED_AT,
+    updatedBy: null,
+    ...STUBBED_ROSTER_EXTRAS,
   },
   {
     status: "evaluated",
     userId: "e1e1e1e1-0000-4000-8000-0000000000e5",
     fullName: "Valentina Maximiliana Rodríguez-Etxeberria de la Fuente",
+    position: STUBBED_FORWARD,
     overall: 6.4,
-    ...STUBBED_EVALUATION_EXTRAS,
+    updatedAt: "2026-06-21T04:00:00+00:00",
+    updatedBy: "Carla Coach",
+    ...STUBBED_ROSTER_EXTRAS,
   },
 ] as const;
+
+/** Las activas de `STUBBED_CATEGORIES`: el número de la pestaña. */
+const ACTIVE_STUBBED_CATEGORY_COUNT = 10;
+
+/** Más de los que caben en la caja de la tabla (D10). */
+const CROWDED_ROSTER_SIZE = 40;
+
+const CROWDED_ROSTER = Array.from(
+  { length: CROWDED_ROSTER_SIZE },
+  (_, index) => ({
+    status: "evaluated",
+    userId: `e2e2e2e2-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    fullName: `Player ${String(index + 1).padStart(2, "0")}`,
+    position: STUBBED_FORWARD,
+    overall: 6.5,
+    updatedAt: EVALUATED_AT,
+    updatedBy: null,
+    ...STUBBED_ROSTER_EXTRAS,
+  }),
+);
 
 /** El resumen que la lista trae desde #817 (D5 de E31). La pantalla de hoy
  * no lo pinta: basta con que tenga la forma del contrato. */
 const STUBBED_ROSTER_SUMMARY = {
   evaluatedCount: 4,
-  playerCount: 5,
+  playerCount: 6,
   categoryAverages: [],
   averageOverall: 7.5,
   longestUnreviewed: [],
@@ -15834,6 +15884,12 @@ async function stubEvaluationReads(
       );
     },
   );
+  // Después de la de arriba, que también casaría: gana la última (#818,
+  // el número de la pestaña Categorías y su contenido).
+  await page.route(
+    (url) => url.pathname === EVALUATION_CATEGORIES_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ categories: STUBBED_CATEGORIES })),
+  );
 }
 
 const RATINGS_LIST = /^(Skill ratings|Valoraciones)$/;
@@ -15842,6 +15898,10 @@ const REFRESH =
 const OUTDATED_CAMILA = stubbedEvaluation(CAMILA_RATINGS, "Experience");
 const EDIT_RATINGS = /^(Edit ratings|Editar valoraciones)$/;
 const CAMILA_BUTTON = /Camila Ortiz/;
+const PLAYERS_LIST = /^(Players|Jugadores)$/;
+const NOT_EVALUATED_CHIP = /^(Not evaluated|Sin evaluar)/;
+const SEARCH_BY_NAME = /^(Search by name|Buscar por nombre)$/;
+const SORT_BY = /^(Sort by|Ordenar por)$/;
 
 async function waitForRoster(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: CAMILA_BUTTON })).toBeVisible();
@@ -15863,6 +15923,8 @@ type EvaluationsState = {
   /** Lo que sirve la ficha de Camila, si no es la evaluación al día. */
   readonly camilaEvaluation?: unknown;
   readonly isSpanish?: boolean;
+  /** Sólo se fotografía a 1440: el móvil de la tabla llega en #822. */
+  readonly isDesktopOnly?: boolean;
   readonly ready: (page: Page) => Promise<void>;
 };
 
@@ -15925,6 +15987,27 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
     },
   },
   {
+    name: "evaluaciones-filtrando",
+    roster: STUBBED_ROSTER,
+    isDesktopOnly: true,
+    ready: async (page) => {
+      await waitForRoster(page);
+      await page.getByRole("button", { name: NOT_EVALUATED_CHIP }).click();
+      await page.getByRole("searchbox", { name: SEARCH_BY_NAME }).fill("ma");
+      await expect(page.getByText("1 of 6 players")).toBeVisible();
+    },
+  },
+  {
+    name: "evaluaciones-sin-resultados",
+    roster: STUBBED_ROSTER,
+    isDesktopOnly: true,
+    ready: async (page) => {
+      await waitForRoster(page);
+      await page.getByRole("searchbox", { name: SEARCH_BY_NAME }).fill("zzz");
+      await expect(page.getByText("No player matches.")).toBeVisible();
+    },
+  },
+  {
     name: "evaluaciones-vacia",
     roster: [],
     ready: async (page) => {
@@ -15952,6 +16035,11 @@ async function goToEvaluations(
   await expect(
     page.getByRole("heading", { level: 1, name: EVALUATIONS_HEADING }),
   ).toBeVisible();
+  // El número de Categorías llega en su propia lectura (#818): sin él, la
+  // captura sale a veces con la pestaña sin número.
+  await expect(
+    page.getByRole("tab", { name: /^(Categories|Categorías)/ }),
+  ).toContainText(String(ACTIVE_STUBBED_CATEGORY_COUNT));
   await state.ready(page);
 }
 
@@ -15965,7 +16053,9 @@ for (const state of EVALUATIONS_STATES) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
-        if (isStatePhotographed(state.name)) {
+        const isPhotographedHere =
+          state.isDesktopOnly !== true || vp.name === "desktop";
+        if (isStatePhotographed(state.name) && isPhotographedHere) {
           for (const theme of themes) {
             test(`matches approved baseline (${theme})`, async ({ page }) => {
               await goToEvaluations(page, state, theme);
@@ -15992,10 +16082,15 @@ for (const state of EVALUATIONS_STATES) {
       });
     }
 
-    test("has no accessibility violations (axe-core)", async ({ page }) => {
-      await goToEvaluations(page, state);
-      await expectNoAxeViolations(page);
-    });
+    for (const theme of themes) {
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await goToEvaluations(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
   });
 }
 
@@ -16016,6 +16111,81 @@ test.describe("evaluaciones en el navegador", () => {
 
     await expect(page.getByRole("searchbox")).toBeVisible();
     await expect(page.getByRole("list", { name: RATINGS_LIST })).toHaveCount(0);
+  });
+
+  test("la búsqueda, la ficha y el orden sobreviven a recargar (#818)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToEvaluations(page, EVALUATIONS_LIST);
+
+    await page.getByRole("button", { name: NOT_EVALUATED_CHIP }).click();
+    await page.getByRole("combobox", { name: SORT_BY }).selectOption("oldest");
+    await page.getByRole("searchbox", { name: SEARCH_BY_NAME }).fill("ma");
+    await expect(page).toHaveURL(/q=ma/);
+    await page.reload();
+
+    await expect(
+      page.getByRole("searchbox", { name: SEARCH_BY_NAME }),
+    ).toHaveValue("ma");
+    await expect(
+      page.getByRole("button", { name: NOT_EVALUATED_CHIP }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("combobox", { name: SORT_BY })).toHaveValue(
+      "oldest",
+    );
+    await expect(
+      page.getByRole("button", { name: /Mateo Fernández/ }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: CAMILA_BUTTON })).toHaveCount(
+      0,
+    );
+  });
+
+  test("la pestaña Categorías va en la dirección y sobrevive a recargar (#818)", async ({
+    page,
+  }) => {
+    await goToEvaluations(page, EVALUATIONS_LIST);
+
+    await page.getByRole("tab", { name: /Categories/ }).click();
+    await expect(page).toHaveURL(/tab=categories/);
+    await page.reload();
+
+    await expect(page.getByRole("tab", { name: /Categories/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(
+      page.getByRole("heading", { name: "Active categories" }),
+    ).toBeVisible();
+  });
+
+  test("con muchos jugadores la lista se desplaza en su caja y la cabecera no se mueve (#818)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToEvaluations(page, {
+      ...EVALUATIONS_LIST,
+      roster: CROWDED_ROSTER,
+      ready: async (crowded) => {
+        await expect(
+          crowded.getByRole("button", { name: /Player 01/ }),
+        ).toBeVisible();
+      },
+    });
+    const rows = page.getByRole("list", { name: PLAYERS_LIST });
+    const heading = page.getByRole("heading", { level: 1 });
+    // Pasar el ratón ya baja la página hasta la lista: se mide después.
+    await rows.hover();
+    const headingTop = (await heading.boundingBox())?.y;
+
+    await page.mouse.wheel(0, 400);
+
+    await expect
+      .poll(() => rows.evaluate((element) => element.scrollTop))
+      .toBeGreaterThan(0);
+    expect(await rows.evaluate((element) => element.clientHeight)).toBe(560);
+    expect((await heading.boundingBox())?.y).toBe(headingTop);
   });
 
   test("con ?miembro= abre ya la ficha de esa persona (#324)", async ({
