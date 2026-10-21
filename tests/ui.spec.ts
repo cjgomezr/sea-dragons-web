@@ -3351,6 +3351,33 @@ test.describe("Mi cuenta sin grupos", () => {
   });
 });
 
+// #840: con el teclado abierto la barra flotaba entre la página y el teclado.
+// Chromium de escritorio no saca teclado: lo que se prueba es que el foco en
+// un campo la esconde y salir de él la devuelve.
+test.describe("la barra de pestañas mientras se escribe en el perfil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    viewport: { width: 375, height: 812 },
+  });
+
+  test("se esconde con el foco en un campo y vuelve al salir", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    const tabBar = page.getByRole("navigation", { name: "Sections" });
+    const about = await openProfileCard(page, ABOUT_CARD);
+    const fullName = about.getByLabel("Full name");
+
+    await fullName.focus();
+    await expect(tabBar).toBeHidden();
+
+    await fullName.blur();
+    await expect(tabBar).toBeVisible();
+  });
+});
+
 test.describe("un socio que edita su perfil", () => {
   skipWithoutSession();
   quietNotificationBell();
