@@ -1,13 +1,32 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { EVALUATION_CATEGORIES_PATH } from "@/lib/auth/routes";
+import { useCallback, useEffect, useState } from "react";
+import type { EvaluationCategories } from "@/lib/evaluations/evaluation-categories";
+import {
+  type EvaluationsTab,
+  searchWithEvaluationsTab,
+  searchWithRosterView,
+} from "@/lib/evaluations/evaluations-address";
 import type { MemberEvaluation } from "@/lib/evaluations/member-evaluation";
+import {
+  type RosterView,
+  applyRosterView,
+  clearRosterFilters,
+  countNotEvaluated,
+  rosterPositions,
+} from "@/lib/evaluations/roster-view";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import { EvaluationCategoriesManager } from "./EvaluationCategoriesScreen";
 import { EvaluationRoster, rosterButtonId } from "./EvaluationRoster";
+import { EvaluationRosterToolbar } from "./EvaluationRosterToolbar";
 import { EvaluationSheet } from "./EvaluationSheet";
+import {
+  EvaluationsTabs,
+  evaluationsPanelId,
+  evaluationsTabId,
+} from "./EvaluationsTabs";
+import { loadCategories } from "./evaluation-categories-client";
 import {
   type EvaluationFailure,
   type ScreenRoster as Roster,
@@ -17,9 +36,10 @@ import {
 } from "./evaluations-client";
 
 /**
- * La pantalla de Evaluaciones (#322, RF-6 del PRD de E9): la lista de
- * miembros con su OVR, la ficha de quien se elija y la edición de sus
- * valoraciones.
+ * La pantalla de Evaluaciones (#322, RF-6 del PRD de E9). Desde #818 (RF-2
+ * del PRD de E31) lleva las pestañas Jugadores y Categorías, y la lista es
+ * una tabla con búsqueda, filtros y orden. Al lado va la ficha de quien se
+ * elija, con la edición de sus valoraciones.
  *
  * Quién llega lo decide la frontera: `EVALUATIONS_PATH` está en
  * `RESTRICTED_ROUTES` para Admin y Coach, y los endpoints lo vuelven a
@@ -27,19 +47,34 @@ import {
  * ser es cambiar sin recargar, y lee por la API v1 que usará la aplicación
  * nativa de Release 2 (CON-002).
  *
+ * La pestaña, los filtros y el orden viven en la dirección (D8): la página
+ * los lee al cargar y cada cambio la reemplaza, sin apilar una entrada por
+ * letra escrita.
+ *
  * Con `initialMemberId` abre ya la ficha de ese miembro: es a donde lleva la
  * marca de sin evaluar del directorio (#324). Si no está en la lista, se
  * queda en la lista.
  *
- * En escritorio la lista y la ficha van lado a lado. En el móvil no caben, y
- * son dos pasos: `data-step` le dice al CSS cuál enseñar, igual que la lista
- * de avisos de #266.
+ * Hasta 1024 px la tabla y la ficha son dos pasos: `data-step` le dice al CSS
+ * cuál enseñar, igual que la lista de avisos de #266.
  */
 
 type RosterState =
   | { readonly kind: "loading" }
   | { readonly kind: "failed"; readonly failure: EvaluationFailure }
   | { readonly kind: "ready"; readonly roster: Roster };
+
+function replaceAddressSearch(search: string): void {
+  window.history.replaceState(null, "", `${window.location.pathname}${search}`);
+}
+
+function currentAddressParams(): URLSearchParams {
+  return new URLSearchParams(window.location.search);
+}
+
+function countActive(categories: EvaluationCategories): number {
+  return categories.filter((category) => category.isActive).length;
+}
 
 function LoadFailure({
   translate,
@@ -62,20 +97,24 @@ function LoadFailure({
   );
 }
 
-/** La fila de la lista con lo que el servidor acaba de confirmar. */
+/** La fila de la lista con lo que el servidor acaba de confirmar. Quién
+ * guardó no viene en la respuesta: queda en `null`, que es "no se sabe", en
+ * vez de atribuírselo a quien lo hizo antes. */
 function toRosterEntry(
   entry: ScreenRosterEntry,
   evaluation: MemberEvaluation,
 ): ScreenRosterEntry {
-  const { userId, fullName } = entry;
+  const { userId, fullName, position, photoUrl } = entry;
+  const player = { userId, fullName, position, photoUrl };
   return evaluation.status === "evaluated"
     ? {
         status: "evaluated",
-        userId,
-        fullName,
+        ...player,
         overall: evaluation.overallRating,
+        updatedAt: evaluation.updatedAt,
+        updatedBy: null,
       }
-    : { status: "not_evaluated", userId, fullName };
+    : { status: "not_evaluated", ...player };
 }
 
 function withEvaluation(roster: Roster, evaluation: MemberEvaluation): Roster {
@@ -88,20 +127,15 @@ function withEvaluation(roster: Roster, evaluation: MemberEvaluation): Roster {
   };
 }
 
-export function EvaluationsScreen({
-  locale,
-  initialMemberId,
-}: {
-  locale: Locale;
-  initialMemberId: string | null;
-}): React.JSX.Element {
-  const translate = createTranslator(locale);
+/** La plantilla del club, con reintentar y con lo que confirme cada
+ * guardado. */
+function useEvaluationRoster(): {
+  readonly state: RosterState;
+  readonly retry: () => void;
+  readonly applyEvaluation: (evaluation: MemberEvaluation) => void;
+} {
   const [state, setState] = useState<RosterState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
-  const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(initialMemberId);
-  // A quién devolver el foco al volver de la ficha a la lista.
-  const [returnFocusTo, setReturnFocusTo] = useState<string | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -119,25 +153,9 @@ export function EvaluationsScreen({
     };
   }, [reloads]);
 
-  useEffect(() => {
-    if (returnFocusTo !== null) {
-      document.getElementById(rosterButtonId(returnFocusTo))?.focus();
-    }
-  }, [returnFocusTo]);
-
-  function retryLoad(): void {
+  function retry(): void {
     setState({ kind: "loading" });
     setReloads((count) => count + 1);
-  }
-
-  function select(userId: string): void {
-    setReturnFocusTo(null);
-    setSelectedId(userId);
-  }
-
-  function goBack(): void {
-    setReturnFocusTo(selectedId);
-    setSelectedId(null);
   }
 
   function applyEvaluation(evaluation: MemberEvaluation): void {
@@ -148,61 +166,201 @@ export function EvaluationsScreen({
     );
   }
 
-  const selected =
-    state.kind === "ready"
-      ? state.roster.members.find((member) => member.userId === selectedId)
-      : undefined;
+  return { state, retry, applyEvaluation };
+}
+
+/** Cuántas categorías activas tiene el club, para el número de la pestaña.
+ * Si no se pueden leer, la pestaña sale sin número: el fallo lo dice la
+ * propia pestaña Categorías al abrirla, con su reintento. */
+function useActiveCategoryCount(): {
+  readonly count: number | null;
+  readonly updateFrom: (categories: EvaluationCategories) => void;
+} {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isCurrent = true;
+    void loadCategories().then((outcome) => {
+      if (isCurrent && outcome.kind === "loaded") {
+        setCount(countActive(outcome.categories));
+      }
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  const updateFrom = useCallback((categories: EvaluationCategories) => {
+    setCount(countActive(categories));
+  }, []);
+
+  return { count, updateFrom };
+}
+
+/** La barra, la tabla y, al lado, `sheet`: la ficha o el aviso de elegir. */
+function PlayersPanel({
+  translate,
+  members,
+  view,
+  selectedId,
+  onViewChange,
+  onSelect,
+  sheet,
+}: {
+  translate: Translator;
+  members: readonly ScreenRosterEntry[];
+  view: RosterView;
+  selectedId: string | null;
+  onViewChange: (view: RosterView) => void;
+  onSelect: (userId: string) => void;
+  sheet: React.ReactNode;
+}): React.JSX.Element {
+  if (members.length === 0) {
+    return <p className="admin-empty">{translate("evaluations.list.empty")}</p>;
+  }
+  return (
+    <>
+      <EvaluationRosterToolbar
+        translate={translate}
+        view={view}
+        counts={{
+          all: members.length,
+          notEvaluated: countNotEvaluated(members),
+        }}
+        positions={rosterPositions(members, translate.locale)}
+        onViewChange={onViewChange}
+      />
+      <div className="evaluations-panes">
+        <EvaluationRoster
+          translate={translate}
+          members={applyRosterView(members, view)}
+          totalCount={members.length}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onClearFilters={() => onViewChange(clearRosterFilters(view))}
+        />
+        {sheet}
+      </div>
+    </>
+  );
+}
+
+export function EvaluationsScreen({
+  locale,
+  initialMemberId,
+  initialTab,
+  initialView,
+}: {
+  locale: Locale;
+  initialMemberId: string | null;
+  initialTab: EvaluationsTab;
+  initialView: RosterView;
+}): React.JSX.Element {
+  const translate = createTranslator(locale);
+  const { state, retry, applyEvaluation } = useEvaluationRoster();
+  const categoryCount = useActiveCategoryCount();
+  const [tab, setTab] = useState<EvaluationsTab>(initialTab);
+  const [view, setView] = useState<RosterView>(initialView);
+  const [selectedId, setSelectedId] = useState<string | null>(initialMemberId);
+  // A quién devolver el foco al volver de la ficha a la lista.
+  const [returnFocusTo, setReturnFocusTo] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (returnFocusTo !== null) {
+      document.getElementById(rosterButtonId(returnFocusTo))?.focus();
+    }
+  }, [returnFocusTo]);
+
+  function selectTab(next: EvaluationsTab): void {
+    setTab(next);
+    replaceAddressSearch(
+      searchWithEvaluationsTab(currentAddressParams(), next),
+    );
+  }
+
+  function changeView(next: RosterView): void {
+    setView(next);
+    replaceAddressSearch(searchWithRosterView(currentAddressParams(), next));
+  }
+
+  /** Pulsar la fila abierta la suelta. */
+  function toggleSelection(userId: string): void {
+    setReturnFocusTo(null);
+    setSelectedId((current) => (current === userId ? null : userId));
+  }
+
+  function goBack(): void {
+    setReturnFocusTo(selectedId);
+    setSelectedId(null);
+  }
+
+  const members = state.kind === "ready" ? state.roster.members : null;
+  const selected = members?.find((member) => member.userId === selectedId);
 
   return (
     <div className="evaluations" data-step={selected ? "sheet" : "list"}>
       <header className="evaluations-header">
-        <div className="evaluations-heading">
-          <h1>{translate("evaluations.title")}</h1>
-          <Link
-            href={EVALUATION_CATEGORIES_PATH}
-            className="admin-secondary evaluations-categories-link"
-          >
-            {translate("evaluations.categories.link")}
-          </Link>
-        </div>
+        <h1>{translate("evaluations.title")}</h1>
         <p className="app-lead">{translate("evaluations.lead")}</p>
-      </header>
-      {state.kind === "loading" ? (
-        <p className="admin-empty">{translate("evaluations.loading")}</p>
-      ) : null}
-      {state.kind === "failed" ? (
-        <LoadFailure
+        <EvaluationsTabs
           translate={translate}
-          failure={state.failure}
-          onRetry={retryLoad}
+          activeTab={tab}
+          counts={{
+            players: members === null ? null : members.length,
+            categories: categoryCount.count,
+          }}
+          onSelect={selectTab}
         />
-      ) : null}
-      {state.kind === "ready" ? (
-        <div className="evaluations-panes">
-          <EvaluationRoster
+      </header>
+      <div
+        role="tabpanel"
+        id={evaluationsPanelId(tab)}
+        aria-labelledby={evaluationsTabId(tab)}
+        className="evaluations-panel"
+      >
+        {tab === "categories" ? (
+          <EvaluationCategoriesManager
             translate={translate}
-            members={state.roster.members}
-            search={search}
-            onSearchChange={setSearch}
-            selectedId={selectedId}
-            onSelect={select}
+            onCategoriesChange={categoryCount.updateFrom}
           />
-          {selected ? (
-            <EvaluationSheet
-              key={selected.userId}
-              translate={translate}
-              memberId={selected.userId}
-              fullName={selected.fullName}
-              onBack={goBack}
-              onEvaluationChange={applyEvaluation}
-            />
-          ) : (
-            <p className="evaluation-sheet-placeholder">
-              {translate("evaluations.sheet.placeholder")}
-            </p>
-          )}
-        </div>
-      ) : null}
+        ) : null}
+        {tab === "players" && state.kind === "loading" ? (
+          <p className="admin-empty">{translate("evaluations.loading")}</p>
+        ) : null}
+        {tab === "players" && state.kind === "failed" ? (
+          <LoadFailure
+            translate={translate}
+            failure={state.failure}
+            onRetry={retry}
+          />
+        ) : null}
+        {tab === "players" && members !== null ? (
+          <PlayersPanel
+            translate={translate}
+            members={members}
+            view={view}
+            selectedId={selectedId}
+            onViewChange={changeView}
+            onSelect={toggleSelection}
+            sheet={
+              selected ? (
+                <EvaluationSheet
+                  key={selected.userId}
+                  translate={translate}
+                  memberId={selected.userId}
+                  fullName={selected.fullName}
+                  onBack={goBack}
+                  onEvaluationChange={applyEvaluation}
+                />
+              ) : (
+                <p className="evaluation-sheet-placeholder">
+                  {translate("evaluations.sheet.placeholder")}
+                </p>
+              )
+            }
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -28,23 +28,30 @@ import type { Translator } from "@/lib/i18n/translator";
  * idioma con el interruptor (E17).
  */
 
+const positionSchema = z.object({
+  id: z.uuid(),
+  names: z.object({ en: z.string().nullable(), es: z.string().nullable() }),
+});
+
+const rosterPlayerSchema = z.object({
+  userId: z.uuid(),
+  fullName: z.string(),
+  position: positionSchema.nullable(),
+  photoUrl: z.string().nullable(),
+});
+
 const rosterEntrySchema = z.discriminatedUnion("status", [
-  z.object({
-    status: z.literal("not_evaluated"),
-    userId: z.uuid(),
-    fullName: z.string(),
-  }),
-  z.object({
+  rosterPlayerSchema.extend({ status: z.literal("not_evaluated") }),
+  rosterPlayerSchema.extend({
     status: z.literal("evaluated"),
-    userId: z.uuid(),
-    fullName: z.string(),
     overall: z.number().nullable(),
+    updatedAt: z.string(),
+    updatedBy: z.string().nullable(),
   }),
 ]);
 
-/** Lo que la pantalla de hoy pinta de cada fila. Lo demás que trae la lista
- * desde #817 (posición, foto, fecha, quién y el resumen) se descarta al leer
- * hasta que llegue la tabla nueva de E31. */
+/** Cada fila de la tabla (#818). El resumen de la plantilla que la lista
+ * trae desde #817 se descarta al leer hasta que lo pinte el panel (#819). */
 export type ScreenRosterEntry = z.infer<typeof rosterEntrySchema>;
 
 export type ScreenRoster = { readonly members: readonly ScreenRosterEntry[] };
