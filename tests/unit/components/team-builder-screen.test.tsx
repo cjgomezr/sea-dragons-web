@@ -166,6 +166,13 @@ type ClubApi = {
   readonly onWrite?: Respond;
 };
 
+/** Lo que responde el cambio de los equipos del club: los que manda, sin
+ * el evento, y qué pasó con su reparto (D4). */
+function teamsChanged(body: unknown, eventSplit: string): Response {
+  const { a, b } = body as { a: unknown; b: unknown };
+  return jsonResponse(200, { data: { a, b, eventSplit } });
+}
+
 function savedOrPublished({ method, path, body }: RecordedRequest): Response {
   if (method === "PUT") {
     const { assignments } = body as { assignments: unknown[] };
@@ -178,7 +185,7 @@ function savedOrPublished({ method, path, body }: RecordedRequest): Response {
     });
   }
   if (method === "PATCH" && path === TEAM_LABELS_PATH) {
-    return jsonResponse(200, { data: body });
+    return teamsChanged(body, "none");
   }
   if (path.endsWith("/publication")) {
     return jsonResponse(201, {
@@ -1747,7 +1754,7 @@ describe("editar un equipo (#760)", () => {
     expect(applyButton()).toBeDisabled();
   });
 
-  it("al aplicar manda los dos equipos, cierra y pinta el nombre y el color nuevos", async () => {
+  it("al aplicar manda los dos equipos con el evento abierto, cierra y pinta el nombre y el color nuevos", async () => {
     stubClub();
     await openEditor();
     await renameKelp("Team Reef");
@@ -1762,6 +1769,7 @@ describe("editar un equipo (#760)", () => {
         body: {
           a: { name: "Team Reef", color: "#D64545" },
           b: { name: "Team Tide", color: "#C99A3E" },
+          eventId: SCRIMMAGE.id,
         },
       },
     ]);
@@ -1773,6 +1781,134 @@ describe("editar un equipo (#760)", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Team updated · used for every event from now on",
     );
+  });
+
+  it("con el reparto ya publicado lo deja con sus equipos y lo dice", async () => {
+    stubClub({
+      builders: [
+        builderFor(SCRIMMAGE, {
+          split: {
+            mode: "manual",
+            publishedAt: "2027-06-15T10:05:00.000Z",
+            assignments: [assigned(DANIELA, "a"), assigned(ETHAN, "b")],
+          },
+        }),
+        builderFor(COMPETITION),
+      ],
+      onWrite: ({ body }) => teamsChanged(body, "published"),
+    });
+    await openEditor();
+    await renameKelp("Team Reef");
+
+    await userEvent.click(applyButton());
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(region("Team Kelp")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Team Reef" })).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Team updated for the next events. These published teams keep their old name and colour: to use the new ones, save them again, apply the change again and publish.",
+    );
+  });
+
+  it("con el reparto ya publicado lo dice también en español", async () => {
+    stubClub({
+      builders: [
+        builderFor(SCRIMMAGE, {
+          split: {
+            mode: "manual",
+            publishedAt: "2027-06-15T10:05:00.000Z",
+            assignments: [assigned(DANIELA, "a"), assigned(ETHAN, "b")],
+          },
+        }),
+        builderFor(COMPETITION),
+      ],
+      onWrite: ({ body }) => teamsChanged(body, "published"),
+    });
+    render(<TeamBuilderScreen locale="es" />);
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Editar nombre y color de Team Kelp",
+      }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Editar equipo" });
+    await within(dialog).findByRole("textbox", { name: "Nombre" });
+
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Aplicar" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Equipo actualizado para los próximos eventos. El reparto publicado de este evento sigue con el nombre y el color de antes: para usar los nuevos, vuelve a guardarlo, aplica otra vez el cambio y publícalo.",
+    );
+  });
+
+  it("con el reparto guardado sin publicar conserva lo movido sin guardar y sólo manda los equipos", async () => {
+    stubClub({
+      builders: [DRAFTED, builderFor(COMPETITION)],
+      onWrite: ({ body }) => teamsChanged(body, "relabelled"),
+    });
+    await openScreen();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Move Mateo Restrepo to Team Tide" }),
+    );
+    await userEvent.click(editButton());
+    await within(editor()).findByRole("textbox", { name: "Name" });
+    await renameKelp("Team Reef");
+
+    await userEvent.click(applyButton());
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(region("Team Reef")).toBeInTheDocument();
+    expect(region("Team Tide")).toHaveTextContent("Mateo Restrepo");
+    expect(saveButton()).toHaveAccessibleName("Save · Unsaved");
+    expect(writes()).toEqual([
+      {
+        method: "PATCH",
+        path: TEAM_LABELS_PATH,
+        body: {
+          a: { name: "Team Reef", color: "#1C6EA4" },
+          b: { name: "Team Tide", color: "#C99A3E" },
+          eventId: SCRIMMAGE.id,
+        },
+      },
+    ]);
+  });
+
+  it("mientras se guarda el reparto no cambia los equipos y lo dice", async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    stubClub({
+      builders: [DRAFTED, builderFor(COMPETITION)],
+      onWrite: async (request) => {
+        await held;
+        return savedOrPublished(request);
+      },
+    });
+    await openScreen();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Move Mateo Restrepo to Team Tide" }),
+    );
+    await userEvent.click(saveButton());
+    await userEvent.click(editButton());
+    await within(editor()).findByRole("textbox", { name: "Name" });
+    await renameKelp("Team Reef");
+
+    await userEvent.click(applyButton());
+
+    expect(await within(editor()).findByRole("alert")).toHaveTextContent(
+      "The teams are still saving. Apply again once they finish.",
+    );
+    expect(writes().map(({ method }) => method)).toEqual(["PUT"]);
+    release();
   });
 
   it("si el servidor responde 400 sigue abierta con el aviso y lo escrito", async () => {
@@ -1885,7 +2021,7 @@ describe("editar un equipo (#760)", () => {
       {
         method: "PATCH",
         path: TEAM_LABELS_PATH,
-        body: DEFAULT_TEAM_LABELS,
+        body: { ...DEFAULT_TEAM_LABELS, eventId: SCRIMMAGE.id },
       },
     ]);
     expect(

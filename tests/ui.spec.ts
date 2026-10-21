@@ -21478,7 +21478,10 @@ async function stubTeams(page: Page, reads: TeamsReads): Promise<TeamsWrite[]> {
         method: request.method(),
         path: CLUB_TEAM_LABELS_ENDPOINT,
       });
-      return route.fulfill(jsonBody(request.postDataJSON()));
+      // Responde los equipos sin el evento, y que su reparto no estaba
+      // guardado (D4).
+      const { a, b } = request.postDataJSON() as { a: unknown; b: unknown };
+      return route.fulfill(jsonBody({ a, b, eventSplit: "none" }));
     },
   );
   await page.route(
@@ -21848,10 +21851,12 @@ test.describe("equipos en el navegador", () => {
 
     await expect(dialog).toBeHidden();
     await expect(teamsRegion(page, "Team Reef")).toBeVisible();
+    // Con el evento abierto, para que su reparto sin publicar cambie también.
     expect(patches).toEqual([
       {
         a: { name: "Team Reef", color: "#2B3F7A" },
         b: TEAMS_LABELS.b,
+        eventId: TEAMS_EVENT.id,
       },
     ]);
   });

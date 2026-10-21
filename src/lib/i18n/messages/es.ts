@@ -2575,6 +2575,10 @@ export const spanishMessages: MessageCatalog = {
     "Revisa el nombre y el color: el nombre lleva de 1 a 24 caracteres y cada equipo, un color distinto.",
   "teams.edit.changed":
     "Equipo actualizado · se usa en todos los eventos desde ahora",
+  "teams.edit.changedKeptByPublished":
+    "Equipo actualizado para los próximos eventos. El reparto publicado de este evento sigue con el nombre y el color de antes: para usar los nuevos, vuelve a guardarlo, aplica otra vez el cambio y publícalo.",
+  "teams.edit.busy":
+    "Los equipos aún se están guardando. Vuelve a aplicar cuando terminen.",
   "teams.coverage.label": "Cobertura de puestos",
   "teams.coverage.goalkeeper": "POR",
   "teams.coverage.defender": "DEF",

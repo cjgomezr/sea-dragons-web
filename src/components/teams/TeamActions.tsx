@@ -197,7 +197,11 @@ function statusText(translate: Translator, action: BuilderAction): string {
     case "published":
       return translate("teams.published", { count: action.notifiedCount });
     case "teamsChanged":
-      return translate("teams.edit.changed");
+      return translate(
+        action.keptByPublished
+          ? "teams.edit.changedKeptByPublished"
+          : "teams.edit.changed",
+      );
     default:
       return "";
   }

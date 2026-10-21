@@ -5,6 +5,7 @@ import { CLUB_TEAM_LABELS_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
 import { DEFAULT_TEAM_LABELS } from "@/lib/teams/team-builder";
 import {
+  EVENT_ID,
   type FakeTeamsClub,
   TEAMS_CALLER_ID,
   TEAMS_CLUB_ID,
@@ -147,7 +148,9 @@ describe("PATCH /api/v1/club/team-labels", () => {
       });
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ data: ORCAS_AND_RAYS });
+      await expect(response.json()).resolves.toEqual({
+        data: { ...ORCAS_AND_RAYS, eventSplit: "none" },
+      });
       expect(club.clubTeamChanges).toEqual([
         { clubId: TEAMS_CLUB_ID, teams: ORCAS_AND_RAYS },
       ]);
@@ -192,6 +195,40 @@ describe("PATCH /api/v1/club/team-labels", () => {
     givenSession("Coach");
 
     await expectValidationError(await changeTeams(body), fields);
+    expect(club.clubTeamChanges).toEqual([]);
+  });
+
+  it("con el evento, lleva los equipos a su reparto guardado sin publicar", async () => {
+    givenSession("Coach");
+    club = fakeTeamsClub({
+      callerRole: "Coach",
+      split: {
+        teams: DEFAULT_TEAM_LABELS,
+        mode: "manual",
+        publishedAt: null,
+        assignments: [],
+      },
+    });
+
+    const response = await changeTeams({
+      ...ORCAS_AND_RAYS,
+      eventId: EVENT_ID,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: { ...ORCAS_AND_RAYS, eventSplit: "relabelled" },
+    });
+    expect(club.split()?.teams).toEqual(ORCAS_AND_RAYS);
+  });
+
+  it("responde 400 a un evento que no es un id y no guarda nada", async () => {
+    givenSession("Coach");
+
+    await expectValidationError(
+      await changeTeams({ ...ORCAS_AND_RAYS, eventId: "scrimmage" }),
+      ["eventId"],
+    );
     expect(club.clubTeamChanges).toEqual([]);
   });
 });

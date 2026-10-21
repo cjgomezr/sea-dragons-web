@@ -34,3 +34,12 @@ export type TeamAssignment = {
   readonly userId: string;
   readonly team: TeamId;
 };
+
+/** Qué pasó con el reparto del evento desde cuyo builder se cambiaron los
+ * equipos del club (D4 de E28): `relabelled` si estaba guardado sin publicar
+ * y ya los lleva, `published` si estaba publicado y conserva los suyos,
+ * `none` si no hay evento del club o no tiene reparto guardado. Vive aquí
+ * porque también lo lee la pantalla. */
+export const EVENT_SPLIT_LABELS = ["relabelled", "published", "none"] as const;
+
+export type EventSplitLabels = (typeof EVENT_SPLIT_LABELS)[number];
