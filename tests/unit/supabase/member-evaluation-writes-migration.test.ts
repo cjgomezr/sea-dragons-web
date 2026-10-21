@@ -55,6 +55,9 @@ async function callFunction(
   return JSON.parse(await database.query(`select public.${call}`)) as Outcome;
 }
 
+// Desde `0078` las escrituras reciben también a quien llama, y tiene que ser
+// del club. Aquí da igual quién: se pasa al propio miembro, y lo que se apunta
+// lo prueba `member-evaluation-updated-by-migration.test.ts`.
 function createEvaluation(
   database: TemporaryDatabase,
   clubId: string,
@@ -62,7 +65,7 @@ function createEvaluation(
 ): Promise<Outcome> {
   return callFunction(
     database,
-    `create_member_evaluation('${clubId}', '${userId}')`,
+    `create_member_evaluation('${clubId}', '${userId}', '${userId}')`,
   );
 }
 
@@ -79,7 +82,7 @@ function saveRatingsCall(
       rating,
     })),
   );
-  return `save_member_evaluation_ratings('${target.clubId}', '${target.userId}', '${expectedUpdatedAt}', '${json}'::jsonb)`;
+  return `save_member_evaluation_ratings('${target.clubId}', '${target.userId}', '${target.userId}', '${expectedUpdatedAt}', '${json}'::jsonb)`;
 }
 
 function updatedAtOf(
@@ -358,8 +361,8 @@ describeConPostgres("guardar valoraciones", () => {
 
 describeConPostgres("quién puede llamar a las funciones", () => {
   it.each([
-    "create_member_evaluation(uuid, uuid)",
-    "save_member_evaluation_ratings(uuid, uuid, timestamptz, jsonb)",
+    "create_member_evaluation(uuid, uuid, uuid)",
+    "save_member_evaluation_ratings(uuid, uuid, uuid, timestamptz, jsonb)",
   ])("sólo service_role ejecuta %s", async (signature) => {
     const database = await migratedDatabase();
 
