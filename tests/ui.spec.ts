@@ -15707,6 +15707,15 @@ const EVALUATED_AT = "2026-09-27T01:02:03.123456+00:00";
 const CAMILA_ID = "e1e1e1e1-0000-4000-8000-0000000000e1";
 const MATEO_ID = "e1e1e1e1-0000-4000-8000-0000000000e2";
 
+/** Lo que la lista trae de cada fila desde #817 y la pantalla de hoy no
+ * pinta todavía: la tabla nueva de E31 lo usará. */
+const STUBBED_ROSTER_EXTRAS = { position: null, photoUrl: null } as const;
+const STUBBED_EVALUATION_EXTRAS = {
+  ...STUBBED_ROSTER_EXTRAS,
+  updatedAt: EVALUATED_AT,
+  updatedBy: "Carla Coach",
+} as const;
+
 /** Una con un nombre de tres veces lo normal, para el caso de contenido
  * largo, y una evaluada sin categorías, que no tiene media. */
 const STUBBED_ROSTER = [
@@ -15714,28 +15723,47 @@ const STUBBED_ROSTER = [
     status: "evaluated",
     userId: CAMILA_ID,
     fullName: "Camila Ortiz",
-    overallRating: 7.9,
+    overall: 7.9,
+    ...STUBBED_EVALUATION_EXTRAS,
   },
   {
     status: "evaluated",
     userId: "e1e1e1e1-0000-4000-8000-0000000000e3",
     fullName: "Chloe Nguyen",
-    overallRating: 8.3,
+    overall: 8.3,
+    ...STUBBED_EVALUATION_EXTRAS,
   },
-  { status: "not_evaluated", userId: MATEO_ID, fullName: "Mateo Fernández" },
+  {
+    status: "not_evaluated",
+    userId: MATEO_ID,
+    fullName: "Mateo Fernández",
+    ...STUBBED_ROSTER_EXTRAS,
+  },
   {
     status: "evaluated",
     userId: "e1e1e1e1-0000-4000-8000-0000000000e4",
     fullName: "Ruby Walsh",
-    overallRating: null,
+    overall: null,
+    ...STUBBED_EVALUATION_EXTRAS,
   },
   {
     status: "evaluated",
     userId: "e1e1e1e1-0000-4000-8000-0000000000e5",
     fullName: "Valentina Maximiliana Rodríguez-Etxeberria de la Fuente",
-    overallRating: 6.4,
+    overall: 6.4,
+    ...STUBBED_EVALUATION_EXTRAS,
   },
 ] as const;
+
+/** El resumen que la lista trae desde #817 (D5 de E31). La pantalla de hoy
+ * no lo pinta: basta con que tenga la forma del contrato. */
+const STUBBED_ROSTER_SUMMARY = {
+  evaluatedCount: 4,
+  playerCount: 5,
+  categoryAverages: [],
+  averageOverall: 7.5,
+  longestUnreviewed: [],
+} as const;
 
 /** Las del mockup, más Experience, que es una de las diez del SRD. Suman 79:
  * el OVR es 7.9, como en el mockup. */
@@ -15788,7 +15816,10 @@ async function stubEvaluationReads(
 ): Promise<void> {
   await page.route(
     (url) => url.pathname === EVALUATIONS_ENDPOINT,
-    (route) => route.fulfill(jsonBody({ members: roster })),
+    (route) =>
+      route.fulfill(
+        jsonBody({ members: roster, summary: STUBBED_ROSTER_SUMMARY }),
+      ),
   );
   await page.route(
     (url) => url.pathname.startsWith(`${EVALUATIONS_ENDPOINT}/`),
