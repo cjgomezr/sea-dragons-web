@@ -205,6 +205,8 @@ begin
     return jsonb_build_object('outcome', 'evaluation_not_found');
   end if;
 
+  -- Después del miembro, como en todas las escrituras de evaluaciones: las
+  -- funciones del catálogo no bloquean miembros, así que el orden no cruza.
   perform public.lock_evaluation_categories(acting_club_id);
 
   if not exists (
