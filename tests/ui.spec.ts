@@ -968,6 +968,11 @@ test.describe("dentro de la aplicación", () => {
     }) => {
       await page.setViewportSize(MOBILE);
       await goToWithTheme(page, "/dashboard", theme);
+      // La captura de la barra se lleva una fila de píxeles de lo que hay
+      // detrás, y con el inicio a medio cargar ahí están sus bloques de
+      // espera: la fila de arriba cambiaba de una corrida a otra (#806,
+      // #810). Se captura con el inicio ya pintado.
+      await expect(page.locator(".section-loading-block")).toHaveCount(0);
       const name = `tabbar-mobile-${theme}.png`;
       const tabBar = page.getByRole("navigation", { name: TAB_BAR });
       await createMissingLocalBaseline(name, () =>
