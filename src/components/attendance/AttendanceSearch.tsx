@@ -2,7 +2,7 @@
 
 import { MagnifyingGlass } from "@phosphor-icons/react/dist/ssr/MagnifyingGlass";
 import { X } from "@phosphor-icons/react/dist/ssr/X";
-import { useRef } from "react";
+import type { RefObject } from "react";
 import { Icon } from "@/components/Icon";
 import type { Translator } from "@/lib/i18n/translator";
 
@@ -14,24 +14,23 @@ const SEARCH_FIELD_ID = "asistencia-buscar";
  * ve; lo marcado y lo que se guarda sigue siendo de todos.
  *
  * El ✕ propio sustituye al del navegador, que no se ve igual en todos y no
- * devuelve el foco al campo.
+ * devuelve el foco al campo. Quien lo pinta guarda la referencia del campo:
+ * "Mostrar a todos" también vuelve a él.
  */
 export function AttendanceSearch({
   translate,
   query,
+  inputRef,
   onQueryChange,
+  onClear,
 }: {
   readonly translate: Translator;
   readonly query: string;
+  readonly inputRef: RefObject<HTMLInputElement | null>;
   readonly onQueryChange: (query: string) => void;
+  /** Vacía la búsqueda y devuelve el foco al campo. */
+  readonly onClear: () => void;
 }): React.JSX.Element {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  function clear(): void {
-    onQueryChange("");
-    inputRef.current?.focus();
-  }
-
   return (
     <div className="attendance-search">
       <label htmlFor={SEARCH_FIELD_ID} className="visually-hidden">
@@ -53,7 +52,7 @@ export function AttendanceSearch({
           className="attendance-search-clear"
           aria-label={translate("attendance.search.clear")}
           title={translate("attendance.search.clear")}
-          onClick={clear}
+          onClick={onClear}
         >
           <Icon glyph={X} />
         </button>

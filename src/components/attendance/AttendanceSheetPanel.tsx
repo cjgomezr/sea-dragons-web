@@ -4,7 +4,7 @@ import { ArrowRight } from "@phosphor-icons/react/dist/ssr/ArrowRight";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { FloppyDisk } from "@phosphor-icons/react/dist/ssr/FloppyDisk";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { useIsPhone } from "@/components/use-is-phone";
 import {
@@ -472,7 +472,16 @@ function ReadySheet({
   readonly canLeaveSheet: () => boolean;
 }): React.JSX.Element {
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const search = query.trim();
+
+  /** El ✕ y "Mostrar a todos": el segundo desaparece al pulsarlo, y sin
+   * esto el foco caería al principio de la página. */
+  function showEveryone(): void {
+    setQuery("");
+    searchRef.current?.focus();
+  }
+
   const shown = sheet.members.filter((member) =>
     matchesNameSearch(member.fullName, search),
   );
@@ -486,7 +495,9 @@ function ReadySheet({
           <AttendanceSearch
             translate={translate}
             query={query}
+            inputRef={searchRef}
             onQueryChange={setQuery}
+            onClear={showEveryone}
           />
           {/* Siempre en el DOM: sólo se anuncia lo que cambia en una región
               que ya estaba. Fuera de un `status`, para no confundirse con el
@@ -500,7 +511,7 @@ function ReadySheet({
                 })}
           </p>
           {shown.length === 0 ? (
-            <NoMatches translate={translate} onShowAll={() => setQuery("")} />
+            <NoMatches translate={translate} onShowAll={showEveryone} />
           ) : (
             <MemberList
               translate={translate}

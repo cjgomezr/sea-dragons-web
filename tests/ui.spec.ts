@@ -21207,6 +21207,21 @@ const ATTENDANCE_STATES: readonly AttendanceState[] = [
       await page.mouse.move(0, 0);
     },
   }),
+  // Con cambios y el buscador a la vez: el campo y, en el móvil, la barra
+  // fija de Guardar.
+  {
+    name: "asistencia-buscando-sin-guardar",
+    sessions: ATTENDANCE_SESSIONS,
+    members: ATTENDANCE_MEMBERS,
+    ready: async (page) => {
+      await markTwoUnsaved(page);
+      await page.getByRole("searchbox", { name: ATTENDANCE_SEARCH }).fill("ma");
+      await expect(page.getByRole("group", { name: "Ruby Tan" })).toHaveCount(
+        0,
+      );
+      await page.mouse.move(0, 0);
+    },
+  },
   ...withSpanish({
     name: "asistencia-buscando-sin-resultados",
     sessions: ATTENDANCE_SESSIONS,

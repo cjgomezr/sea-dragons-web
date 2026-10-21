@@ -1630,7 +1630,47 @@ describe("el buscador por nombre", () => {
       screen.getByRole("button", { name: "Show everyone" }),
     );
     expect(searchBox()).toHaveValue("");
+    expect(searchBox()).toHaveFocus();
     expect(screen.getByText(MATEO.fullName)).toBeInTheDocument();
+  });
+
+  it("al volver a verla, la fila marcada que el filtro escondía sigue marcada y sin guardar", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await userEvent.click(choice(await findRow(MATEO.fullName), "Late"));
+
+    await userEvent.type(searchBox(), "ruby");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Clear the search" }),
+    );
+
+    const mateo = await findRow(MATEO.fullName);
+    expect(choice(mateo, "Late")).toHaveAttribute("aria-pressed", "true");
+    expect(within(mateo).getByTitle("Not saved yet")).toBeInTheDocument();
+  });
+
+  it("en el móvil, sin resultados, la barra sigue contando y guarda también lo oculto", async () => {
+    stubScreenWidth(true);
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await userEvent.click(choice(await findRow(MATEO.fullName), "Late"));
+
+    await userEvent.type(searchBox(), "zzz");
+    expect(screen.getByText("1 unsaved")).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save attendance" }),
+    );
+
+    expect(
+      await screen.findByText("Saved · 1 present, 1 late, 1 absent"),
+    ).toBeInTheDocument();
+    expect(saveRequests()[0]?.body).toEqual({
+      records: [
+        { userId: MATEO.userId, status: "late" },
+        { userId: VALENTINA.userId, status: "present" },
+        { userId: RUBY.userId, status: "absent" },
+      ],
+    });
   });
 
   it("el botón de borrar sólo sale con algo escrito, y devuelve el foco al buscador", async () => {
