@@ -14,6 +14,8 @@ import {
 } from "@/lib/navigation";
 import { NAV_SECTION_ICONS, OverflowIcon } from "@/components/NavIcons";
 import { useDismissal } from "@/components/use-dismissal";
+import { useIsPhone } from "@/components/use-is-phone";
+import { useIsTyping } from "@/components/use-is-typing";
 import { useStickToVisualBottom } from "@/components/use-stick-to-visual-bottom";
 
 const OVERFLOW_PANEL_ID = "app-tabbar-overflow";
@@ -56,6 +58,11 @@ export function MobileTabBar({
     onFocusOutside: closeOverflow,
   });
   useStickToVisualBottom(navRef);
+  // Con el teclado abierto la barra flotaba a media pantalla, entre la página
+  // y el teclado (#840). Se esconde como en las apps nativas; `hidden` la
+  // saca también del lector de pantalla y del orden de Tab.
+  const isPhone = useIsPhone();
+  const isTyping = useIsTyping();
 
   const hasActiveOverflowSection = overflow.some((section) =>
     isSectionActive(section.href, pathname),
@@ -66,6 +73,7 @@ export function MobileTabBar({
       ref={navRef}
       aria-label={translate("nav.tabBarLabel")}
       className="app-tabbar"
+      hidden={isPhone && isTyping}
     >
       <ul
         className="app-tabbar-overflow"
