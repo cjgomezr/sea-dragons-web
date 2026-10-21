@@ -2518,6 +2518,12 @@ export const spanishMessages: MessageCatalog = {
   "attendance.status.late": "Tarde",
   "attendance.status.absent": "Ausente",
   "attendance.emptySheet": "No se espera a nadie en esta sesión.",
+  // El buscador por nombre de la hoja.
+  "attendance.search.label": "Buscar por nombre",
+  "attendance.search.clear": "Borrar la búsqueda",
+  "attendance.search.showing": "Mostrando {shown} de {total}",
+  "attendance.search.noMatches": "Nadie se llama así",
+  "attendance.search.showAll": "Mostrar a todos",
   "attendance.inactive": "Desactivada",
   "attendance.noPosition": "Sin posición",
   "attendance.save": "Guardar asistencia",

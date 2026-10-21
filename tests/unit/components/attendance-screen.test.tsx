@@ -1551,3 +1551,178 @@ describe("la hoja en el móvil (#766)", () => {
     expect(screen.getByText("1 unsaved")).toBeInTheDocument();
   });
 });
+
+describe("el buscador por nombre", () => {
+  function searchBox(name = "Search by name"): HTMLElement {
+    return screen.getByRole("searchbox", { name });
+  }
+
+  it("filtra las filas mientras se escribe, sin mayúsculas ni tildes", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await findRow(MATEO.fullName);
+
+    await userEvent.type(searchBox(), "gomez");
+
+    expect(screen.getByText(VALENTINA.fullName)).toBeInTheDocument();
+    expect(screen.queryByText(MATEO.fullName)).not.toBeInTheDocument();
+    expect(screen.queryByText(RUBY.fullName)).not.toBeInTheDocument();
+    expect(groupedRows()).toEqual([["Maybe", [VALENTINA.fullName]]]);
+  });
+
+  it("los totales siguen contando a todo el grupo", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await findRow(MATEO.fullName);
+
+    await userEvent.type(searchBox(), "ruby");
+
+    expect(
+      within(totals())
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["2Present", "0Late", "1Absent"]);
+  });
+
+  it("anuncia cuántos salen de cuántos", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await findRow(MATEO.fullName);
+
+    await userEvent.type(searchBox(), "a");
+
+    expect(screen.getByText("Showing 3 of 3")).toBeInTheDocument();
+    await userEvent.clear(searchBox());
+    await userEvent.type(searchBox(), "ruby");
+    expect(screen.getByText("Showing 1 of 3")).toBeInTheDocument();
+  });
+
+  it("lo marcado en una fila que el filtro esconde se queda y se guarda", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await userEvent.click(choice(await findRow(MATEO.fullName), "Late"));
+
+    await userEvent.type(searchBox(), "ruby");
+    expect(screen.queryByText(MATEO.fullName)).not.toBeInTheDocument();
+    await userEvent.click(saveButton());
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Saved · 1 present, 1 late, 1 absent",
+    );
+    expect(saveRequests()[0]?.body).toEqual({
+      records: [
+        { userId: MATEO.userId, status: "late" },
+        { userId: VALENTINA.userId, status: "present" },
+        { userId: RUBY.userId, status: "absent" },
+      ],
+    });
+  });
+
+  it("sin nadie con ese nombre lo dice y deja borrar la búsqueda", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await findRow(MATEO.fullName);
+
+    await userEvent.type(searchBox(), "zzz");
+
+    expect(screen.getByText("No one by that name")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Show everyone" }),
+    );
+    expect(searchBox()).toHaveValue("");
+    expect(searchBox()).toHaveFocus();
+    expect(screen.getByText(MATEO.fullName)).toBeInTheDocument();
+  });
+
+  it("al volver a verla, la fila marcada que el filtro escondía sigue marcada y sin guardar", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await userEvent.click(choice(await findRow(MATEO.fullName), "Late"));
+
+    await userEvent.type(searchBox(), "ruby");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Clear the search" }),
+    );
+
+    const mateo = await findRow(MATEO.fullName);
+    expect(choice(mateo, "Late")).toHaveAttribute("aria-pressed", "true");
+    expect(within(mateo).getByTitle("Not saved yet")).toBeInTheDocument();
+  });
+
+  it("en el móvil, sin resultados, la barra sigue contando y guarda también lo oculto", async () => {
+    stubScreenWidth(true);
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await userEvent.click(choice(await findRow(MATEO.fullName), "Late"));
+
+    await userEvent.type(searchBox(), "zzz");
+    expect(screen.getByText("1 unsaved")).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save attendance" }),
+    );
+
+    expect(
+      await screen.findByText("Saved · 1 present, 1 late, 1 absent"),
+    ).toBeInTheDocument();
+    expect(saveRequests()[0]?.body).toEqual({
+      records: [
+        { userId: MATEO.userId, status: "late" },
+        { userId: VALENTINA.userId, status: "present" },
+        { userId: RUBY.userId, status: "absent" },
+      ],
+    });
+  });
+
+  it("el botón de borrar sólo sale con algo escrito, y devuelve el foco al buscador", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await findRow(MATEO.fullName);
+    expect(
+      screen.queryByRole("button", { name: "Clear the search" }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.type(searchBox(), "mat");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Clear the search" }),
+    );
+
+    expect(searchBox()).toHaveValue("");
+    expect(searchBox()).toHaveFocus();
+  });
+
+  it("no sale en una hoja sin nadie", async () => {
+    stubClub([POOL_TRAINING], [sheetFor(POOL_TRAINING, [])]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await screen.findByText("Nobody is expected at this session.");
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  });
+
+  it("en español", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+    await findRow(MATEO.fullName);
+
+    await userEvent.type(searchBox("Buscar por nombre"), "zzz");
+
+    expect(screen.getByText("Nadie se llama así")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Borrar la búsqueda" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Mostrar a todos" }),
+    ).toBeInTheDocument();
+  });
+
+  it("en el móvil también filtra", async () => {
+    stubScreenWidth(true);
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await findRow(MATEO.fullName);
+
+    await userEvent.type(searchBox(), "mateo");
+
+    expect(screen.getByText(MATEO.fullName)).toBeInTheDocument();
+    expect(screen.queryByText(RUBY.fullName)).not.toBeInTheDocument();
+  });
+});
