@@ -159,7 +159,7 @@ Ninguna. D6 y D7 las decidió el dueño; el resto se ratifica al aprobar este PR
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-Todos llevan `ui-review` menos el 1. Las capturas de Playwright `evaluaciones-*` se rehacen ticket a ticket.
+Creados como sub-issues de la épica #816: #817 (1), #818 (2), #819 (3), #820 (4), #821 (5), #822 (6) y #823 (7). Todos llevan `ui-review` menos el 1. Las capturas de Playwright `evaluaciones-*` se rehacen ticket a ticket.
 
 | #   | Título propuesto                                                                              | Tamaño | Depende de | Auto-merge sugerido                 |
 | --- | --------------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------- |
