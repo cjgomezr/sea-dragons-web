@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+body{margin:0;background:#070f16;color:#e8f0f7;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+a{color:#33a1e0}a:hover{color:#5ab4e8}
+input::placeholder{color:#5a7086}
+input[type=checkbox]{accent-color:#33a1e0}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #33a1e0;outline-offset:2px}
+</style>
+</helmet>
+
+<section id="t1" style="padding:48px 56px 80px;display:flex;flex-direction:column;gap:26px;background:#070f16;min-height:100vh;width:max-content;box-sizing:border-box">
+<div style="display:flex;flex-direction:column;gap:10px;max-width:1040px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t1" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">1</a><span style="font-size:20px;font-weight:700">Grupos — lista compacta + panel del grupo</span></div>
+<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14.5px;line-height:1.5;color:#cfdeea">
+<li><strong>Lista a la izquierda, grupo a la derecha</strong> (como Evaluaciones): filas de una línea con conteo y caritas. Renombrar y borrar pasan a íconos dentro del grupo.</li>
+<li><strong>Agregar varios a la vez</strong>: un buscador con casillas en vez del desplegable de a uno. "Add 4 members" y listo.</li>
+<li><strong>Dónde se usa</strong>: cada grupo muestra los eventos y noticias que lo tienen como audiencia. Al borrar, avisa qué pierde su audiencia.</li>
+<li><strong>Acciones útiles</strong>: escribir a todo el grupo y verlo en el directorio ya filtrado.</li>
+</ul>
+<p style="margin:0;font-size:14px;color:#8aa1b5">Probá: elegí un grupo, "Add members" y marcá varios, quitá uno, renombrá, intentá borrar. <a href="#1a">1a</a> escritorio · <a href="#2a">2a</a> celular (comparten datos).</p>
+</div>
+
+<div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+
+<div id="1a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1a</a><span style="font-size:13.5px;color:#8aa1b5">Escritorio · Admin / Coach / Committee</span></div>
+<div style="width:1120px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;padding:24px 28px 28px;display:flex;flex-direction:column;gap:16px;position:relative">
+<header style="display:flex;flex-direction:column;gap:4px"><h1 style="margin:0;font-size:28px;line-height:1.15;font-weight:700">Groups</h1><p style="margin:0;font-size:14.5px;color:#8aa1b5">Groups are audiences: pick them when you create an event or a news post, and only their members see it.</p></header>
+<sc-if value="{{ notice }}"><div role="status" style="display:flex;gap:8px;align-items:center;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+
+<div style="display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start">
+<aside style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:6px">
+<input value="{{ newName }}" onChange="{{ onNewName }}" onKeyDown="{{ newKey }}" maxlength="60" placeholder="New group name" aria-label="New group name" style="all:unset;flex:1;box-sizing:border-box;height:38px;padding:0 12px;border-radius:8px;border:1px solid {{ newBorder }};background:#13283a;font-size:14px">
+<button onClick="{{ create }}" disabled="{{ cantCreate }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:38px;padding:0 14px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13.5px;font-weight:700;opacity:{{ createOp }}"><i class="ph-bold ph-plus"></i>Create</button>
+</div>
+<sc-if value="{{ newErr }}"><span style="font-size:12.5px;color:#f2887a;margin-top:-4px">{{ newErr }}</span></sc-if>
+<div style="border:1px solid #274055;border-radius:12px;overflow:hidden;background:#13283a">
+<div style="display:flex;justify-content:space-between;align-items:center;height:34px;padding:0 14px;background:#0f2131;border-bottom:1px solid #274055;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5"><span>{{ groupCount }} GROUPS</span><span>MEMBERS</span></div>
+<sc-for list="{{ groupRows }}" as="g">
+<button onClick="{{ g.select }}" aria-current="{{ g.on }}" style="all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;gap:12px;align-items:center;min-height:54px;padding:8px 14px;border-bottom:1px solid #22394d;background:{{ g.bg }};box-shadow:{{ g.bar }}" style-hover="background:#16304a">
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.name }}</span><span style="font-size:12px;color:#8aa1b5">{{ g.usage }}</span></span>
+<span style="display:flex;align-items:center"><sc-for list="{{ g.faces }}" as="f"><span style="width:24px;height:24px;margin-left:-7px;border-radius:50%;box-shadow:0 0 0 2px {{ g.ring }};overflow:hidden;background:{{ f.av }};display:grid;place-items:center;font:700 9px ui-monospace,Menlo,monospace"><sc-if value="{{ f.photo }}"><img src="{{ f.photo }}" alt="" style="width:100%;height:100%;object-fit:cover"></sc-if><sc-if value="{{ f.noPhoto }}">{{ f.ini }}</sc-if></span></sc-for></span>
+<span style="width:28px;text-align:right;font:700 14px ui-monospace,Menlo,monospace">{{ g.count }}</span>
+</button>
+</sc-for>
+<sc-if value="{{ noGroups }}"><div style="padding:24px 16px;text-align:center;font-size:14px;color:#8aa1b5">No groups yet. Create the first one above.</div></sc-if>
+</div>
+</aside>
+
+<sc-if value="{{ hasSel }}">
+<section style="border:1px solid #274055;border-radius:12px;background:#13283a;display:flex;flex-direction:column">
+<div style="display:flex;gap:12px;align-items:center;padding:14px 14px 12px 18px">
+<sc-if value="{{ notRenaming }}"><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><h2 style="margin:0;font-size:21px;font-weight:700;line-height:1.2">{{ sel.name }}</h2><span style="font-size:13px;color:#8aa1b5">{{ sel.summary }}</span></span></sc-if>
+<sc-if value="{{ renaming }}"><span style="flex:1;display:flex;gap:6px;align-items:center"><input value="{{ renameVal }}" onChange="{{ onRename }}" onKeyDown="{{ renameKey }}" maxlength="60" aria-label="Group name" style="all:unset;flex:1;box-sizing:border-box;height:38px;padding:0 12px;border-radius:8px;border:1px solid #33a1e0;background:#0c1a26;font-size:16px;font-weight:600"><button onClick="{{ applyRename }}" aria-label="Save name" style="all:unset;cursor:pointer;width:38px;height:38px;border-radius:8px;display:grid;place-items:center;background:#33a1e0;color:#0c1a26"><i class="ph-bold ph-check"></i></button><button onClick="{{ cancelRename }}" aria-label="Cancel" style="all:unset;cursor:pointer;width:38px;height:38px;border-radius:8px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349"><i class="ph ph-x"></i></button></span></sc-if>
+<sc-if value="{{ notRenaming }}">
+<span style="display:flex;gap:6px">
+<a href="#1a" aria-label="Email everyone in the group" title="Email the group" style="width:38px;height:38px;box-sizing:border-box;border-radius:9px;border:1px solid #274055;background:#0c1a26;display:grid;place-items:center;color:#e8f0f7"><i class="ph ph-envelope-simple" style="font-size:17px"></i></a>
+<a href="#1a" aria-label="Open in directory" title="Open in directory (filtered)" style="width:38px;height:38px;box-sizing:border-box;border-radius:9px;border:1px solid #274055;background:#0c1a26;display:grid;place-items:center;color:#e8f0f7"><i class="ph ph-address-book" style="font-size:17px"></i></a>
+<button onClick="{{ startRename }}" aria-label="Rename group" title="Rename" style="all:unset;cursor:pointer;width:38px;height:38px;box-sizing:border-box;border-radius:9px;border:1px solid #274055;background:#0c1a26;display:grid;place-items:center" style-hover="border-color:#33a1e0"><i class="ph ph-pencil-simple" style="font-size:17px"></i></button>
+<button onClick="{{ askDelete }}" aria-label="Delete group" title="Delete" style="all:unset;cursor:pointer;width:38px;height:38px;box-sizing:border-box;border-radius:9px;border:1px solid #274055;background:#0c1a26;display:grid;place-items:center;color:#f2887a" style-hover="border-color:#f2887a"><i class="ph ph-trash" style="font-size:17px"></i></button>
+</span>
+</sc-if>
+</div>
+
+<sc-if value="{{ confirmDelete }}">
+<div style="margin:0 14px 12px;padding:12px 14px;border-radius:10px;background:color-mix(in srgb,#f2887a 12%,#13283a);border:1px solid color-mix(in srgb,#f2887a 50%,transparent);display:flex;flex-direction:column;gap:8px">
+<span style="font-size:14px;font-weight:600">Delete “{{ sel.name }}”?</span>
+<span style="font-size:13.5px;line-height:1.5;color:#cfdeea">{{ deleteText }}</span>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button onClick="{{ cancelDelete }}" style="all:unset;cursor:pointer;padding:7px 14px;border-radius:8px;font-size:13.5px;font-weight:600;color:#cfdeea" style-hover="background:#1a3349">Cancel</button><button onClick="{{ doDelete }}" style="all:unset;cursor:pointer;padding:7px 16px;border-radius:8px;border:1px solid #f2887a;color:#f2887a;font-size:13.5px;font-weight:700">Delete group</button></div>
+</div>
+</sc-if>
+
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 260px;border-top:1px solid #22394d">
+<div style="display:flex;flex-direction:column;min-width:0;border-right:1px solid #22394d">
+<div style="display:flex;gap:8px;align-items:center;padding:10px 14px">
+<label style="flex:1;display:flex;gap:8px;align-items:center;height:36px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26"><i class="ph ph-magnifying-glass" style="color:#8aa1b5"></i><input value="{{ mq }}" onChange="{{ onMq }}" type="search" placeholder="Search in this group" aria-label="Search members" style="all:unset;flex:1;font-size:13.5px"></label>
+<button onClick="{{ togglePicker }}" aria-expanded="{{ pickerOpen }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:7px;align-items:center;height:36px;padding:0 14px;border-radius:8px;border:1px solid {{ pickerBorder }};background:{{ pickerBg }};font-size:13.5px;font-weight:700;color:#5ab4e8"><i class="ph-bold ph-user-plus"></i>Add members</button>
+</div>
+
+<sc-if value="{{ pickerOpen }}">
+<div style="margin:0 14px 10px;border:1px solid #33a1e0;border-radius:10px;background:#0c1a26;display:flex;flex-direction:column;overflow:hidden">
+<label style="display:flex;gap:8px;align-items:center;height:40px;padding:0 12px;border-bottom:1px solid #22394d"><i class="ph ph-magnifying-glass" style="color:#8aa1b5"></i><input value="{{ pq }}" onChange="{{ onPq }}" type="search" placeholder="Search members not in this group" aria-label="Search members to add" style="all:unset;flex:1;font-size:14px"></label>
+<div style="max-height:220px;overflow-y:auto;scrollbar-width:thin">
+<sc-for list="{{ candRows }}" as="c">
+<label style="display:flex;gap:10px;align-items:center;min-height:42px;padding:4px 12px;border-bottom:1px solid #22394d;cursor:pointer;background:{{ c.bg }}">
+<input type="checkbox" checked="{{ c.on }}" onChange="{{ c.toggle }}" style="width:16px;height:16px">
+<span style="width:28px;height:28px;border-radius:50%;overflow:hidden;background:{{ c.av }};display:grid;place-items:center;font:700 10px ui-monospace,Menlo,monospace"><sc-if value="{{ c.photo }}"><img src="{{ c.photo }}" alt="" style="width:100%;height:100%;object-fit:cover"></sc-if><sc-if value="{{ c.noPhoto }}">{{ c.ini }}</sc-if></span>
+<span style="flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+<span style="font-size:12px;color:#8aa1b5">{{ c.meta }}</span>
+</label>
+</sc-for>
+<sc-if value="{{ noCands }}"><div style="padding:14px 12px;font-size:13.5px;color:#8aa1b5">{{ noCandsText }}</div></sc-if>
+</div>
+<div style="display:flex;gap:8px;align-items:center;padding:8px 10px 8px 12px;background:#0f2131">
+<span style="flex:1;font-size:12.5px;color:#8aa1b5">{{ pickedText }}</span>
+<button onClick="{{ togglePicker }}" style="all:unset;cursor:pointer;padding:7px 12px;border-radius:8px;font-size:13px;font-weight:600;color:#cfdeea" style-hover="background:#1a3349">Cancel</button>
+<button onClick="{{ addPicked }}" disabled="{{ nonePicked }}" style="all:unset;cursor:pointer;padding:7px 14px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13px;font-weight:700;opacity:{{ addOp }}">{{ addLabel }}</button>
+</div>
+</div>
+</sc-if>
+
+<div style="max-height:440px;overflow-y:auto;scrollbar-width:thin">
+<sc-for list="{{ memberRows }}" as="m">
+<div style="display:grid;grid-template-columns:34px minmax(0,1fr) auto 34px;gap:10px;align-items:center;min-height:48px;padding:5px 10px 5px 14px;border-top:1px solid #22394d" style-hover="background:#16304a">
+<span style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:{{ m.av }};display:grid;place-items:center;font:700 11px ui-monospace,Menlo,monospace"><sc-if value="{{ m.photo }}"><img src="{{ m.photo }}" alt="" style="width:100%;height:100%;object-fit:cover"></sc-if><sc-if value="{{ m.noPhoto }}">{{ m.ini }}</sc-if></span>
+<span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</span><span style="font-size:12px;color:#8aa1b5">{{ m.meta }}</span></span>
+<span><sc-if value="{{ m.pending }}"><span style="height:22px;padding:0 8px;border-radius:999px;background:color-mix(in srgb,#f2ce78 16%,#13283a);display:flex;align-items:center;font-size:11.5px;font-weight:600;color:#f2ce78">Not activated</span></sc-if></span>
+<button onClick="{{ m.remove }}" aria-label="{{ m.removeLabel }}" title="Remove from group" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:7px;display:grid;place-items:center;color:#8aa1b5" style-hover="background:#1a3349;color:#f2887a"><i class="ph ph-x" style="font-size:15px"></i></button>
+</div>
+</sc-for>
+<sc-if value="{{ noMembers }}"><div style="padding:24px 14px;text-align:center;font-size:14px;color:#8aa1b5">{{ noMembersText }}</div></sc-if>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:12px;padding:12px 14px">
+<span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">AUDIENCE OF</span>
+<sc-for list="{{ usageRows }}" as="u">
+<a href="#1a" style="display:flex;gap:10px;align-items:center;text-decoration:none;color:#e8f0f7">
+<span style="flex:none;width:30px;height:30px;border-radius:8px;background:{{ u.bg }};display:grid;place-items:center"><i class="ph {{ u.icon }}" style="font-size:15px;color:{{ u.color }}"></i></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.title }}</span><span style="font-size:12px;color:#8aa1b5">{{ u.meta }}</span></span>
+</a>
+</sc-for>
+<sc-if value="{{ noUsage }}"><span style="font-size:13px;line-height:1.45;color:#8aa1b5">Not used yet. Pick it as the audience when you create an event or a news post.</span></sc-if>
+</div>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{ noSel }}"><section style="border:1px dashed #274055;border-radius:12px;padding:48px 20px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center"><i class="ph ph-users-three" style="font-size:30px;color:#5a7086"></i><span style="font-size:14px;color:#8aa1b5">Pick a group to see and manage its members.</span></section></sc-if>
+</div>
+</div>
+</div>
+
+<div id="2a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#2a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2a</a><span style="font-size:13.5px;color:#8aa1b5">Celular · lista → grupo</span></div>
+<div style="width:390px;height:844px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;display:flex;flex-direction:column;position:relative">
+<sc-if value="{{ mList }}">
+<div style="padding:16px 14px 10px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #22394d">
+<span style="font-size:24px;font-weight:700">Groups</span>
+<div style="display:flex;gap:8px"><input value="{{ newName }}" onChange="{{ onNewName }}" onKeyDown="{{ newKey }}" maxlength="60" placeholder="New group name" aria-label="New group name" style="all:unset;flex:1;box-sizing:border-box;height:46px;padding:0 12px;border-radius:10px;border:1px solid {{ newBorder }};background:#13283a;font-size:16px"><button onClick="{{ create }}" disabled="{{ cantCreate }}" aria-label="Create group" style="all:unset;cursor:pointer;width:46px;height:46px;border-radius:10px;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;opacity:{{ createOp }}"><i class="ph-bold ph-plus" style="font-size:19px"></i></button></div>
+<sc-if value="{{ newErr }}"><span style="font-size:13px;color:#f2887a">{{ newErr }}</span></sc-if>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none">
+<sc-if value="{{ notice }}"><div role="status" style="margin:10px 14px 0;display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+<sc-for list="{{ groupRows }}" as="g">
+<button onClick="{{ g.mSelect }}" style="all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;gap:12px;align-items:center;min-height:66px;padding:8px 14px;border-bottom:1px solid #22394d">
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="font-size:15.5px;font-weight:600">{{ g.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ g.count }} members · {{ g.usage }}</span></span>
+<span style="display:flex;align-items:center"><sc-for list="{{ g.faces }}" as="f"><span style="width:26px;height:26px;margin-left:-8px;border-radius:50%;box-shadow:0 0 0 2px #0c1a26;overflow:hidden;background:{{ f.av }};display:grid;place-items:center;font:700 9px ui-monospace,Menlo,monospace"><sc-if value="{{ f.photo }}"><img src="{{ f.photo }}" alt="" style="width:100%;height:100%;object-fit:cover"></sc-if><sc-if value="{{ f.noPhoto }}">{{ f.ini }}</sc-if></span></sc-for></span>
+<i class="ph ph-caret-right" style="color:#5a7086"></i>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ mGroup }}">
+<div style="display:flex;align-items:center;gap:2px;height:52px;padding:0 6px;border-bottom:1px solid #22394d">
+<button onClick="{{ mBack }}" aria-label="Back to groups" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center"><i class="ph ph-caret-left" style="font-size:21px"></i></button>
+<span style="flex:1;font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ mSel.name }}</span>
+<button onClick="{{ mToggleMenu }}" aria-label="Group actions" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center"><i class="ph-bold ph-dots-three" style="font-size:21px"></i></button>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:12px 14px 90px;display:flex;flex-direction:column;gap:12px">
+<span style="font-size:13.5px;color:#8aa1b5">{{ mSel.summary }}</span>
+<sc-if value="{{ notice }}"><div role="status" style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<a href="#2a" style="display:flex;gap:8px;align-items:center;justify-content:center;height:46px;border-radius:10px;border:1px solid #274055;background:#13283a;color:#e8f0f7;text-decoration:none;font-size:14px;font-weight:600"><i class="ph ph-envelope-simple" style="font-size:18px"></i>Email all</a>
+<a href="#2a" style="display:flex;gap:8px;align-items:center;justify-content:center;height:46px;border-radius:10px;border:1px solid #274055;background:#13283a;color:#e8f0f7;text-decoration:none;font-size:14px;font-weight:600"><i class="ph ph-address-book" style="font-size:18px"></i>Directory</a>
+</div>
+<sc-if value="{{ hasUsage }}"><div style="display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid #274055;border-radius:12px;background:#13283a"><span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">AUDIENCE OF</span><sc-for list="{{ usageRows }}" as="u"><a href="#2a" style="display:flex;gap:10px;align-items:center;min-height:44px;text-decoration:none;color:#e8f0f7"><span style="flex:none;width:32px;height:32px;border-radius:8px;background:{{ u.bg }};display:grid;place-items:center"><i class="ph {{ u.icon }}" style="font-size:16px;color:{{ u.color }}"></i></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:14px;font-weight:600">{{ u.title }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ u.meta }}</span></span><i class="ph ph-caret-right" style="color:#5a7086"></i></a></sc-for></div></sc-if>
+<label style="display:flex;gap:8px;align-items:center;height:46px;padding:0 12px;border-radius:10px;border:1px solid #274055;background:#13283a"><i class="ph ph-magnifying-glass" style="color:#8aa1b5;font-size:18px"></i><input value="{{ mq }}" onChange="{{ onMq }}" type="search" placeholder="Search in this group" aria-label="Search members" style="all:unset;flex:1;font-size:16px"></label>
+<div style="border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ memberRows }}" as="m">
+<div style="display:flex;gap:10px;align-items:center;min-height:60px;padding:4px 4px 4px 12px;border-top:{{ m.sep }}">
+<span style="flex:none;width:38px;height:38px;border-radius:50%;overflow:hidden;background:{{ m.av }};display:grid;place-items:center;font:700 12px ui-monospace,Menlo,monospace"><sc-if value="{{ m.photo }}"><img src="{{ m.photo }}" alt="" style="width:100%;height:100%;object-fit:cover"></sc-if><sc-if value="{{ m.noPhoto }}">{{ m.ini }}</sc-if></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ m.name }}</span><span style="font-size:12.5px;color:{{ m.metaColor }}">{{ m.mMeta }}</span></span>
+<button onClick="{{ m.remove }}" aria-label="{{ m.removeLabel }}" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-x" style="font-size:18px"></i></button>
+</div>
+</sc-for>
+<sc-if value="{{ noMembers }}"><div style="padding:20px 12px;text-align:center;font-size:14px;color:#8aa1b5">{{ noMembersText }}</div></sc-if>
+</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:10px 12px 16px;border-top:1px solid #274055;background:#13283a">
+<button onClick="{{ mOpenPicker }}" style="all:unset;cursor:pointer;box-sizing:border-box;width:100%;display:flex;gap:8px;align-items:center;justify-content:center;height:50px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700"><i class="ph-bold ph-user-plus" style="font-size:18px"></i>Add members</button>
+</div>
+
+<sc-if value="{{ mMenuOpen }}">
+<div onClick="{{ mToggleMenu }}" style="position:absolute;inset:0;background:color-mix(in srgb,#0c1a26 60%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 12px 22px;display:flex;flex-direction:column;gap:2px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055;margin-bottom:8px"></span>
+<sc-if value="{{ notMConfirm }}">
+<sc-if value="{{ notRenaming }}"><button onClick="{{ startRename }}" style="all:unset;cursor:pointer;display:flex;gap:12px;align-items:center;min-height:52px;padding:0 12px;border-radius:10px;font-size:15px"><i class="ph ph-pencil-simple" style="font-size:20px"></i>Rename group</button></sc-if>
+<sc-if value="{{ renaming }}"><div style="display:flex;gap:8px;padding:4px 0 10px"><input value="{{ renameVal }}" onChange="{{ onRename }}" maxlength="60" aria-label="Group name" style="all:unset;flex:1;box-sizing:border-box;height:48px;padding:0 12px;border-radius:8px;border:1px solid #33a1e0;background:#0c1a26;font-size:16px"><button onClick="{{ applyRename }}" style="all:unset;cursor:pointer;height:48px;padding:0 18px;display:flex;align-items:center;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Save</button></div></sc-if>
+<button onClick="{{ askDelete }}" style="all:unset;cursor:pointer;display:flex;gap:12px;align-items:center;min-height:52px;padding:0 12px;border-radius:10px;border-top:1px solid #274055;font-size:15px;color:#f2887a"><i class="ph ph-trash" style="font-size:20px"></i>Delete group</button>
+</sc-if>
+<sc-if value="{{ confirmDelete }}"><div style="display:flex;flex-direction:column;gap:12px;padding:4px 4px 0"><span style="font-size:17px;font-weight:700">Delete “{{ mSel.name }}”?</span><span style="font-size:14px;line-height:1.5;color:#cfdeea">{{ deleteText }}</span><div style="display:flex;gap:8px"><button onClick="{{ cancelDelete }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:46px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:15px;font-weight:600">Cancel</button><button onClick="{{ doDelete }}" style="all:unset;cursor:pointer;flex:1.3;text-align:center;height:48px;line-height:46px;box-sizing:border-box;border-radius:10px;border:1px solid #f2887a;color:#f2887a;font-size:15px;font-weight:700">Delete</button></div></div></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ mPickerOpen }}">
+<div style="position:absolute;inset:0;background:#0c1a26;display:flex;flex-direction:column">
+<div style="display:flex;align-items:center;gap:6px;height:52px;padding:0 6px 0 4px;border-bottom:1px solid #22394d"><button onClick="{{ togglePicker }}" style="all:unset;cursor:pointer;height:44px;padding:0 10px;display:flex;align-items:center;font-size:15px;color:#cfdeea">Cancel</button><span style="flex:1;text-align:center;font-size:16px;font-weight:700">Add to {{ mSel.short }}</span><span style="width:64px"></span></div>
+<div style="padding:10px 14px"><label style="display:flex;gap:8px;align-items:center;height:46px;padding:0 12px;border-radius:10px;border:1px solid #274055;background:#13283a"><i class="ph ph-magnifying-glass" style="color:#8aa1b5;font-size:18px"></i><input value="{{ pq }}" onChange="{{ onPq }}" type="search" placeholder="Search members" aria-label="Search members to add" style="all:unset;flex:1;font-size:16px"></label></div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none">
+<sc-for list="{{ candRows }}" as="c">
+<label style="display:flex;gap:12px;align-items:center;min-height:58px;padding:4px 14px;border-bottom:1px solid #22394d;background:{{ c.bg }}">
+<input type="checkbox" checked="{{ c.on }}" onChange="{{ c.toggle }}" style="width:22px;height:22px">
+<span style="flex:none;width:36px;height:36px;border-radius:50%;overflow:hidden;background:{{ c.av }};display:grid;place-items:center;font:700 11px ui-monospace,Menlo,monospace"><sc-if value="{{ c.photo }}"><img src="{{ c.photo }}" alt="" style="width:100%;height:100%;object-fit:cover"></sc-if><sc-if value="{{ c.noPhoto }}">{{ c.ini }}</sc-if></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:15px">{{ c.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ c.meta }}</span></span>
+</label>
+</sc-for>
+<sc-if value="{{ noCands }}"><div style="padding:20px 14px;font-size:14px;color:#8aa1b5">{{ noCandsText }}</div></sc-if>
+</div>
+<div style="padding:10px 12px 16px;border-top:1px solid #274055;background:#13283a"><button onClick="{{ addPicked }}" disabled="{{ nonePicked }}" style="all:unset;cursor:pointer;box-sizing:border-box;width:100%;text-align:center;height:50px;line-height:50px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700;opacity:{{ addOp }}">{{ addLabel }}</button></div>
+</div>
+</sc-if>
+</sc-if>
+</div>
+</div>
+
+</div>
+
+<ul style="margin:0;padding-left:18px;max-width:1040px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+<li>"Not activated" = está asignado pero todavía no activó su cuenta; no suma en el conteo (como hoy).</li>
+<li>Borrar un grupo no borra socios ni eventos, pero esos eventos/noticias se quedan sin esa audiencia — por eso el aviso dice cuáles.</li>
+<li>"Email all" abre el correo con todos en copia oculta; no hace falta ningún servicio extra.</li>
+</ul>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const PEOPLE = [['Liam Carter','Goalkeeper',12],['Sofia Reyes','Full back',47],['Noah Williams','Half back',13],['Mia Thompson','Centre',45],['Oliver Nguyen','Forward',null],['Ava Martinez','Forward',44],['Ethan Brown','Half back',15],['Isla Patel','Centre',49],['Zoe Walker','Goalkeeper',41],['Lucas Kim','Full back',60],['Chloe Davis','Centre',48],['Jack Wilson','Forward',59],['Grace Lee','Half back',null],['Henry Clark','Full back',57],['Maximiliano Fernández-Gutiérrez','Full back',53],['Ruby Scott','Forward',32],['Leo Harris','Half back',null],['Emily Chen','Centre',26],['Thomas Wright','Forward',68],['Hannah Young','Half back',null],['Samuel Adams','Goalkeeper',51],['Olivia Baker','Full back',36],['Daniel Hall','Centre',null],['Lily Turner','Forward',29],['Ana Gómez','Coach',null],['Peter Lane','Committee',null]]
+  .map(([name,pos,img],i)=>({id:'u'+(i+1), name, pos, photo: img ? `https://i.pravatar.cc/96?img=${img}` : null}));
+const PENDING = new Set(['u20','u23']);
+const W = ['u2','u4','u6','u8','u9','u11','u13','u16','u18','u20','u22','u24','u14','u7'];
+const G0 = [
+  {id:'g1', name:'Senior women', members: new Set(W)},
+  {id:'g2', name:'Senior men', members: new Set(['u1','u3','u5','u7','u10','u12','u14','u15','u17','u19','u21','u23'])},
+  {id:'g3', name:'Sunday social', members: new Set(['u2','u3','u4','u5','u6','u10','u11','u15','u18','u19','u22','u24','u25','u26','u1','u8','u12','u16'])},
+  {id:'g4', name:'Island Cup squad', members: new Set(['u1','u2','u4','u6','u9','u10','u11','u15','u19','u21'])},
+  {id:'g5', name:'Goalkeepers', members: new Set(['u1','u9','u21'])},
+  {id:'g6', name:'Committee', members: new Set(['u26','u25','u2'])},
+  {id:'g7', name:'Juniors U16', members: new Set()}
+];
+const USAGE = {
+  g1: [['ev','Wednesday training','Weekly · Wed 6 pm'],['ev','Women’s friendly vs Tide','Sat 24 Oct'],['news','New kit sizes for women','Posted 12 Oct']],
+  g2: [['ev','Thursday training','Weekly · Thu 6 pm']],
+  g3: [['ev','Sunday social game','Weekly · Sun 10 am'],['ev','End-of-season BBQ','Sat 5 Dec']],
+  g4: [['ev','Island Cup','Sat 24 – Sun 25 Oct'],['news','Island Cup travel plan','Posted 18 Oct']],
+  g5: [['ev','Keeper session','Weekly · Mon 7 pm']],
+  g6: [['ev','Committee meeting','Tue 3 Nov']],
+  g7: []
+};
+const AV = ['#1d4869','#2a4a3f','#4a3a2a','#3a2f4f','#24465a'];
+const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const ini = n => n.split(' ').map(w=>w[0]).slice(0,2).join('');
+const plural = (n,a,b) => `${n} ${n===1?a:b}`;
+
+class Component extends DCLogic {
+  state = { groups:G0, sel:'g1', mSel:null, newName:'', mq:'', picker:false, mPicker:false, pq:'', picked:new Set(),
+    renaming:false, renameVal:'', confirmDelete:false, mMenu:false, notice:null };
+  componentWillUnmount(){ clearTimeout(this._t); }
+  flash(t){ clearTimeout(this._t); this.setState({notice:t}); this._t = setTimeout(()=>this.setState({notice:null}), 3000); }
+  renderVals(){
+    const s = this.state, byName = (a,b)=>a.name.localeCompare(b.name);
+    const groups = [...s.groups].sort(byName);
+    const cnt = g => [...g.members].filter(id=>!PENDING.has(id)).length;
+    const usageText = g => { const u = USAGE[g.id]||[]; const ev = u.filter(x=>x[0]==='ev').length, nw = u.filter(x=>x[0]==='news').length;
+      if(!u.length) return 'Not used yet'; return [ev && plural(ev,'event','events'), nw && plural(nw,'post','posts')].filter(Boolean).join(' · '); };
+    const face = (p,i) => ({photo:p.photo, noPhoto:!p.photo, ini:ini(p.name), av:AV[i%AV.length]});
+    const selId = s.mSel || s.sel;
+    const g = s.groups.find(x=>x.id===selId);
+    const nameTaken = (n, except) => s.groups.some(x=>x.id!==except && norm(x.name)===norm(n.trim()));
+    const newErr = s.newName.trim() && nameTaken(s.newName) ? 'There is already a group with that name.' : '';
+    const create = () => { const n = s.newName.trim(); if(!n || newErr) return; const id = 'g'+Date.now(); USAGE[id] = [];
+      this.setState(st=>({groups:[...st.groups, {id, name:n, members:new Set()}], newName:'', sel:id, mSel: st.mSel ? id : null, picker:true, picked:new Set(), pq:''})); this.flash(`${n} created · now add its members`); };
+    const sel = g ? (()=>{ const members = PEOPLE.filter(p=>g.members.has(p.id)).sort(byName); const u = USAGE[g.id]||[];
+      return { g, members, u, name:g.name, short: g.name.length>16 ? g.name.slice(0,15)+'…' : g.name,
+        summary: `${plural(cnt(g),'member','members')}${members.length>cnt(g) ? ` · ${members.length-cnt(g)} not activated` : ''} · ${usageText(g)}` }; })() : null;
+    const nq = norm(s.mq.trim()), pq = norm(s.pq.trim());
+    const memberRows = sel ? sel.members.filter(p=>!nq || norm(p.name).includes(nq)).map((p,i)=>({ ...face(p,i), name:p.name, meta:p.pos, pending:PENDING.has(p.id),
+      mMeta: PENDING.has(p.id) ? `${p.pos} · not activated` : p.pos, metaColor: PENDING.has(p.id) ? '#f2ce78' : '#8aa1b5', sep: i===0 ? 'none' : '1px solid #22394d',
+      removeLabel:`Remove ${p.name} from ${g.name}`,
+      remove: ()=>{ this.setState(st=>({groups:st.groups.map(x=>x.id===g.id ? {...x, members:new Set([...x.members].filter(id=>id!==p.id))} : x)})); this.flash(`${p.name} removed from ${g.name}`); } })) : [];
+    const others = g ? PEOPLE.filter(p=>!g.members.has(p.id)).sort(byName) : [];
+    const candRows = others.filter(p=>!pq || norm(p.name).includes(pq)).map((p,i)=>{ const on = s.picked.has(p.id); const inGroups = s.groups.filter(x=>x.members.has(p.id)).map(x=>x.name);
+      return { ...face(p,i), name:p.name, on, bg: on ? 'color-mix(in srgb,#33a1e0 10%,transparent)' : 'transparent',
+        meta: inGroups.length ? `${p.pos} · in ${inGroups.length}` : p.pos,
+        toggle: ()=>this.setState(st=>{ const n = new Set(st.picked); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return {picked:n}; }) }; });
+    const nPicked = s.picked.size;
+    const openPicker = () => this.setState({picker:true, picked:new Set(), pq:''});
+    const closePicker = () => this.setState({picker:false, mPicker:false, picked:new Set(), pq:''});
+    const usage = sel ? sel.u : [];
+    const ev = usage.filter(x=>x[0]==='ev').length, nw = usage.filter(x=>x[0]==='news').length;
+    const rows = groups.map(x=>{ const on = !s.mSel && x.id===s.sel; const ps = PEOPLE.filter(p=>x.members.has(p.id));
+      return { name:x.name, count:cnt(x), usage:usageText(x), on, bg: on ? '#16304a' : 'transparent', bar: on ? 'inset 3px 0 0 #33a1e0' : 'none', ring: on ? '#16304a' : '#13283a',
+        faces: ps.slice(0,3).map(face),
+        select: ()=>this.setState({sel: on ? null : x.id, mq:'', picker:false, renaming:false, confirmDelete:false}),
+        mSelect: ()=>this.setState({mSel:x.id, mq:'', mPicker:false, renaming:false, confirmDelete:false, mMenu:false}) }; });
+    return {
+      notice: s.notice, groupCount: groups.length, groupRows: rows, noGroups: groups.length===0,
+      newName: s.newName, onNewName: e=>this.setState({newName:e.target.value}), newKey: e=>{ if(e.key==='Enter') create(); },
+      create, cantCreate: !s.newName.trim() || !!newErr, createOp: !s.newName.trim() || newErr ? .4 : 1, newErr, newBorder: newErr ? '#f2887a' : '#274055',
+      hasSel: !!sel && !s.mSel, noSel: !sel && !s.mSel, sel: sel || {},
+      mq: s.mq, onMq: e=>this.setState({mq:e.target.value}),
+      memberRows, noMembers: memberRows.length===0, noMembersText: sel && sel.members.length===0 ? 'No members yet. Use “Add members” to pick several at once.' : 'No one in this group matches.',
+      pickerOpen: s.picker && !s.mSel, togglePicker: ()=> (s.picker || s.mPicker) ? closePicker() : openPicker(),
+      pickerBorder: s.picker ? '#33a1e0' : '#274055', pickerBg: s.picker ? '#1d4869' : 'transparent',
+      pq: s.pq, onPq: e=>this.setState({pq:e.target.value}), candRows, noCands: candRows.length===0,
+      noCandsText: others.length===0 ? 'Everyone in the club is already in this group.' : 'No one matches.',
+      pickedText: nPicked ? `${nPicked} selected` : `${others.length} members not in this group`,
+      nonePicked: nPicked===0, addOp: nPicked ? 1 : .4, addLabel: nPicked ? `Add ${plural(nPicked,'member','members')}` : 'Add members',
+      addPicked: ()=>{ if(!nPicked || !g) return; this.setState(st=>({groups:st.groups.map(x=>x.id===g.id ? {...x, members:new Set([...x.members, ...st.picked])} : x), picker:false, mPicker:false, picked:new Set(), pq:''})); this.flash(`${plural(nPicked,'member','members')} added to ${g.name}`); },
+      usageRows: usage.map(([k,t,m])=>({title:t, meta:m, icon: k==='ev' ? 'ph-calendar-blank' : 'ph-newspaper', bg: k==='ev' ? 'color-mix(in srgb,#33a1e0 20%,#13283a)' : 'color-mix(in srgb,#6fd6b4 18%,#13283a)', color: k==='ev' ? '#5ab4e8' : '#6fd6b4'})),
+      noUsage: usage.length===0, hasUsage: usage.length>0,
+      renaming: s.renaming, notRenaming: !s.renaming, renameVal: s.renameVal, onRename: e=>this.setState({renameVal:e.target.value}),
+      startRename: ()=>g && this.setState({renaming:true, renameVal:g.name}), cancelRename: ()=>this.setState({renaming:false}),
+      renameKey: e=>{ if(e.key==='Escape') this.setState({renaming:false}); if(e.key==='Enter') e.currentTarget.parentNode.querySelector('button').click(); },
+      applyRename: ()=>{ const n = s.renameVal.trim(); if(!n || !g) return; if(nameTaken(n, g.id)){ this.flash('There is already a group with that name.'); return; }
+        this.setState(st=>({groups:st.groups.map(x=>x.id===g.id ? {...x, name:n} : x), renaming:false, mMenu:false})); this.flash('Group renamed'); },
+      confirmDelete: s.confirmDelete, notMConfirm: !s.confirmDelete,
+      askDelete: ()=>this.setState({confirmDelete:true, renaming:false, mMenu: !!s.mSel}), cancelDelete: ()=>this.setState({confirmDelete:false, mMenu:false}),
+      deleteText: !usage.length ? `Its ${plural(sel ? sel.members.length : 0,'member stays','members stay')} in the club. It isn't the audience of anything.`
+        : `Members stay in the club, but ${[ev && plural(ev,'event','events'), nw && plural(nw,'news post','news posts')].filter(Boolean).join(' and ')} will lose this audience. If that was their only group, nobody but Admins will see them.`,
+      doDelete: ()=>{ if(!g) return; const n = g.name; this.setState(st=>({groups:st.groups.filter(x=>x.id!==g.id), sel:null, mSel:null, confirmDelete:false, mMenu:false})); this.flash(`${n} deleted`); },
+      mList: !s.mSel, mGroup: !!s.mSel, mSel: s.mSel && sel ? sel : {}, mBack: ()=>this.setState({mSel:null, mPicker:false, mMenu:false, confirmDelete:false, renaming:false}),
+      mMenuOpen: s.mMenu, mToggleMenu: ()=>this.setState(st=>({mMenu:!st.mMenu, confirmDelete:false, renaming:false})),
+      mPickerOpen: s.mPicker, mOpenPicker: ()=>this.setState({mPicker:true, picked:new Set(), pq:''})
+    };
+  }
+}
+</script>
+</body>
+</html>
