@@ -24,6 +24,9 @@ import type { MembershipStatus } from "@/lib/membership/membership";
  * Sólo elige: lo que hace cada opción es de la ficha, con los controles de
  * siempre. Se cierra como el menú de la cuenta, y también al elegir, con el
  * foco de vuelta en el ⋯.
+ *
+ * En el móvil las mismas opciones van en una hoja inferior (#777,
+ * `MemberAdminSheet`): las dos pintan `AdminMenuItems`.
  */
 
 export type AdminAction =
@@ -109,6 +112,55 @@ function StatusItem({
   );
 }
 
+/** Las opciones del ⋯, en el desplegable y en la hoja del móvil. */
+export function AdminMenuItems({
+  translate,
+  member,
+  onChoose,
+}: {
+  translate: Translator;
+  member: AdminMenuMember;
+  onChoose: (action: AdminAction) => void;
+}): React.JSX.Element {
+  return (
+    <>
+      <MenuItem
+        glyph={UserSwitch}
+        label={translate("memberRecord.menu.changeRole")}
+        detail={translate(`role.${member.role}`)}
+        isDanger={false}
+        onChoose={() => onChoose("changeRole")}
+      />
+      <MenuItem
+        glyph={HandCoins}
+        label={translate(
+          member.membershipStatus === "waived"
+            ? "memberRecord.menu.removeWaiver"
+            : "memberRecord.menu.waive",
+        )}
+        detail={null}
+        isDanger={false}
+        onChoose={() => onChoose("waiver")}
+      />
+      {member.accountStatus === "incomplete" ? (
+        <MenuItem
+          glyph={PaperPlaneTilt}
+          label={translate("memberRecord.menu.resendInvitation")}
+          detail={null}
+          isDanger={false}
+          onChoose={() => onChoose("resendInvitation")}
+        />
+      ) : null}
+      <hr className="member-admin-menu-rule" />
+      <StatusItem
+        translate={translate}
+        accountStatus={member.accountStatus}
+        onChoose={onChoose}
+      />
+    </>
+  );
+}
+
 export function MemberAdminMenu({
   translate,
   member,
@@ -147,37 +199,9 @@ export function MemberAdminMenu({
       </button>
       {isOpen ? (
         <div id={menuId} className="member-admin-menu">
-          <MenuItem
-            glyph={UserSwitch}
-            label={translate("memberRecord.menu.changeRole")}
-            detail={translate(`role.${member.role}`)}
-            isDanger={false}
-            onChoose={() => choose("changeRole")}
-          />
-          <MenuItem
-            glyph={HandCoins}
-            label={translate(
-              member.membershipStatus === "waived"
-                ? "memberRecord.menu.removeWaiver"
-                : "memberRecord.menu.waive",
-            )}
-            detail={null}
-            isDanger={false}
-            onChoose={() => choose("waiver")}
-          />
-          {member.accountStatus === "incomplete" ? (
-            <MenuItem
-              glyph={PaperPlaneTilt}
-              label={translate("memberRecord.menu.resendInvitation")}
-              detail={null}
-              isDanger={false}
-              onChoose={() => choose("resendInvitation")}
-            />
-          ) : null}
-          <hr className="member-admin-menu-rule" />
-          <StatusItem
+          <AdminMenuItems
             translate={translate}
-            accountStatus={member.accountStatus}
+            member={member}
             onChoose={choose}
           />
         </div>

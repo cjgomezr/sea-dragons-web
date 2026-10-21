@@ -3,6 +3,8 @@
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { ProfilePhoneBar } from "@/components/account/ProfilePhoneBar";
+import { useIsPhone } from "@/components/use-is-phone";
 import { DIRECTORY_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -14,6 +16,7 @@ import {
   loadMemberRecord,
 } from "./member-record-client";
 import { type AdminAction, MemberAdminMenu } from "./MemberAdminMenu";
+import { MemberAdminSheet } from "./MemberAdminSheet";
 import { type AdminPanel, MemberAdminPanel } from "./MemberAdminPanel";
 import { MemberRecordForm } from "./MemberRecordForm";
 import { MemberRecordReadOnly } from "./MemberRecordReadOnly";
@@ -28,6 +31,10 @@ import { useMemberStatusChange } from "./MemberStatusControl";
  * exención, la invitación y la baja se piden en el ⋯ de la cabecera (#775).
  * El Committee y el Coach la leen sin editar nada (#776), en la vista que el
  * endpoint recorta para su rol.
+ *
+ * En el móvil (#777), "← Directorio" deja su sitio a la barra de arriba con
+ * Volver y "Socio"; el ⋯ del Admin sube de la cabecera a esa barra y abre
+ * una hoja inferior en vez del desplegable.
  *
  * La frontera ya mandó al panel al Player; si alguien pierde el rol con la
  * pantalla abierta, el 403 del endpoint lo dice aquí. Es de cliente
@@ -46,6 +53,26 @@ type RecordChange = Partial<
   >
 >;
 
+/** La barra del móvil, que vuelve siempre al directorio. */
+function RecordPhoneBar({
+  locale,
+  translate,
+  more = null,
+}: {
+  locale: Locale;
+  translate: Translator;
+  more?: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <ProfilePhoneBar
+      locale={locale}
+      title={translate("profileBar.memberTitle")}
+      back={{ kind: "link", href: DIRECTORY_PATH }}
+      more={more}
+    />
+  );
+}
+
 export function MemberRecordScreen({
   locale,
   userId,
@@ -56,6 +83,7 @@ export function MemberRecordScreen({
   const translate = createTranslator(locale);
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
+  const isPhone = useIsPhone();
 
   useEffect(() => {
     let isCurrent = true;
@@ -86,10 +114,16 @@ export function MemberRecordScreen({
 
   return (
     <div className="member-record member-record-wide">
-      <Link href={DIRECTORY_PATH} className="member-record-back">
-        <ArrowLeft aria-hidden="true" weight="bold" />
-        {translate("memberRecord.back")}
-      </Link>
+      {isPhone ? null : (
+        <Link href={DIRECTORY_PATH} className="member-record-back">
+          <ArrowLeft aria-hidden="true" weight="bold" />
+          {translate("memberRecord.back")}
+        </Link>
+      )}
+      {/* La del Admin la pone la ficha cargada, con su ⋯. */}
+      {isPhone && state.kind !== "loaded" ? (
+        <RecordPhoneBar locale={locale} translate={translate} />
+      ) : null}
       {state.kind === "loading" ? (
         <p className="admin-empty">{translate("memberRecord.loading")}</p>
       ) : null}
@@ -108,6 +142,7 @@ export function MemberRecordScreen({
           locale={locale}
           translate={translate}
           loaded={state}
+          isPhone={isPhone}
           onRecordChanged={applyChange}
         />
       ) : null}
@@ -123,6 +158,7 @@ function LoadedMemberRecord({
   locale,
   translate,
   loaded,
+  isPhone,
   onRecordChanged,
 }: {
   locale: Locale;
@@ -131,6 +167,8 @@ function LoadedMemberRecord({
     readonly record: MemberRecord;
     readonly clubGroups: readonly Group[];
   };
+  /** En el móvil, el ⋯ va en la barra de arriba y abre una hoja. */
+  isPhone: boolean;
   onRecordChanged: (change: RecordChange) => void;
 }): React.JSX.Element {
   const { record } = loaded;
@@ -163,20 +201,27 @@ function LoadedMemberRecord({
     menuButtonRef.current?.focus();
   }
 
+  const menuProps = {
+    translate,
+    member: record,
+    openerRef: menuButtonRef,
+    onChoose: chooseAction,
+  };
+
   return (
     <>
+      {isPhone ? (
+        <RecordPhoneBar
+          locale={locale}
+          translate={translate}
+          more={<MemberAdminSheet {...menuProps} />}
+        />
+      ) : null}
       <MemberRecordForm
         locale={locale}
         record={record}
         clubGroups={loaded.clubGroups}
-        adminMenu={
-          <MemberAdminMenu
-            translate={translate}
-            member={record}
-            openerRef={menuButtonRef}
-            onChoose={chooseAction}
-          />
-        }
+        adminMenu={isPhone ? null : <MemberAdminMenu {...menuProps} />}
         adminPanel={
           <MemberAdminPanel
             key={choice.key}

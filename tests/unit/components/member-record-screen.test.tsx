@@ -3124,3 +3124,244 @@ describe("ficha en pantalla: en lectura para Committee y Coach (#776)", () => {
     expect(screen.getByRole("region", { name: "Groups" })).toBeInTheDocument();
   });
 });
+
+/* La ficha en el móvil (#777, RF-7 y D14 del PRD de E30): la barra de
+   arriba con Volver, "Socio" y, para el Admin, el ⋯, que sube una hoja
+   inferior con las mismas opciones que el desplegable de escritorio. El
+   ancho lo dice `matchMedia`, que aquí se simula; las medidas, el asa y el
+   fondo atenuado los mira Playwright. */
+describe("ficha en pantalla: en el móvil (#777)", () => {
+  const PHONE_QUERY = "(width < 768px)";
+
+  function emulatePhone(): void {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === PHONE_QUERY,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }));
+  }
+
+  function phoneBar(name = "Member"): HTMLElement {
+    return screen.getByRole("navigation", { name });
+  }
+
+  function barMoreButton(name = "More actions"): HTMLElement {
+    return within(phoneBar()).getByRole("button", { name });
+  }
+
+  function adminSheet(): HTMLElement {
+    return screen.getByRole("dialog", { name: "More actions" });
+  }
+
+  beforeEach(() => {
+    emulatePhone();
+  });
+
+  it("lleva arriba Volver al directorio, el título Socio y el ⋯ del Admin", async () => {
+    stubApi();
+    await renderScreen();
+
+    const bar = phoneBar();
+    expect(within(bar).getByText("Member")).toBeInTheDocument();
+    expect(within(bar).getByRole("link", { name: "Back" })).toHaveAttribute(
+      "href",
+      "/directorio",
+    );
+    expect(barMoreButton()).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).queryByRole("button", {
+        name: "More actions",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Directory" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("la cabecera dice rol · posición · experiencia", async () => {
+    stubApi();
+    await renderScreen();
+
+    expect(
+      within(screen.getByRole("banner")).getByText(
+        "Player · Goalkeeper · Intermediate",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("el ⋯ sube una hoja con las opciones de escritorio y Desactivar tras una línea", async () => {
+    stubApi({ record: { ...RECORD, accountStatus: "incomplete" } });
+    await renderScreen();
+
+    await userEvent.setup().click(barMoreButton());
+
+    const sheet = adminSheet();
+    expect(barMoreButton()).toHaveAttribute("aria-expanded", "true");
+    expect(
+      within(sheet).getByRole("button", {
+        name: "Change role",
+        description: "Player",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(sheet)
+        .getAllByRole("button")
+        .map((item) => item.textContent)
+        // El asa no lleva texto: se nombra con su etiqueta.
+        .filter((text) => text !== ""),
+    ).toEqual([
+      "Change rolePlayer",
+      "Waive membership fee",
+      "Resend invitation",
+      "Deactivate member",
+    ]);
+    expect(within(sheet).getByRole("separator")).toBeInTheDocument();
+  });
+
+  it("al abrirse, el foco queda dentro de la hoja", async () => {
+    stubApi();
+    await renderScreen();
+
+    await userEvent.setup().click(barMoreButton());
+
+    expect(adminSheet()).toContainElement(
+      document.activeElement as HTMLElement,
+    );
+  });
+
+  it("Tab desde la última fila no saca el foco de la hoja", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.click(barMoreButton());
+    within(adminSheet())
+      .getByRole("button", { name: "Deactivate member" })
+      .focus();
+
+    await user.tab();
+
+    expect(adminSheet()).toContainElement(
+      document.activeElement as HTMLElement,
+    );
+  });
+
+  it("se cierra con su asa y devuelve el foco al ⋯", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.click(barMoreButton());
+
+    await user.click(
+      within(adminSheet()).getByRole("button", { name: "Close actions" }),
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(barMoreButton()).toHaveAttribute("aria-expanded", "false");
+    expect(barMoreButton()).toHaveFocus();
+  });
+
+  it("se cierra con Escape y devuelve el foco al ⋯", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.click(barMoreButton());
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(barMoreButton()).toHaveFocus();
+  });
+
+  it("elegir Eximir cierra la hoja y abre su confirmación", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.click(barMoreButton());
+
+    await user.click(
+      within(adminSheet()).getByRole("button", {
+        name: "Waive membership fee",
+      }),
+    );
+
+    expect(
+      screen.queryByRole("dialog", { name: "More actions" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", {
+        name: "Waive Paula Player's membership fee",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("elegir Desactivar pide la confirmación y cancelarla devuelve el foco al ⋯", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.click(barMoreButton());
+    await user.click(
+      within(adminSheet()).getByRole("button", { name: "Deactivate member" }),
+    );
+    expect(screen.getByText(/Deactivate Paula Player\?/)).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(statusChanges).toEqual([]);
+    expect(barMoreButton()).toHaveFocus();
+  });
+
+  it("el Coach lee la barra sin ⋯", async () => {
+    stubApi({
+      load: () =>
+        jsonResponse(200, {
+          data: {
+            view: "coach",
+            userId: RECORD.userId,
+            fullName: RECORD.fullName,
+            photoUrl: null,
+            role: RECORD.role,
+            positionName: RECORD.positionName,
+            experienceLevel: RECORD.experienceLevel,
+            country: RECORD.country,
+            emergencyContact: RECORD.emergencyContact,
+            membershipPlan: RECORD.membershipPlan,
+            membershipStatus: RECORD.membershipStatus,
+            membershipRenewsOn: RECORD.membershipRenewsOn,
+            groups: RECORD.groups,
+            attendance: RECORD.attendance,
+          } satisfies CoachMemberRecord,
+        }),
+    });
+    await renderScreen();
+
+    expect(
+      within(phoneBar()).getByRole("link", { name: "Back" }),
+    ).toBeInTheDocument();
+    expect(
+      within(phoneBar()).queryByRole("button", { name: "More actions" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("mientras carga ya lleva la barra con Volver", () => {
+    stubApi({ load: () => new Promise<Response>(() => {}) });
+    render(<MemberRecordScreen locale="en" userId={MEMBER_ID} />);
+
+    expect(
+      within(phoneBar()).getByRole("link", { name: "Back" }),
+    ).toBeInTheDocument();
+  });
+
+  it("se lee en español", async () => {
+    stubApi();
+    await renderScreen("es");
+
+    const bar = screen.getByRole("navigation", { name: "Miembro" });
+    expect(within(bar).getByRole("link", { name: "Volver" })).toBeVisible();
+    expect(
+      within(bar).getByRole("button", { name: "Más acciones" }),
+    ).toBeVisible();
+  });
+});

@@ -13,6 +13,9 @@ import { EmptyValue } from "./DetailList";
  * perfil y en la ficha: el número en mono, el vencimiento con los días que
  * faltan, en aviso si son menos de 90, y el estado. Lo que falta se cuenta
  * desde hoy en el club.
+ *
+ * En el móvil (#777) es una fila de 58 px con el estado a la derecha: lo
+ * hace la hoja de estilos con `profile-auf-cells`.
  */
 
 function ExpiryValue({
@@ -109,5 +112,7 @@ export function AufCells({
   translate: Translator;
   auf: OwnAuf;
 }): React.JSX.Element {
-  return <CardCells cells={cellsOf(translate, auf)} />;
+  return (
+    <CardCells cells={cellsOf(translate, auf)} className="profile-auf-cells" />
+  );
 }

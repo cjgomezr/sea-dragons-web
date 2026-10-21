@@ -40,7 +40,10 @@ import {
  */
 
 const refresh = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+const push = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh, push, back: vi.fn() }),
+}));
 
 const PROFILE: OwnProfile = {
   fullName: "Nerea Ruiz",
@@ -2257,5 +2260,160 @@ describe("pantalla de perfil: la franja de lo que falta (#771)", () => {
         .getAllByRole("button")
         .map((button) => button.textContent),
     ).toEqual(["Contacto de emergencia", "Teléfono"]);
+  });
+});
+
+/* El perfil en el móvil (#777, RF-7 y D14 del PRD de E30): por debajo de
+   768 px lleva su barra de arriba, la cabecera centrada con "rol · posición ·
+   experiencia", la tarjeta de lo que falta con una fila por dato y, al
+   final, la fila para pedir otro rol. El ancho lo dice `matchMedia`, que aquí
+   se simula; las medidas las mira Playwright. */
+describe("perfil propio en el móvil (#777)", () => {
+  const PHONE_QUERY = "(width < 768px)";
+
+  function emulatePhone(): void {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === PHONE_QUERY,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }));
+  }
+
+  beforeEach(() => {
+    emulatePhone();
+    push.mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function phoneBar(name = "My profile"): HTMLElement {
+    return screen.getByRole("navigation", { name });
+  }
+
+  it("arriba lleva una barra con Volver y el título Mi perfil, sin ⋯", () => {
+    renderScreen();
+
+    const bar = phoneBar();
+    expect(within(bar).getByText("My profile")).toBeInTheDocument();
+    expect(
+      within(bar).getByRole("button", { name: "Back" }),
+    ).toBeInTheDocument();
+    expect(
+      within(bar).queryByRole("button", { name: "More actions" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Volver, entrando directo al perfil, lleva al inicio", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(within(phoneBar()).getByRole("button", { name: "Back" }));
+
+    expect(push).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("la cabecera dice rol · posición · experiencia", () => {
+    renderScreen();
+
+    expect(
+      within(screen.getByRole("banner")).getByText(
+        "Player · Defender · Intermediate",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("lo que falta sale en una tarjeta Casi listo con una fila por dato", () => {
+    renderScreen({
+      profile: { ...PROFILE, phone: null, emergencyContact: null },
+    });
+
+    const card = screen.getByRole("note", {
+      name: "Almost there · 60% complete",
+    });
+    expect(
+      within(card)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Emergency contact", "Phone"]);
+  });
+
+  it("la fila de un dato abre su tarjeta con el foco en su campo", async () => {
+    const user = userEvent.setup();
+    renderScreen({
+      profile: { ...PROFILE, phone: null, emergencyContact: null },
+    });
+
+    await user.click(
+      within(
+        screen.getByRole("note", { name: "Almost there · 60% complete" }),
+      ).getByRole("button", { name: "Phone" }),
+    );
+
+    expect(screen.getByLabelText(OWN_PHONE_LABEL)).toHaveFocus();
+  });
+
+  it("al final, la fila Solicitar un cambio de rol abre el formulario", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    const row = screen.getByRole("button", { name: "Request a role change" });
+    expect(row).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(row);
+
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("heading", { name: "Request a role" }),
+    ).toBeVisible();
+  });
+
+  it("con una solicitud pendiente enseña su estado en lugar de la fila", () => {
+    renderScreen({
+      latestRequest: {
+        id: "r1",
+        requestedRole: "Coach",
+        status: "pending",
+        createdAt: "2026-10-01T09:00:00.000Z",
+      },
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "Request a role change" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Request pending" }),
+    ).toBeVisible();
+  });
+
+  it("se lee en español", () => {
+    renderScreen({
+      locale: "es",
+      profile: { ...PROFILE, phone: null, emergencyContact: null },
+    });
+
+    expect(phoneBar("Mi perfil")).toBeInTheDocument();
+    expect(
+      within(phoneBar("Mi perfil")).getByRole("button", { name: "Volver" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("note", { name: /^Casi listo · 60\s%\scompleto$/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Solicitar un cambio de rol" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("perfil propio en escritorio (#777)", () => {
+  it("no lleva la barra del móvil", () => {
+    renderScreen();
+
+    expect(
+      screen.queryByRole("navigation", { name: "My profile" }),
+    ).not.toBeInTheDocument();
   });
 });

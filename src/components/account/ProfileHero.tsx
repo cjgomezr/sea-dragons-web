@@ -28,6 +28,11 @@ import { HERO_AVATAR_SIZE, ProfilePhoto } from "./ProfilePhoto";
  *
  * A la derecha, la ficha pone sus acciones (#775): los botones de contacto y
  * el ⋯ del Admin. El perfil propio no lleva ninguna.
+ *
+ * En el móvil va centrada (#777) y, en vez de la píldora y la línea con el
+ * país, lee "rol · posición · experiencia". Las dos líneas se pintan y la
+ * hoja de estilos esconde la que no toca, para que la cabecera no salte al
+ * hidratar.
  */
 
 export type HeroAuf = {
@@ -111,6 +116,26 @@ function detailsLineOf(translate: Translator, member: HeroMember): string {
     .join(" · ");
 }
 
+/** "Rol · Posición · Experiencia", la línea del móvil (#777), o null sin
+ * posición ni experiencia: entonces el móvil deja la píldora del rol. */
+function phoneSummaryOf(
+  translate: Translator,
+  member: HeroMember,
+): string | null {
+  const details = [
+    member.positionNames === null
+      ? null
+      : positionName(member.positionNames, translate.locale),
+    member.experienceLevel === null
+      ? null
+      : translate(`level.${member.experienceLevel}`),
+  ].filter((part): part is string => part !== null);
+  if (details.length === 0) {
+    return null;
+  }
+  return [translate(`role.${member.role}`), ...details].join(" · ");
+}
+
 function HeroIdentity({
   translate,
   member,
@@ -119,6 +144,7 @@ function HeroIdentity({
   member: HeroMember;
 }): React.JSX.Element {
   const details = detailsLineOf(translate, member);
+  const phoneSummary = phoneSummaryOf(translate, member);
   const chips = [
     membershipChipOf(translate, member.membershipStatus),
     ...aufChipsOf(translate, member.auf),
@@ -133,6 +159,9 @@ function HeroIdentity({
       </div>
       {details === "" ? null : (
         <p className="profile-hero-details">{details}</p>
+      )}
+      {phoneSummary === null ? null : (
+        <p className="profile-hero-summary">{phoneSummary}</p>
       )}
       <div className="profile-hero-chips">
         {chips.map(({ text, tone, icon: Icon }) => (

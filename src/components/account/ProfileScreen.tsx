@@ -1,3 +1,4 @@
+import { ScreenOnly } from "@/components/ScreenOnly";
 import { SeasonAttendanceCard } from "@/components/attendance/SeasonAttendanceCard";
 import type { SeasonAttendance } from "@/lib/attendance/season-attendance";
 import type { RoleRequestAccount } from "@/lib/auth/role-request";
@@ -23,6 +24,7 @@ import { MembershipCard } from "./MembershipCard";
 import { MyGroups } from "./MyGroups";
 import { ProfileEvaluation } from "./ProfileEvaluation";
 import { ProfileForm } from "./ProfileForm";
+import { ProfilePhoneBar } from "./ProfilePhoneBar";
 import { RoleCard } from "./RoleCard";
 
 /** Sin AUF no hay ficha. Vencido se mira hoy en el club, como la ficha del
@@ -45,6 +47,7 @@ function heroAufOf(auf: OwnAuf): HeroAuf | null {
  * bajo ella, la franja de lo que falta son las del rediseño (#771), y a la
  * derecha de la ficha va su columna: membresía, asistencia de la temporada,
  * grupos, evaluación y rol (#774).
+ * En el móvil lleva arriba su barra con Volver (#777).
  * La página lee los datos; esto sólo los coloca. */
 export function ProfileScreen({
   locale,
@@ -97,6 +100,13 @@ export function ProfileScreen({
   );
   return (
     <div className="account">
+      <ScreenOnly screen="phone">
+        <ProfilePhoneBar
+          locale={locale}
+          title={translate("profileBar.ownTitle")}
+          back={{ kind: "history" }}
+        />
+      </ScreenOnly>
       <ProfileHero
         locale={locale}
         isOwnProfile
