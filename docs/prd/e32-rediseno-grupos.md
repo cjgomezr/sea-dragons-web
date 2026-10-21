@@ -163,6 +163,8 @@ Los grupos son las audiencias de los eventos y las noticias, pero la pantalla no
 
 ## 10. Descomposición en tickets (para write-ticket)
 
+Creados como sub-issues de la épica #825: #826 (1), #827 (2), #828 (3), #829 (4), #830 (5), #831 (6) y #832 (7). Todos llevan `ui-review` menos el 1 y el 2.
+
 | #   | Título propuesto                                                                                    | Tamaño | Depende de | Auto-merge sugerido                                       | ui-review |
 | --- | --------------------------------------------------------------------------------------------------- | ------ | ---------- | --------------------------------------------------------- | --------- |
 | 1   | Añade a la lista de grupos su uso y la vista previa, y a los miembros su posición y su foto         | M      | ninguna    | No: cambia la API y lo que ve cada rol                    | No        |
