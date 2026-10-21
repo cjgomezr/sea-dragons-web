@@ -24,3 +24,13 @@ describe("hueco de la raya de inicio", () => {
     );
   });
 });
+
+// #840: la barra se recoloca con un transform en cada scroll; en su propia
+// capa el navegador la mueve sin volver a pintar la página.
+describe("capa propia de la barra de pestañas", () => {
+  it("avisa al navegador de que su transform va a cambiar", () => {
+    expect(cssBlock(globalsCss, ".app-tabbar")).toContain(
+      "will-change: transform;",
+    );
+  });
+});
