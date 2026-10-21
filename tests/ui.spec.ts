@@ -13826,6 +13826,43 @@ const WITHDRAW_QUESTION = /^(Withdraw this post\?|¿Retirar esta publicación\?)
 /** Cuántas veces se alarga la ventana antes de rendirse. */
 const MAX_VIEWPORT_FITS = 5;
 
+/** Lecturas iguales seguidas para dar por quieta la altura de la página. */
+const STABLE_HEIGHT_READINGS = 5;
+
+/** Cada cuánto se vuelve a leer la altura mientras se mueve. */
+const HEIGHT_READING_INTERVAL_MS = 100;
+
+/**
+ * La altura de la página cuando deja de moverse. Justo después de alargar la
+ * ventana la página puede medir de más un instante, y la ventana sólo crece:
+ * con `min-height: 100vh` ese pico se queda como hueco al pie de la captura
+ * (#835, `perfil-con-foto` en el móvil salía 12 px más alta unas veces sí y
+ * otras no).
+ */
+async function settledPageHeight(page: Page): Promise<number> {
+  let readings: readonly number[] = [];
+  await expect
+    .poll(
+      async () => {
+        const height = await page.evaluate(
+          () => document.documentElement.scrollHeight,
+        );
+        readings = [...readings, height].slice(-STABLE_HEIGHT_READINGS);
+        return (
+          readings.length === STABLE_HEIGHT_READINGS &&
+          readings.every((reading) => reading === height)
+        );
+      },
+      { intervals: [HEIGHT_READING_INTERVAL_MS] },
+    )
+    .toBe(true);
+  const settled = readings.at(-1);
+  if (settled === undefined) {
+    throw new Error("No se llegó a leer la altura de la página.");
+  }
+  return settled;
+}
+
 /**
  * Alarga la ventana hasta que quepa la página entera, sin tocar su ancho.
  *
@@ -13845,9 +13882,7 @@ async function fitViewportToPage(page: Page): Promise<void> {
   }
   let height = viewport.height;
   for (let attempt = 0; attempt < MAX_VIEWPORT_FITS; attempt += 1) {
-    const pageHeight = await page.evaluate(
-      () => document.documentElement.scrollHeight,
-    );
+    const pageHeight = await settledPageHeight(page);
     if (pageHeight <= height) {
       return;
     }
@@ -15738,6 +15773,15 @@ const EVALUATED_AT = "2026-09-27T01:02:03.123456+00:00";
 const CAMILA_ID = "e1e1e1e1-0000-4000-8000-0000000000e1";
 const MATEO_ID = "e1e1e1e1-0000-4000-8000-0000000000e2";
 
+/** Lo que la lista trae de cada fila desde #817 y la pantalla de hoy no
+ * pinta todavía: la tabla nueva de E31 lo usará. */
+const STUBBED_ROSTER_EXTRAS = { position: null, photoUrl: null } as const;
+const STUBBED_EVALUATION_EXTRAS = {
+  ...STUBBED_ROSTER_EXTRAS,
+  updatedAt: EVALUATED_AT,
+  updatedBy: "Carla Coach",
+} as const;
+
 /** Una con un nombre de tres veces lo normal, para el caso de contenido
  * largo, y una evaluada sin categorías, que no tiene media. */
 const STUBBED_ROSTER = [
@@ -15745,28 +15789,47 @@ const STUBBED_ROSTER = [
     status: "evaluated",
     userId: CAMILA_ID,
     fullName: "Camila Ortiz",
-    overallRating: 7.9,
+    overall: 7.9,
+    ...STUBBED_EVALUATION_EXTRAS,
   },
   {
     status: "evaluated",
     userId: "e1e1e1e1-0000-4000-8000-0000000000e3",
     fullName: "Chloe Nguyen",
-    overallRating: 8.3,
+    overall: 8.3,
+    ...STUBBED_EVALUATION_EXTRAS,
   },
-  { status: "not_evaluated", userId: MATEO_ID, fullName: "Mateo Fernández" },
+  {
+    status: "not_evaluated",
+    userId: MATEO_ID,
+    fullName: "Mateo Fernández",
+    ...STUBBED_ROSTER_EXTRAS,
+  },
   {
     status: "evaluated",
     userId: "e1e1e1e1-0000-4000-8000-0000000000e4",
     fullName: "Ruby Walsh",
-    overallRating: null,
+    overall: null,
+    ...STUBBED_EVALUATION_EXTRAS,
   },
   {
     status: "evaluated",
     userId: "e1e1e1e1-0000-4000-8000-0000000000e5",
     fullName: "Valentina Maximiliana Rodríguez-Etxeberria de la Fuente",
-    overallRating: 6.4,
+    overall: 6.4,
+    ...STUBBED_EVALUATION_EXTRAS,
   },
 ] as const;
+
+/** El resumen que la lista trae desde #817 (D5 de E31). La pantalla de hoy
+ * no lo pinta: basta con que tenga la forma del contrato. */
+const STUBBED_ROSTER_SUMMARY = {
+  evaluatedCount: 4,
+  playerCount: 5,
+  categoryAverages: [],
+  averageOverall: 7.5,
+  longestUnreviewed: [],
+} as const;
 
 /** Las del mockup, más Experience, que es una de las diez del SRD. Suman 79:
  * el OVR es 7.9, como en el mockup. */
@@ -15819,7 +15882,10 @@ async function stubEvaluationReads(
 ): Promise<void> {
   await page.route(
     (url) => url.pathname === EVALUATIONS_ENDPOINT,
-    (route) => route.fulfill(jsonBody({ members: roster })),
+    (route) =>
+      route.fulfill(
+        jsonBody({ members: roster, summary: STUBBED_ROSTER_SUMMARY }),
+      ),
   );
   await page.route(
     (url) => url.pathname.startsWith(`${EVALUATIONS_ENDPOINT}/`),

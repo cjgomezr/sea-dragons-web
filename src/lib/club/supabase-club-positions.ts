@@ -45,7 +45,9 @@ const MANAGED_POSITIONS_COLUMNS = `${POSITIONS_COLUMNS}, coverage`;
 
 /** El `check` de `0025` sólo deja los idiomas de la aplicación. Sin ningún
  * nombre la posición no se puede pintar: se falla en vez de servirla. */
-function toPositionNames(row: PositionRow): PositionNames {
+export function toPositionNames(
+  row: Pick<PositionRow, "id" | "names">,
+): PositionNames {
   const names: Record<keyof PositionNames, string | null> = {
     en: null,
     es: null,

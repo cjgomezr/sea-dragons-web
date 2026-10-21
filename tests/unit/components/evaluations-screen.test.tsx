@@ -8,7 +8,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EvaluationsScreen } from "@/components/evaluations/EvaluationsScreen";
-import type { EvaluationRosterEntry } from "@/lib/evaluations/evaluation-roster";
+import type { ScreenRosterEntry } from "@/components/evaluations/evaluations-client";
 import type {
   EvaluationRating,
   MemberEvaluation,
@@ -25,14 +25,14 @@ const ROSTER_PATH = "/api/v1/evaluations";
 const READ_AT = "2026-09-27T01:02:03.123456+00:00";
 const SAVED_AT = "2026-09-27T01:05:00.654321+00:00";
 
-const CAMILA: EvaluationRosterEntry = {
+const CAMILA: ScreenRosterEntry = {
   status: "evaluated",
   userId: "aaaaaaaa-0000-4000-8000-00000000000a",
   fullName: "Camila Ortiz",
-  overallRating: 7.5,
+  overall: 7.5,
 };
 
-const MATEO: EvaluationRosterEntry = {
+const MATEO: ScreenRosterEntry = {
   status: "not_evaluated",
   userId: "bbbbbbbb-0000-4000-8000-00000000000b",
   fullName: "Mateo Ruiz",
@@ -199,11 +199,11 @@ describe("lista de evaluaciones", () => {
   });
 
   it("marca con su propio texto una evaluación sin categorías, sin inventar un OVR", async () => {
-    const ruby: EvaluationRosterEntry = {
+    const ruby: ScreenRosterEntry = {
       status: "evaluated",
       userId: "cccccccc-0000-4000-8000-00000000000c",
       fullName: "Ruby Walsh",
-      overallRating: null,
+      overall: null,
     };
     stubApi(() => jsonResponse(200, { data: { members: [ruby] } }));
 

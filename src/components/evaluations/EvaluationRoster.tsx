@@ -1,4 +1,4 @@
-import type { EvaluationRosterEntry } from "@/lib/evaluations/evaluation-roster";
+import type { ScreenRosterEntry } from "./evaluations-client";
 import { formatOverallRating } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import { matchesNameSearch } from "@/lib/text/name-search";
@@ -22,7 +22,7 @@ function RosterMark({
   member,
 }: {
   translate: Translator;
-  member: EvaluationRosterEntry;
+  member: ScreenRosterEntry;
 }): React.JSX.Element {
   // Sin evaluación y sin ninguna categoría son dos casos distintos, pero
   // ninguno tiene nota: los dos van con la misma marca y su propio texto.
@@ -33,7 +33,7 @@ function RosterMark({
       </span>
     );
   }
-  if (member.overallRating === null) {
+  if (member.overall === null) {
     return (
       <span className="evaluation-roster-pending">
         {translate("evaluations.list.noRatings")}
@@ -43,7 +43,7 @@ function RosterMark({
   return (
     <span className="evaluation-roster-ovr">
       {translate("evaluations.list.overall", {
-        rating: formatOverallRating(translate.locale, member.overallRating),
+        rating: formatOverallRating(translate.locale, member.overall),
       })}
     </span>
   );
@@ -56,7 +56,7 @@ function RosterMembers({
   onSelect,
 }: {
   translate: Translator;
-  members: readonly EvaluationRosterEntry[];
+  members: readonly ScreenRosterEntry[];
   selectedId: string | null;
   onSelect: (userId: string) => void;
 }): React.JSX.Element {
@@ -89,7 +89,7 @@ export function EvaluationRoster({
   onSelect,
 }: {
   translate: Translator;
-  members: readonly EvaluationRosterEntry[];
+  members: readonly ScreenRosterEntry[];
   search: string;
   onSearchChange: (search: string) => void;
   selectedId: string | null;

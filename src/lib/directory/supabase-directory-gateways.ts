@@ -42,7 +42,9 @@ const MEMBERS_TABLE = "members";
 // basta el id: el filtro por grupo (#497) no pinta ningún nombre. El
 // correo y el contacto (#499) se leen siempre; el dominio decide a quién
 // le salen.
-export const DIRECTORY_COLUMNS = `user_id, full_name, country, experience_level, role, position_id, account_status, created_at, date_of_birth, auf_number, auf_expiry, auf_verified_at, photo_path, email, ${CONTACT_COLUMNS}, member_evaluations(id), group_memberships(group_id), ${MEMBERSHIP_STANDING_EMBED}`;
+// La evaluación va por la clave del evaluado: desde `0078` hay otra hacia
+// `members`, la de quien la editó, y PostgREST no elige sola.
+export const DIRECTORY_COLUMNS = `user_id, full_name, country, experience_level, role, position_id, account_status, created_at, date_of_birth, auf_number, auf_expiry, auf_verified_at, photo_path, email, ${CONTACT_COLUMNS}, member_evaluations!member_evaluations_member_same_club_fkey(id), group_memberships(group_id), ${MEMBERSHIP_STANDING_EMBED}`;
 const EVALUATIONS_RELATION = "member_evaluations";
 const GROUP_MEMBERSHIPS_RELATION = "group_memberships";
 const MEMBERSHIPS_RELATION = "memberships";

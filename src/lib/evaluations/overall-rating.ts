@@ -17,10 +17,17 @@ const TENTHS_PER_UNIT = 10;
 export function calculateOverallRating(
   ratings: readonly number[],
 ): number | null {
-  if (ratings.length === 0) {
+  return averageToOneDecimal(ratings);
+}
+
+/** La media de cualquier lista de notas con la misma regla que el OVR: el
+ * resumen de la plantilla la usa por categoría y para los OVR (D5 del PRD de
+ * E31). Sin valores, `null`. */
+export function averageToOneDecimal(values: readonly number[]): number | null {
+  if (values.length === 0) {
     return null;
   }
-  const sum = ratings.reduce((total, rating) => total + rating, 0);
-  const tenths = Math.round((sum * TENTHS_PER_UNIT) / ratings.length);
+  const sum = values.reduce((total, value) => total + value, 0);
+  const tenths = Math.round((sum * TENTHS_PER_UNIT) / values.length);
   return tenths / TENTHS_PER_UNIT;
 }
