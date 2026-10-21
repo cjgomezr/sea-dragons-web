@@ -3001,6 +3001,13 @@ for (const state of ACCOUNT_STATES) {
               await state.beforeVisit?.(page);
               await goToWithTheme(page, ACCOUNT_PATH, theme);
               await state.prepare?.(page);
+              // El perfil usa `useIsPhone` (#777): si la página no cabe, la
+              // captura de página entera lo ve un instante como móvil, lo
+              // vuelve a montar y se pierde lo escrito (#675). Con la ventana
+              // a su altura no pasa.
+              if (state.prepare !== undefined) {
+                await fitViewportToPage(page);
+              }
               const snapshot = `${state.name}-${vp.name}-${theme}.png`;
               await createMissingLocalBaseline(snapshot, () =>
                 page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
