@@ -4,6 +4,7 @@ import { ArrowRight } from "@phosphor-icons/react/dist/ssr/ArrowRight";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { FloppyDisk } from "@phosphor-icons/react/dist/ssr/FloppyDisk";
 import Link from "next/link";
+import { useState } from "react";
 import { Icon } from "@/components/Icon";
 import { useIsPhone } from "@/components/use-is-phone";
 import {
@@ -13,6 +14,7 @@ import {
 import { CALENDAR_PATH } from "@/lib/auth/routes";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
 import type { Translator } from "@/lib/i18n/translator";
+import { matchesNameSearch } from "@/lib/text/name-search";
 import {
   type OpenedSheet,
   type SessionChoice,
@@ -27,6 +29,7 @@ import {
   totalsOf,
 } from "./attendance-marks";
 import { AttendanceRow, type RowViewer, opensElsewhere } from "./AttendanceRow";
+import { AttendanceSearch } from "./AttendanceSearch";
 import { sessionDay } from "./session-day";
 import {
   type AttendanceSheetControls,
@@ -46,6 +49,9 @@ import {
  *
  * En el móvil (#766) la cabecera no lleva Guardar: baja a una barra fija que
  * sólo sale mientras hay cambios (D5 de E29).
+ *
+ * El buscador por nombre sólo decide qué filas se ven: los totales, lo
+ * marcado y lo que se guarda siguen siendo del grupo entero.
  *
  * Se monta de nuevo con cada sesión (la pantalla le pone su id como clave),
  * así lo marcado en una no se cuela en otra. Por eso las fichas viven aquí:
@@ -360,23 +366,38 @@ function MemberGroup({
   );
 }
 
+/** Sin nadie que se llame así: lo dice y ofrece volver a ver a todos. */
+function NoMatches({
+  translate,
+  onShowAll,
+}: {
+  readonly translate: Translator;
+  readonly onShowAll: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="attendance-no-matches">
+      <p className="admin-empty">{translate("attendance.search.noMatches")}</p>
+      <button type="button" className="auth-secondary" onClick={onShowAll}>
+        {translate("attendance.search.showAll")}
+      </button>
+    </div>
+  );
+}
+
 /** Un grupo sin nadie no se pinta, ni su cabecera. */
 function MemberList({
   translate,
   viewer,
-  sheet,
+  members: shown,
   marks,
   onMark,
-}: MemberRowsProps & { readonly sheet: OpenedSheet }): React.JSX.Element {
-  if (sheet.members.length === 0) {
-    return <p className="admin-empty">{translate("attendance.emptySheet")}</p>;
-  }
+}: MemberRowsProps & {
+  readonly members: readonly SheetMember[];
+}): React.JSX.Element {
   return (
     <>
       {RSVP_GROUPS.map((group) => {
-        const members = sheet.members.filter(
-          (member) => groupOf(member) === group,
-        );
+        const members = shown.filter((member) => groupOf(member) === group);
         return members.length === 0 ? null : (
           <MemberGroup
             key={group}
@@ -425,18 +446,74 @@ function SheetBody({
       );
     case "ready":
       return (
-        <>
-          <Totals translate={translate} totals={totalsOf(state.marks)} />
-          <MemberList
-            translate={translate}
-            viewer={{ kind: state.sheet.viewer, canLeaveSheet }}
-            sheet={state.sheet}
-            marks={state.marks}
-            onMark={controls.mark}
-          />
-        </>
+        <ReadySheet
+          translate={translate}
+          sheet={state.sheet}
+          marks={state.marks}
+          onMark={controls.mark}
+          canLeaveSheet={canLeaveSheet}
+        />
       );
   }
+}
+
+/** Los totales, el buscador y la lista de una hoja abierta. */
+function ReadySheet({
+  translate,
+  sheet,
+  marks,
+  onMark,
+  canLeaveSheet,
+}: {
+  readonly translate: Translator;
+  readonly sheet: OpenedSheet;
+  readonly marks: SheetMarks;
+  readonly onMark: AttendanceSheetControls["mark"];
+  readonly canLeaveSheet: () => boolean;
+}): React.JSX.Element {
+  const [query, setQuery] = useState("");
+  const search = query.trim();
+  const shown = sheet.members.filter((member) =>
+    matchesNameSearch(member.fullName, search),
+  );
+  return (
+    <>
+      <Totals translate={translate} totals={totalsOf(marks)} />
+      {sheet.members.length === 0 ? (
+        <p className="admin-empty">{translate("attendance.emptySheet")}</p>
+      ) : (
+        <>
+          <AttendanceSearch
+            translate={translate}
+            query={query}
+            onQueryChange={setQuery}
+          />
+          {/* Siempre en el DOM: sólo se anuncia lo que cambia en una región
+              que ya estaba. Fuera de un `status`, para no confundirse con el
+              aviso de guardado. */}
+          <p className="visually-hidden" aria-live="polite">
+            {search === ""
+              ? ""
+              : translate("attendance.search.showing", {
+                  shown: shown.length,
+                  total: sheet.members.length,
+                })}
+          </p>
+          {shown.length === 0 ? (
+            <NoMatches translate={translate} onShowAll={() => setQuery("")} />
+          ) : (
+            <MemberList
+              translate={translate}
+              viewer={{ kind: sheet.viewer, canLeaveSheet }}
+              members={shown}
+              marks={marks}
+              onMark={onMark}
+            />
+          )}
+        </>
+      )}
+    </>
+  );
 }
 
 export function AttendanceSheetPanel({

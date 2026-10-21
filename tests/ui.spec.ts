@@ -21126,6 +21126,8 @@ type AttendanceState = AttendanceReads & {
 
 const ATTENDANCE_ROW_UNSAVED = /^(Not saved yet|Sin guardar todavía)$/;
 
+const ATTENDANCE_SEARCH = /^(Search by name|Buscar por nombre)$/;
+
 /** Cambia a dos socios sin guardar: los dos llevan el punto (#764). */
 async function markTwoUnsaved(page: Page): Promise<void> {
   await waitForAttendanceSheet(page);
@@ -21187,6 +21189,39 @@ const ATTENDANCE_STATES: readonly AttendanceState[] = [
       await expect(page.getByText(/^(2 unsaved|2 sin guardar)$/)).toBeVisible();
     },
   },
+  // El buscador por nombre: "ma" deja a Mateo y a Maximiliana, cada uno en
+  // su grupo, y los totales siguen contando a todos.
+  ...withSpanish({
+    name: "asistencia-buscando",
+    sessions: ATTENDANCE_SESSIONS,
+    members: ATTENDANCE_MEMBERS,
+    ready: async (page) => {
+      await waitForAttendanceSheet(page);
+      await page.getByRole("searchbox", { name: ATTENDANCE_SEARCH }).fill("ma");
+      await expect(
+        page.getByRole("group", { name: LONG_NAMED_ATTENDEE }),
+      ).toBeVisible();
+      await expect(page.getByRole("group", { name: "Ruby Tan" })).toHaveCount(
+        0,
+      );
+      await page.mouse.move(0, 0);
+    },
+  }),
+  ...withSpanish({
+    name: "asistencia-buscando-sin-resultados",
+    sessions: ATTENDANCE_SESSIONS,
+    members: ATTENDANCE_MEMBERS,
+    ready: async (page) => {
+      await waitForAttendanceSheet(page);
+      await page
+        .getByRole("searchbox", { name: ATTENDANCE_SEARCH })
+        .fill("zzz");
+      await expect(
+        page.getByText(/^(No one by that name|Nadie se llama así)$/),
+      ).toBeVisible();
+      await page.mouse.move(0, 0);
+    },
+  }),
   ...withSpanish({
     name: "asistencia-error",
     sessions: ATTENDANCE_SESSIONS,

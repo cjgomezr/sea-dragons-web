@@ -2499,6 +2499,12 @@ export const englishMessages = {
   "attendance.status.late": "Late",
   "attendance.status.absent": "Absent",
   "attendance.emptySheet": "Nobody is expected at this session.",
+  // El buscador por nombre de la hoja.
+  "attendance.search.label": "Search by name",
+  "attendance.search.clear": "Clear the search",
+  "attendance.search.showing": "Showing {shown} of {total}",
+  "attendance.search.noMatches": "No one by that name",
+  "attendance.search.showAll": "Show everyone",
   "attendance.inactive": "Deactivated",
   "attendance.noPosition": "No position",
   "attendance.save": "Save attendance",
