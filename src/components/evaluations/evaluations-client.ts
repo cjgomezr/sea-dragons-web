@@ -9,7 +9,6 @@ import {
   EVALUATIONS_API_PATH,
   EVALUATION_REFRESH_API_PATH,
 } from "@/lib/auth/routes";
-import type { EvaluationRoster } from "@/lib/evaluations/evaluation-roster";
 import {
   EVALUATION_CHANGED_REASON,
   EVALUATION_EXISTS_REASON,
@@ -39,9 +38,16 @@ const rosterEntrySchema = z.discriminatedUnion("status", [
     status: z.literal("evaluated"),
     userId: z.uuid(),
     fullName: z.string(),
-    overallRating: z.number().nullable(),
+    overall: z.number().nullable(),
   }),
 ]);
+
+/** Lo que la pantalla de hoy pinta de cada fila. Lo demás que trae la lista
+ * desde #817 (posición, foto, fecha, quién y el resumen) se descarta al leer
+ * hasta que llegue la tabla nueva de E31. */
+export type ScreenRosterEntry = z.infer<typeof rosterEntrySchema>;
+
+export type ScreenRoster = { readonly members: readonly ScreenRosterEntry[] };
 
 const rosterResponseSchema = z.object({
   data: z.object({ members: z.array(rosterEntrySchema) }),
@@ -76,7 +82,7 @@ const refreshResponseSchema = z.object({
 export type EvaluationFailure = ApiRequestFailure;
 
 export type RosterLoad =
-  | { readonly kind: "loaded"; readonly roster: EvaluationRoster }
+  | { readonly kind: "loaded"; readonly roster: ScreenRoster }
   | EvaluationFailure;
 
 export type EvaluationLoad =
