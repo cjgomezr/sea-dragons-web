@@ -22162,6 +22162,10 @@ async function goToTeams(
   return writes;
 }
 
+/** Las capturas del Team builder con una ventana abierta, que se mueve si
+ * la página entera no cabe en la ventana (#675). */
+const OPEN_TEAMS_STATES: ReadonlySet<string> = new Set(["equipos-editar"]);
+
 for (const state of TEAMS_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
@@ -22176,6 +22180,12 @@ for (const state of TEAMS_STATES) {
           for (const theme of themes) {
             test(`matches approved baseline (${theme})`, async ({ page }) => {
               await goToTeams(page, state, theme);
+              // El Team builder usa `useIsPhone` (#762): si la página no
+              // cabe, la captura de página entera lo ve un instante como
+              // móvil y la ventana de editar equipo sale en otro sitio (#675).
+              if (OPEN_TEAMS_STATES.has(state.name)) {
+                await fitViewportToPage(page);
+              }
               const snapshot = `${state.name}-${vp.name}-${theme}.png`;
               await createMissingLocalBaseline(snapshot, () =>
                 page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
