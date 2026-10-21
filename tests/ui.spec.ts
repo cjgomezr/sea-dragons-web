@@ -8451,6 +8451,10 @@ async function goToMemberRecord(
 const OPEN_RECORD_STATES: ReadonlySet<string> = new Set([
   "ficha-menu-abierto",
   "ficha-desactivar-confirmacion",
+  // Guardar deja la página a media altura: sin alargar la ventana, la barra
+  // de pestañas y la de la ficha salen en medio de la captura, según dónde
+  // quedó el scroll (#840).
+  "ficha-nacimiento-aviso-validacion",
 ]);
 
 for (const state of MEMBER_RECORD_STATES) {
