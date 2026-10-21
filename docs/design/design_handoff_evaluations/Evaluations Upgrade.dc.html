@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+body{margin:0;background:#070f16;color:#e8f0f7;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+a{color:#33a1e0}a:hover{color:#5ab4e8}
+input::placeholder{color:#5a7086}
+input[type=range]{accent-color:#33a1e0}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #33a1e0;outline-offset:2px}
+</style>
+</helmet>
+
+<section id="t1" style="padding:48px 56px 80px;display:flex;flex-direction:column;gap:26px;background:#070f16;min-height:100vh;width:max-content;box-sizing:border-box">
+<div style="display:flex;flex-direction:column;gap:10px;max-width:1040px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t1" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">1</a><span style="font-size:20px;font-weight:700">Evaluaciones — tabla para muchos jugadores, categorías compactas</span></div>
+<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14.5px;line-height:1.5;color:#cfdeea">
+<li><strong>Jugadores como tabla</strong> (como el directorio): búsqueda, filtro "Not evaluated", posición y orden (nombre, OVR, más antiguo). Con 100 personas se encuentra a quien sea en segundos.</li>
+<li><strong>Evaluar en serie</strong>: la ficha tiene ‹ › para pasar al siguiente de la lista filtrada y "Save &amp; next". Filtrás "Not evaluated" y los vas haciendo uno tras otro.</li>
+<li><strong>Categorías en una pestaña</strong>, no en otra página: filas de una línea, arrastrar para ordenar (o ↑/↓ con teclado), renombrar en la fila, y crear desde la última fila.</li>
+</ul>
+<p style="margin:0;font-size:14px;color:#8aa1b5">Probá: buscá, filtrá, abrí un jugador, editá y "Save &amp; next"; en la pestaña Categories arrastrá ⋮⋮. <a href="#1a">1a</a> escritorio · <a href="#2a">2a</a> <a href="#2b">2b</a> celular (comparten datos).</p>
+</div>
+
+<div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+
+<div id="1a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1a</a><span style="font-size:13.5px;color:#8aa1b5">Escritorio · Admin / Coach</span></div>
+<div style="width:1180px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;padding:24px 28px 28px;display:flex;flex-direction:column;gap:16px;position:relative">
+
+<header style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-direction:column;gap:4px"><h1 style="margin:0;font-size:28px;line-height:1.15;font-weight:700">Evaluations</h1><p style="margin:0;font-size:14.5px;color:#8aa1b5">Rate players by category. Their overall (OVR) is the average, and Teams uses it to balance.</p></div>
+<div role="tablist" style="display:flex;gap:22px;border-bottom:1px solid #274055">
+<sc-for list="{{ dTabs }}" as="x"><button onClick="{{ x.pick }}" role="tab" aria-selected="{{ x.on }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;height:40px;margin-bottom:-1px;border-bottom:2px solid {{ x.line }};font-size:14px;font-weight:600;color:{{ x.color }}"><i class="ph {{ x.icon }}" style="font-size:16px"></i>{{ x.label }}<span style="font:12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ x.n }}</span></button></sc-for>
+</div>
+</header>
+
+<sc-if value="{{ notice }}"><div role="status" style="display:flex;gap:8px;align-items:center;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+
+<sc-if value="{{ dPlayers }}">
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+<label style="flex:1;min-width:220px;display:flex;gap:8px;align-items:center;height:38px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a"><i class="ph ph-magnifying-glass" style="color:#8aa1b5"></i><input value="{{ q }}" onChange="{{ onQ }}" type="search" aria-label="Search players" placeholder="Search by name" style="all:unset;flex:1;font-size:14px"></label>
+<div style="display:flex;gap:6px">
+<sc-for list="{{ chips }}" as="c"><button onClick="{{ c.pick }}" aria-pressed="{{ c.on }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:7px;align-items:center;height:34px;padding:0 13px;border-radius:999px;border:1px solid {{ c.border }};background:{{ c.bg }};font-size:13.5px;font-weight:600;color:{{ c.color }}"><sc-if value="{{ c.dot }}"><span style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span></sc-if>{{ c.label }}<span style="font:12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ c.n }}</span></button></sc-for>
+</div>
+<select value="{{ pos }}" onChange="{{ onPos }}" aria-label="Position" style="height:38px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#13283a;color:#e8f0f7;font-size:13.5px"><option value="all">All positions</option><option>Goalkeeper</option><option>Full back</option><option>Half back</option><option>Centre</option><option>Forward</option></select>
+<select value="{{ sort }}" onChange="{{ onSort }}" aria-label="Sort" style="height:38px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#13283a;color:#e8f0f7;font-size:13.5px"><option value="name">Name A–Z</option><option value="ovr-desc">OVR high → low</option><option value="ovr-asc">OVR low → high</option><option value="last">Oldest evaluation first</option></select>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:16px;align-items:start">
+<div style="border:1px solid #274055;border-radius:12px;overflow:hidden">
+<div style="display:grid;grid-template-columns:40px minmax(0,1fr) 60px 92px;gap:12px;align-items:center;height:36px;padding:0 14px;background:#0f2131;border-bottom:1px solid #274055;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5"><span></span><span>PLAYER</span><span style="text-align:right">OVR</span><span style="text-align:right">UPDATED</span></div>
+<div style="max-height:560px;overflow-y:auto;scrollbar-width:thin">
+<sc-for list="{{ rows }}" as="p">
+<button onClick="{{ p.select }}" aria-current="{{ p.on }}" title="{{ p.selTitle }}" style="all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:grid;grid-template-columns:40px minmax(0,1fr) 60px 92px;gap:12px;align-items:center;min-height:52px;padding:6px 14px;border-bottom:1px solid #22394d;background:{{ p.bg }};box-shadow:{{ p.bar }}" style-hover="background:#16304a">
+<span style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:{{ p.av }};display:grid;place-items:center;font:700 11.5px ui-monospace,Menlo,monospace"><sc-if value="{{ p.photo }}"><img src="{{ p.photo }}" alt="" style="width:100%;height:100%;object-fit:cover"></sc-if><sc-if value="{{ p.noPhoto }}">{{ p.ini }}</sc-if></span>
+<span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ p.pos }}</span></span>
+
+<span style="text-align:right;font:700 15px ui-monospace,Menlo,monospace;color:{{ p.ovrColor }}">{{ p.ovr }}</span>
+<span style="text-align:right;font-size:12.5px;color:{{ p.lastColor }}">{{ p.last }}</span>
+</button>
+</sc-for>
+<sc-if value="{{ noRows }}"><div style="padding:28px 16px;text-align:center;font-size:14px;color:#8aa1b5">No players match. <button onClick="{{ clearFilters }}" style="all:unset;cursor:pointer;color:#5ab4e8;font-weight:600">Clear filters</button></div></sc-if>
+</div>
+<div style="display:flex;justify-content:space-between;padding:8px 14px;background:#0f2131;font-size:12.5px;color:#8aa1b5"><span>{{ countText }}</span><span>OVR = average of active categories</span></div>
+</div>
+
+<aside style="position:sticky;top:16px;border:1px solid {{ dBorder }};border-radius:12px;background:#13283a;display:flex;flex-direction:column">
+<sc-if value="{{ hasSel }}">
+<div style="display:flex;align-items:center;gap:6px;padding:8px 8px 8px 14px;border-bottom:1px solid #22394d">
+<span style="flex:1;font-size:12.5px;color:#8aa1b5">{{ sel.posText }}</span>
+<button onClick="{{ closeSel }}" aria-label="Close and show squad overview" title="Close" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:8px;display:grid;place-items:center" style-hover="background:#1a3349"><i class="ph ph-x" style="font-size:16px"></i></button>
+<button onClick="{{ prev }}" disabled="{{ noPrev }}" aria-label="Previous player" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;opacity:{{ prevOp }}" style-hover="background:#1a3349"><i class="ph ph-caret-left" style="font-size:16px"></i></button>
+<button onClick="{{ next }}" disabled="{{ noNext }}" aria-label="Next player" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;opacity:{{ nextOp }}" style-hover="background:#1a3349"><i class="ph ph-caret-right" style="font-size:16px"></i></button>
+</div>
+<div style="display:flex;gap:14px;align-items:center;padding:16px">
+<span style="flex:none;width:56px;height:56px;border-radius:50%;overflow:hidden;background:{{ sel.av }};display:grid;place-items:center;font:700 16px ui-monospace,Menlo,monospace"><sc-if value="{{ sel.photo }}"><img src="{{ sel.photo }}" alt="" style="width:100%;height:100%;object-fit:cover"></sc-if><sc-if value="{{ sel.noPhoto }}">{{ sel.ini }}</sc-if></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:19px;font-weight:700;line-height:1.2">{{ sel.name }}</span><span style="font-size:13px;color:#8aa1b5">{{ sel.pos }} · <a href="#1a" style="color:#5ab4e8;text-decoration:none">Profile</a></span></span>
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:0"><span style="font:700 30px ui-monospace,Menlo,monospace;line-height:1;color:{{ sel.ovrColor }}">{{ liveOvr }}</span><span style="font:700 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">OVR</span></span>
+</div>
+
+<sc-if value="{{ showCreate }}">
+<div style="margin:0 16px 16px;padding:16px;border:1px dashed #274055;border-radius:10px;display:flex;flex-direction:column;gap:10px">
+<span style="font-size:14.5px;font-weight:600">{{ sel.first }} hasn't been evaluated yet</span>
+<span style="font-size:13px;line-height:1.45;color:#8aa1b5">Every category starts at 5. Until then, Teams counts them as 5.</span>
+<button onClick="{{ startCreate }}" style="all:unset;cursor:pointer;align-self:flex-start;display:flex;gap:7px;align-items:center;height:38px;padding:0 16px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:14px;font-weight:700"><i class="ph-bold ph-plus"></i>Start evaluation</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ showRatings }}">
+<div style="display:flex;flex-direction:column;padding:0 16px 6px">
+<span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5;padding-bottom:6px">RATINGS · 1–10</span>
+<sc-for list="{{ ratingRows }}" as="r">
+<div style="display:grid;grid-template-columns:104px minmax(0,1fr) 28px;gap:12px;align-items:center;min-height:38px;border-top:1px solid #22394d">
+<label for="{{ r.id }}" style="font-size:13.5px;color:#cfdeea;display:flex;flex-direction:column;gap:0">{{ r.name }}<sc-if value="{{ r.unrated }}"><span style="font-size:11px;color:#f2ce78">new · not rated</span></sc-if></label>
+<sc-if value="{{ dEditing }}"><input id="{{ r.id }}" type="range" min="1" max="10" step="1" value="{{ r.val }}" onChange="{{ r.set }}" style="width:100%"></sc-if>
+<sc-if value="{{ dReading }}"><span style="height:6px;border-radius:3px;background:#0c1a26;overflow:hidden"><span style="display:block;height:100%;width:{{ r.w }};background:#33a1e0"></span></span></sc-if>
+<span style="font:700 14px ui-monospace,Menlo,monospace;text-align:right">{{ r.shown }}</span>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;gap:8px;align-items:center;padding:12px 16px 16px;border-top:1px solid #22394d;margin-top:6px">
+<sc-if value="{{ dReading }}"><span style="flex:1;font-size:12.5px;color:#8aa1b5">{{ sel.updated }}</span><button onClick="{{ startEdit }}" style="all:unset;cursor:pointer;display:flex;gap:7px;align-items:center;height:36px;padding:0 14px;border-radius:8px;border:1px solid #274055;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0"><i class="ph ph-pencil-simple"></i>Edit ratings</button></sc-if>
+<sc-if value="{{ dEditing }}"><button onClick="{{ cancelEdit }}" style="all:unset;cursor:pointer;padding:8px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:#cfdeea" style-hover="background:#1a3349">Cancel</button><span style="flex:1"></span><button onClick="{{ save }}" style="all:unset;cursor:pointer;height:36px;padding:0 14px;display:flex;align-items:center;border-radius:8px;border:1px solid #274055;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0">Save</button><button onClick="{{ saveNext }}" disabled="{{ noNext }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:36px;padding:0 14px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13.5px;font-weight:700;opacity:{{ nextOp }}">Save &amp; next<i class="ph-bold ph-caret-right"></i></button></sc-if>
+</div>
+</sc-if>
+</sc-if>
+<sc-if value="{{ noSel }}">
+<div style="display:flex;flex-direction:column;gap:16px;padding:16px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">SQUAD OVERVIEW</span>
+<div style="display:flex;gap:10px;align-items:baseline"><span style="font:700 30px ui-monospace,Menlo,monospace;line-height:1">{{ ov.done }}</span><span style="font-size:13.5px;color:#8aa1b5">of {{ ov.total }} players evaluated</span></div>
+<div style="height:8px;border-radius:4px;background:#0c1a26;overflow:hidden"><span style="display:block;height:100%;width:{{ ov.pct }};background:#33a1e0"></span></div>
+<sc-if value="{{ ov.hasTodo }}"><button onClick="{{ ov.startNext }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;justify-content:center;height:40px;margin-top:4px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:14px;font-weight:700"><i class="ph-bold ph-play"></i>Evaluate the {{ ov.todo }} pending</button></sc-if>
+<sc-if value="{{ ov.allDone }}"><span style="display:flex;gap:6px;align-items:center;font-size:13.5px;color:#6fd6b4"><i class="ph ph-check-circle"></i>Everyone has an evaluation.</span></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;border-top:1px solid #22394d;padding-top:12px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:6px"><span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">SQUAD AVERAGE BY CATEGORY</span><span style="font:700 13px ui-monospace,Menlo,monospace">{{ ov.avg }}</span></div>
+<sc-for list="{{ ov.cats }}" as="c"><div style="display:grid;grid-template-columns:96px minmax(0,1fr) 30px;gap:10px;align-items:center;min-height:30px;font-size:13px"><span style="color:#cfdeea">{{ c.name }}</span><span style="height:6px;border-radius:3px;background:#0c1a26;overflow:hidden"><span style="display:block;height:100%;width:{{ c.w }};background:{{ c.color }}"></span></span><span style="font-family:ui-monospace,Menlo,monospace;text-align:right">{{ c.v }}</span></div></sc-for>
+<span style="font-size:12px;color:#8aa1b5;padding-top:4px">Lowest: <strong style="color:#cfdeea">{{ ov.weakest }}</strong> — something to work on in training.</span>
+</div>
+<div style="display:flex;flex-direction:column;border-top:1px solid #22394d;padding-top:12px">
+<span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5;padding-bottom:4px">LONGEST WITHOUT REVIEW</span>
+<sc-for list="{{ ov.oldest }}" as="o"><button onClick="{{ o.go }}" style="all:unset;cursor:pointer;display:flex;gap:10px;align-items:center;min-height:38px;padding:0 6px;margin:0 -6px;border-radius:7px" style-hover="background:#1a3349"><span style="flex:1;font-size:13.5px">{{ o.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ o.last }}</span><i class="ph ph-caret-right" style="color:#5a7086"></i></button></sc-for>
+</div>
+</div>
+</sc-if>
+</aside>
+</div>
+</sc-if>
+
+<sc-if value="{{ dCats }}">
+<div style="max-width:680px;display:flex;flex-direction:column;gap:14px">
+<p style="margin:0;font-size:14px;line-height:1.5;color:#8aa1b5">The order here is the order on every evaluation. Deactivating hides a category from new ratings; old scores are kept.</p>
+<div style="border:1px solid #274055;border-radius:12px;overflow:hidden">
+<div style="display:grid;grid-template-columns:36px 28px minmax(0,1fr) 84px;gap:10px;align-items:center;height:34px;padding:0 12px;background:#0f2131;border-bottom:1px solid #274055;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5"><span></span><span>#</span><span>CATEGORY</span><span></span></div>
+<sc-for list="{{ catRows }}" as="c">
+<div draggable="{{ c.draggable }}" onDragStart="{{ c.dragStart }}" onDragOver="{{ c.dragOver }}" onDrop="{{ c.drop }}" onDragEnd="{{ c.dragEnd }}" style="display:grid;grid-template-columns:36px 28px minmax(0,1fr) 84px;gap:10px;align-items:center;min-height:46px;padding:6px 12px;border-bottom:1px solid #22394d;border-top:{{ c.dropLine }};opacity:{{ c.op }};background:#13283a">
+<button onKeyDown="{{ c.key }}" aria-label="{{ c.handleLabel }}" title="Drag, or use ↑ ↓" style="all:unset;cursor:grab;width:30px;height:30px;border-radius:7px;display:grid;place-items:center;color:#8aa1b5" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph-bold ph-dots-six-vertical" style="font-size:17px"></i></button>
+<span style="font:13px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ c.rank }}</span>
+<sc-if value="{{ c.reading }}"><span style="font-size:14.5px;font-weight:600">{{ c.name }}</span></sc-if>
+<sc-if value="{{ c.renaming }}"><input value="{{ renameVal }}" onChange="{{ onRename }}" onKeyDown="{{ renameKey }}" aria-label="New name" autofocus="true" style="all:unset;box-sizing:border-box;height:32px;padding:0 10px;border-radius:7px;border:1px solid #33a1e0;background:#0c1a26;font-size:14px"></sc-if>
+<span style="display:flex;gap:2px;justify-content:flex-end">
+<sc-if value="{{ c.reading }}"><button onClick="{{ c.rename }}" aria-label="{{ c.renameLabel }}" title="Rename" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:7px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph ph-pencil-simple" style="font-size:16px"></i></button><button onClick="{{ c.deactivate }}" aria-label="{{ c.deactLabel }}" title="Deactivate" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:7px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349;color:#f2887a"><i class="ph ph-eye-slash" style="font-size:16px"></i></button></sc-if>
+<sc-if value="{{ c.renaming }}"><button onClick="{{ applyRename }}" aria-label="Save name" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:7px;display:grid;place-items:center;background:#33a1e0;color:#0c1a26"><i class="ph-bold ph-check" style="font-size:15px"></i></button><button onClick="{{ cancelRename }}" aria-label="Cancel" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:7px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349"><i class="ph ph-x" style="font-size:15px"></i></button></sc-if>
+</span>
+</div>
+</sc-for>
+<div style="display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;min-height:50px;padding:7px 12px;background:#0f2131">
+<span style="display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-plus" style="font-size:16px"></i></span>
+<input value="{{ newCat }}" onChange="{{ onNewCat }}" onKeyDown="{{ newCatKey }}" maxlength="40" placeholder="New category, e.g. Speed" aria-label="New category" style="all:unset;box-sizing:border-box;height:34px;padding:0 10px;border-radius:7px;border:1px solid {{ newBorder }};background:#0c1a26;font-size:14px">
+<button onClick="{{ addCat }}" disabled="{{ cantAdd }}" style="all:unset;cursor:pointer;height:34px;padding:0 16px;display:flex;align-items:center;border-radius:7px;background:#33a1e0;color:#0c1a26;font-size:13.5px;font-weight:700;opacity:{{ addOp }}">Add</button>
+</div>
+</div>
+<sc-if value="{{ newErr }}"><span style="font-size:12.5px;color:#f2887a;margin-top:-6px">{{ newErr }}</span></sc-if>
+<div style="display:flex;flex-direction:column;gap:6px">
+<button onClick="{{ toggleArch }}" aria-expanded="{{ archOpen }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;height:32px;font-size:13.5px;font-weight:600;color:#cfdeea"><i class="ph-bold {{ archIcon }}"></i>Deactivated · {{ inactiveCount }}<span style="font-weight:400;color:#8aa1b5">— hidden from new ratings, kept on old ones</span></button>
+<sc-if value="{{ archOpen }}"><div style="border:1px solid #274055;border-radius:10px;overflow:hidden"><sc-for list="{{ inactiveRows }}" as="c"><div style="display:flex;align-items:center;gap:10px;min-height:44px;padding:4px 8px 4px 16px;border-top:{{ c.sep }};background:#13283a"><span style="flex:1;font-size:14px;color:#cfdeea">{{ c.name }}</span><button onClick="{{ c.reactivate }}" style="all:unset;cursor:pointer;height:32px;padding:0 12px;display:flex;align-items:center;border-radius:7px;border:1px solid #274055;font-size:13px;font-weight:600" style-hover="border-color:#33a1e0">Reactivate</button></div></sc-for><sc-if value="{{ noInactive }}"><div style="padding:12px 16px;font-size:13.5px;color:#8aa1b5;background:#13283a">None.</div></sc-if></div></sc-if>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+
+<div id="2a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#2a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2a</a><span style="font-size:13.5px;color:#8aa1b5">Celular · jugadores → ficha</span></div>
+<div style="width:390px;height:844px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;display:flex;flex-direction:column;position:relative">
+<sc-if value="{{ mList }}">
+<div style="padding:16px 14px 10px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #22394d">
+<span style="font-size:24px;font-weight:700">Evaluations</span>
+<label style="display:flex;gap:8px;align-items:center;height:46px;padding:0 12px;border-radius:10px;border:1px solid #274055;background:#13283a"><i class="ph ph-magnifying-glass" style="color:#8aa1b5;font-size:18px"></i><input value="{{ q }}" onChange="{{ onQ }}" type="search" aria-label="Search players" placeholder="Search by name" style="all:unset;flex:1;font-size:16px"></label>
+<div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none">
+<sc-for list="{{ chips }}" as="c"><button onClick="{{ c.pick }}" aria-pressed="{{ c.on }}" style="all:unset;cursor:pointer;flex:none;white-space:nowrap;display:flex;gap:7px;align-items:center;height:36px;padding:0 13px;border-radius:999px;border:1px solid {{ c.border }};background:{{ c.bg }};font-size:14px;font-weight:600;color:{{ c.color }}"><sc-if value="{{ c.dot }}"><span style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span></sc-if>{{ c.label }}<span style="font:12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ c.n }}</span></button></sc-for>
+<select value="{{ sort }}" onChange="{{ onSort }}" aria-label="Sort" style="flex:none;height:36px;padding:0 8px;border-radius:999px;border:1px solid #274055;background:#13283a;color:#e8f0f7;font-size:14px"><option value="name">A–Z</option><option value="ovr-desc">OVR ↓</option><option value="ovr-asc">OVR ↑</option><option value="last">Oldest</option></select>
+</div>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none">
+<sc-for list="{{ rows }}" as="p">
+<button onClick="{{ p.mSelect }}" style="all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;gap:12px;align-items:center;min-height:64px;padding:8px 14px;border-bottom:1px solid #22394d">
+<span style="flex:none;width:40px;height:40px;border-radius:50%;overflow:hidden;background:{{ p.av }};display:grid;place-items:center;font:700 12px ui-monospace,Menlo,monospace"><sc-if value="{{ p.photo }}"><img src="{{ p.photo }}" alt="" style="width:100%;height:100%;object-fit:cover"></sc-if><sc-if value="{{ p.noPhoto }}">{{ p.ini }}</sc-if></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ p.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ p.pos }} · <span style="color:{{ p.lastColor }}">{{ p.last }}</span></span></span>
+<span style="flex:none;font:700 16px ui-monospace,Menlo,monospace;color:{{ p.ovrColor }}">{{ p.ovr }}</span>
+<i class="ph ph-caret-right" style="color:#5a7086"></i>
+</button>
+</sc-for>
+<sc-if value="{{ noRows }}"><div style="padding:28px 16px;text-align:center;font-size:14px;color:#8aa1b5">No players match.</div></sc-if>
+<div style="padding:12px 14px;font-size:12.5px;color:#8aa1b5">{{ countText }}</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ mSheet }}">
+<div style="display:flex;align-items:center;gap:2px;height:52px;padding:0 6px;border-bottom:1px solid #22394d">
+<button onClick="{{ mBack }}" aria-label="Back to players" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center"><i class="ph ph-caret-left" style="font-size:21px"></i></button>
+<span style="flex:1;font-size:13.5px;color:#8aa1b5">{{ mSel.posText }}</span>
+<button onClick="{{ mPrev }}" disabled="{{ mNoPrev }}" aria-label="Previous player" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;opacity:{{ mPrevOp }}"><i class="ph ph-arrow-up" style="font-size:19px"></i></button>
+<button onClick="{{ mNext }}" disabled="{{ mNoNext }}" aria-label="Next player" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;opacity:{{ mNextOp }}"><i class="ph ph-arrow-down" style="font-size:19px"></i></button>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:16px 14px 20px;display:flex;flex-direction:column;gap:14px">
+<sc-if value="{{ notice }}"><div role="status" style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+<div style="display:flex;gap:12px;align-items:center">
+<span style="flex:none;width:60px;height:60px;border-radius:50%;overflow:hidden;background:{{ mSel.av }};display:grid;place-items:center;font:700 17px ui-monospace,Menlo,monospace"><sc-if value="{{ mSel.photo }}"><img src="{{ mSel.photo }}" alt="" style="width:100%;height:100%;object-fit:cover"></sc-if><sc-if value="{{ mSel.noPhoto }}">{{ mSel.ini }}</sc-if></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:19px;font-weight:700;line-height:1.2">{{ mSel.name }}</span><span style="font-size:13px;color:#8aa1b5">{{ mSel.pos }}</span></span>
+<span style="display:flex;flex-direction:column;align-items:flex-end"><span style="font:700 30px ui-monospace,Menlo,monospace;line-height:1;color:{{ mSel.ovrColor }}">{{ mLiveOvr }}</span><span style="font:700 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">OVR</span></span>
+</div>
+<sc-if value="{{ mShowCreate }}">
+<div style="padding:16px;border:1px dashed #274055;border-radius:12px;display:flex;flex-direction:column;gap:10px">
+<span style="font-size:15px;font-weight:600">{{ mSel.first }} hasn't been evaluated yet</span>
+<span style="font-size:13.5px;line-height:1.45;color:#8aa1b5">Every category starts at 5.</span>
+<button onClick="{{ mStartCreate }}" style="all:unset;cursor:pointer;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Start evaluation</button>
+</div>
+</sc-if>
+<sc-if value="{{ mShowRatings }}">
+<div style="border:1px solid {{ mBorder }};border-radius:12px;background:#13283a">
+<div style="padding:10px 14px;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">RATINGS · 1–10</div>
+<sc-for list="{{ mRatingRows }}" as="r">
+<div style="display:flex;flex-direction:column;gap:6px;padding:10px 14px;border-top:1px solid #22394d">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><label for="{{ r.mid }}" style="font-size:14.5px">{{ r.name }}<sc-if value="{{ r.unrated }}"><span style="font-size:12px;color:#f2ce78"> · new</span></sc-if></label><span style="font:700 16px ui-monospace,Menlo,monospace">{{ r.shown }}</span></div>
+<sc-if value="{{ mEditing }}"><div style="display:flex;gap:8px;align-items:center"><button onClick="{{ r.dec }}" aria-label="{{ r.decLabel }}" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;display:grid;place-items:center"><i class="ph-bold ph-minus"></i></button><input id="{{ r.mid }}" type="range" min="1" max="10" step="1" value="{{ r.val }}" onChange="{{ r.set }}" style="flex:1;height:44px"><button onClick="{{ r.inc }}" aria-label="{{ r.incLabel }}" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;display:grid;place-items:center"><i class="ph-bold ph-plus"></i></button></div></sc-if>
+<sc-if value="{{ mReading }}"><span style="height:6px;border-radius:3px;background:#0c1a26;overflow:hidden"><span style="display:block;height:100%;width:{{ r.w }};background:#33a1e0"></span></span></sc-if>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{ mReading }}"><span style="font-size:12.5px;color:#8aa1b5">{{ mSel.updated }}</span></sc-if>
+</sc-if>
+</div>
+<sc-if value="{{ mShowRatings }}">
+<div style="display:flex;gap:8px;padding:10px 12px 16px;border-top:1px solid #274055;background:#13283a">
+<sc-if value="{{ mReading }}"><button onClick="{{ mStartEdit }}" style="all:unset;cursor:pointer;flex:1;display:flex;gap:8px;align-items:center;justify-content:center;height:48px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:15px;font-weight:600"><i class="ph ph-pencil-simple"></i>Edit ratings</button></sc-if>
+<sc-if value="{{ mEditing }}"><button onClick="{{ cancelEdit }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:46px;box-sizing:border-box;border-radius:10px;border:1px solid #274055;font-size:15px;font-weight:600">Cancel</button><button onClick="{{ mSaveNext }}" style="all:unset;cursor:pointer;flex:1.6;display:flex;gap:6px;align-items:center;justify-content:center;height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">{{ mSaveLabel }}</button></sc-if>
+</div>
+</sc-if>
+</sc-if>
+</div>
+</div>
+
+<div id="2b" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#2b" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2b</a><span style="font-size:13.5px;color:#8aa1b5">Celular · categorías</span></div>
+<div style="width:390px;height:844px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;display:flex;flex-direction:column;position:relative">
+<div style="display:flex;align-items:center;gap:4px;height:52px;padding:0 6px;border-bottom:1px solid #22394d"><span style="width:44px;height:44px;display:grid;place-items:center"><i class="ph ph-caret-left" style="font-size:21px"></i></span><span style="flex:1;font-size:16px;font-weight:700">Categories</span></div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:14px 14px 22px;display:flex;flex-direction:column;gap:12px">
+<span style="display:flex;gap:6px;align-items:center;font-size:13px;color:#8aa1b5"><i class="ph ph-hand-grabbing"></i>Hold ⋮⋮ and drag to reorder. Tap to rename.</span>
+<sc-if value="{{ notice }}"><div role="status" style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+<div style="border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ catRows }}" as="c">
+<div draggable="true" onDragStart="{{ c.dragStart }}" onDragOver="{{ c.dragOver }}" onDrop="{{ c.drop }}" onDragEnd="{{ c.dragEnd }}" style="display:flex;align-items:center;min-height:58px;border-bottom:1px solid #22394d;border-top:{{ c.dropLine }};opacity:{{ c.op }}">
+<span aria-hidden="true" style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:#8aa1b5;cursor:grab;touch-action:none"><i class="ph-bold ph-dots-six-vertical" style="font-size:19px"></i></span>
+<button onClick="{{ c.mOpen }}" style="all:unset;cursor:pointer;flex:1;display:flex;gap:10px;align-items:center;min-height:58px;padding-right:12px"><span style="font:13px ui-monospace,Menlo,monospace;color:#8aa1b5;width:16px">{{ c.rank }}</span><span style="flex:1;font-size:15px;font-weight:600">{{ c.name }}</span><i class="ph ph-caret-right" style="color:#5a7086"></i></button>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;gap:8px">
+<input value="{{ newCat }}" onChange="{{ onNewCat }}" onKeyDown="{{ newCatKey }}" maxlength="40" placeholder="New category" aria-label="New category" style="all:unset;flex:1;box-sizing:border-box;height:48px;padding:0 12px;border-radius:10px;border:1px solid {{ newBorder }};background:#13283a;font-size:16px">
+<button onClick="{{ addCat }}" disabled="{{ cantAdd }}" style="all:unset;cursor:pointer;height:48px;padding:0 18px;display:flex;align-items:center;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700;opacity:{{ addOp }}">Add</button>
+</div>
+<sc-if value="{{ newErr }}"><span style="font-size:13px;color:#f2887a;margin-top:-4px">{{ newErr }}</span></sc-if>
+<button onClick="{{ toggleArch }}" aria-expanded="{{ archOpen }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;min-height:44px;font-size:14px;font-weight:600;color:#cfdeea"><i class="ph-bold {{ archIcon }}"></i>Deactivated · {{ inactiveCount }}</button>
+<sc-if value="{{ archOpen }}"><div style="border:1px solid #274055;border-radius:12px;overflow:hidden;background:#13283a"><sc-for list="{{ inactiveRows }}" as="c"><div style="display:flex;align-items:center;gap:10px;min-height:56px;padding:4px 8px 4px 14px;border-top:{{ c.sep }}"><span style="flex:1;font-size:15px;color:#cfdeea">{{ c.name }}</span><button onClick="{{ c.reactivate }}" style="all:unset;cursor:pointer;height:44px;padding:0 14px;display:flex;align-items:center;border-radius:10px;border:1px solid #274055;font-size:14px;font-weight:600">Reactivate</button></div></sc-for><sc-if value="{{ noInactive }}"><div style="padding:14px;font-size:14px;color:#8aa1b5">None.</div></sc-if></div></sc-if>
+</div>
+<sc-if value="{{ mCatOpen }}">
+<div onClick="{{ mCatClose }}" style="position:absolute;inset:0;background:color-mix(in srgb,#0c1a26 60%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 16px 22px;display:flex;flex-direction:column;gap:14px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055"></span>
+<span style="font-size:18px;font-weight:700">{{ mCatName }}</span>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Name</span><input value="{{ renameVal }}" onChange="{{ onRename }}" style="all:unset;box-sizing:border-box;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:16px"></label>
+<div style="display:flex;gap:8px"><button onClick="{{ mCatDeactivate }}" style="all:unset;cursor:pointer;flex:1;display:flex;gap:7px;align-items:center;justify-content:center;height:48px;box-sizing:border-box;border-radius:10px;border:1px solid color-mix(in srgb,#f2887a 60%,#274055);color:#f2887a;font-size:15px;font-weight:600"><i class="ph ph-eye-slash"></i>Deactivate</button><button onClick="{{ mCatSave }}" style="all:unset;cursor:pointer;flex:1.3;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Save</button></div>
+</div>
+</sc-if>
+</div>
+</div>
+
+</div>
+
+<ul style="margin:0;padding-left:18px;max-width:1040px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+
+<li>"Updated" en amarillo = nunca evaluado. Ordenar por "Oldest evaluation first" sirve para revisar a los que hace tiempo no se miran.</li>
+<li>Una categoría nueva aparece en cada ficha como "new · not rated" y no cuenta en el OVR hasta que se le pone nota.</li>
+</ul>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const NAMES = [['Liam Carter','Goalkeeper',12],['Sofia Reyes','Full back',47],['Noah Williams','Half back',13],['Mia Thompson','Centre',45],['Oliver Nguyen','Forward',null],['Ava Martinez','Forward',44],['Ethan Brown','Half back',15],['Isla Patel','Centre',49],['Zoe Walker','Goalkeeper',41],['Lucas Kim','Full back',60],['Chloe Davis','Centre',48],['Jack Wilson','Forward',59],['Grace Lee','Half back',null],['Henry Clark','Full back',57],['Maximiliano Fernández-Gutiérrez','Full back',53],['Ruby Scott','Forward',32],['Leo Harris','Half back',null],['Emily Chen','Centre',26],['Thomas Wright','Forward',68],['Hannah Young','Half back',null],['Samuel Adams','Goalkeeper',51],['Olivia Baker','Full back',36],['Daniel Hall','Centre',null],['Lily Turner','Forward',29]];
+const PLAYERS = NAMES.map(([name,pos,img],i)=>({id:'p'+(i+1), name, pos, photo: img ? `https://i.pravatar.cc/96?img=${img}` : null}));
+const NOT_EVAL = new Set(['p5','p13','p17','p20','p23']);
+const DATES = ['12 Sep','3 Oct','28 Aug','15 Oct','2 Jul','19 Sep','9 Oct','21 Jun'];
+const DATE_RANK = {'21 Jun':1,'2 Jul':2,'28 Aug':3,'12 Sep':4,'19 Sep':5,'3 Oct':6,'9 Oct':7,'15 Oct':8,'21 Oct':9};
+const CATS0 = [{id:'c1',name:'Technique'},{id:'c2',name:'Fitness'},{id:'c3',name:'Game sense'},{id:'c4',name:'Attitude'},{id:'c5',name:'Passing'}];
+const RATINGS0 = {}, LAST0 = {};
+PLAYERS.forEach((p,i)=>{ if(NOT_EVAL.has(p.id)) return; const r = {}; CATS0.forEach((c,j)=>{ r[c.id] = Math.max(3, Math.min(10, 4 + ((i*7 + j*5 + i*j) % 6) + (j===3?1:0))); }); RATINGS0[p.id] = r; LAST0[p.id] = DATES[i % DATES.length]; });
+const AV = ['#1d4869','#2a4a3f','#4a3a2a','#3a2f4f','#24465a'];
+const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const r1 = x => (Math.round(x*10)/10).toFixed(1);
+
+class Component extends DCLogic {
+  state = { ratings:RATINGS0, last:LAST0, cats:CATS0, inactive:[{id:'c6',name:'Speed'}],
+    q:'', filter:'all', pos:'all', sort:'name', sel:null, mSel:null, editing:null, draft:{},
+    notice:null, dTab:'players', renaming:null, renameVal:'', newCat:'', archOpen:false, drag:null, dropAt:null, mCat:null };
+  componentWillUnmount(){ clearTimeout(this._t); }
+  flash(t){ clearTimeout(this._t); this.setState({notice:t}); this._t = setTimeout(()=>this.setState({notice:null}), 2800); }
+  moveCat(from, to){ this.setState(st=>{ const a = [...st.cats]; const [m] = a.splice(from,1); a.splice(Math.max(0,Math.min(a.length,to)),0,m); return {cats:a, drag:null, dropAt:null}; });
+    const c = this.state.cats[from]; this.flash(`${c.name} moved to ${Math.max(1,Math.min(this.state.cats.length,to+1))} of ${this.state.cats.length} · saved`); }
+  renderVals(){
+    const s = this.state, cats = s.cats;
+    const ovrOf = (id, r = s.ratings[id]) => { if(!r) return null; const v = cats.map(c=>r[c.id]).filter(x=>x!=null); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
+    const nq = norm(s.q.trim());
+    let list = PLAYERS.filter(p=>(!nq || norm(p.name).includes(nq)) && (s.filter==='all' || !s.ratings[p.id]) && (s.pos==='all' || p.pos===s.pos));
+    const byName = (a,b)=>a.name.localeCompare(b.name);
+    if(s.sort==='name') list.sort(byName);
+    if(s.sort==='ovr-desc') list.sort((a,b)=>(ovrOf(b.id)??-1)-(ovrOf(a.id)??-1)||byName(a,b));
+    if(s.sort==='ovr-asc') list.sort((a,b)=>(ovrOf(a.id)??99)-(ovrOf(b.id)??99)||byName(a,b));
+    if(s.sort==='last') list.sort((a,b)=>(DATE_RANK[s.last[a.id]]??0)-(DATE_RANK[s.last[b.id]]??0)||byName(a,b));
+    const notEvalN = PLAYERS.filter(p=>!s.ratings[p.id]).length;
+    const ini = n => n.split(' ').map(w=>w[0]).slice(0,2).join('');
+    const pick = (id, field) => this.setState({[field]:id, editing:null});
+    const rows = list.map((p,i)=>{ const o = ovrOf(p.id), r = s.ratings[p.id], on = s.sel===p.id;
+      return { selTitle: on ? 'Click again to close' : '', name:p.name, pos:p.pos, photo:p.photo, noPhoto:!p.photo, ini:ini(p.name), av:AV[i%AV.length], on,
+        bg: on ? '#16304a' : 'transparent', bar: on ? 'inset 3px 0 0 #33a1e0' : 'none',
+        ovr: o==null ? '—' : r1(o), ovrColor: o==null ? '#5a7086' : '#e8f0f7',
+        last: r ? s.last[p.id] : 'Not evaluated', lastColor: r ? '#8aa1b5' : '#f2ce78', noEval: !r,
+        ...(()=>{ const rated = r ? cats.filter(c=>r[c.id]!=null).map(c=>({n:c.name, v:r[c.id]})) : []; if(!rated.length) return {hasEval:false}; const hi = rated.reduce((a,b)=>b.v>a.v?b:a), lo = rated.reduce((a,b)=>b.v<a.v?b:a); const band = v => v>=8 ? '#6fd6b4' : v<=4 ? '#f2887a' : '#e8f0f7'; return {hasEval:true, top:hi.n, topV:hi.v, topC:band(hi.v), low:lo.n, lowV:lo.v, lowC:band(lo.v)}; })(),
+        select: ()=>on ? this.setState({sel:null, editing:null}) : pick(p.id,'sel'), mSelect: ()=>pick(p.id,'mSel') }; });
+    const sheet = (id, ed) => {
+      const p = PLAYERS.find(x=>x.id===id); if(!p) return null;
+      const idx = list.findIndex(x=>x.id===id), r = s.ratings[id], editing = s.editing===ed;
+      const vals = editing ? s.draft : (r||{});
+      const liveO = editing ? ovrOf(id, s.draft) : ovrOf(id);
+      return { p, idx, r, editing, prevId: idx>0 ? list[idx-1].id : null, nextId: idx>=0 && idx<list.length-1 ? list[idx+1].id : null,
+        info: { name:p.name, first:p.name.split(' ')[0], pos:p.pos, photo:p.photo, noPhoto:!p.photo, ini:ini(p.name), av:AV[Math.max(idx,0)%AV.length],
+          posText: idx>=0 ? `${idx+1} of ${list.length} in this list` : 'Not in the current filter', ovrColor: liveO==null ? '#5a7086' : '#e8f0f7',
+          updated: r ? `Updated ${s.last[id]} by Coach Ana` : '' },
+        liveOvr: liveO==null ? '—' : r1(liveO),
+        rows: cats.map(c=>{ const v = vals[c.id]; const set = n => this.setState(st=>({draft:{...st.draft, [c.id]: Math.max(1,Math.min(10,n))}}));
+          return { id:'d-'+c.id, mid:'m-'+c.id, name:c.name, val: v ?? 5, shown: v==null ? '—' : String(v), w: v==null ? '0%' : (v*10)+'%', unrated: !!r && v==null && !editing,
+            set: e=>set(Number(e.target.value)), dec: ()=>set((v??5)-1), inc: ()=>set((v??5)+1), decLabel:`Lower ${c.name}`, incLabel:`Raise ${c.name}` }; }) };
+    };
+    const startEdit = (id, ed) => { const r = s.ratings[id] || {}; const d = {}; cats.forEach(c=>{ d[c.id] = r[c.id] ?? 5; }); this.setState({editing:ed, draft:d}); };
+    const doSave = id => { const p = PLAYERS.find(x=>x.id===id); this.setState(st=>({ratings:{...st.ratings, [id]:{...st.draft}}, last:{...st.last, [id]:'21 Oct'}, editing:null})); return p; };
+    const d = sheet(s.sel,'d'), m = sheet(s.mSel,'m');
+    const goTo = (id, field, keepEditing, ed) => { this.setState({[field]:id}); if(keepEditing){ const r = s.ratings[id] || {}; const dr = {}; cats.forEach(c=>{ dr[c.id] = r[c.id] ?? 5; }); this.setState({editing:ed, draft:dr}); } else this.setState({editing:null}); };
+    // categories
+    const nameTaken = n => [...cats, ...s.inactive].some(c=>norm(c.name)===norm(n.trim()));
+    const newErr = s.newCat.trim() && nameTaken(s.newCat) ? 'There is already a category with that name.' : '';
+    const addCat = ()=>{ const n = s.newCat.trim(); if(!n || newErr) return; this.setState(st=>({cats:[...st.cats, {id:'c'+Date.now(), name:n}], newCat:''})); this.flash(`${n} added · it shows as "not rated" on existing evaluations`); };
+    const deactivate = c => { this.setState(st=>({cats:st.cats.filter(x=>x.id!==c.id), inactive:[...st.inactive, c], renaming:null, mCat:null})); this.flash(`${c.name} deactivated · old scores kept`); };
+    const applyRename = ()=>{ const n = s.renameVal.trim(), id = s.renaming || s.mCat; if(!n || !id) return; this.setState(st=>({cats:st.cats.map(c=>c.id===id?{...c, name:n}:c), renaming:null, mCat:null})); this.flash('Category renamed'); };
+    const catRows = cats.map((c,i)=>({ name:c.name, rank:i+1, reading: s.renaming!==c.id, renaming: s.renaming===c.id, draggable: s.renaming!==c.id,
+      op: s.drag===i ? .45 : 1, dropLine: s.dropAt===i && s.drag!==null && s.drag!==i ? '2px solid #33a1e0' : 'none',
+      handleLabel:`Reorder ${c.name}, position ${i+1} of ${cats.length}`, renameLabel:`Rename ${c.name}`, deactLabel:`Deactivate ${c.name}`,
+      dragStart: e=>{ try{ e.dataTransfer.setData('text/plain', c.id); }catch(x){} e.dataTransfer.effectAllowed='move'; this.setState({drag:i}); },
+      dragOver: e=>{ e.preventDefault(); if(s.dropAt!==i) this.setState({dropAt:i}); },
+      drop: e=>{ e.preventDefault(); if(s.drag!==null && s.drag!==i) this.moveCat(s.drag, i); else this.setState({drag:null, dropAt:null}); },
+      dragEnd: ()=>this.setState({drag:null, dropAt:null}),
+      key: e=>{ if(e.key==='ArrowUp' && i>0){ e.preventDefault(); this.moveCat(i,i-1); } if(e.key==='ArrowDown' && i<cats.length-1){ e.preventDefault(); this.moveCat(i,i+1); } },
+      rename: ()=>this.setState({renaming:c.id, renameVal:c.name}), deactivate: ()=>deactivate(c),
+      mOpen: ()=>this.setState({mCat:c.id, renameVal:c.name}) }));
+    const mCatObj = cats.find(c=>c.id===s.mCat);
+    const evald = PLAYERS.filter(p=>s.ratings[p.id]);
+    const catAvg = cats.map(c=>{ const v = evald.map(p=>s.ratings[p.id][c.id]).filter(x=>x!=null); return {c, a: v.length ? v.reduce((x,y)=>x+y,0)/v.length : null}; });
+    const minA = Math.min(...catAvg.filter(x=>x.a!=null).map(x=>x.a));
+    const overallAvg = evald.map(p=>ovrOf(p.id)).filter(x=>x!=null);
+    const todoList = PLAYERS.filter(p=>!s.ratings[p.id]).sort((a,b)=>a.name.localeCompare(b.name));
+    const ov = { done: evald.length, total: PLAYERS.length, pct: (evald.length/PLAYERS.length*100)+'%', todo: todoList.length, hasTodo: todoList.length>0, allDone: todoList.length===0,
+      startNext: ()=>{ const first = todoList[0]; if(!first) return; this.setState({filter:'todo', q:'', pos:'all', sort:'name', sel:first.id}); setTimeout(()=>startEdit(first.id,'d'),0); },
+      avg: overallAvg.length ? 'OVR '+r1(overallAvg.reduce((a,b)=>a+b,0)/overallAvg.length) : '',
+      cats: catAvg.map(({c,a})=>({name:c.name, v: a==null ? '—' : r1(a), w: a==null ? '0%' : (a*10)+'%', color: a!=null && a===minA ? '#f2ce78' : '#33a1e0'})),
+      weakest: (catAvg.find(x=>x.a===minA)||{c:{name:'—'}}).c.name,
+      oldest: [...evald].sort((a,b)=>(DATE_RANK[s.last[a.id]]??0)-(DATE_RANK[s.last[b.id]]??0)).slice(0,3).map(p=>({name:p.name, last:s.last[p.id], go:()=>this.setState({sel:p.id, editing:null})})) };
+    return {
+      dTabs: [['players','Players','ph-users',PLAYERS.length],['cats','Categories','ph-list-numbers',cats.length]].map(([k,l,ic,n])=>({label:l, icon:ic, n, on:s.dTab===k, line:s.dTab===k?'#33a1e0':'transparent', color:s.dTab===k?'#e8f0f7':'#8aa1b5', pick:()=>this.setState({dTab:k})})),
+      dPlayers: s.dTab==='players', dCats: s.dTab==='cats', notice: s.notice,
+      q: s.q, onQ: e=>this.setState({q:e.target.value}), pos: s.pos, onPos: e=>this.setState({pos:e.target.value}), sort: s.sort, onSort: e=>this.setState({sort:e.target.value}),
+      chips: [['all','All',PLAYERS.length,false],['todo','Not evaluated',notEvalN,true]].map(([k,l,n,dot])=>({label:l, n, dot, on:s.filter===k, bg:s.filter===k?'#1d4869':'transparent', border:s.filter===k?'#33a1e0':'#274055', color:s.filter===k?'#e8f0f7':'#cfdeea', pick:()=>this.setState({filter:k})})),
+      rows, noRows: rows.length===0, countText: `${rows.length} of ${PLAYERS.length} players`, clearFilters: ()=>this.setState({q:'', filter:'all', pos:'all'}),
+      ov, closeSel: ()=>this.setState({sel:null, editing:null}),
+      hasSel: !!d, noSel: !d, sel: d ? d.info : {}, liveOvr: d ? d.liveOvr : '', ratingRows: d ? d.rows : [],
+      showCreate: !!d && !d.r && !d.editing, showRatings: !!d && (!!d.r || d.editing),
+      dEditing: !!d && d.editing, dReading: !!d && !d.editing, dBorder: d && d.editing ? '#33a1e0' : '#274055',
+      noPrev: !d || !d.prevId, noNext: !d || !d.nextId, prevOp: d && d.prevId ? 1 : .35, nextOp: d && d.nextId ? 1 : .35,
+      prev: ()=>d && d.prevId && goTo(d.prevId,'sel',false), next: ()=>d && d.nextId && goTo(d.nextId,'sel',false),
+      startEdit: ()=>startEdit(s.sel,'d'), startCreate: ()=>startEdit(s.sel,'d'), cancelEdit: ()=>this.setState({editing:null}),
+      save: ()=>{ const p = doSave(s.sel); this.flash(`${p.name} saved`); },
+      saveNext: ()=>{ if(!d || !d.nextId) return; const p = doSave(s.sel); this.flash(`${p.name} saved · now ${PLAYERS.find(x=>x.id===d.nextId).name}`); setTimeout(()=>goTo(d.nextId,'sel',true,'d'),0); },
+      mList: !m, mSheet: !!m, mSel: m ? m.info : {}, mLiveOvr: m ? m.liveOvr : '', mRatingRows: m ? m.rows : [],
+      mShowCreate: !!m && !m.r && !m.editing, mShowRatings: !!m && (!!m.r || m.editing), mEditing: !!m && m.editing, mReading: !!m && !m.editing, mBorder: m && m.editing ? '#33a1e0' : '#274055',
+      mNoPrev: !m || !m.prevId, mNoNext: !m || !m.nextId, mPrevOp: m && m.prevId ? 1 : .35, mNextOp: m && m.nextId ? 1 : .35,
+      mBack: ()=>this.setState({mSel:null, editing:null}), mPrev: ()=>m && m.prevId && goTo(m.prevId,'mSel',false), mNext: ()=>m && m.nextId && goTo(m.nextId,'mSel',false),
+      mStartEdit: ()=>startEdit(s.mSel,'m'), mStartCreate: ()=>startEdit(s.mSel,'m'),
+      mSaveLabel: m && m.nextId ? 'Save & next' : 'Save',
+      mSaveNext: ()=>{ if(!m) return; const p = doSave(s.mSel); if(m.nextId){ this.flash(`${p.name} saved`); setTimeout(()=>goTo(m.nextId,'mSel',true,'m'),0); } else this.flash(`${p.name} saved`); },
+      catRows, renameVal: s.renameVal, onRename: e=>this.setState({renameVal:e.target.value}),
+      renameKey: e=>{ if(e.key==='Enter') applyRename(); if(e.key==='Escape') this.setState({renaming:null}); },
+      applyRename, cancelRename: ()=>this.setState({renaming:null}),
+      newCat: s.newCat, onNewCat: e=>this.setState({newCat:e.target.value}), newCatKey: e=>{ if(e.key==='Enter') addCat(); },
+      addCat, cantAdd: !s.newCat.trim() || !!newErr, addOp: !s.newCat.trim() || newErr ? .4 : 1, newErr, newBorder: newErr ? '#f2887a' : '#274055',
+      archOpen: s.archOpen, toggleArch: ()=>this.setState(st=>({archOpen:!st.archOpen})), archIcon: s.archOpen ? 'ph-caret-down' : 'ph-caret-right',
+      inactiveCount: s.inactive.length, noInactive: s.inactive.length===0,
+      inactiveRows: s.inactive.map((c,i)=>({name:c.name, sep: i===0?'none':'1px solid #22394d', reactivate: ()=>{ this.setState(st=>({inactive:st.inactive.filter(x=>x.id!==c.id), cats:[...st.cats, c]})); this.flash(`${c.name} reactivated · added at the end`); }})),
+      mCatOpen: !!mCatObj, mCatName: mCatObj ? mCatObj.name : '', mCatClose: ()=>this.setState({mCat:null}),
+      mCatSave: applyRename, mCatDeactivate: ()=>mCatObj && deactivate(mCatObj)
+    };
+  }
+}
+</script>
+</body>
+</html>
