@@ -154,12 +154,16 @@ function Header({ translate }: { translate: Translator }): React.JSX.Element {
   );
 }
 
-export function EvaluationCategoriesScreen({
-  locale,
+/** El catálogo sin la cabecera: lo pinta esta pantalla y, desde #818, la
+ * pestaña Categorías de Evaluaciones. `onCategoriesChange` recibe cada
+ * catálogo que confirma el servidor, para el número de la pestaña. */
+export function EvaluationCategoriesManager({
+  translate,
+  onCategoriesChange,
 }: {
-  locale: Locale;
+  translate: Translator;
+  onCategoriesChange?: (categories: EvaluationCategories) => void;
 }): React.JSX.Element {
-  const translate = createTranslator(locale);
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
   const [listFailure, setListFailure] = useState<ListFailure | null>(null);
@@ -180,6 +184,12 @@ export function EvaluationCategoriesScreen({
       isCurrent = false;
     };
   }, [reloads]);
+
+  useEffect(() => {
+    if (state.kind === "loaded") {
+      onCategoriesChange?.(state.categories);
+    }
+  }, [state, onCategoriesChange]);
 
   // El foco vuelve a su sitio cuando la lista nueva ya está pintada: mientras
   // esperaba, el botón pulsado estaba desactivado y lo había perdido.
@@ -429,8 +439,7 @@ export function EvaluationCategoriesScreen({
   }
 
   return (
-    <div ref={screenRef} className="evaluation-categories">
-      <Header translate={translate} />
+    <div ref={screenRef} className="evaluation-categories-body">
       {state.kind === "loading" ? (
         <p className="admin-empty">
           {translate("evaluations.categories.loading")}
@@ -444,6 +453,20 @@ export function EvaluationCategoriesScreen({
       <p className="visually-hidden" aria-live="polite">
         {announcement}
       </p>
+    </div>
+  );
+}
+
+export function EvaluationCategoriesScreen({
+  locale,
+}: {
+  locale: Locale;
+}): React.JSX.Element {
+  const translate = createTranslator(locale);
+  return (
+    <div className="evaluation-categories">
+      <Header translate={translate} />
+      <EvaluationCategoriesManager translate={translate} />
     </div>
   );
 }

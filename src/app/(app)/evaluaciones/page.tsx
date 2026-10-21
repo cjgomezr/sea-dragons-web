@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { EvaluationsScreen } from "@/components/evaluations/EvaluationsScreen";
 import { EVALUATION_MEMBER_QUERY_PARAM } from "@/lib/auth/routes";
 import { readMetadataContext } from "@/lib/club/metadata-context";
+import {
+  readEvaluationsTab,
+  readRosterView,
+} from "@/lib/evaluations/evaluations-address";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 
 /**
@@ -13,7 +17,9 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
  * aquí, escriban la dirección o no (FR-055). Lo que la pantalla enseña lo
  * lee de los endpoints de `/api/v1/evaluations`, que lo vuelven a comprobar.
  *
- * `?miembro=<user_id>` abre ya la ficha de esa persona (#324).
+ * `?miembro=<user_id>` abre ya la ficha de esa persona (#324). La pestaña,
+ * los filtros y el orden también llegan en la dirección (#818, D8 del PRD de
+ * E31).
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -30,6 +36,17 @@ function readInitialMemberId(
   return typeof value === "string" ? value : null;
 }
 
+/** Los parámetros de un solo valor; uno repetido no dice cuál usar. */
+function singleValuedParams(
+  params: Record<string, string | string[] | undefined>,
+): URLSearchParams {
+  return new URLSearchParams(
+    Object.entries(params).flatMap(([name, value]) =>
+      typeof value === "string" ? [[name, value]] : [],
+    ),
+  );
+}
+
 export default async function EvaluacionesPage({
   searchParams,
 }: {
@@ -39,12 +56,15 @@ export default async function EvaluacionesPage({
     readRequestLocale(),
     searchParams,
   ]);
+  const address = singleValuedParams(params);
   return (
     <EvaluationsScreen
       locale={locale}
       initialMemberId={readInitialMemberId(
         params[EVALUATION_MEMBER_QUERY_PARAM],
       )}
+      initialTab={readEvaluationsTab(address)}
+      initialView={readRosterView(address)}
     />
   );
 }
