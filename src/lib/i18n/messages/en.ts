@@ -2515,6 +2515,13 @@ export const englishMessages = {
   "evaluations.categories.deactivated": "{name} deactivated · old scores kept",
   "evaluations.categories.reactivated": "{name} reactivated · added at the end",
   "evaluations.categories.retry": "Try again",
+  "evaluations.categories.phone.hint":
+    "Hold ⋮⋮ and drag to reorder. Tap to rename.",
+  "evaluations.categories.phone.placeholder": "New category",
+  "evaluations.categories.sheet.close": "Close the sheet",
+  "evaluations.categories.sheet.name": "Name",
+  "evaluations.categories.sheet.deactivate": "Deactivate",
+  "evaluations.categories.sheet.save": "Save",
   "evaluations.categories.reloadLatest": "Load the latest categories",
   "evaluations.categories.issue.nameRequired": "Write a name for the category.",
   "evaluations.categories.issue.nameTooLong": "Up to {max} characters.",

@@ -2527,6 +2527,13 @@ export const spanishMessages: MessageCatalog = {
     "{name} desactivada · se conservan las notas antiguas",
   "evaluations.categories.reactivated": "{name} reactivada · añadida al final",
   "evaluations.categories.retry": "Volver a intentarlo",
+  "evaluations.categories.phone.hint":
+    "Mantén ⋮⋮ y arrastra para ordenar. Toca para renombrar.",
+  "evaluations.categories.phone.placeholder": "Nueva categoría",
+  "evaluations.categories.sheet.close": "Cerrar la hoja",
+  "evaluations.categories.sheet.name": "Nombre",
+  "evaluations.categories.sheet.deactivate": "Desactivar",
+  "evaluations.categories.sheet.save": "Guardar",
   "evaluations.categories.reloadLatest": "Cargar las últimas categorías",
   "evaluations.categories.issue.nameRequired":
     "Escribe un nombre para la categoría.",

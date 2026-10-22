@@ -12150,7 +12150,34 @@ a.auth-brand-header:focus-visible {
 }
 
 .evaluation-categories-rename-input.club-positions-input[aria-invalid="true"],
-.evaluation-categories-add-input.club-positions-input[aria-invalid="true"] {
+.evaluation-categories-add-input.club-positions-input[aria-invalid="true"],
+.evaluation-categories-phone-input.club-positions-input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+/* Las categorías en el móvil (#823, RF-7 del PRD de E31; "07-mobile-
+   categories" del handoff). Son la tarjeta de las posiciones del móvil
+   (#724), con el número entre el asa y el nombre y filas de 58px. */
+.evaluation-categories .club-positions-phone-row {
+  min-height: 58px;
+}
+
+.evaluation-categories-phone-row .evaluation-categories-rank {
+  flex: none;
+  width: 20px;
+  text-align: center;
+}
+
+/* El nombre ocupa lo que sobra: la flecha va a la derecha del todo. */
+.evaluation-categories-phone-row .evaluation-categories-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+}
+
+/* La hoja: Desactivar con el borde de peligro, al lado de Guardar. */
+.club-positions-sheet-archive.auth-secondary.evaluation-categories-sheet-deactivate {
+  color: var(--color-danger);
   border-color: var(--color-danger);
 }
 
