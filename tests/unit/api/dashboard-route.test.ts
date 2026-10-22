@@ -124,6 +124,7 @@ function dashboardGateways(): DashboardGateways {
       sessions: { findRecentTrainings: async () => [] },
     },
     unanswered: { countUnanswered: async () => 0 },
+    droppedPlayers: { findDroppedPlayers: async () => null },
     failures: { report: () => undefined },
   };
 }

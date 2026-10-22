@@ -633,6 +633,67 @@ describeRls("la columna del inicio en Supabase (#746)", () => {
   );
 
   it(
+    "da a un Admin los asignados que ya no vienen de un reparto publicado sin quien lo publicó (#838)",
+    async () => {
+      await withHome(async (home) => {
+        const clubId = await clubIdOf(home);
+        const { client } = home.serviceClient;
+        await updateRow(
+          home,
+          "members",
+          { role: "Admin" },
+          { column: "user_id", value: home.player.id },
+        );
+        await withPublishedSplit(home, clubId, async () => {
+          await withPlayer(home.serviceClient, clubId, async (gone) => {
+            const { data: split, error } = await client
+              .from("team_splits")
+              .select("id")
+              .eq("event_id", home.trainingId)
+              .single();
+            expect(error).toBeNull();
+            await succeed(
+              "poner en el reparto a quien ya no viene",
+              client.from("team_split_members").insert({
+                split_id: split?.id,
+                user_id: gone.id,
+                club_id: clubId,
+                team: "a",
+              }),
+            );
+            await succeed(
+              "responder que no",
+              client.from("event_rsvps").insert({
+                event_id: home.trainingId,
+                club_id: clubId,
+                user_id: gone.id,
+                response: "no",
+              }),
+            );
+
+            const result = await readDashboard(
+              createDashboardGateways(client),
+              { callerId: home.player.id, now: new Date() },
+            );
+
+            expect(result).toMatchObject({
+              todos: expect.arrayContaining([
+                {
+                  kind: "teams_dropped",
+                  eventId: home.trainingId,
+                  title: "Entrenamiento del inicio",
+                  count: 1,
+                },
+              ]),
+            });
+          });
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "da a un Admin la asistencia por tomar, quién no respondió y los números del club",
     async () => {
       await withHome(async (home) => {

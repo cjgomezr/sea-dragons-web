@@ -335,6 +335,11 @@ export const englishMessages = {
   "dashboard.todos.teams": "Publish teams",
   "dashboard.todos.teams.detail": "{event} · saved, not published",
   "dashboard.todos.teams.action": "Open",
+  // #838: asignados de un reparto publicado que respondieron que no.
+  "dashboard.todos.teamsDropped": {
+    one: "{count} player dropped out of published teams",
+    other: "{count} players dropped out of published teams",
+  },
   "dashboard.todos.noReply": {
     one: "{count} hasn't replied",
     other: "{count} haven't replied",

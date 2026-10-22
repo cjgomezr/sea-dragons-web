@@ -21,7 +21,11 @@ import type {
   DashboardGateways,
   DashboardRosterGateway,
 } from "./dashboard";
-import type { UnansweredGateway } from "./dashboard-management";
+import type {
+  DroppedPlayersGateway,
+  PublishedSplitDrops,
+  UnansweredGateway,
+} from "./dashboard-management";
 
 /**
  * Adaptador entre el dashboard (#424) y Supabase. Cada fuente se cablea con
@@ -131,6 +135,77 @@ export function createUnansweredGateway(
   };
 }
 
+const SPLITS_TABLE = "team_splits";
+const RSVPS_TABLE = "event_rsvps";
+const DECLINED_RESPONSE = "no";
+
+const publishedSplitRowSchema = z.object({
+  published_by: z.string().nullable(),
+  team_split_members: z.array(z.object({ user_id: z.string() })),
+});
+
+const userIdRowsSchema = z.array(z.object({ user_id: z.string() }));
+
+async function findDeclinedUserIds(
+  serviceClient: SupabaseClient,
+  query: { readonly eventId: string; readonly userIds: readonly string[] },
+): Promise<readonly string[]> {
+  if (query.userIds.length === 0) {
+    return [];
+  }
+  const { data, error } = await serviceClient
+    .from(RSVPS_TABLE)
+    .select("user_id")
+    .eq("event_id", query.eventId)
+    .eq("response", DECLINED_RESPONSE)
+    .in("user_id", query.userIds);
+  if (error) {
+    throw new Error(
+      `No se pudo leer quién ya no viene al evento ${query.eventId}: ${error.message}`,
+    );
+  }
+  return userIdRowsSchema.parse(data).map((row) => row.user_id);
+}
+
+/** #838: el reparto publicado del evento, quién lo publicó y cuáles de sus
+ * asignados respondieron que no. */
+async function findDroppedPlayers(
+  serviceClient: SupabaseClient,
+  query: { readonly clubId: string; readonly eventId: string },
+): Promise<PublishedSplitDrops | null> {
+  const { data, error } = await serviceClient
+    .from(SPLITS_TABLE)
+    .select("published_by, team_split_members(user_id)")
+    .eq("club_id", query.clubId)
+    .eq("event_id", query.eventId)
+    .not("published_at", "is", null)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo leer el reparto publicado del evento ${query.eventId}: ${error.message}`,
+    );
+  }
+  if (data === null) {
+    return null;
+  }
+  const split = publishedSplitRowSchema.parse(data);
+  return {
+    publishedBy: split.published_by,
+    droppedUserIds: await findDeclinedUserIds(serviceClient, {
+      eventId: query.eventId,
+      userIds: split.team_split_members.map((member) => member.user_id),
+    }),
+  };
+}
+
+export function createDroppedPlayersGateway(
+  serviceClient: SupabaseClient,
+): DroppedPlayersGateway {
+  return {
+    findDroppedPlayers: (query) => findDroppedPlayers(serviceClient, query),
+  };
+}
+
 /** Una fuente caída no rompe la respuesta, así que el envoltorio de la API
  * nunca la ve: sin esto el fallo no quedaría en ningún sitio (RF-6). */
 const consoleFailureLog: DashboardFailureLog = {
@@ -157,6 +232,7 @@ export function createDashboardGateways(
     administration: createClubAdministrationGateways(serviceClient),
     attendanceSessions: createAttendanceSessionsGateways(serviceClient),
     unanswered: createUnansweredGateway(serviceClient),
+    droppedPlayers: createDroppedPlayersGateway(serviceClient),
     failures: consoleFailureLog,
   };
 }

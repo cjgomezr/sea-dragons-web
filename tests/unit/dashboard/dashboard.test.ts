@@ -37,6 +37,7 @@ import type {
   RsvpTally,
 } from "@/lib/events/event-agenda";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
+import type { PublishedSplitDrops } from "@/lib/dashboard/dashboard-management";
 import type { PlayerRecord, StoredTeamSplit } from "@/lib/teams/team-builder";
 import { DEFAULT_TEAM_LABELS } from "@/lib/teams/team-builder";
 import { GOALKEEPER, SEEDED_POSITIONS } from "../helpers/seeded-positions";
@@ -84,7 +85,8 @@ type FakeSource =
   | "season"
   | "roleRequests"
   | "sessions"
-  | "unanswered";
+  | "unanswered"
+  | "dropped";
 
 type Club = {
   role: Role;
@@ -122,6 +124,9 @@ type Club = {
   recentTrainings: RecentTraining[];
   /** Cuántos de la audiencia no respondieron, por evento. */
   unanswered: Map<string, number>;
+  /** Quién publicó el reparto de cada evento y cuáles de sus asignados
+   * respondieron que no (#838). */
+  dropped: Map<string, PublishedSplitDrops>;
   failing: Set<FakeSource>;
 };
 
@@ -426,6 +431,12 @@ function gateways(): DashboardGateways {
         return club.unanswered.get(eventId) ?? 0;
       },
     },
+    droppedPlayers: {
+      findDroppedPlayers: async ({ eventId }) => {
+        failIf("dropped");
+        return club.dropped.get(eventId) ?? null;
+      },
+    },
     failures: {
       report: (source, error) => {
         reported.push({ source, error });
@@ -516,6 +527,7 @@ beforeEach(() => {
     pendingRequests: [],
     recentTrainings: [],
     unanswered: new Map(),
+    dropped: new Map(),
     failing: new Set(),
   };
 });
@@ -1963,6 +1975,110 @@ describe("los pendientes (#746, D9 y D10)", () => {
       expect(result.week).toMatchObject({ kind: "week" });
     },
   );
+});
+
+describe("pendiente de quien ya no viene (#838)", () => {
+  const PUBLISHER_ID = "c0c0c0c0-0000-4000-8000-00000000000c";
+  const PUBLISHED_AT = new Date("2026-09-29T00:00:00.000Z");
+  const GONE = [uuid(), uuid()];
+
+  /** El próximo evento con su reparto publicado y dos asignados que ya no
+   * vienen. */
+  function publishedScrimmage(publishedBy: string | null): EventRow {
+    const row = upcomingScrimmage();
+    club.splits.set(row.id, teamSplit(PUBLISHED_AT));
+    club.dropped.set(row.id, { publishedBy, droppedUserIds: GONE });
+    return row;
+  }
+
+  it.each<Role>(["Admin", "Coach"])(
+    "a un %s que publicó el reparto le cuenta los asignados que ya no vienen",
+    async (role) => {
+      club.role = role;
+      const row = publishedScrimmage(CALLER_ID);
+
+      await expect(todos()).resolves.toEqual([
+        {
+          kind: "teams_dropped",
+          eventId: row.id,
+          title: "Partido amistoso",
+          count: 2,
+        },
+      ]);
+    },
+  );
+
+  it.each<Role>(["Admin", "Coach"])(
+    "a un %s que no publicó el reparto no se lo da",
+    async (role) => {
+      club.role = role;
+      publishedScrimmage(PUBLISHER_ID);
+
+      await expect(todos()).resolves.toEqual([]);
+    },
+  );
+
+  it("sin quien publicó se lo da a un Admin", async () => {
+    club.role = "Admin";
+    publishedScrimmage(null);
+
+    await expect(todos()).resolves.toMatchObject([
+      { kind: "teams_dropped", count: 2 },
+    ]);
+  });
+
+  it.each<Role>(["Coach", "Committee"])(
+    "sin quien publicó no se lo da a un %s",
+    async (role) => {
+      club.role = role;
+      publishedScrimmage(null);
+
+      await expect(todos()).resolves.toEqual([]);
+    },
+  );
+
+  it("no lo da cuando nadie dejó de venir", async () => {
+    club.role = "Coach";
+    const row = upcomingScrimmage();
+    club.splits.set(row.id, teamSplit(PUBLISHED_AT));
+    club.dropped.set(row.id, { publishedBy: CALLER_ID, droppedUserIds: [] });
+
+    await expect(todos()).resolves.toEqual([]);
+  });
+
+  it("no cuenta a quien mira entre los que ya no vienen", async () => {
+    club.role = "Coach";
+    const row = upcomingScrimmage();
+    club.splits.set(row.id, teamSplit(PUBLISHED_AT));
+    club.dropped.set(row.id, {
+      publishedBy: CALLER_ID,
+      droppedUserIds: [CALLER_ID],
+    });
+
+    await expect(todos()).resolves.toEqual([]);
+  });
+
+  it("sin la lectura de los que no vienen, los pendientes no están disponibles y el resto se sirve", async () => {
+    club.role = "Coach";
+    publishedScrimmage(CALLER_ID);
+    club.failing.add("dropped");
+
+    const result = await managementDashboard();
+
+    expect(result.todos).toEqual({ kind: "unavailable" });
+    expect(result.week).toMatchObject({ kind: "week" });
+  });
+
+  it("no lo da con el reparto en borrador", async () => {
+    club.role = "Coach";
+    const row = upcomingScrimmage();
+    club.splits.set(row.id, teamSplit(null));
+    club.dropped.set(row.id, { publishedBy: CALLER_ID, droppedUserIds: GONE });
+
+    await expect(todos()).resolves.toEqual([
+      { kind: "teams_unpublished", eventId: row.id, title: "Partido amistoso" },
+    ]);
+  });
 });
 
 describe("los números del club (#746, D11)", () => {

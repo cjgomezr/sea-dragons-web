@@ -331,6 +331,11 @@ export const spanishMessages: MessageCatalog = {
   "dashboard.todos.teams": "Publicar equipos",
   "dashboard.todos.teams.detail": "{event} · guardado, sin publicar",
   "dashboard.todos.teams.action": "Abrir",
+  // #838: asignados de un reparto publicado que respondieron que no.
+  "dashboard.todos.teamsDropped": {
+    one: "{count} ya no viene en un reparto publicado",
+    other: "{count} ya no vienen en un reparto publicado",
+  },
   "dashboard.todos.noReply": {
     one: "{count} no ha respondido",
     other: "{count} no han respondido",

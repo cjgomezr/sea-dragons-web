@@ -696,7 +696,10 @@ describe("team_player_dropped y team_player_returned", () => {
   const cases = [
     {
       type: "team_player_dropped",
-      en: { title: "Nerea Silva can't make Scrimmage", body: "Was on Team Kelp" },
+      en: {
+        title: "Nerea Silva can't make Scrimmage",
+        body: "Was on Team Kelp",
+      },
       es: {
         title: "Nerea Silva ya no viene a Scrimmage",
         body: "Estaba en Team Kelp",
