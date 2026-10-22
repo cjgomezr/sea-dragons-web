@@ -16925,6 +16925,25 @@ test.describe("categorías de evaluación en el móvil", () => {
     await expect(handle).toHaveCSS("touch-action", "none");
   });
 
+  test("añadir mide 48 px y las desactivadas 56", async ({ page }) => {
+    await goToEvaluationCategories(page, { name: "debajo" });
+    await openDeactivatedCategories(page);
+
+    for (const control of [
+      page.getByRole("textbox", { name: NEW_CATEGORY_FIELD }),
+      page.getByRole("button", { name: "Add", exact: true }),
+    ]) {
+      expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+    }
+    const deactivatedRow = page
+      .getByRole("list", { name: "Deactivated categories" })
+      .getByRole("listitem")
+      .first();
+    expect((await deactivatedRow.boundingBox())?.height).toBeGreaterThanOrEqual(
+      56,
+    );
+  });
+
   test("la hoja lleva el campo y los botones de 48 px", async ({ page }) => {
     await goToEvaluationCategories(page, { name: "hoja" });
     await openSpeedSheet(page);
