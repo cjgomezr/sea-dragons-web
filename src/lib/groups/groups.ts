@@ -4,6 +4,20 @@ import type {
   RoleRequestMember,
 } from "@/lib/auth/role-request";
 import { hasCapability } from "@/lib/auth/roles";
+import {
+  type ProfilePhotoSigner,
+  signPhotosOrNone,
+  signedPhotoUrl,
+} from "@/lib/members/profile-photo-urls";
+import { clubCalendarDate } from "@/lib/time/club-calendar";
+import {
+  type GroupAudienceUses,
+  type GroupMembershipRecord,
+  type GroupPreviewMember,
+  type GroupUsage,
+  countGroupUsage,
+  pickPreviewMembers,
+} from "./group-overview";
 
 /**
  * Crear, listar, renombrar y borrar los grupos del club (#226, RF-2 a RF-5 y
@@ -28,6 +42,13 @@ export type Group = {
   readonly id: string;
   readonly name: string;
   readonly memberCount: number;
+};
+
+/** Un grupo como lo lista la pantalla de E32 (D4): dónde se usa y a quién
+ * enseña su vista previa, en la misma respuesta que la lista. */
+export type GroupOverview = Group & {
+  readonly usage: GroupUsage;
+  readonly previewMembers: readonly GroupPreviewMember[];
 };
 
 export type GroupInsert = { readonly clubId: string; readonly name: string };
@@ -60,6 +81,18 @@ export type GroupsGateways = {
     renameGroup(input: GroupRename): Promise<GroupRenameResult>;
     deleteGroup(input: GroupDeletion): Promise<GroupDeletionResult>;
   };
+  readonly overview: {
+    /** Todas las pertenencias del club, de baja y sin activar incluidas. */
+    findMemberships(clubId: string): Promise<readonly GroupMembershipRecord[]>;
+    /** Lo que tiene a algún grupo del club en su audiencia. Puede dejar fuera
+     * lo que ya terminó antes de `today` (`YYYY-MM-DD` de Melbourne), para no
+     * traer el histórico entero; lo que cuenta lo decide `countGroupUsage`. */
+    findAudienceUses(query: {
+      readonly clubId: string;
+      readonly today: string;
+    }): Promise<GroupAudienceUses>;
+  };
+  readonly photos: ProfilePhotoSigner;
 };
 
 export class GroupsForbiddenError extends Error {
@@ -130,13 +163,43 @@ export async function findGroupManager(
   return caller;
 }
 
-/** Los grupos del club de quien llama, en orden alfabético y con su conteo. */
+const NO_USAGE: GroupUsage = { events: 0, posts: 0 };
+
+/** Los grupos del club de quien llama, en orden alfabético, con su conteo, su
+ * uso y su vista previa. Todo sale de tres lecturas del club, no de una por
+ * grupo (D4), y las fotos de las vistas previas se firman en una llamada. */
 export async function listGroups(
   gateways: GroupsGateways,
-  callerId: string,
-): Promise<readonly Group[]> {
-  const caller = await findGroupManager(gateways, callerId);
-  return gateways.groups.findClubGroups(caller.clubId);
+  request: { readonly callerId: string; readonly now: Date },
+): Promise<readonly GroupOverview[]> {
+  const caller = await findGroupManager(gateways, request.callerId);
+  const today = clubCalendarDate(request.now);
+  const [groups, memberships, uses] = await Promise.all([
+    gateways.groups.findClubGroups(caller.clubId),
+    gateways.overview.findMemberships(caller.clubId),
+    gateways.overview.findAudienceUses({ clubId: caller.clubId, today }),
+  ]);
+  const usage = countGroupUsage(uses, today);
+  const previewed = groups.map((group) => ({
+    group,
+    preview: pickPreviewMembers(memberships, group.id),
+  }));
+  const photoUrls = await signPhotosOrNone(
+    gateways.photos,
+    previewed.flatMap(({ preview }) =>
+      preview.map(({ photoPath }) => photoPath),
+    ),
+    "groups",
+  );
+  return previewed.map(({ group, preview }) => ({
+    ...group,
+    usage: usage.get(group.id) ?? NO_USAGE,
+    previewMembers: preview.map(({ id, fullName, photoPath }) => ({
+      id,
+      fullName,
+      photoUrl: signedPhotoUrl(photoUrls, photoPath),
+    })),
+  }));
 }
 
 export async function createGroup(

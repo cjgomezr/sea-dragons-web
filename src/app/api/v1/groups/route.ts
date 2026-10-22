@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
-import { type Group, createGroup, listGroups } from "@/lib/groups/groups";
+import {
+  type Group,
+  type GroupOverview,
+  createGroup,
+  listGroups,
+} from "@/lib/groups/groups";
 import {
   asGroupsApiError,
   requireGroupsGateways,
@@ -27,8 +32,9 @@ const groupBodySchema = z.object({ name: z.string() });
 
 type GroupBody = z.infer<typeof groupBodySchema>;
 
-/** Los grupos del club de quien llama, en orden alfabético, con su conteo. */
-export type GroupsResponse = { readonly groups: readonly Group[] };
+/** Los grupos del club de quien llama, en orden alfabético, con su conteo,
+ * su uso y su vista previa (D4 de E32). */
+export type GroupsResponse = { readonly groups: readonly GroupOverview[] };
 
 /** El grupo recién creado, con su conteo en 0. */
 export type CreatedGroupResponse = Group;
@@ -38,7 +44,12 @@ const getGroups = createApiRoute<GroupsResponse>({
     const callerId = await identifyAccountCaller({ request, decorateResponse });
     try {
       return {
-        data: { groups: await listGroups(requireGroupsGateways(), callerId) },
+        data: {
+          groups: await listGroups(requireGroupsGateways(), {
+            callerId,
+            now: new Date(),
+          }),
+        },
       };
     } catch (error) {
       asGroupsApiError(error);

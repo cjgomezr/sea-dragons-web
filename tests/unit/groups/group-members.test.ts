@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
 import {
+  type AssignableMember,
   type GroupMember,
   GroupMemberNotFoundError,
   type GroupMembersGateways,
@@ -23,11 +24,56 @@ const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
 const GROUP_ID = "9a9a9a9a-0000-4000-8000-000000000009";
 const MEMBER_ID = "b1b1b1b1-0000-4000-8000-00000000000b";
 
+const OTHER_GROUP_ID = "8b8b8b8b-0000-4000-8000-000000000008";
+const SIGNED_URL_PREFIX = "https://storage.test/photos/";
+
 const PAULA: GroupMember = {
   id: MEMBER_ID,
   fullName: "Paula Player",
   isPendingActivation: false,
 };
+
+/** En este grupo y en otro, con foto y posición. */
+const PAULA_RECORD: AssignableMember = {
+  id: MEMBER_ID,
+  fullName: "Paula Player",
+  accountStatus: "active",
+  photoPath: "paula.webp",
+  position: { en: "Forward", es: "Delantera" },
+  groupIds: [GROUP_ID, OTHER_GROUP_ID],
+};
+
+/** En este grupo, sin activar, sin foto ni posición. */
+const ZOE_RECORD: AssignableMember = {
+  id: "c2c2c2c2-0000-4000-8000-00000000000c",
+  fullName: "Zoe Zapata",
+  accountStatus: "incomplete",
+  photoPath: null,
+  position: null,
+  groupIds: [GROUP_ID],
+};
+
+/** Fuera del grupo, en otro. La posición sólo tiene nombre en inglés. */
+const NEREA_RECORD: AssignableMember = {
+  id: "d3d3d3d3-0000-4000-8000-00000000000d",
+  fullName: "nerea Navarro",
+  accountStatus: "active",
+  photoPath: "nerea.webp",
+  position: { en: "Goalkeeper", es: null },
+  groupIds: [OTHER_GROUP_ID],
+};
+
+/** Fuera de todos los grupos. */
+const BEA_RECORD: AssignableMember = {
+  id: "e4e4e4e4-0000-4000-8000-00000000000e",
+  fullName: "Bea Bravo",
+  accountStatus: "active",
+  photoPath: null,
+  position: null,
+  groupIds: [],
+};
+
+const ASSIGNABLE = [ZOE_RECORD, NEREA_RECORD, PAULA_RECORD, BEA_RECORD];
 
 type GatewayOptions = {
   readonly role?: Role;
@@ -46,14 +92,12 @@ type Write = {
 
 const writes: Write[] = [];
 const scopesRead: string[] = [];
+const signedPaths: string[] = [];
 
 function gateways(options: GatewayOptions = {}): GroupMembersGateways {
   writes.length = 0;
   scopesRead.length = 0;
-  const groupResult = <T>(value: T) =>
-    options.missingGroup
-      ? ({ kind: "group_not_found" } as const)
-      : ({ kind: "found", members: value } as const);
+  signedPaths.length = 0;
   return {
     members: {
       findRoleRequestMember: async () => ({
@@ -63,13 +107,11 @@ function gateways(options: GatewayOptions = {}): GroupMembersGateways {
       }),
     },
     groupMembers: {
-      findGroupMembers: async ({ clubId, groupId }) => {
-        scopesRead.push(`members ${clubId} ${groupId}`);
-        return groupResult([PAULA]);
-      },
-      findCandidates: async ({ clubId, groupId }) => {
-        scopesRead.push(`candidates ${clubId} ${groupId}`);
-        return groupResult([PAULA]);
+      findAssignableMembers: async ({ clubId, groupId }) => {
+        scopesRead.push(`assignable ${clubId} ${groupId}`);
+        return options.missingGroup
+          ? { kind: "group_not_found" }
+          : { kind: "found", members: ASSIGNABLE };
       },
       findClubMember: async ({ clubId, userId }) => {
         scopesRead.push(`member ${clubId} ${userId}`);
@@ -94,6 +136,14 @@ function gateways(options: GatewayOptions = {}): GroupMembersGateways {
         return options.missingGroup
           ? { kind: "group_not_found" }
           : { kind: "removed" };
+      },
+    },
+    photos: {
+      signPhotoUrls: async (photoPaths) => {
+        signedPaths.push(...photoPaths);
+        return new Map(
+          photoPaths.map((path) => [path, `${SIGNED_URL_PREFIX}${path}`]),
+        );
       },
     },
   };
@@ -196,13 +246,43 @@ describe("socios de un grupo: quitar", () => {
 });
 
 describe("socios de un grupo: listar", () => {
-  const LIST_REQUEST = { callerId: CALLER_ID, groupId: GROUP_ID };
+  const LIST_REQUEST = {
+    callerId: CALLER_ID,
+    groupId: GROUP_ID,
+    locale: "es" as const,
+  };
 
-  it("devuelve los socios del grupo, leídos en el club de quien llama", async () => {
+  it("devuelve los socios del grupo en orden de nombre, leídos en el club de quien llama", async () => {
     const members = await listGroupMembers(gateways(), LIST_REQUEST);
 
-    expect(members).toEqual([PAULA]);
-    expect(scopesRead).toEqual([`members ${CLUB_ID} ${GROUP_ID}`]);
+    expect(members.map(({ fullName }) => fullName)).toEqual([
+      "Paula Player",
+      "Zoe Zapata",
+    ]);
+    expect(scopesRead).toEqual([`assignable ${CLUB_ID} ${GROUP_ID}`]);
+  });
+
+  it("trae la posición en el idioma de quien pide y la foto firmada", async () => {
+    const [paula, zoe] = await listGroupMembers(gateways(), LIST_REQUEST);
+
+    expect(paula).toEqual({
+      ...PAULA,
+      positionName: "Delantera",
+      photoUrl: `${SIGNED_URL_PREFIX}paula.webp`,
+    });
+    expect(zoe).toEqual({
+      id: ZOE_RECORD.id,
+      fullName: "Zoe Zapata",
+      isPendingActivation: true,
+      positionName: null,
+      photoUrl: null,
+    });
+  });
+
+  it("firma sólo las fotos de los socios que devuelve, en una llamada", async () => {
+    await listGroupMembers(gateways(), LIST_REQUEST);
+
+    expect(signedPaths).toEqual(["paula.webp"]);
   });
 
   it("rechaza un grupo que no existe o es de otro club", async () => {
@@ -220,13 +300,41 @@ describe("socios de un grupo: listar", () => {
 });
 
 describe("candidatos", () => {
-  const LIST_REQUEST = { callerId: CALLER_ID, groupId: GROUP_ID };
+  const LIST_REQUEST = {
+    callerId: CALLER_ID,
+    groupId: GROUP_ID,
+    locale: "es" as const,
+  };
 
-  it("devuelve los candidatos del grupo, leídos en el club de quien llama", async () => {
+  it("devuelve a quien no está en el grupo en orden de nombre, leído en el club de quien llama", async () => {
     const candidates = await listGroupCandidates(gateways(), LIST_REQUEST);
 
-    expect(candidates).toEqual([PAULA]);
-    expect(scopesRead).toEqual([`candidates ${CLUB_ID} ${GROUP_ID}`]);
+    expect(candidates.map(({ fullName }) => fullName)).toEqual([
+      "Bea Bravo",
+      "nerea Navarro",
+    ]);
+    expect(scopesRead).toEqual([`assignable ${CLUB_ID} ${GROUP_ID}`]);
+  });
+
+  it("trae de cada uno la posición, la foto y en cuántos grupos del club está ya", async () => {
+    const [bea, nerea] = await listGroupCandidates(gateways(), LIST_REQUEST);
+
+    expect(bea).toEqual({
+      id: BEA_RECORD.id,
+      fullName: "Bea Bravo",
+      isPendingActivation: false,
+      positionName: null,
+      photoUrl: null,
+      groupCount: 0,
+    });
+    expect(nerea).toEqual({
+      id: NEREA_RECORD.id,
+      fullName: "nerea Navarro",
+      isPendingActivation: false,
+      positionName: "Goalkeeper",
+      photoUrl: `${SIGNED_URL_PREFIX}nerea.webp`,
+      groupCount: 1,
+    });
   });
 
   it("rechaza un grupo que no existe o es de otro club", async () => {

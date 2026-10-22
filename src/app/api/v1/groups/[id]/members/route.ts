@@ -1,12 +1,16 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
-import { type GroupMember, listGroupMembers } from "@/lib/groups/group-members";
+import {
+  type GroupRosterMember,
+  listGroupMembers,
+} from "@/lib/groups/group-members";
 import {
   asGroupsApiError,
   readGroupId,
   requireGroupMembersGateways,
 } from "@/lib/groups/groups-api";
+import { readApiRequestLocale } from "@/lib/i18n/request-locale";
 
 /**
  * Los socios de un grupo (FR-026; RF-6 del PRD de E4).
@@ -20,9 +24,10 @@ import {
 export const dynamic = "force-dynamic";
 
 /** Los socios del grupo que no están dados de baja, en orden alfabético, con
- * id y nombre completo y nada más. */
+ * su posición en el idioma de quien pide y su foto firmada. Nada de la ficha
+ * de contacto. */
 export type GroupMembersResponse = {
-  readonly members: readonly GroupMember[];
+  readonly members: readonly GroupRosterMember[];
 };
 
 type GroupRouteContext = {
@@ -46,6 +51,7 @@ export function GET(
             members: await listGroupMembers(requireGroupMembersGateways(), {
               callerId,
               groupId,
+              locale: readApiRequestLocale(apiRequest),
             }),
           },
         };

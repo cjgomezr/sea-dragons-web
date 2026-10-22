@@ -200,8 +200,7 @@ function memberRecordGateways(
       ],
     },
     groupMembers: {
-      findGroupMembers: async () => ({ kind: "found", members: [] }),
-      findCandidates: async () => ({ kind: "found", members: [] }),
+      findAssignableMembers: async () => ({ kind: "found", members: [] }),
       findClubMember: async ({ userId }) => ({
         id: userId,
         fullName: "Paula Player",
