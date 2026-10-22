@@ -75,21 +75,28 @@ const AUF_NUMBER_BODY_MAX_LENGTH = AUF_NUMBER_MAX_LENGTH * 4;
 const DATE_BODY_MAX_LENGTH = 10;
 const GROUP_IDS_MAX = 100;
 
-/** Sólo la forma: todos los campos son obligatorios y `strict` responde 400 a
- * cualquier otro, como el rol, que nace Player. */
+/** Un dato de jugador que no se mandó llega vacío. */
+function optionalBodyText(maxLength: number): z.ZodDefault<z.ZodString> {
+  return z.string().max(maxLength).default("");
+}
+
+/** Sólo la forma: el nombre y el correo son obligatorios; los datos de
+ * jugador (#861, D12 del PRD de E33) llegan vacíos si no se mandan, que es
+ * como el dominio los entiende. `strict` responde 400 a cualquier otro campo,
+ * como el rol, que nace Player. */
 const newMemberBodySchema = z
   .object({
     fullName: z.string().max(FULL_NAME_BODY_MAX_LENGTH),
     email: z.string().max(EMAIL_BODY_MAX_LENGTH),
-    country: z.string().max(CATALOG_BODY_MAX_LENGTH),
-    // El id de una posición del club (#299): vacío si el club no ofrece
-    // ninguna, y por eso no `z.uuid()`.
-    positionId: z.string().max(CATALOG_BODY_MAX_LENGTH),
-    experienceLevel: z.string().max(CATALOG_BODY_MAX_LENGTH),
-    gender: z.string().max(CATALOG_BODY_MAX_LENGTH),
-    aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH),
-    aufExpiry: z.string().max(DATE_BODY_MAX_LENGTH),
-    groupIds: z.array(z.uuid()).max(GROUP_IDS_MAX),
+    country: optionalBodyText(CATALOG_BODY_MAX_LENGTH),
+    // El id de una posición del club (#299), y por eso no `z.uuid()`: vacío
+    // es sin posición.
+    positionId: optionalBodyText(CATALOG_BODY_MAX_LENGTH),
+    experienceLevel: optionalBodyText(CATALOG_BODY_MAX_LENGTH),
+    gender: optionalBodyText(CATALOG_BODY_MAX_LENGTH),
+    aufNumber: optionalBodyText(AUF_NUMBER_BODY_MAX_LENGTH),
+    aufExpiry: optionalBodyText(DATE_BODY_MAX_LENGTH),
+    groupIds: z.array(z.uuid()).max(GROUP_IDS_MAX).default([]),
   })
   .strict();
 

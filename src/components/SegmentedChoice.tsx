@@ -23,12 +23,16 @@ export function SegmentedChoice<Value extends string>({
   options,
   selected,
   onChoose,
+  firstOptionId,
 }: {
   readonly label: string;
   readonly options: readonly SegmentedOption<Value>[];
   /** Null si todavía no se eligió ninguna. */
   readonly selected: Value | null;
   readonly onChoose: (value: Value) => void;
+  /** El id del primer radio, para quien tenga que llevarle el foco, como la
+   * franja de lo que falta del perfil (#861). */
+  readonly firstOptionId?: string;
 }): React.JSX.Element {
   const id = useId();
   const labelId = `${id}-label`;
@@ -42,9 +46,10 @@ export function SegmentedChoice<Value extends string>({
         aria-labelledby={labelId}
         className="segmented-choice-options"
       >
-        {options.map((option) => (
+        {options.map((option, index) => (
           <label key={option.value} className="segmented-choice-option">
             <input
+              id={index === 0 ? firstOptionId : undefined}
               type="radio"
               name={id}
               value={option.value}

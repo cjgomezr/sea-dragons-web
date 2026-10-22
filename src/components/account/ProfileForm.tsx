@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { ClubPositions } from "@/lib/club/club-positions";
+import {
+  type ClubPositions,
+  offeredPositions,
+} from "@/lib/club/club-positions";
 import type { CountryOption } from "@/lib/geo/countries";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -14,7 +17,14 @@ import type {
   EmergencyContactProposal,
   OwnProfile,
 } from "@/lib/members/own-profile";
-import { AboutCard, COUNTRY_ID, FULL_NAME_ID } from "./AboutCard";
+import {
+  AboutCard,
+  COUNTRY_ID,
+  EXPERIENCE_ID,
+  FULL_NAME_ID,
+  GENDER_ID,
+  POSITION_ID,
+} from "./AboutCard";
 import { AUF_NUMBER_ID, OwnAufCard } from "./OwnAufCard";
 import {
   EMERGENCY_NAME_ID,
@@ -46,6 +56,9 @@ const MISSING_ITEM_TARGETS = {
   emergency_contact: { card: "contact", focusFieldId: EMERGENCY_NAME_ID },
   phone: { card: "contact", focusFieldId: PHONE_ID },
   country: { card: "about", focusFieldId: COUNTRY_ID },
+  position: { card: "about", focusFieldId: POSITION_ID },
+  experience_level: { card: "about", focusFieldId: EXPERIENCE_ID },
+  gender: { card: "about", focusFieldId: GENDER_ID },
 } as const satisfies Record<MissingProfileItem, CardRequest<ProfileCard>>;
 
 function guardianProposalOf(
@@ -117,7 +130,10 @@ export function ProfileForm({
     <>
       <ProfileCompletionStrip
         locale={locale}
-        completeness={profileCompletenessOf(initialProfile)}
+        completeness={profileCompletenessOf(initialProfile, {
+          hasActivePositions:
+            offeredPositions(positionOptions, null).length > 0,
+        })}
         onAdd={(item) => cards.openCard(MISSING_ITEM_TARGETS[item])}
       />
       <AboutCard

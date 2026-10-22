@@ -24,11 +24,15 @@ export function isDismissibleReminder(reminder: ContactReminder): boolean {
 }
 
 /** Lo que la franja del perfil (#771, D8 del PRD de E30) pide completar, en
- * el orden en que lo pide: primero lo obligatorio. */
+ * el orden en que lo pide: primero lo obligatorio, y después los datos de
+ * jugador que el alta ya no exige (#861, D13 del PRD de E33). */
 export const MISSING_PROFILE_ITEMS = [
   "emergency_contact",
   "phone",
   "country",
+  "position",
+  "experience_level",
+  "gender",
 ] as const;
 
 export type MissingProfileItem = (typeof MISSING_PROFILE_ITEMS)[number];
@@ -39,13 +43,23 @@ export type ProfileCompleteness = {
   readonly percent: number;
 };
 
+/** Lo que la franja mira de la ficha. */
+export type CompletableProfile = ProfileContact & {
+  readonly country: string | null;
+  readonly positionId: string | null;
+  readonly experienceLevel: string | null;
+  readonly gender: string | null;
+};
+
+/** Lo que la franja necesita saber del club: sin posiciones activas no hay
+ * cuál elegir, así que la posición ni se pide ni se cuenta. */
+export type CompletenessContext = { readonly hasActivePositions: boolean };
+
 /** El nombre y el correo: sin ellos no hay cuenta, así que siempre están y
  * cuentan como hechos. Por eso a quien le falta todo no le sale un 0. */
 const ALWAYS_PRESENT_ITEMS = 2;
 /** El porcentaje va de 0 a esto. */
 export const PERCENT_MAX = 100;
-
-const COUNTED_ITEMS = ALWAYS_PRESENT_ITEMS + MISSING_PROFILE_ITEMS.length;
 
 const MISSING_CONTACT: Readonly<
   Record<ContactReminder, readonly MissingProfileItem[]>
@@ -56,19 +70,38 @@ const MISSING_CONTACT: Readonly<
   both: ["emergency_contact", "phone"],
 };
 
-/** Por ahora cuenta el contacto de emergencia, el teléfono y el país (D8);
- * los dos primeros, con la misma regla que el aviso de contacto. */
+/** Los datos de la ficha que no son de contacto, cada uno con si falta. */
+function missingProfileDataOf(
+  profile: CompletableProfile,
+  { hasActivePositions }: CompletenessContext,
+): readonly MissingProfileItem[] {
+  const isMissing: readonly (readonly [MissingProfileItem, boolean])[] = [
+    ["country", profile.country === null],
+    ["position", hasActivePositions && profile.positionId === null],
+    ["experience_level", profile.experienceLevel === null],
+    ["gender", profile.gender === null],
+  ];
+  return isMissing.flatMap(([item, missing]) => (missing ? [item] : []));
+}
+
+/** El contacto de emergencia y el teléfono, con la misma regla que el aviso
+ * de contacto (D8); después el país y los datos de jugador (D13). */
 export function profileCompletenessOf(
-  profile: ProfileContact & { readonly country: string | null },
+  profile: CompletableProfile,
+  context: CompletenessContext,
 ): ProfileCompleteness {
   const missing: readonly MissingProfileItem[] = [
     ...MISSING_CONTACT[contactReminderOf(profile)],
-    ...(profile.country === null ? (["country"] as const) : []),
+    ...missingProfileDataOf(profile, context),
   ];
+  const askedItems = MISSING_PROFILE_ITEMS.filter(
+    (item) => context.hasActivePositions || item !== "position",
+  );
+  const countedItems = ALWAYS_PRESENT_ITEMS + askedItems.length;
   return {
     missing,
     percent: Math.round(
-      ((COUNTED_ITEMS - missing.length) / COUNTED_ITEMS) * PERCENT_MAX,
+      ((countedItems - missing.length) / countedItems) * PERCENT_MAX,
     ),
   };
 }

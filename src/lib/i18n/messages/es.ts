@@ -556,6 +556,9 @@ export const spanishMessages: MessageCatalog = {
   "profileCompletion.item.emergency_contact": "Contacto de emergencia",
   "profileCompletion.item.phone": "Teléfono",
   "profileCompletion.item.country": "País",
+  "profileCompletion.item.position": "Posición",
+  "profileCompletion.item.experience_level": "Experiencia",
+  "profileCompletion.item.gender": "Género",
   "profileCompletion.phoneTitle": "Casi listo · {percent} completo",
   "profileBar.back": "Volver",
   "profileBar.ownTitle": "Mi perfil",
@@ -1214,6 +1217,8 @@ export const spanishMessages: MessageCatalog = {
   "newMember.issue.aufNumberMissing": "Escribe el número de AUF.",
   "newMember.issue.aufNumberTooLong":
     "El número de AUF no puede pasar de {max} caracteres.",
+  "newMember.issue.aufExpiryMissing":
+    "Añade el vencimiento que va con el número de AUF.",
   "newMember.issue.aufExpiryNotADate": "Escribe el vencimiento del AUF.",
   "newMember.issue.aufExpiryInThePast": "Ese AUF ya venció. Revisa la fecha.",
   "newMember.error.emailTaken": "Ese correo ya tiene una cuenta en el club.",

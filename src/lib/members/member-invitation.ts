@@ -60,16 +60,18 @@ import {
  * cuenta; aquí quien llama es un Admin que ya sabe si el alta salió, y la
  * pantalla tiene que decirle si la invitación no salió para ofrecer reenviarla.
  *
- * La posición es una activa del club del Admin (#299). Si el club las archivó
- * todas no hay qué elegir, y el miembro nace sin posición.
+ * Sólo el nombre y el correo son obligatorios (#861, D12 del PRD de E33): el
+ * Admin a menudo no sabe el país, la posición o el AUF de alguien que acaba
+ * de conocer. Lo que sí se manda tiene que valer. La posición, si va, es una
+ * activa del club del Admin (#299), y el AUF va entero o no va.
  */
 
+/** Los datos de jugador vacíos son datos que no se mandaron. */
 export type NewMemberSubmission = {
   readonly fullName: string;
   readonly email: string;
   readonly country: string;
-  /** El id de una posición del club; vacío sólo si el club no ofrece
-   * ninguna. */
+  /** El id de una posición activa del club. */
   readonly positionId: string;
   readonly experienceLevel: string;
   readonly gender: string;
@@ -90,6 +92,7 @@ export const NEW_MEMBER_ISSUE_CODES = [
   "gender_unknown",
   "auf_number_missing",
   "auf_number_too_long",
+  "auf_expiry_missing",
   "auf_expiry_not_a_date",
   "auf_expiry_before_joined",
 ] as const;
@@ -115,12 +118,13 @@ export type InvitedMemberRow = {
   readonly user_id: string;
   readonly full_name: string;
   readonly email: string;
-  readonly country: string;
+  readonly country: string | null;
   readonly position_id: string | null;
-  readonly experience_level: ExperienceLevel;
-  readonly gender: Gender;
-  readonly auf_number: string;
-  readonly auf_expiry: string;
+  readonly experience_level: ExperienceLevel | null;
+  readonly gender: Gender | null;
+  /** Los dos o ninguno. */
+  readonly auf_number: string | null;
+  readonly auf_expiry: string | null;
   readonly role: "Player";
   readonly account_status: "incomplete";
   /** El idioma del Admin: es el único que se conoce del miembro hasta que
@@ -162,6 +166,11 @@ export type MemberInvitationGateways = Pick<
   readonly invitees: {
     insertInvitedMember(row: InvitedMemberRow): Promise<void>;
     findInvitee(scope: MemberScope): Promise<Invitee | null>;
+    /** El correo llega ya en minúsculas, como se guarda. */
+    findClubMemberByEmail(scope: {
+      readonly clubId: string;
+      readonly email: string;
+    }): Promise<ExistingMember | null>;
   };
   /** Emite el enlace y manda la invitación. Tiene la forma del correo de
    * confirmación para que el reenvío use su mismo límite. */
@@ -197,10 +206,21 @@ export class NewMemberValidationError extends Error {
   }
 }
 
+/** El socio del club que ya tiene un correo. Sólo lo ve un Admin, que ya ve
+ * a todo el club en el Directorio (D14 del PRD de E33). */
+export type ExistingMember = {
+  readonly userId: string;
+  readonly fullName: string;
+};
+
 export class MemberEmailTakenError extends Error {
-  constructor() {
+  /** Null si la cuenta no es de ningún socio del club. */
+  readonly existingMember: ExistingMember | null;
+
+  constructor(existingMember: ExistingMember | null) {
     super("Ese correo ya tiene una cuenta.");
     this.name = "MemberEmailTakenError";
+    this.existingMember = existingMember;
   }
 }
 
@@ -242,23 +262,58 @@ type ValidNewMember = Omit<
 
 type FieldCheck = readonly [NewMemberField, NewMemberIssueCode | null];
 
+function isBlank(value: string): boolean {
+  return value.trim() === "";
+}
+
+/** Un dato de jugador vacío no se mandó; uno escrito tiene que valer. */
+function optionalValueOf<Value>(
+  value: string,
+  parse: (value: string) => Value | null,
+): Value | null {
+  return isBlank(value) ? null : parse(value);
+}
+
+function checkOptional<Value>(
+  value: string,
+  parse: (value: string) => Value | null,
+  code: NewMemberIssueCode,
+): NewMemberIssueCode | null {
+  return isBlank(value) || parse(value) !== null ? null : code;
+}
+
+function parseCountry(value: string): string | null {
+  const country = validateCountryField(value);
+  return country.ok ? country.value : null;
+}
+
+/** El AUF va entero o no va: un número sin vencimiento no dice hasta cuándo
+ * vale, y un vencimiento sin número no dice de qué registro es. */
+type AufPair = { readonly number: string; readonly expiry: string };
+
+function checkAufNumber({
+  number,
+  expiry,
+}: AufPair): NewMemberIssueCode | null {
+  if (isBlank(number)) {
+    return isBlank(expiry) ? null : "auf_number_missing";
+  }
+  return isAufNumberTooLong(number.trim()) ? "auf_number_too_long" : null;
+}
+
 function checkAufExpiry(
-  aufExpiry: string,
+  { number, expiry }: AufPair,
   todayInClub: string,
 ): NewMemberIssueCode | null {
-  if (!isRealCalendarDate(aufExpiry)) {
+  if (isBlank(expiry)) {
+    return isBlank(number) ? null : "auf_expiry_missing";
+  }
+  if (!isRealCalendarDate(expiry)) {
     return "auf_expiry_not_a_date";
   }
   // Ingresa hoy, y un registro no puede caducar antes de que la persona fuera
   // del club: la misma regla que la ficha (#242).
-  return aufExpiry < todayInClub ? "auf_expiry_before_joined" : null;
-}
-
-function checkAufNumber(aufNumber: string): NewMemberIssueCode | null {
-  if (aufNumber === "") {
-    return "auf_number_missing";
-  }
-  return isAufNumberTooLong(aufNumber) ? "auf_number_too_long" : null;
+  return expiry < todayInClub ? "auf_expiry_before_joined" : null;
 }
 
 /** Contra qué se valida el alta: el día del club, que es el de ingreso, y
@@ -269,17 +324,17 @@ export type NewMemberContext = {
   readonly positionChoices: readonly NamedPosition[];
 };
 
-/** Obligatoria mientras el club ofrezca alguna, y siempre una de ellas: una
- * archivada o de otro club no está entre las que se ofrecen. */
+/** Opcional aunque el club ofrezca alguna (D12), pero si va es una de ellas:
+ * una archivada o de otro club no está entre las que se ofrecen. */
 function checkPosition(
   positionId: string,
   positionChoices: readonly NamedPosition[],
 ): NewMemberIssueCode | null {
-  const isOffered =
-    positionId === ""
-      ? positionChoices.length === 0
-      : positionChoices.some((position) => position.id === positionId);
-  return isOffered ? null : "position_unknown";
+  return checkOptional(
+    positionId,
+    (id) => positionChoices.find((position) => position.id === id) ?? null,
+    "position_unknown",
+  );
 }
 
 /** Todos los campos que no valen, no el primero: el formulario los marca de
@@ -289,62 +344,56 @@ export function listNewMemberIssues(
   submission: NewMemberSubmission,
   { todayInClub, positionChoices }: NewMemberContext,
 ): readonly NewMemberIssue[] {
+  const auf = { number: submission.aufNumber, expiry: submission.aufExpiry };
   const checks: readonly FieldCheck[] = [
-    [
-      "fullName",
-      submission.fullName.trim() === "" ? "full_name_missing" : null,
-    ],
+    ["fullName", isBlank(submission.fullName) ? "full_name_missing" : null],
     ["email", looksLikeEmail(submission.email) ? null : "email_malformed"],
     [
       "country",
-      validateCountryField(submission.country).ok ? null : "country_unknown",
+      checkOptional(submission.country, parseCountry, "country_unknown"),
     ],
     ["positionId", checkPosition(submission.positionId, positionChoices)],
     [
       "experienceLevel",
-      parseExperienceLevel(submission.experienceLevel) === null
-        ? "experience_level_unknown"
-        : null,
+      checkOptional(
+        submission.experienceLevel,
+        parseExperienceLevel,
+        "experience_level_unknown",
+      ),
     ],
-    [
-      "gender",
-      parseGender(submission.gender) === null ? "gender_unknown" : null,
-    ],
-    ["aufNumber", checkAufNumber(submission.aufNumber.trim())],
-    ["aufExpiry", checkAufExpiry(submission.aufExpiry, todayInClub)],
+    ["gender", checkOptional(submission.gender, parseGender, "gender_unknown")],
+    ["aufNumber", checkAufNumber(auf)],
+    ["aufExpiry", checkAufExpiry(auf, todayInClub)],
   ];
   return checks.flatMap(([field, code]) =>
     code === null ? [] : [{ field, code }],
   );
 }
 
+/** Los valores salen de los mismos `parse` que las comprobaciones: sin
+ * avisos, un dato escrito nunca se convierte en `null`. */
 function validateNewMember(
   submission: NewMemberSubmission,
   context: NewMemberContext,
 ): ValidNewMember {
   const issues = listNewMemberIssues(submission, context);
-  const country = validateCountryField(submission.country);
-  const experienceLevel = parseExperienceLevel(submission.experienceLevel);
-  const gender = parseGender(submission.gender);
-  // Los tres últimos términos no pueden ser ciertos sin el primero; están
-  // aquí porque son los que estrechan el tipo.
-  if (
-    issues.length > 0 ||
-    !country.ok ||
-    experienceLevel === null ||
-    gender === null
-  ) {
+  if (issues.length > 0) {
     throw new NewMemberValidationError(issues);
   }
   return {
     full_name: submission.fullName.trim(),
     email: submission.email.trim().toLowerCase(),
-    country: country.value,
-    position_id: submission.positionId === "" ? null : submission.positionId,
-    experience_level: experienceLevel,
-    gender,
-    auf_number: submission.aufNumber.trim(),
-    auf_expiry: submission.aufExpiry,
+    country: optionalValueOf(submission.country, parseCountry),
+    position_id: optionalValueOf(submission.positionId, (id) => id),
+    experience_level: optionalValueOf(
+      submission.experienceLevel,
+      parseExperienceLevel,
+    ),
+    gender: optionalValueOf(submission.gender, parseGender),
+    auf_number: optionalValueOf(submission.aufNumber, (number) =>
+      number.trim(),
+    ),
+    auf_expiry: optionalValueOf(submission.aufExpiry, (expiry) => expiry),
   };
 }
 
@@ -478,7 +527,7 @@ export async function createInvitedMember(
   const { positionId } = request.submission;
   const positions = await gateways.positions.findClubPositions(
     caller.clubId,
-    positionId === "" ? [] : [positionId],
+    isBlank(positionId) ? [] : [positionId],
   );
   const member = validateNewMember(request.submission, {
     todayInClub: request.todayInClub,
@@ -493,7 +542,12 @@ export async function createInvitedMember(
     member.email,
   );
   if (identity.kind === "already_registered") {
-    throw new MemberEmailTakenError();
+    throw new MemberEmailTakenError(
+      await gateways.invitees.findClubMemberByEmail({
+        clubId: caller.clubId,
+        email: member.email,
+      }),
+    );
   }
   await insertMemberOrUndoIdentity(gateways, {
     ...member,

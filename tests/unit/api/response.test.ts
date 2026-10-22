@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   ApiError,
+  ApiErrorWithDetails,
   apiError,
+  apiErrorFrom,
   apiSuccess,
   type ApiErrorCode,
 } from "@/lib/api/response";
@@ -85,5 +87,50 @@ describe("ApiError", () => {
     expect(error.code).toBe("conflict");
     expect(error.message).toBe("el recurso ya existe");
     expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe("apiErrorFrom", () => {
+  it("responde el código, el mensaje y el motivo de un ApiError", async () => {
+    const response = apiErrorFrom(
+      new ApiError("gone", "ya no sirve", "link_unusable"),
+    );
+
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toEqual({
+      error: { code: "gone", message: "ya no sirve", reason: "link_unusable" },
+    });
+  });
+
+  it("añade junto al código los datos que el error lleva", async () => {
+    const response = apiErrorFrom(
+      new ApiErrorWithDetails("conflict", "ya existe", {
+        reason: "email_taken",
+        details: { existingMember: { userId: "u1", fullName: "Nerea" } },
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "conflict",
+        message: "ya existe",
+        reason: "email_taken",
+        existingMember: { userId: "u1", fullName: "Nerea" },
+      },
+    });
+  });
+
+  it("no deja que un dato pise el código, el mensaje o el motivo", async () => {
+    const response = apiErrorFrom(
+      new ApiErrorWithDetails("conflict", "ya existe", {
+        reason: "email_taken",
+        details: { code: "gone", message: "otro", reason: "otro" },
+      }),
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      error: { code: "conflict", message: "ya existe", reason: "email_taken" },
+    });
   });
 });

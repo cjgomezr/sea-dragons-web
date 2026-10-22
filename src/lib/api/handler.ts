@@ -11,6 +11,7 @@ import {
   type ApiSuccessStatus,
   NO_CONTENT_STATUS,
   apiError,
+  apiErrorFrom,
   apiFile,
   apiNoContent,
   apiRedirect,
@@ -180,7 +181,7 @@ export function createApiRoute<T, Body = undefined>(
       return decorated(apiSuccess(result.data, result.status));
     } catch (error) {
       if (error instanceof ApiError) {
-        return decorated(apiError(error.code, error.message, error.reason));
+        return decorated(apiErrorFrom(error));
       }
       console.error(
         "[api/v1] unhandled error",

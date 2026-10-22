@@ -123,6 +123,8 @@ export function describeNewMemberIssue(
       return translate("newMember.issue.aufNumberTooLong", {
         max: AUF_NUMBER_MAX_LENGTH,
       });
+    case "auf_expiry_missing":
+      return translate("newMember.issue.aufExpiryMissing");
     case "auf_expiry_not_a_date":
       return translate("newMember.issue.aufExpiryNotADate");
     case "auf_expiry_before_joined":

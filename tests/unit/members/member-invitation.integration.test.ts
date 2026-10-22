@@ -19,7 +19,6 @@ import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
 import { createInvitationEmailGateway } from "@/lib/members/invitation-email-sender";
 import {
   InvitationNotPendingError,
-  MemberEmailTakenError,
   type MemberInvitationGateways,
   type NewMemberSubmission,
   createInvitedMember,
@@ -317,6 +316,61 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
   );
 
   it(
+    "con sólo el nombre y el correo, la fila nace sin datos de jugador ni AUF verificado (#861)",
+    async () => {
+      await withScenario(async ({ serviceClient, adminId }) => {
+        await withInvitedEmail(serviceClient, async (email) => {
+          const { gateway, sent } = capturingInvitationEmail(serviceClient);
+
+          const created = await createInvitedMember(
+            realGateways(serviceClient, gateway),
+            {
+              callerId: adminId,
+              submission: {
+                fullName: "Nerea Invitada",
+                email,
+                country: "",
+                positionId: "",
+                experienceLevel: "",
+                gender: "",
+                aufNumber: "",
+                aufExpiry: "",
+                groupIds: [],
+              },
+              todayInClub: clubCalendarDate(new Date()),
+              now: new Date(),
+              locale: "en",
+              appUrl: APP_URL,
+            },
+          );
+
+          const { data: row, error } = await serviceClient.client
+            .from(MEMBERS_TABLE)
+            .select(
+              "role, account_status, country, position_id, experience_level, gender, auf_number, auf_expiry, auf_verified_at",
+            )
+            .eq("user_id", created.member.userId)
+            .single();
+          expect(error).toBeNull();
+          expect(row).toEqual({
+            role: "Player",
+            account_status: "incomplete",
+            country: null,
+            position_id: null,
+            experience_level: null,
+            gender: null,
+            auf_number: null,
+            auf_expiry: null,
+            auf_verified_at: null,
+          });
+          expect(sent).toHaveLength(1);
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "rechaza un correo que ya tiene cuenta sin crear otra fila ni mandar nada",
     async () => {
       await withScenario(
@@ -336,7 +390,7 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
               locale: "es" as const,
               appUrl: APP_URL,
             };
-            await createInvitedMember(gateways, request);
+            const first = await createInvitedMember(gateways, request);
 
             await expect(
               createInvitedMember(gateways, {
@@ -346,7 +400,15 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
                   email: email.toUpperCase(),
                 },
               }),
-            ).rejects.toBeInstanceOf(MemberEmailTakenError);
+            ).rejects.toEqual(
+              expect.objectContaining({
+                name: "MemberEmailTakenError",
+                existingMember: {
+                  userId: first.member.userId,
+                  fullName: "Nerea Invitada",
+                },
+              }),
+            );
             const { count } = await serviceClient.client
               .from(MEMBERS_TABLE)
               .select("user_id", { count: "exact", head: true })
