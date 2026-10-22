@@ -656,7 +656,8 @@ export const spanishMessages: MessageCatalog = {
   "groups.deleteTitle": "¿Borrar «{name}»?",
   "groups.deleteUnused": {
     one: "Su {count} miembro sigue en el club. No es la audiencia de nada.",
-    other: "Sus {count} miembros siguen en el club. No es la audiencia de nada.",
+    other:
+      "Sus {count} miembros siguen en el club. No es la audiencia de nada.",
   },
   "groups.deleteEmptyUnused": "No tiene miembros ni es la audiencia de nada.",
   "groups.deleteUsed": {

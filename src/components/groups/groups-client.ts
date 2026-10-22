@@ -49,6 +49,10 @@ const groupOverviewSchema = groupSchema.extend({
 });
 
 const groupsSchema = z.object({
+  data: z.object({ groups: z.array(groupSchema) }),
+});
+
+const groupOverviewsSchema = z.object({
   data: z.object({ groups: z.array(groupOverviewSchema) }),
 });
 
@@ -83,6 +87,10 @@ const singleMemberSchema = z.object({ data: memberSchema });
 export type GroupsFailure = ApiRequestFailure;
 
 export type GroupsLoad =
+  | { readonly kind: "loaded"; readonly groups: readonly Group[] }
+  | GroupsFailure;
+
+export type GroupOverviewsLoad =
   | { readonly kind: "loaded"; readonly groups: readonly GroupOverview[] }
   | GroupsFailure;
 
@@ -140,8 +148,22 @@ async function saveGroup(
     : { kind: "saved", group: read.value.data };
 }
 
+/** Los grupos con nombre y conteo: lo que piden las pantallas que los
+ * ofrecen como audiencia o los asignan a un socio. */
 export async function loadGroups(): Promise<GroupsLoad> {
   const read = readApiPayload(await requestApi(GROUPS_API_PATH), groupsSchema);
+  return read.kind === "failed"
+    ? read
+    : { kind: "loaded", groups: read.value.data.groups };
+}
+
+/** La misma lista con el uso y la vista previa de cada grupo, que sólo pinta
+ * la pantalla Grupos (D4 de E32). */
+export async function loadGroupOverviews(): Promise<GroupOverviewsLoad> {
+  const read = readApiPayload(
+    await requestApi(GROUPS_API_PATH),
+    groupOverviewsSchema,
+  );
   return read.kind === "failed"
     ? read
     : { kind: "loaded", groups: read.value.data.groups };

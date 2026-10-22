@@ -13,14 +13,14 @@ import { type GroupActionResult, GroupCreateForm } from "./GroupNameForm";
 import type { GroupAction } from "./group-action";
 import {
   GROUP_GONE,
+  type GroupOverviewsLoad,
   type GroupsFailure,
-  type GroupsLoad,
   createGroup,
   deleteGroup,
   describeGroupsFailure,
   hasActionableCause,
   isGroupGone,
-  loadGroups,
+  loadGroupOverviews,
   renameGroup,
 } from "./groups-client";
 import { useChangeNotice } from "./use-change-notice";
@@ -151,7 +151,7 @@ export function GroupsScreen({
   const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
-    void loadGroups().then((outcome: GroupsLoad) => {
+    void loadGroupOverviews().then((outcome: GroupOverviewsLoad) => {
       setState(
         outcome.kind === "loaded"
           ? { kind: "ready", groups: byName(outcome.groups) }
