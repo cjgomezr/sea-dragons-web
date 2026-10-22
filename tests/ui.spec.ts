@@ -17504,6 +17504,9 @@ function lineupPlayer(
   };
 }
 
+const LONG_LINEUP_NAME =
+  "Maximiliana Alejandra Fernández-Rodríguez de la Torre";
+
 const PUBLISHED_TEAMS = {
   status: "published",
   publishedAt: "2026-06-20T08:00:00.000Z",
@@ -17533,11 +17536,7 @@ const PUBLISHED_TEAMS = {
         lineupPlayer(8, "Grace Lee", "goalkeeper"),
         lineupPlayer(9, "Hamish MacLeod", "defender"),
         lineupPlayer(10, "Liam O'Connor", "forward"),
-        lineupPlayer(
-          11,
-          "Maximiliana Alejandra Fernández-Rodríguez de la Torre",
-          "defender",
-        ),
+        lineupPlayer(11, LONG_LINEUP_NAME, "defender"),
         lineupPlayer(12, "Sam Patel", null),
       ],
     },
@@ -17563,7 +17562,7 @@ const NOT_COMING_TEAMS = {
     b: {
       ...PUBLISHED_TEAMS.teams.b,
       players: PUBLISHED_TEAMS.teams.b.players.map((player) =>
-        player.fullName.startsWith("Maximiliana")
+        player.fullName === LONG_LINEUP_NAME
           ? { ...player, isOutsideSquad: true }
           : player,
       ),
