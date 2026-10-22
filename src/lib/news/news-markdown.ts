@@ -22,7 +22,7 @@ const PLAIN_TEXT_BREAKING_CONSTRUCTS = [
   "characterReference",
 ];
 
-function remarkKeepPlainTextLook(this: Processor): void {
+export function remarkKeepPlainTextLook(this: Processor): void {
   const data = this.data();
   data.micromarkExtensions = [
     ...(data.micromarkExtensions ?? []),

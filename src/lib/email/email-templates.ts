@@ -4,6 +4,11 @@ import {
   evaluateAccentColor,
 } from "@/lib/club/accent-color";
 import type { ClubBrand } from "@/lib/club/club-brand";
+import {
+  parseDirectoryEmailMessage,
+  renderDirectoryEmailMessageHtml,
+  renderDirectoryEmailMessageText,
+} from "@/lib/directory/directory-email-markdown";
 import type { Role } from "@/lib/auth/roles";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -39,6 +44,9 @@ type EmailAction = {
 type EmailContent = {
   readonly subject: string;
   readonly intro: readonly string[];
+  /** El mensaje con formato del correo del directorio (#857), ya pintado por
+   * `directory-email-markdown.ts`. `null` en los de la aplicación. */
+  readonly messageHtml: string | null;
   /** `null` en el correo que escribe un socio (#501): no lleva a ninguna
    * pantalla. */
   readonly action: EmailAction | null;
@@ -153,8 +161,7 @@ function escapeHtml(value: string): string {
   );
 }
 
-/** Un salto de línea dentro de un párrafo se conserva: el correo del
- * directorio (#501) va tal como lo escribió el socio. */
+/** Un salto de línea dentro de un párrafo se conserva. */
 function renderParagraph(text: string): string {
   const lines = escapeHtml(text).split("\n").join("<br>\n");
   return `<p style="${PARAGRAPH_STYLE}">${lines}</p>`;
@@ -204,6 +211,7 @@ function renderCard(brand: EmailBrand, content: EmailContent): string {
     `<tr><td style="${headerStyle(brand.accent)}">${renderHeaderContent(brand)}</td></tr>`,
     `<tr><td style="${CONTENT_STYLE}">`,
     ...content.intro.map(renderParagraph),
+    ...(content.messageHtml === null ? [] : [content.messageHtml]),
     ...renderAction(content.action, brand.accent),
     ...content.outro.map(renderParagraph),
     "</td></tr>",
@@ -253,10 +261,14 @@ function renderText(content: EmailContent): string {
 function renderEmail(
   t: Translator,
   clubBrand: ClubBrand,
-  content: Omit<EmailContent, "signature">,
+  content: Omit<EmailContent, "signature" | "messageHtml">,
 ): RenderedEmail {
   const brand = toEmailBrand(clubBrand);
-  const signed = { ...content, signature: clubSignatureIn(t, clubBrand) };
+  const signed = {
+    ...content,
+    messageHtml: null,
+    signature: clubSignatureIn(t, clubBrand),
+  };
   return {
     subject: signed.subject,
     html: renderHtml(t, brand, signed),
@@ -382,14 +394,12 @@ export type DirectoryEmailDraft = {
   readonly message: string;
 };
 
-/** Cada línea en blanco del mensaje separa un párrafo del HTML. */
-const BLANK_LINE_PATTERN = /\n\s*\n/;
-
 /** El correo que un Admin o un Committee escribe a los socios desde el
- * directorio (#501, RF-6 del PRD de E19). El asunto y el mensaje van tal como
- * se escribieron: en el HTML se escapan, así que nada de lo escrito se
- * interpreta como etiqueta. El pie dice quién escribe, en el idioma de quien
- * lo recibe. */
+ * directorio (#501, RF-6 del PRD de E19). El asunto va tal como se escribió.
+ * El mensaje admite negrita, cursiva, enlaces y listas (#857, D3 del PRD de
+ * E33); todo lo demás se escapa, así que ninguna etiqueta escrita a mano
+ * llega al HTML. El pie dice quién escribe, en el idioma de quien lo
+ * recibe. */
 export function renderDirectoryEmail(input: {
   readonly draft: DirectoryEmailDraft;
   readonly sender: { readonly fullName: string; readonly role: Role };
@@ -402,17 +412,21 @@ export function renderDirectoryEmail(input: {
     role: t(`role.${input.sender.role}`),
     clubName: input.brand.name,
   });
+  const brand = toEmailBrand(input.brand);
+  const message = parseDirectoryEmailMessage(input.draft.message);
   return {
     subject: input.draft.subject,
-    html: renderHtml(t, toEmailBrand(input.brand), {
+    html: renderHtml(t, brand, {
       subject: input.draft.subject,
-      intro: input.draft.message.split(BLANK_LINE_PATTERN),
+      intro: [],
+      messageHtml: renderDirectoryEmailMessageHtml(message, {
+        textStyle: PARAGRAPH_STYLE,
+        linkColor: brand.accent.accentText,
+      }),
       action: null,
       outro: [],
       signature,
     }),
-    // El texto plano lleva el mensaje entero tal cual, con sus líneas en
-    // blanco, y no los párrafos que el HTML saca de él.
-    text: `${input.draft.message}\n\n${signature}\n`,
+    text: `${renderDirectoryEmailMessageText(message)}\n\n${signature}\n`,
   };
 }
