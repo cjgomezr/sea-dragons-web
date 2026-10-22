@@ -16537,6 +16537,49 @@ test.describe("evaluaciones en el navegador", () => {
     }
   });
 
+  test("en el móvil la lista y la ficha llevan las medidas del handoff (#822)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToEvaluations(page, EVALUATIONS_LIST);
+    const heightOf = async (locator: Locator): Promise<number | undefined> =>
+      (await locator.boundingBox())?.height;
+    const fontSizeOf = (locator: Locator): Promise<string> =>
+      locator.evaluate((element) => getComputedStyle(element).fontSize);
+    const camilaRow = rosterButton(page, CAMILA_BUTTON);
+
+    expect(await fontSizeOf(page.getByRole("heading", { level: 1 }))).toBe(
+      "24px",
+    );
+    expect(
+      await heightOf(page.getByRole("searchbox", { name: SEARCH_BY_NAME })),
+    ).toBe(46);
+    expect(
+      await heightOf(page.getByRole("button", { name: NOT_EVALUATED_CHIP })),
+    ).toBe(36);
+    expect(await heightOf(camilaRow.locator(".evaluation-row-avatar"))).toBe(
+      40,
+    );
+    expect(await fontSizeOf(camilaRow.locator(".evaluation-row-overall"))).toBe(
+      "16px",
+    );
+
+    await openCamila(page);
+    expect(
+      await heightOf(page.locator(".evaluation-sheet .evaluation-avatar")),
+    ).toBe(60);
+    expect(
+      await heightOf(page.getByRole("button", { name: EDIT_RATINGS })),
+    ).toBe(48);
+    await page.getByRole("button", { name: EDIT_RATINGS }).click();
+    for (const name of [/^Cancel$/, SAVE_AND_NEXT]) {
+      expect(
+        await heightOf(page.getByRole("button", { name })),
+        String(name),
+      ).toBe(48);
+    }
+  });
+
   test("la búsqueda, la ficha y el orden sobreviven a recargar (#818)", async ({
     page,
   }) => {
