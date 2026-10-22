@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { GroupsScreen } from "@/components/groups/GroupsScreen";
+import { readCallerRole } from "@/lib/auth/caller-role";
 import { readMetadataContext } from "@/lib/club/metadata-context";
+import { canEmailFromDirectory } from "@/lib/directory/directory-email";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 
 /**
@@ -14,6 +16,10 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
  *
  * Se llega desde la navegación, que sólo la ofrece a quien la frontera deja
  * pasar (#213).
+ *
+ * El rol se lee aquí, en el servidor, sólo para no ofrecerle al Coach
+ * Escribir a todos (#830, D6): quien decide si el correo sale es el endpoint
+ * del Directorio, que al Coach le responde 403.
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -25,5 +31,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function GroupsPage(): Promise<React.JSX.Element> {
-  return <GroupsScreen locale={await readRequestLocale()} />;
+  const [locale, role] = await Promise.all([
+    readRequestLocale(),
+    readCallerRole(),
+  ]);
+  return (
+    <GroupsScreen
+      locale={locale}
+      canWriteEmails={canEmailFromDirectory(role)}
+    />
+  );
 }

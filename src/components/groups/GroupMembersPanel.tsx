@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { EmailRecipient } from "@/components/directory/DirectoryEmailComposer";
 import type {
   GroupRosterMember,
   RejectedMember,
@@ -8,6 +9,7 @@ import type {
 import type { GroupOverview } from "@/lib/groups/groups";
 import type { Translator } from "@/lib/i18n/translator";
 import { compareNames } from "@/lib/text/name-order";
+import { GroupAudienceColumn } from "./GroupAudienceColumn";
 import type { GroupActionResult } from "./GroupNameForm";
 import { GroupMemberList } from "./GroupMemberList";
 import { GroupPanelHeader } from "./GroupPanelHeader";
@@ -28,7 +30,8 @@ import type { PendingAction } from "./use-pending-action";
 
 /**
  * El panel del grupo elegido, a la derecha de la lista (#828, RF-3 de E32):
- * la cabecera con el resumen, renombrar y borrar, y la columna de miembros.
+ * la cabecera con el resumen, renombrar y borrar, la columna de miembros y,
+ * desde #830, la de "Audiencia de" y Escribir a todos.
  *
  * El panel pide sus dos listas al abrirse y las mantiene él. Lo que la lista
  * de la izquierda enseña de este grupo (su conteo y sus avatares) se lo dice a
@@ -63,6 +66,19 @@ function byName<Member extends GroupRosterMember>(
   );
 }
 
+/** A quién escribe "Escribir a todos": los activos, no los pendientes de
+ * activar (D7). `null` mientras no se sabe quiénes son. */
+function emailRecipientsOf(
+  state: RosterState,
+): readonly EmailRecipient[] | null {
+  if (state.kind !== "ready") {
+    return null;
+  }
+  return state.members
+    .filter((member) => !member.isPendingActivation)
+    .map(({ id, fullName }) => ({ userId: id, fullName }));
+}
+
 /** Los rechazados vuelven sólo con su id; el nombre es el que enseñaba el
  * selector. */
 function namedRejections(
@@ -93,6 +109,7 @@ export function GroupMembersPanel({
   onRename,
   onDelete,
   onNotice,
+  onWriteToAll,
 }: {
   translate: Translator;
   group: GroupOverview;
@@ -107,6 +124,8 @@ export function GroupMembersPanel({
   onRename: (name: string) => Promise<GroupActionResult>;
   onDelete: () => void;
   onNotice: (notice: string) => void;
+  /** Abre el redactor del Directorio; `null` si quien mira no puede (D6). */
+  onWriteToAll: ((recipients: readonly EmailRecipient[]) => void) | null;
 }): React.JSX.Element {
   const [state, setState] = useState<RosterState>({ kind: "loading" });
   // Se guarda el fallo y no la frase: el aviso que ya está a la vista cambia
@@ -225,6 +244,11 @@ export function GroupMembersPanel({
         translate={translate}
         group={group}
         notActivatedCount={countNotActivated(state)}
+        writeToAll={
+          onWriteToAll === null
+            ? null
+            : { recipients: emailRecipientsOf(state), onOpen: onWriteToAll }
+        }
         isDisabled={isDisabled}
         isDeleting={pending?.kind === "delete"}
         onRename={onRename}
@@ -240,33 +264,42 @@ export function GroupMembersPanel({
           {describeRejection(translate, rejected)}
         </p>
       )}
-      {state.kind === "loading" ? (
-        <p className="groups-members-empty">
-          {translate("groups.members.loading")}
-        </p>
-      ) : null}
-      {state.kind === "failed" ? (
-        <div className="admin-load-failure groups-panel-error">
-          <p className="auth-error" role="alert">
-            {translate("groups.members.loadFailed")}
-          </p>
-          <button type="button" className="auth-submit" onClick={retryLoad}>
-            {translate("groups.retry")}
-          </button>
+      <div className="groups-panel-body">
+        <div className="groups-panel-members">
+          {state.kind === "loading" ? (
+            <p className="groups-members-empty">
+              {translate("groups.members.loading")}
+            </p>
+          ) : null}
+          {state.kind === "failed" ? (
+            <div className="admin-load-failure groups-panel-error">
+              <p className="auth-error" role="alert">
+                {translate("groups.members.loadFailed")}
+              </p>
+              <button type="button" className="auth-submit" onClick={retryLoad}>
+                {translate("groups.retry")}
+              </button>
+            </div>
+          ) : null}
+          {state.kind === "ready" ? (
+            <GroupMemberList
+              translate={translate}
+              groupName={group.name}
+              roster={state}
+              isDisabled={isDisabled}
+              isAdding={pending?.kind === "assign"}
+              isNewGroup={isNewGroup}
+              onAdd={addMany}
+              onRemove={(member) => remove(state, member)}
+            />
+          ) : null}
         </div>
-      ) : null}
-      {state.kind === "ready" ? (
-        <GroupMemberList
+        <GroupAudienceColumn
           translate={translate}
-          groupName={group.name}
-          roster={state}
-          isDisabled={isDisabled}
-          isAdding={pending?.kind === "assign"}
-          isNewGroup={isNewGroup}
-          onAdd={addMany}
-          onRemove={(member) => remove(state, member)}
+          groupId={group.id}
+          onGroupGone={onGroupGone}
         />
-      ) : null}
+      </div>
     </section>
   );
 }

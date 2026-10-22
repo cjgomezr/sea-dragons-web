@@ -1,11 +1,17 @@
 "use client";
 
+import { AddressBook } from "@phosphor-icons/react/dist/ssr/AddressBook";
 import { Check } from "@phosphor-icons/react/dist/ssr/Check";
+import { EnvelopeSimple } from "@phosphor-icons/react/dist/ssr/EnvelopeSimple";
 import { PencilSimple } from "@phosphor-icons/react/dist/ssr/PencilSimple";
 import { Trash } from "@phosphor-icons/react/dist/ssr/Trash";
 import { X } from "@phosphor-icons/react/dist/ssr/X";
+import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
+import type { EmailRecipient } from "@/components/directory/DirectoryEmailComposer";
+import { DIRECTORY_PATH } from "@/lib/auth/routes";
+import { GROUP_QUERY_PARAM } from "@/lib/directory/directory-query";
 import { GROUP_NAME_MAX_LENGTH, type GroupOverview } from "@/lib/groups/groups";
 import type { Translator } from "@/lib/i18n/translator";
 import type { GroupActionResult } from "./GroupNameForm";
@@ -21,6 +27,49 @@ import { describeDeletion, describeSummary } from "./group-texts";
  */
 
 type HeaderMode = "viewing" | "renaming" | "confirmingDelete";
+
+/** Escribir a todos (#830, D5 a D7). `recipients` es `null` mientras los
+ * miembros no han llegado: el botón espera sin decir que no hay nadie. */
+export type WriteToAll = {
+  readonly recipients: readonly EmailRecipient[] | null;
+  readonly onOpen: (recipients: readonly EmailRecipient[]) => void;
+};
+
+/** El Directorio filtrado por el grupo, con su ficha (D8). */
+function directoryHref(groupId: string): string {
+  return `${DIRECTORY_PATH}?${GROUP_QUERY_PARAM}=${groupId}`;
+}
+
+function WriteToAllButton({
+  translate,
+  groupName,
+  writeToAll,
+  isDisabled,
+}: {
+  translate: Translator;
+  groupName: string;
+  writeToAll: WriteToAll;
+  isDisabled: boolean;
+}): React.JSX.Element {
+  const { recipients, onOpen } = writeToAll;
+  const hasNobody = recipients !== null && recipients.length === 0;
+  return (
+    <button
+      type="button"
+      className="groups-icon-button"
+      aria-label={translate("groups.writeAll", { name: groupName })}
+      title={hasNobody ? translate("groups.writeAll.nobody") : undefined}
+      disabled={isDisabled || recipients === null || hasNobody}
+      onClick={() => {
+        if (recipients !== null) {
+          onOpen(recipients);
+        }
+      }}
+    >
+      <Icon glyph={EnvelopeSimple} />
+    </button>
+  );
+}
 
 function RenameForm({
   translate,
@@ -148,6 +197,7 @@ export function GroupPanelHeader({
   translate,
   group,
   notActivatedCount,
+  writeToAll,
   isDisabled,
   isDeleting,
   onRename,
@@ -156,6 +206,8 @@ export function GroupPanelHeader({
   translate: Translator;
   group: GroupOverview;
   notActivatedCount: number;
+  /** `null` para quien no escribe desde el Directorio: el Coach (D6). */
+  writeToAll: WriteToAll | null;
   /** Hay una acción en vuelo en la pantalla. */
   isDisabled: boolean;
   /** La que está en vuelo es el borrado de este grupo. */
@@ -215,6 +267,21 @@ export function GroupPanelHeader({
           campo tiraba el nombre escrito con un mal toque. */}
       {mode === "renaming" ? null : (
         <div className="groups-panel-actions">
+          {writeToAll === null ? null : (
+            <WriteToAllButton
+              translate={translate}
+              groupName={group.name}
+              writeToAll={writeToAll}
+              isDisabled={isDisabled}
+            />
+          )}
+          <Link
+            className="groups-icon-button"
+            href={directoryHref(group.id)}
+            aria-label={translate("groups.openDirectory", { name: group.name })}
+          >
+            <Icon glyph={AddressBook} />
+          </Link>
           <button
             ref={renameRef}
             type="button"

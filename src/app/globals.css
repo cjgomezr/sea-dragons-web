@@ -4446,6 +4446,11 @@ a.auth-brand-header:focus-visible {
   cursor: pointer;
 }
 
+/* Abrir en el directorio es un enlace con forma de botón (#830). */
+a.groups-icon-button {
+  text-decoration: none;
+}
+
 .groups-icon-button:hover:not(:disabled) {
   background: var(--color-hover);
 }
@@ -4520,6 +4525,123 @@ a.auth-brand-header:focus-visible {
 
 .groups-text-button:hover:not(:disabled) {
   background: var(--color-hover);
+}
+
+/* El cuerpo del panel (#830, D13): desde 1280px los miembros y "Audiencia de"
+   van lado a lado, `1fr | 260px`, con una línea entre los dos. Por debajo,
+   "Audiencia de" va encima de los miembros, como en el móvil. */
+.groups-panel-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.groups-panel-members {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.groups-audience {
+  order: -1;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+@media (min-width: 1280px) {
+  .groups-panel-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    align-items: stretch;
+  }
+
+  .groups-audience {
+    order: 0;
+    border-bottom: none;
+    border-left: 1px solid var(--color-border);
+  }
+}
+
+.app-main .groups-audience-heading {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+}
+
+.groups-audience-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.groups-audience-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  margin: 0 calc(-1 * var(--space-2));
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.groups-audience-row:hover {
+  background: var(--color-hover);
+}
+
+.groups-audience-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  border-radius: var(--radius);
+}
+
+.groups-audience-tile-event {
+  color: var(--color-accent-text);
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.groups-audience-tile-post {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+}
+
+.groups-audience-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.groups-audience-title {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groups-audience-date,
+.groups-audience-more,
+.groups-audience-empty {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.groups-audience-more {
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.groups-audience-empty {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .groups-panel-error {

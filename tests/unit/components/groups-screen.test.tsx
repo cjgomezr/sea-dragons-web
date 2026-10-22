@@ -6,6 +6,11 @@ import type {
   GroupCandidate,
   GroupRosterMember,
 } from "@/lib/groups/group-members";
+import type {
+  AudienceEvent,
+  AudiencePost,
+  GroupAudience,
+} from "@/lib/groups/group-audience";
 import type { GroupOverview } from "@/lib/groups/groups";
 
 /**
@@ -91,6 +96,13 @@ type ApiStub = {
     userIds: readonly string[],
   ) => Response | Promise<Response>;
   readonly removeMember?: Respond;
+  readonly audience?: GroupAudience;
+  readonly loadAudience?: Respond;
+};
+
+const NO_AUDIENCE: GroupAudience = {
+  events: { items: [], total: 0 },
+  posts: { items: [], total: 0 },
 };
 
 const calls: ApiCall[] = [];
@@ -113,6 +125,8 @@ const GROUP_PATH = /^\/api\/v1\/groups\/([^/]+)$/;
 const MEMBERS_PATH = /^\/api\/v1\/groups\/([^/]+)\/members$/;
 const CANDIDATES_PATH = /^\/api\/v1\/groups\/([^/]+)\/candidates$/;
 const MEMBERSHIP_PATH = /^\/api\/v1\/groups\/([^/]+)\/members\/([^/]+)$/;
+const AUDIENCE_PATH = /^\/api\/v1\/groups\/([^/]+)\/audience$/;
+const DIRECTORY_EMAILS_PATH = "/api/v1/directory/emails";
 
 const CREATED_ID = "99999999-0000-4000-8000-000000000009";
 
@@ -196,13 +210,32 @@ function stubApi(stub: ApiStub = {}): void {
       if (MEMBERS_PATH.test(url) || CANDIDATES_PATH.test(url)) {
         return stub.loadDetail?.(url) ?? detailResponse(stub, url);
       }
+      if (AUDIENCE_PATH.test(url)) {
+        return (
+          stub.loadAudience?.() ??
+          jsonResponse(200, { data: stub.audience ?? NO_AUDIENCE })
+        );
+      }
+      if (url === DIRECTORY_EMAILS_PATH) {
+        return method === "GET"
+          ? jsonResponse(200, { data: { limit: 90, remaining: 90 } })
+          : jsonResponse(200, {
+              data: { sentCount: 1, failed: [], remaining: 89 },
+            });
+      }
       throw new Error(`Petición inesperada: ${method} ${url}`);
     }),
   );
 }
 
-async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
-  render(<GroupsScreen locale={locale} />);
+/** Por defecto mira un Admin, que puede escribir desde el Directorio. */
+async function renderScreen(
+  locale: "en" | "es" = "en",
+  options: { readonly canWriteEmails: boolean } = { canWriteEmails: true },
+): Promise<void> {
+  render(
+    <GroupsScreen locale={locale} canWriteEmails={options.canWriteEmails} />,
+  );
   await screen.findByRole("region", {
     name: locale === "en" ? "Club groups" : "Grupos del club",
   });
@@ -404,7 +437,7 @@ describe("la lista de grupos", () => {
           : jsonResponse(200, { data: { groups: [SENIOR] } });
       },
     });
-    render(<GroupsScreen locale="en" />);
+    render(<GroupsScreen locale="en" canWriteEmails />);
 
     expect(
       await screen.findByText("We couldn't load the club's groups."),
@@ -422,7 +455,7 @@ describe("la lista de grupos", () => {
         throw new TypeError("Failed to fetch");
       },
     });
-    render(<GroupsScreen locale="en" />);
+    render(<GroupsScreen locale="en" canWriteEmails />);
 
     expect(
       await screen.findByText(
@@ -1878,5 +1911,429 @@ describe("los avisos de cada cambio", () => {
       vi.advanceTimersByTime(200);
     });
     expect(statusNotice()).toBeEmptyDOMElement();
+  });
+});
+
+const ISLAND_CUP: AudienceEvent = {
+  kind: "event",
+  id: "e0000000-0000-4000-8000-000000000001",
+  title: "Island Cup",
+  startsOn: "2026-10-24",
+  startTime: "09:00",
+};
+
+const WEDNESDAY_NEXT_SESSION_ID = "e0000000-0000-4000-8000-000000000003";
+
+const WEDNESDAY_TRAINING: AudienceEvent = {
+  kind: "series",
+  id: "e0000000-0000-4000-8000-000000000002",
+  title: "Wednesday training",
+  weekdays: [3],
+  startTime: "18:00",
+  nextSession: {
+    id: WEDNESDAY_NEXT_SESSION_ID,
+    startsOn: "2026-10-28",
+  },
+};
+
+const TRAVEL_PLAN: AudiencePost = {
+  id: "f0000000-0000-4000-8000-000000000001",
+  title: "Island Cup travel plan",
+  // El 12 de octubre en Melbourne, aunque en UTC sea aún el 11.
+  publishedAt: "2026-10-11T22:00:00Z",
+};
+
+const USED_AUDIENCE: GroupAudience = {
+  events: { items: [WEDNESDAY_TRAINING, ISLAND_CUP], total: 2 },
+  posts: { items: [TRAVEL_PLAN], total: 1 },
+};
+
+/** El evento, sin la noticia que también empieza por "Island Cup". */
+const ISLAND_CUP_LINK = /^Island Cup(?! travel)/;
+
+function audienceSection(panel: HTMLElement): HTMLElement {
+  return within(panel).getByRole("region", {
+    name: /^(AUDIENCE OF|AUDIENCIA DE)$/,
+  });
+}
+
+/** Abre el grupo y espera a que su audiencia haya llegado, en cualquier
+ * idioma. */
+async function openAudience(name: string): Promise<HTMLElement> {
+  await selectGroup(name);
+  const panel = groupPanel(name);
+  const section = audienceSection(panel);
+  await waitFor(() =>
+    expect(within(section).queryByText(/Loading|Cargando/)).toBeNull(),
+  );
+  return section;
+}
+
+function manyEvents(count: number): AudienceEvent[] {
+  return Array.from({ length: count }, (_, index) => ({
+    ...ISLAND_CUP,
+    id: `e0000000-0000-4000-8000-00000000010${index}`,
+    title: `Match ${index + 1}`,
+  }));
+}
+
+function manyPosts(count: number): AudiencePost[] {
+  return Array.from({ length: count }, (_, index) => ({
+    ...TRAVEL_PLAN,
+    id: `f0000000-0000-4000-8000-00000000010${index}`,
+    title: `Post ${index + 1}`,
+  }));
+}
+
+describe("la audiencia del grupo", () => {
+  it("pide la audiencia del grupo elegido", async () => {
+    stubApi({ groups: [SENIOR], audience: USED_AUDIENCE });
+    await renderScreen();
+
+    await openAudience("Senior Squad");
+
+    expect(calls.map((call) => call.url)).toContain(
+      `/api/v1/groups/${SENIOR.id}/audience`,
+    );
+  });
+
+  it("cada evento y cada noticia es un enlace a su página, con su título y su fecha", async () => {
+    stubApi({ groups: [SENIOR], audience: USED_AUDIENCE });
+    await renderScreen();
+
+    const section = await openAudience("Senior Squad");
+
+    const series = within(section).getByRole("link", {
+      name: /Wednesday training/,
+    });
+    const event = within(section).getByRole("link", { name: ISLAND_CUP_LINK });
+    const post = within(section).getByRole("link", {
+      name: /Island Cup travel plan/,
+    });
+    expect(series).toHaveAttribute(
+      "href",
+      `/calendario?evento=${WEDNESDAY_NEXT_SESSION_ID}`,
+    );
+    expect(series).toHaveTextContent("Weekly · Wed 6:00 pm");
+    expect(event).toHaveAttribute(
+      "href",
+      `/calendario?evento=${ISLAND_CUP.id}`,
+    );
+    expect(event).toHaveTextContent("Sat 24 Oct");
+    expect(post).toHaveAttribute("href", `/noticias/${TRAVEL_PLAN.id}`);
+    expect(post).toHaveTextContent("Posted 12 Oct");
+  });
+
+  it("en español, las fechas salen como en el diseño", async () => {
+    stubApi({ groups: [SENIOR], audience: USED_AUDIENCE });
+    await renderScreen("es");
+
+    const section = await openAudience("Senior Squad");
+
+    expect(
+      within(section).getByRole("link", { name: /Wednesday training/ }),
+    ).toHaveTextContent("Semanal · mié 18:00");
+    expect(
+      within(section).getByRole("link", { name: ISLAND_CUP_LINK }),
+    ).toHaveTextContent("sáb 24 oct");
+    expect(
+      within(section).getByRole("link", { name: /travel plan/ }),
+    ).toHaveTextContent("Publicada el 12 oct");
+  });
+
+  it("los eventos van antes que las noticias, en el orden del servidor", async () => {
+    stubApi({ groups: [SENIOR], audience: USED_AUDIENCE });
+    await renderScreen();
+
+    const section = await openAudience("Senior Squad");
+
+    expect(
+      within(section)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual([
+      expect.stringContaining("Wednesday training"),
+      expect.stringContaining("Island Cup"),
+      expect.stringContaining("Island Cup travel plan"),
+    ]);
+  });
+
+  it("con más de 5 eventos o noticias enseña 5 de cada uno y cuántos más hay", async () => {
+    stubApi({
+      groups: [SENIOR],
+      audience: {
+        events: { items: manyEvents(5), total: 8 },
+        posts: { items: manyPosts(5), total: 6 },
+      },
+    });
+    await renderScreen();
+
+    const section = await openAudience("Senior Squad");
+
+    expect(within(section).getAllByRole("link")).toHaveLength(10);
+    expect(within(section).getByText("+ 3 more")).toBeVisible();
+    expect(within(section).getByText("+ 1 more")).toBeVisible();
+  });
+
+  it("con 5 justos no dice que haya más", async () => {
+    stubApi({
+      groups: [SENIOR],
+      audience: {
+        events: { items: manyEvents(5), total: 5 },
+        posts: { items: [], total: 0 },
+      },
+    });
+    await renderScreen();
+
+    const section = await openAudience("Senior Squad");
+
+    expect(within(section).queryByText(/more/)).toBeNull();
+  });
+
+  it("un grupo sin uso invita a elegirlo como audiencia", async () => {
+    stubApi({ groups: [SENIOR], audience: NO_AUDIENCE });
+    await renderScreen();
+
+    const section = await openAudience("Senior Squad");
+
+    expect(
+      within(section).getByText(
+        "Not used yet. Pick it as the audience when you create an event or a news post.",
+      ),
+    ).toBeVisible();
+    expect(within(section).queryAllByRole("link")).toEqual([]);
+  });
+
+  it("en español, el grupo sin uso lo dice en español", async () => {
+    stubApi({ groups: [SENIOR], audience: NO_AUDIENCE });
+    await renderScreen("es");
+
+    const section = await openAudience("Senior Squad");
+
+    expect(
+      within(section).getByText(
+        "Sin usar todavía. Elígelo como audiencia al crear un evento o una noticia.",
+      ),
+    ).toBeVisible();
+  });
+
+  it("un error al cargar la audiencia deja volver a intentarlo", async () => {
+    let attempts = 0;
+    stubApi({
+      groups: [SENIOR],
+      loadAudience: () => {
+        attempts += 1;
+        return attempts === 1
+          ? errorResponse(500, "internal_error")
+          : jsonResponse(200, { data: USED_AUDIENCE });
+      },
+    });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+    const section = audienceSection(panel);
+
+    await within(section).findByText(
+      "We couldn't load where this group is used.",
+    );
+    await userEvent
+      .setup()
+      .click(within(section).getByRole("button", { name: "Try again" }));
+
+    await within(section).findByRole("link", { name: ISLAND_CUP_LINK });
+  });
+
+  it("un grupo que otro borró vuelve a elegir y lo explica", async () => {
+    stubApi({
+      groups: [SENIOR, MASTERS],
+      loadAudience: () => errorResponse(404, "not_found"),
+    });
+    await renderScreen();
+
+    await userEvent.setup().click(groupRow("Senior Squad"));
+
+    await screen.findByText("That group is no longer in the club.");
+    expect(rowNames()).toEqual(["Masters Squad"]);
+  });
+});
+
+describe("escribir a todos y abrir en el directorio", () => {
+  const PENDING_ANA: GroupCandidate = { ...ANA, isPendingActivation: true };
+
+  it("un Admin o un Committee ve Escribir a todos", async () => {
+    stubApi({ groups: [SENIOR], members: [NEREA] });
+    await renderScreen();
+
+    const panel = await openGroup("Senior Squad");
+
+    expect(
+      within(panel).getByRole("button", {
+        name: "Email everyone in Senior Squad",
+      }),
+    ).toBeEnabled();
+  });
+
+  it("un Coach no ve Escribir a todos", async () => {
+    stubApi({ groups: [SENIOR], members: [NEREA] });
+    await renderScreen("en", { canWriteEmails: false });
+
+    const panel = await openGroup("Senior Squad");
+
+    expect(
+      within(panel).queryByRole("button", { name: /Email everyone/ }),
+    ).toBeNull();
+    expect(
+      within(panel).getByRole("link", {
+        name: "Open Senior Squad in the directory",
+      }),
+    ).toBeVisible();
+  });
+
+  it("sin miembros activos, Escribir a todos está desactivado y dice por qué", async () => {
+    stubApi({ groups: [SENIOR], members: [PENDING_ANA] });
+    await renderScreen();
+
+    const panel = await openGroup("Senior Squad");
+
+    const button = within(panel).getByRole("button", {
+      name: "Email everyone in Senior Squad",
+    });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("title", "Nobody to write to");
+  });
+
+  it("en español, el botón desactivado dice que no hay a quién escribir", async () => {
+    stubApi({ groups: [SENIOR], members: [] });
+    await renderScreen("es");
+    await userEvent.setup().click(groupRow("Senior Squad"));
+
+    const button = await screen.findByRole("button", {
+      name: "Escribir a todos en Senior Squad",
+    });
+    await waitFor(() => expect(button).toBeDisabled());
+    expect(button).toHaveAttribute("title", "Nadie a quien escribir");
+  });
+
+  it("abre el redactor del Directorio con los miembros activos del grupo, sin los pendientes", async () => {
+    stubApi({ groups: [SENIOR], members: [NEREA, PENDING_ANA, TOMAS] });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+
+    await userEvent.setup().click(
+      within(panel).getByRole("button", {
+        name: "Email everyone in Senior Squad",
+      }),
+    );
+
+    const composer = await screen.findByRole("region", {
+      name: "Email members",
+    });
+    const recipients = within(composer).getByRole("list", {
+      name: "2 recipients",
+    });
+    expect(within(recipients).getByText("Nerea Ruiz")).toBeVisible();
+    expect(within(recipients).getByText("Tomás Errekondo")).toBeVisible();
+    expect(within(recipients).queryByText("Ana Admin")).toBeNull();
+  });
+
+  it("al enviar, manda a los activos con una clave de petición por el endpoint del Directorio", async () => {
+    stubApi({ groups: [SENIOR], members: [NEREA, PENDING_ANA] });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+    const user = userEvent.setup();
+    await user.click(
+      within(panel).getByRole("button", {
+        name: "Email everyone in Senior Squad",
+      }),
+    );
+    await user.type(screen.getByRole("textbox", { name: "Subject" }), "Hola");
+    await user.type(screen.getByRole("textbox", { name: "Message" }), "Mar.");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Send the email?",
+    });
+
+    await user.click(within(dialog).getByRole("button", { name: "Send now" }));
+
+    await waitFor(() =>
+      expect(
+        calls.filter(
+          (call) =>
+            call.url === DIRECTORY_EMAILS_PATH && call.method === "POST",
+        ),
+      ).toEqual([
+        {
+          url: DIRECTORY_EMAILS_PATH,
+          method: "POST",
+          body: {
+            requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+            subject: "Hola",
+            message: "Mar.",
+            recipientIds: [NEREA.id],
+          },
+        },
+      ]),
+    );
+  });
+
+  it("con el redactor abierto, Escribir a todos en otro grupo le escribe a ese grupo", async () => {
+    stubApi({
+      groups: [SENIOR, MASTERS],
+      loadDetail: (url) =>
+        MEMBERS_PATH.test(url)
+          ? jsonResponse(200, {
+              data: { members: url.includes(SENIOR.id) ? [NEREA] : [TOMAS] },
+            })
+          : null,
+    });
+    await renderScreen();
+    const user = userEvent.setup();
+    const senior = await openGroup("Senior Squad");
+    await user.click(
+      within(senior).getByRole("button", {
+        name: "Email everyone in Senior Squad",
+      }),
+    );
+
+    const masters = await openGroup("Masters Squad");
+    await user.click(
+      within(masters).getByRole("button", {
+        name: "Email everyone in Masters Squad",
+      }),
+    );
+
+    const recipients = within(
+      screen.getByRole("region", { name: "Email members" }),
+    ).getByRole("list", { name: "1 recipient" });
+    expect(within(recipients).getByText("Tomás Errekondo")).toBeVisible();
+    expect(within(recipients).queryByText("Nerea Ruiz")).toBeNull();
+  });
+
+  it("cerrar el redactor lo quita", async () => {
+    stubApi({ groups: [SENIOR], members: [NEREA] });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+    const user = userEvent.setup();
+    await user.click(
+      within(panel).getByRole("button", {
+        name: "Email everyone in Senior Squad",
+      }),
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Close" }));
+
+    expect(screen.queryByRole("region", { name: "Email members" })).toBeNull();
+  });
+
+  it("Abrir en el directorio lleva al Directorio filtrado por el grupo", async () => {
+    stubApi({ groups: [SENIOR], members: [NEREA] });
+    await renderScreen();
+
+    const panel = await openGroup("Senior Squad");
+
+    expect(
+      within(panel).getByRole("link", {
+        name: "Open Senior Squad in the directory",
+      }),
+    ).toHaveAttribute("href", `/directorio?group=${SENIOR.id}`);
   });
 });

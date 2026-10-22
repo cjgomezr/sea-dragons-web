@@ -3802,12 +3802,90 @@ const STUBBED_GROUPS = [
 ];
 
 const OPENED_GROUP_NAME = "Senior Squad";
+const AUDIENCE_HEADING = "AUDIENCE OF";
 
-/** Las tres lecturas de la sección, con datos fijos. Registradas antes de
+/** "Audiencia de" (#830). Las fechas son fijas: la pantalla las pinta tal
+ * cual llegan, sin compararlas con hoy. */
+const STUBBED_AUDIENCE_EVENT = {
+  kind: "event",
+  id: "e0000000-0000-4000-8000-000000000001",
+  title: "Island Cup",
+  startsOn: "2026-10-24",
+  startTime: "09:00",
+};
+
+const STUBBED_AUDIENCE_SERIES = {
+  kind: "series",
+  id: "e0000000-0000-4000-8000-000000000002",
+  title: "Wednesday training at the Melbourne Sports and Aquatic Centre",
+  weekdays: [3],
+  startTime: "18:00",
+  nextSession: {
+    id: "e0000000-0000-4000-8000-000000000003",
+    startsOn: "2026-10-28",
+  },
+};
+
+const STUBBED_AUDIENCE_POST = {
+  id: "f0000000-0000-4000-8000-000000000001",
+  title: "Island Cup travel plan",
+  publishedAt: "2026-10-12T01:00:00Z",
+};
+
+type StubbedAudience = {
+  readonly events: {
+    readonly items: readonly unknown[];
+    readonly total: number;
+  };
+  readonly posts: {
+    readonly items: readonly unknown[];
+    readonly total: number;
+  };
+};
+
+/** La que corresponde al uso de "Senior Squad" en la lista: 2 eventos y 1
+ * noticia. */
+const STUBBED_AUDIENCE: StubbedAudience = {
+  events: {
+    items: [STUBBED_AUDIENCE_SERIES, STUBBED_AUDIENCE_EVENT],
+    total: 2,
+  },
+  posts: { items: [STUBBED_AUDIENCE_POST], total: 1 },
+};
+
+/** Más de cinco de cada uno: salen cinco y "+ {n} más". */
+const STUBBED_LARGE_AUDIENCE: StubbedAudience = {
+  events: {
+    items: Array.from({ length: 5 }, (_, index) => ({
+      ...STUBBED_AUDIENCE_EVENT,
+      id: `e0000000-0000-4000-8000-00000000010${index}`,
+      title: `Island Cup match ${index + 1}`,
+    })),
+    total: 8,
+  },
+  posts: {
+    items: Array.from({ length: 5 }, (_, index) => ({
+      ...STUBBED_AUDIENCE_POST,
+      id: `f0000000-0000-4000-8000-00000000010${index}`,
+      title: `Island Cup update ${index + 1}`,
+    })),
+    total: 6,
+  },
+};
+
+const STUBBED_EMPTY_AUDIENCE: StubbedAudience = {
+  events: { items: [], total: 0 },
+  posts: { items: [], total: 0 },
+};
+
+/** Las lecturas de la sección, con datos fijos. Registradas antes de
  * navegar, para que la pantalla no llegue a ver las de verdad. */
 async function stubGroupsReads(
   page: Page,
-  options: { readonly withGroups: boolean },
+  options: {
+    readonly withGroups: boolean;
+    readonly audience?: StubbedAudience;
+  },
 ): Promise<void> {
   await page.route(
     (url) => url.pathname === GROUPS_ENDPOINT,
@@ -3840,6 +3918,17 @@ async function stubGroupsReads(
         }),
       }),
   );
+  await page.route(
+    (url) => /^\/api\/v1\/groups\/[^/]+\/audience$/.test(url.pathname),
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: options.audience ?? STUBBED_AUDIENCE,
+        }),
+      }),
+  );
 }
 
 const NEW_GROUP_FIELD = /^(New group name|Nombre del grupo nuevo)$/;
@@ -3859,7 +3948,11 @@ async function waitForGroups(page: Page, withGroups: boolean): Promise<void> {
   }
 }
 
-/** Elige el grupo con miembros y espera a que su lista haya llegado. */
+const AUDIENCE_LOADING =
+  /^(Loading where this group is used…|Cargando dónde se usa este grupo…)$/;
+
+/** Elige el grupo con miembros y espera a que su lista y su audiencia hayan
+ * llegado. */
 async function selectGroup(page: Page): Promise<void> {
   await page
     .getByRole("button", { name: OPENED_GROUP_NAME, exact: true })
@@ -3867,6 +3960,7 @@ async function selectGroup(page: Page): Promise<void> {
   await expect(
     page.getByRole("searchbox", { name: GROUP_SEARCH }),
   ).toBeVisible();
+  await expect(page.getByText(AUDIENCE_LOADING)).toHaveCount(0);
   // El puntero se queda encima de la fila y su hover taparía el elegido.
   await page.mouse.move(0, 0);
 }
@@ -3888,6 +3982,12 @@ async function startRenamingGroup(page: Page): Promise<void> {
     page.getByRole("textbox", { name: `New name for ${OPENED_GROUP_NAME}` }),
   ).toBeFocused();
 }
+
+type GroupsViewport = {
+  readonly name: string;
+  readonly width: number;
+  readonly height: number;
+};
 
 const OPEN_PICKER_BUTTON = /^(Add members|Añadir miembros)$/;
 const PICKER_LABEL = `Add members to ${OPENED_GROUP_NAME}`;
@@ -3913,6 +4013,9 @@ async function chooseThreeCandidates(page: Page): Promise<void> {
 type GroupsState = {
   readonly name: string;
   readonly withGroups: boolean;
+  readonly audience?: StubbedAudience;
+  /** Los de `GROUPS_VIEWPORTS` si no se dicen. */
+  readonly viewports?: readonly GroupsViewport[];
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
 };
@@ -3923,10 +4026,29 @@ const SPANISH_GROUPS_HEADING = "Grupos del club";
 /** El escritorio de #828 (RF-2 de E32). Por debajo de 1024px va el flujo del
  * móvil, que es otro ticket (D13): ahí sólo se comprueba que no hay scroll
  * horizontal. */
-const GROUPS_VIEWPORTS = [
-  { name: "desktop-1024", width: 1024, height: 900 },
-  { name: "desktop", width: 1440, height: 900 },
-] as const;
+const GROUPS_DESKTOP_1024: GroupsViewport = {
+  name: "desktop-1024",
+  width: 1024,
+  height: 900,
+};
+const GROUPS_DESKTOP: GroupsViewport = {
+  name: "desktop",
+  width: 1440,
+  height: 900,
+};
+
+const GROUPS_VIEWPORTS: readonly GroupsViewport[] = [
+  GROUPS_DESKTOP_1024,
+  GROUPS_DESKTOP,
+];
+
+/** "Audiencia de" pasa al lado de los miembros desde 1280px (#830, D13): sus
+ * estados se fotografían también justo ahí. */
+const GROUPS_AUDIENCE_VIEWPORTS: readonly GroupsViewport[] = [
+  GROUPS_DESKTOP_1024,
+  { name: "desktop-1280", width: 1280, height: 900 },
+  GROUPS_DESKTOP,
+];
 
 const GROUPS_NARROW_WIDTHS = [375, 768] as const;
 
@@ -3951,6 +4073,20 @@ const GROUPS_STATES: readonly GroupsState[] = [
     name: "grupos-renombrando",
     withGroups: true,
     prepare: startRenamingGroup,
+  },
+  {
+    name: "grupos-audiencia",
+    withGroups: true,
+    audience: STUBBED_LARGE_AUDIENCE,
+    viewports: GROUPS_AUDIENCE_VIEWPORTS,
+    prepare: selectGroup,
+  },
+  {
+    name: "grupos-audiencia-vacia",
+    withGroups: true,
+    audience: STUBBED_EMPTY_AUDIENCE,
+    viewports: GROUPS_AUDIENCE_VIEWPORTS,
+    prepare: selectGroup,
   },
   { name: "grupos-anadir", withGroups: true, prepare: chooseThreeCandidates },
 ];
@@ -3977,7 +4113,7 @@ for (const state of GROUPS_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of GROUPS_VIEWPORTS) {
+    for (const vp of state.viewports ?? GROUPS_VIEWPORTS) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -4088,6 +4224,81 @@ test.describe("la sección Grupos en escritorio", () => {
     expect(rename?.height).toBe(38);
     expect(remove?.width).toBe(32);
     expect(remove?.height).toBe(32);
+  });
+
+  test("Escribir a todos y Abrir en el directorio miden 38px como los demás", async ({
+    page,
+  }) => {
+    await goToGroups(page, { name: "grupos-panel", withGroups: true });
+    await selectGroup(page);
+
+    const writeAll = await page
+      .getByRole("button", { name: `Email everyone in ${OPENED_GROUP_NAME}` })
+      .boundingBox();
+    const directory = await page
+      .getByRole("link", { name: `Open ${OPENED_GROUP_NAME} in the directory` })
+      .boundingBox();
+    expect(writeAll?.width).toBe(38);
+    expect(writeAll?.height).toBe(38);
+    expect(directory?.width).toBe(38);
+    expect(directory?.height).toBe(38);
+  });
+
+  test("cada fila de la audiencia mide al menos 44px", async ({ page }) => {
+    await goToGroups(page, { name: "grupos-panel", withGroups: true });
+    await selectGroup(page);
+
+    const rows = page
+      .getByRole("region", { name: AUDIENCE_HEADING })
+      .getByRole("link");
+    for (const row of await rows.all()) {
+      expect((await row.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    }
+  });
+});
+
+/** El cuerpo del panel (#830, D13): desde 1280px, miembros `1fr` y
+ * "Audiencia de" de 260px lado a lado; por debajo, la audiencia encima. */
+test.describe("el cuerpo del panel de un grupo", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  async function measureBody(
+    page: Page,
+  ): Promise<{ readonly audience: Box; readonly members: Box }> {
+    await goToGroups(page, { name: "grupos-panel", withGroups: true });
+    await selectGroup(page);
+    const panel = page.getByRole("region", { name: OPENED_GROUP_NAME });
+    const audience = await panel
+      .getByRole("region", { name: AUDIENCE_HEADING })
+      .boundingBox();
+    const members = await panel
+      .getByRole("searchbox", { name: GROUP_SEARCH })
+      .boundingBox();
+    if (audience === null || members === null) {
+      throw new Error("El panel no pintó la audiencia o los miembros.");
+    }
+    return { audience, members };
+  }
+
+  test("a 1280px la audiencia mide 260px y va a la derecha de los miembros", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    const { audience, members } = await measureBody(page);
+
+    expect(audience.width).toBe(260);
+    expect(audience.x).toBeGreaterThan(members.x + members.width);
+  });
+
+  test("a 1024px la audiencia va encima de los miembros", async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 900 });
+
+    const { audience, members } = await measureBody(page);
+
+    expect(audience.y + audience.height).toBeLessThanOrEqual(members.y);
   });
 });
 

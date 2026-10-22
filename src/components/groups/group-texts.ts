@@ -1,14 +1,22 @@
+import type { AudienceEvent, AudiencePost } from "@/lib/groups/group-audience";
 import type { RejectionReason } from "@/lib/groups/group-members";
 import type { GroupUsage } from "@/lib/groups/group-overview";
 import type { GroupOverview } from "@/lib/groups/groups";
+import {
+  formatClockTime,
+  formatClubCompactDay,
+  formatDashboardDay,
+  formatWeekdayName,
+} from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import type { RosterCandidate } from "./groups-client";
 
 /**
  * Las frases de la pantalla Grupos que se arman a trozos (#828, E32): el uso
- * de un grupo, el resumen de su panel, el aviso de borrarlo (D11) y las del
- * selector de añadir a varios (#829). Cada trozo sale del catálogo; aquí sólo
- * se decide cuáles van y en qué orden.
+ * de un grupo, el resumen de su panel, el aviso de borrarlo (D11), las del
+ * selector de añadir a varios (#829) y la fecha de lo que lo tiene de
+ * audiencia (#830). Cada trozo sale del catálogo; aquí sólo se decide
+ * cuáles van y en qué orden.
  */
 
 const PART_SEPARATOR = " · ";
@@ -88,6 +96,37 @@ export function describeDeletion(
     uses: describeLostUses(translate, usage),
   });
   return `${used} ${describeFallback(translate, usage)}`;
+}
+
+const WEEKDAY_SEPARATOR = ", ";
+
+/** "Weekly · Wed 6:00 pm" para una serie, "Sat 24 Oct" para un evento suelto
+ * (RF-5): la fila dice cuándo es, sin el año, igual que el inicio. */
+export function describeAudienceEventDate(
+  translate: Translator,
+  event: AudienceEvent,
+): string {
+  const { locale } = translate;
+  if (event.kind === "event") {
+    return formatDashboardDay(locale, event.startsOn);
+  }
+  const days = event.weekdays
+    .map((weekday) => formatWeekdayName(locale, weekday, "short"))
+    .join(WEEKDAY_SEPARATOR);
+  return translate("groups.audience.weekly", {
+    days,
+    time: formatClockTime(locale, event.startTime),
+  });
+}
+
+/** "Posted 12 Oct": el día del club en que salió, sin el año. */
+export function describeAudiencePostDate(
+  translate: Translator,
+  post: AudiencePost,
+): string {
+  return translate("groups.audience.posted", {
+    date: formatClubCompactDay(translate.locale, new Date(post.publishedAt)),
+  });
 }
 
 /** "Forward · in 2 groups" en la fila del selector, sin la parte que no se
