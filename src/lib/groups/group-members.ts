@@ -82,6 +82,26 @@ export type MembershipInsertResult =
 export type MembershipDeletionResult =
   { readonly kind: "removed" } | { readonly kind: "group_not_found" };
 
+/** Por qué un socio pedido en el alta masiva no entró (D3 de E32): está dado
+ * de baja, o no es del club de quien llama (o no existe, que se responde
+ * igual). */
+export type RejectionReason = "inactive" | "not_in_club";
+
+export type RejectedMember = {
+  readonly userId: string;
+  readonly reason: RejectionReason;
+};
+
+/** La lista del grupo y sus candidatos, leídas a la vez. */
+export type GroupRoster = {
+  readonly members: readonly GroupRosterMember[];
+  readonly candidates: readonly GroupCandidate[];
+};
+
+export type BulkAssignment = GroupRoster & {
+  readonly rejected: readonly RejectedMember[];
+};
+
 export type GroupMembersGateways = {
   readonly members: RoleRequestGateways["members"];
   readonly groupMembers: {
@@ -97,6 +117,18 @@ export type GroupMembersGateways = {
     /** Quitar a quien no estaba no es un error. */
     deleteMembership(membership: Membership): Promise<MembershipDeletionResult>;
   };
+  readonly bulkMemberships: {
+    /** Los socios del club entre `userIds`, dados de baja incluidos. */
+    findClubMembers(input: {
+      readonly clubId: string;
+      readonly userIds: readonly string[];
+    }): Promise<readonly ClubMember[]>;
+    /** En una sola escritura: entran todos o ninguno. Quien ya estaba no se
+     * duplica. */
+    insertMemberships(
+      memberships: GroupScope & { readonly userIds: readonly string[] },
+    ): Promise<MembershipInsertResult>;
+  };
   readonly photos: ProfilePhotoSigner;
 };
 
@@ -110,11 +142,21 @@ export type GroupMembershipGateways = Pick<
 type GroupRequest = { readonly callerId: string; readonly groupId: string };
 type GroupListRequest = GroupRequest & { readonly locale: Locale };
 type MembershipRequest = GroupRequest & { readonly userId: string };
+type BulkMembershipRequest = GroupListRequest & {
+  readonly userIds: readonly string[];
+};
 
 export class GroupMemberNotFoundError extends Error {
   constructor() {
     super("No existe ese socio en tu club.");
     this.name = "GroupMemberNotFoundError";
+  }
+}
+
+export class EmptyMemberSelectionError extends Error {
+  constructor() {
+    super("Elige al menos un socio para añadir al grupo.");
+    this.name = "EmptyMemberSelectionError";
   }
 }
 
@@ -125,6 +167,25 @@ export class InactiveMemberError extends Error {
   }
 }
 
+/** Los socios del club que no están de baja, en orden alfabético, con el
+ * grupo comprobado. */
+async function findSortedAssignable(
+  gateways: GroupMembersGateways,
+  scope: GroupScope,
+): Promise<readonly AssignableMember[]> {
+  const result = await gateways.groupMembers.findAssignableMembers(scope);
+  if (result.kind === "group_not_found") {
+    throw new GroupNotFoundError();
+  }
+  return [...result.members].sort((first, second) =>
+    compareNames(first.fullName, second.fullName),
+  );
+}
+
+function isInGroup(member: AssignableMember, groupId: string): boolean {
+  return member.groupIds.includes(groupId);
+}
+
 /** Los socios del club que no están de baja, repartidos según estén o no en
  * el grupo, en orden alfabético: `side` elige qué mitad. */
 async function findMembersBy(
@@ -133,19 +194,13 @@ async function findMembersBy(
   side: "in_group" | "outside_group",
 ): Promise<readonly AssignableMember[]> {
   const caller = await findGroupManager(gateways, request.callerId);
-  const result = await gateways.groupMembers.findAssignableMembers({
+  const members = await findSortedAssignable(gateways, {
     clubId: caller.clubId,
     groupId: request.groupId,
   });
-  if (result.kind === "group_not_found") {
-    throw new GroupNotFoundError();
-  }
-  return result.members
-    .filter(
-      (member) =>
-        member.groupIds.includes(request.groupId) === (side === "in_group"),
-    )
-    .sort((first, second) => compareNames(first.fullName, second.fullName));
+  return members.filter(
+    (member) => isInGroup(member, request.groupId) === (side === "in_group"),
+  );
 }
 
 function signMemberPhotos(
@@ -159,12 +214,14 @@ function signMemberPhotos(
   );
 }
 
+type RosterContext = {
+  readonly photoUrls: ReadonlyMap<string, string>;
+  readonly locale: Locale;
+};
+
 function toRosterMember(
   member: AssignableMember,
-  context: {
-    readonly photoUrls: ReadonlyMap<string, string>;
-    readonly locale: Locale;
-  },
+  context: RosterContext,
 ): GroupRosterMember {
   return {
     ...toGroupMember(member),
@@ -197,10 +254,107 @@ export async function listGroupCandidates(
 ): Promise<readonly GroupCandidate[]> {
   const candidates = await findMembersBy(gateways, request, "outside_group");
   const photoUrls = await signMemberPhotos(gateways, candidates);
-  return candidates.map((candidate) => ({
-    ...toRosterMember(candidate, { photoUrls, locale: request.locale }),
-    groupCount: candidate.groupIds.length,
-  }));
+  return candidates.map((candidate) =>
+    toCandidate(candidate, { photoUrls, locale: request.locale }),
+  );
+}
+
+function toCandidate(
+  member: AssignableMember,
+  context: RosterContext,
+): GroupCandidate {
+  return {
+    ...toRosterMember(member, context),
+    groupCount: member.groupIds.length,
+  };
+}
+
+/** Las dos mitades de una sola lectura, con las fotos firmadas en una
+ * llamada. */
+async function readGroupRoster(
+  gateways: GroupMembersGateways,
+  request: GroupScope & { readonly locale: Locale },
+): Promise<GroupRoster> {
+  const assignable = await findSortedAssignable(gateways, request);
+  const photoUrls = await signMemberPhotos(gateways, assignable);
+  const context = { photoUrls, locale: request.locale };
+  return {
+    members: assignable
+      .filter((member) => isInGroup(member, request.groupId))
+      .map((member) => toRosterMember(member, context)),
+    candidates: assignable
+      .filter((member) => !isInGroup(member, request.groupId))
+      .map((member) => toCandidate(member, context)),
+  };
+}
+
+/** Quién de lo pedido puede entrar y quién no, en el orden en que llegó. */
+function sortOutRequested(
+  userIds: readonly string[],
+  clubMembers: readonly ClubMember[],
+): {
+  readonly assignableIds: readonly string[];
+  readonly rejected: readonly RejectedMember[];
+} {
+  const statusById = new Map(
+    clubMembers.map(({ id, accountStatus }) => [id, accountStatus]),
+  );
+  const rejected: RejectedMember[] = [];
+  const assignableIds: string[] = [];
+  for (const userId of userIds) {
+    const status = statusById.get(userId);
+    if (status === undefined) {
+      rejected.push({ userId, reason: "not_in_club" });
+    } else if (status === "inactive") {
+      rejected.push({ userId, reason: "inactive" });
+    } else {
+      assignableIds.push(userId);
+    }
+  }
+  return { assignableIds, rejected };
+}
+
+async function insertAssignable(
+  gateways: GroupMembersGateways,
+  memberships: GroupScope & { readonly userIds: readonly string[] },
+): Promise<void> {
+  if (memberships.userIds.length === 0) {
+    return;
+  }
+  const result = await gateways.bulkMemberships.insertMemberships(memberships);
+  if (result.kind === "group_not_found") {
+    throw new GroupNotFoundError();
+  }
+  if (result.kind === "member_not_found") {
+    throw new GroupMemberNotFoundError();
+  }
+}
+
+/** Añade a varios socios al grupo de una vez (D3 de E32). Quien ya estaba no
+ * se duplica; el dado de baja y el de otro club no entran y vuelven en
+ * `rejected`, sin tumbar al resto. Responde las dos listas ya actualizadas,
+ * para que la pantalla no tenga que pedirlas otra vez. */
+export async function assignGroupMembers(
+  gateways: GroupMembersGateways,
+  request: BulkMembershipRequest,
+): Promise<BulkAssignment> {
+  const userIds = [...new Set(request.userIds)];
+  if (userIds.length === 0) {
+    throw new EmptyMemberSelectionError();
+  }
+  const caller = await findGroupManager(gateways, request.callerId);
+  const scope = { clubId: caller.clubId, groupId: request.groupId };
+  const clubMembers = await gateways.bulkMemberships.findClubMembers({
+    clubId: caller.clubId,
+    userIds,
+  });
+  const { assignableIds, rejected } = sortOutRequested(userIds, clubMembers);
+  await insertAssignable(gateways, { ...scope, userIds: assignableIds });
+  const roster = await readGroupRoster(gateways, {
+    ...scope,
+    locale: request.locale,
+  });
+  return { ...roster, rejected };
 }
 
 async function findMembershipTarget(

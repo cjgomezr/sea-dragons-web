@@ -3,7 +3,11 @@ import type {
   RosterMemberRecord,
   RosterRatingRecord,
 } from "@/lib/evaluations/evaluation-roster";
-import { summarizeEvaluationRoster } from "@/lib/evaluations/evaluation-roster-summary";
+import {
+  type CategoryAverage,
+  lowestCategoryAverage,
+  summarizeEvaluationRoster,
+} from "@/lib/evaluations/evaluation-roster-summary";
 
 /**
  * El resumen de la plantilla (#817, D5 del PRD de E31): cuántos están
@@ -221,5 +225,34 @@ describe("resumen de la plantilla", () => {
 
     expect(summary.categoryAverages).toEqual([]);
     expect(summary.evaluatedCount).toBe(1);
+  });
+});
+
+describe("la categoría más baja (#819)", () => {
+  function average(categoryId: string, value: number): CategoryAverage {
+    return { categoryId, name: categoryId, average: value };
+  }
+
+  it("es la de menor media", () => {
+    const lowest = lowestCategoryAverage([
+      average("fitness", 7.5),
+      average("speed", 6.1),
+      average("breath", 6.8),
+    ]);
+
+    expect(lowest?.categoryId).toBe("speed");
+  });
+
+  it("con un empate se queda con la primera en el orden del club", () => {
+    const lowest = lowestCategoryAverage([
+      average("fitness", 6),
+      average("speed", 6),
+    ]);
+
+    expect(lowest?.categoryId).toBe("fitness");
+  });
+
+  it("sin medias no hay ninguna", () => {
+    expect(lowestCategoryAverage([])).toBeNull();
   });
 });

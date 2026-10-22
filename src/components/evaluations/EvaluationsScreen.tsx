@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { EvaluationCategories } from "@/lib/evaluations/evaluation-categories";
 import {
   type EvaluationsTab,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/evaluations/evaluations-address";
 import type { MemberEvaluation } from "@/lib/evaluations/member-evaluation";
 import {
+  DEFAULT_ROSTER_VIEW,
   type RosterView,
   applyRosterView,
   clearRosterFilters,
@@ -16,9 +17,11 @@ import {
   rosterPositions,
   withHeldPosition,
 } from "@/lib/evaluations/roster-view";
+import { locateInList } from "@/lib/evaluations/sheet-navigation";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import { EvaluationCategoriesManager } from "./EvaluationCategoriesScreen";
+import { EvaluationOverview } from "./EvaluationOverview";
 import { EvaluationRoster, rosterButtonId } from "./EvaluationRoster";
 import { EvaluationRosterToolbar } from "./EvaluationRosterToolbar";
 import { EvaluationSheet } from "./EvaluationSheet";
@@ -39,8 +42,9 @@ import {
 /**
  * La pantalla de Evaluaciones (#322, RF-6 del PRD de E9). Desde #818 (RF-2
  * del PRD de E31) lleva las pestañas Jugadores y Categorías, y la lista es
- * una tabla con búsqueda, filtros y orden. Al lado va la ficha de quien se
- * elija, con la edición de sus valoraciones.
+ * una tabla con búsqueda, filtros y orden. Al lado va un panel (#819): sin
+ * nadie elegido, el resumen de la plantilla; con alguien, su ficha, con la
+ * edición de sus valoraciones.
  *
  * Quién llega lo decide la frontera: `EVALUATIONS_PATH` está en
  * `RESTRICTED_ROUTES` para Admin y Coach, y los endpoints lo vuelven a
@@ -53,8 +57,8 @@ import {
  * letra escrita.
  *
  * Con `initialMemberId` abre ya la ficha de ese miembro: es a donde lleva la
- * marca de sin evaluar del directorio (#324). Si no está en la lista, se
- * queda en la lista.
+ * marca de sin evaluar del directorio (#324). Si no está en la lista (no
+ * existe o está de baja), el panel enseña el resumen (D8).
  *
  * Hasta 1024 px la tabla y la ficha son dos pasos: `data-step` le dice al CSS
  * cuál enseñar, igual que la lista de avisos de #266.
@@ -98,9 +102,20 @@ function LoadFailure({
   );
 }
 
-/** La fila de la lista con lo que el servidor acaba de confirmar. Quién
- * guardó no viene en la respuesta: queda en `null`, que es "no se sabe", en
- * vez de atribuírselo a quien lo hizo antes. */
+/** Quién guardó no viene en la respuesta de la ficha. Si es la misma versión
+ * que trajo la lista, se conserva el de la lista; si es otra, queda en
+ * `null`, que es "no se sabe", en vez de atribuírselo a quien lo hizo antes. */
+function updatedByFor(
+  entry: ScreenRosterEntry,
+  updatedAt: string,
+): string | null {
+  return entry.status === "evaluated" &&
+    Date.parse(entry.updatedAt) === Date.parse(updatedAt)
+    ? entry.updatedBy
+    : null;
+}
+
+/** La fila de la lista con lo que el servidor acaba de confirmar o leer. */
 function toRosterEntry(
   entry: ScreenRosterEntry,
   evaluation: MemberEvaluation,
@@ -113,13 +128,14 @@ function toRosterEntry(
         ...player,
         overall: evaluation.overallRating,
         updatedAt: evaluation.updatedAt,
-        updatedBy: null,
+        updatedBy: updatedByFor(entry, evaluation.updatedAt),
       }
     : { status: "not_evaluated", ...player };
 }
 
 function withEvaluation(roster: Roster, evaluation: MemberEvaluation): Roster {
   return {
+    ...roster,
     members: roster.members.map((entry) =>
       entry.userId === evaluation.memberId
         ? toRosterEntry(entry, evaluation)
@@ -170,20 +186,23 @@ function useEvaluationRoster(): {
   return { state, retry, applyEvaluation };
 }
 
-/** Cuántas categorías activas tiene el club, para el número de la pestaña.
- * Si no se pueden leer, la pestaña sale sin número: el fallo lo dice la
- * propia pestaña Categorías al abrirla, con su reintento. */
-function useActiveCategoryCount(): {
-  readonly count: number | null;
+/** Las categorías del club: su número va en la pestaña y su orden en las
+ * notas de la ficha (#819). Si no se pueden leer, la pestaña sale sin número
+ * y la ficha enseña las notas tal como vienen: el fallo lo dice la propia
+ * pestaña Categorías al abrirla, con su reintento. */
+function useClubCategories(): {
+  readonly categories: EvaluationCategories | null;
   readonly updateFrom: (categories: EvaluationCategories) => void;
 } {
-  const [count, setCount] = useState<number | null>(null);
+  const [categories, setCategories] = useState<EvaluationCategories | null>(
+    null,
+  );
 
   useEffect(() => {
     let isCurrent = true;
     void loadCategories().then((outcome) => {
       if (isCurrent && outcome.kind === "loaded") {
-        setCount(countActive(outcome.categories));
+        setCategories(outcome.categories);
       }
     });
     return () => {
@@ -191,36 +210,60 @@ function useActiveCategoryCount(): {
     };
   }, []);
 
-  const updateFrom = useCallback((categories: EvaluationCategories) => {
-    setCount(countActive(categories));
-  }, []);
-
-  return { count, updateFrom };
+  return { categories, updateFrom: setCategories };
 }
 
-/** La barra, la tabla y, al lado, `sheet`: la ficha o el aviso de elegir. */
+/** Lo que enseña la tabla: las posiciones del club, la vista sin una
+ * posición que nadie tiene, y quién pasa la vista y en qué orden. */
+type RosterDisplay = {
+  readonly positions: ReturnType<typeof rosterPositions>;
+  readonly shownView: RosterView;
+  readonly listed: readonly ScreenRosterEntry[];
+};
+
+function displayRoster(
+  members: readonly ScreenRosterEntry[],
+  view: RosterView,
+  locale: Locale,
+): RosterDisplay {
+  const positions = rosterPositions(members, locale);
+  const shownView = withHeldPosition(view, positions);
+  return {
+    positions,
+    shownView,
+    listed: applyRosterView(members, shownView),
+  };
+}
+
+/** Lo que pide "Evaluar a los pendientes": sólo los sin evaluar, sin
+ * búsqueda ni posición, por nombre. */
+const PENDING_VIEW: RosterView = {
+  ...DEFAULT_ROSTER_VIEW,
+  filter: "not_evaluated",
+};
+
+/** La barra, la tabla y, al lado, `side`: la ficha o el resumen. */
 function PlayersPanel({
   translate,
   members,
-  view,
+  display,
   selectedId,
   onViewChange,
   onSelect,
-  sheet,
+  side,
 }: {
   translate: Translator;
   members: readonly ScreenRosterEntry[];
-  view: RosterView;
+  display: RosterDisplay;
   selectedId: string | null;
   onViewChange: (view: RosterView) => void;
   onSelect: (userId: string) => void;
-  sheet: React.ReactNode;
+  side: React.ReactNode;
 }): React.JSX.Element {
   if (members.length === 0) {
     return <p className="admin-empty">{translate("evaluations.list.empty")}</p>;
   }
-  const positions = rosterPositions(members, translate.locale);
-  const shownView = withHeldPosition(view, positions);
+  const { positions, shownView, listed } = display;
   return (
     <>
       <EvaluationRosterToolbar
@@ -236,32 +279,35 @@ function PlayersPanel({
       <div className="evaluations-panes">
         <EvaluationRoster
           translate={translate}
-          members={applyRosterView(members, shownView)}
+          members={listed}
           totalCount={members.length}
           selectedId={selectedId}
           onSelect={onSelect}
           onClearFilters={() => onViewChange(clearRosterFilters(shownView))}
         />
-        {sheet}
+        {side}
       </div>
     </>
   );
 }
-
 export function EvaluationsScreen({
   locale,
   initialMemberId,
   initialTab,
   initialView,
+  canOpenMemberRecords,
 }: {
   locale: Locale;
   initialMemberId: string | null;
   initialTab: EvaluationsTab;
   initialView: RosterView;
+  /** Si quien mira puede abrir la ficha del socio: la ficha enlaza su
+   * perfil sólo entonces. */
+  canOpenMemberRecords: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const { state, retry, applyEvaluation } = useEvaluationRoster();
-  const categoryCount = useActiveCategoryCount();
+  const clubCategories = useClubCategories();
   const [tab, setTab] = useState<EvaluationsTab>(initialTab);
   const [view, setView] = useState<RosterView>(initialView);
   const [selectedId, setSelectedId] = useState<string | null>(initialMemberId);
@@ -286,6 +332,11 @@ export function EvaluationsScreen({
     replaceAddressSearch(searchWithRosterView(currentAddressParams(), next));
   }
 
+  function openMember(userId: string): void {
+    setReturnFocusTo(null);
+    setSelectedId(userId);
+  }
+
   /** Pulsar la fila abierta la suelta. */
   function toggleSelection(userId: string): void {
     setReturnFocusTo(null);
@@ -300,6 +351,64 @@ export function EvaluationsScreen({
   const members = state.kind === "ready" ? state.roster.members : null;
   const selected = members?.find((member) => member.userId === selectedId);
 
+  /** Hasta #820 el primero se abre en lectura. */
+  function evaluatePending(players: readonly ScreenRosterEntry[]): void {
+    changeView(PENDING_VIEW);
+    const [first] = applyRosterView(players, PENDING_VIEW);
+    if (first !== undefined) {
+      openMember(first.userId);
+    }
+  }
+
+  /** El panel lateral: la ficha de quien esté elegido, o el resumen. */
+  function renderSide(
+    roster: Roster,
+    display: RosterDisplay,
+  ): React.JSX.Element {
+    return selected ? (
+      <EvaluationSheet
+        key={selected.userId}
+        translate={translate}
+        member={selected}
+        categories={clubCategories.categories}
+        canOpenMemberRecords={canOpenMemberRecords}
+        position={locateInList(
+          display.listed.map((member) => member.userId),
+          selected.userId,
+        )}
+        onClose={goBack}
+        onNavigate={openMember}
+        onEvaluationChange={applyEvaluation}
+      />
+    ) : (
+      <EvaluationOverview
+        translate={translate}
+        count={{
+          evaluated: roster.members.length - countNotEvaluated(roster.members),
+          total: roster.members.length,
+        }}
+        summary={roster.summary}
+        onEvaluatePending={() => evaluatePending(roster.members)}
+        onOpen={openMember}
+      />
+    );
+  }
+
+  function renderPlayers(roster: Roster): React.JSX.Element {
+    const display = displayRoster(roster.members, view, locale);
+    return (
+      <PlayersPanel
+        translate={translate}
+        members={roster.members}
+        display={display}
+        selectedId={selectedId}
+        onViewChange={changeView}
+        onSelect={toggleSelection}
+        side={renderSide(roster, display)}
+      />
+    );
+  }
+
   return (
     <div className="evaluations" data-step={selected ? "sheet" : "list"}>
       <header className="evaluations-header">
@@ -310,7 +419,10 @@ export function EvaluationsScreen({
           activeTab={tab}
           counts={{
             players: members === null ? null : members.length,
-            categories: categoryCount.count,
+            categories:
+              clubCategories.categories === null
+                ? null
+                : countActive(clubCategories.categories),
           }}
           onSelect={selectTab}
         />
@@ -324,7 +436,7 @@ export function EvaluationsScreen({
         {tab === "categories" ? (
           <EvaluationCategoriesManager
             translate={translate}
-            onCategoriesChange={categoryCount.updateFrom}
+            onCategoriesChange={clubCategories.updateFrom}
           />
         ) : null}
         {tab === "players" && state.kind === "loading" ? (
@@ -337,32 +449,9 @@ export function EvaluationsScreen({
             onRetry={retry}
           />
         ) : null}
-        {tab === "players" && members !== null ? (
-          <PlayersPanel
-            translate={translate}
-            members={members}
-            view={view}
-            selectedId={selectedId}
-            onViewChange={changeView}
-            onSelect={toggleSelection}
-            sheet={
-              selected ? (
-                <EvaluationSheet
-                  key={selected.userId}
-                  translate={translate}
-                  memberId={selected.userId}
-                  fullName={selected.fullName}
-                  onBack={goBack}
-                  onEvaluationChange={applyEvaluation}
-                />
-              ) : (
-                <p className="evaluation-sheet-placeholder">
-                  {translate("evaluations.sheet.placeholder")}
-                </p>
-              )
-            }
-          />
-        ) : null}
+        {tab === "players" && state.kind === "ready"
+          ? renderPlayers(state.roster)
+          : null}
       </div>
     </div>
   );

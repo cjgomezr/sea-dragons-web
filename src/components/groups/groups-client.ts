@@ -7,12 +7,19 @@ import {
   requestApi,
 } from "@/lib/api/request-api";
 import { GROUPS_API_PATH } from "@/lib/auth/routes";
-import type { GroupMember } from "@/lib/groups/group-members";
+import { ISO_WEEKDAYS } from "@/lib/events/event-occurrences";
+import type { GroupAudience } from "@/lib/groups/group-audience";
+import type {
+  GroupCandidate,
+  GroupMember,
+  GroupRosterMember,
+  RejectedMember,
+} from "@/lib/groups/group-members";
 import { GROUP_NAME_MAX_LENGTH, type Group } from "@/lib/groups/groups";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
- * Lo que la pantalla Grupos le pide a la API v1 (#226 y #227) y cómo reduce
+ * Lo que la pantalla Grupos le pide a la API v1 (#226, #227 y #827) y cómo reduce
  * cada respuesta a algo que pintar.
  *
  * Nada habla con la base: los endpoints son el producto, y la aplicación
@@ -51,6 +58,60 @@ const candidatesSchema = z.object({
 
 const singleMemberSchema = z.object({ data: memberSchema });
 
+const rosterMemberSchema = memberSchema.extend({
+  positionName: z.string().nullable(),
+  photoUrl: z.string().nullable(),
+});
+
+const bulkAssignmentSchema = z.object({
+  data: z.object({
+    members: z.array(rosterMemberSchema),
+    candidates: z.array(rosterMemberSchema.extend({ groupCount: z.number() })),
+    rejected: z.array(
+      z.object({
+        userId: z.string(),
+        reason: z.enum(["inactive", "not_in_club"]),
+      }),
+    ),
+  }),
+});
+
+const weekdaySchema = z.union(ISO_WEEKDAYS.map((day) => z.literal(day)));
+
+const audienceEventSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("event"),
+    id: z.uuid(),
+    title: z.string(),
+    startsOn: z.string(),
+    startTime: z.string(),
+  }),
+  z.object({
+    kind: z.literal("series"),
+    id: z.uuid(),
+    title: z.string(),
+    weekdays: z.array(weekdaySchema),
+    startTime: z.string(),
+    nextSession: z.object({ id: z.uuid(), startsOn: z.string() }),
+  }),
+]);
+
+const audiencePostSchema = z.object({
+  id: z.uuid(),
+  title: z.string(),
+  publishedAt: z.string(),
+});
+
+const audienceSchema = z.object({
+  data: z.object({
+    events: z.object({
+      items: z.array(audienceEventSchema),
+      total: z.number(),
+    }),
+    posts: z.object({ items: z.array(audiencePostSchema), total: z.number() }),
+  }),
+});
+
 export type GroupsFailure = ApiRequestFailure;
 
 export type GroupsLoad =
@@ -72,6 +133,20 @@ export type GroupRosterLoad =
 
 export type MemberAssigned =
   { readonly kind: "assigned"; readonly member: GroupMember } | GroupsFailure;
+
+/** El alta masiva (D3 de E32): las dos listas ya actualizadas y quién no
+ * entró. */
+export type MembersAssigned =
+  | {
+      readonly kind: "assigned";
+      readonly members: readonly GroupRosterMember[];
+      readonly candidates: readonly GroupCandidate[];
+      readonly rejected: readonly RejectedMember[];
+    }
+  | GroupsFailure;
+
+export type GroupAudienceLoad =
+  { readonly kind: "loaded"; readonly audience: GroupAudience } | GroupsFailure;
 
 export type MemberRemoved = { readonly kind: "removed" } | GroupsFailure;
 
@@ -167,6 +242,35 @@ export async function assignMember(
   return read.kind === "failed"
     ? read
     : { kind: "assigned", member: read.value.data };
+}
+
+export async function assignMembers(
+  groupId: string,
+  userIds: readonly string[],
+): Promise<MembersAssigned> {
+  const read = readApiPayload(
+    await requestApi(`${groupPath(groupId)}/members`, {
+      method: "POST",
+      headers: JSON_REQUEST_HEADERS,
+      body: JSON.stringify({ userIds }),
+    }),
+    bulkAssignmentSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "assigned", ...read.value.data };
+}
+
+export async function loadGroupAudience(
+  groupId: string,
+): Promise<GroupAudienceLoad> {
+  const read = readApiPayload(
+    await requestApi(`${groupPath(groupId)}/audience`),
+    audienceSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "loaded", audience: read.value.data };
 }
 
 export async function removeMember(

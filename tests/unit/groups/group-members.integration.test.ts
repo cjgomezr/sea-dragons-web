@@ -3,6 +3,7 @@ import { expect, it } from "vitest";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import {
   type GroupMembersGateways,
+  assignGroupMembers,
   listGroupCandidates,
   listGroupMembers,
 } from "@/lib/groups/group-members";
@@ -406,6 +407,74 @@ describeRls("los socios de un grupo contra seadragons-dev", () => {
                     userId: missingId,
                   }),
                 ).resolves.toEqual({ kind: "member_not_found" });
+              },
+            ),
+        ),
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "el alta masiva asigna de una vez, rechaza al dado de baja y al de otro club, y repetirla no duplica",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = createGroupMembersGateways(serviceClient.client);
+
+      await withTwoClubs(serviceClient, ([clubId, otherClubId]) =>
+        withMembers(
+          serviceClient,
+          [
+            { clubId, fullName: "Ana Active", accountStatus: "active" },
+            { clubId, fullName: "Bea Bravo", accountStatus: "incomplete" },
+            { clubId, fullName: "Inés Inactiva", accountStatus: "inactive" },
+            {
+              clubId: otherClubId,
+              fullName: "Olga Otra",
+              accountStatus: "active",
+            },
+          ],
+          ([ana, bea, ines, olga]) =>
+            withGroups(
+              serviceClient,
+              [clubId, otherClubId],
+              async ({ seniorId, otherClubGroupId }) => {
+                const coach = asCoachOf(gateways, clubId);
+                const request = {
+                  callerId: CALLER_ID,
+                  groupId: seniorId,
+                  locale: "es" as const,
+                  userIds: [ana!.id, bea!.id, ines!.id, olga!.id],
+                };
+
+                for (let attempt = 0; attempt < 2; attempt += 1) {
+                  const result = await assignGroupMembers(coach, request);
+
+                  expect(result.members.map(({ id }) => id)).toEqual([
+                    ana!.id,
+                    bea!.id,
+                  ]);
+                  expect(result.candidates).toEqual([]);
+                  expect(result.rejected).toEqual([
+                    { userId: ines!.id, reason: "inactive" },
+                    { userId: olga!.id, reason: "not_in_club" },
+                  ]);
+                }
+                const { count, error } = await serviceClient.client
+                  .from("group_memberships")
+                  .select("user_id", { count: "exact", head: true })
+                  .eq("group_id", seniorId);
+                expect(error).toBeNull();
+                expect(count).toBe(2);
+
+                // Un grupo de otro club responde como uno que no existe.
+                await expect(
+                  gateways.bulkMemberships.insertMemberships({
+                    clubId,
+                    groupId: otherClubGroupId,
+                    userIds: [ana!.id],
+                  }),
+                ).resolves.toEqual({ kind: "group_not_found" });
               },
             ),
         ),
