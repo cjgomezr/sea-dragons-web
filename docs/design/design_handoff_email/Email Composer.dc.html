@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+.ec-root button:focus-visible,.ec-root a:focus-visible,.ec-root input:focus-visible,.ec-root textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ec-root input::placeholder,.ec-root textarea::placeholder{color:var(--text2);opacity:.8}
+@keyframes ec-spin{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+
+<sc-if value="{{ isDesk }}" hint-placeholder-val="{{ true }}">
+<section class="ec-root" aria-labelledby="{{ ids.title }}" style="position:relative;min-height:600px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--text)">
+<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column">
+
+<div style="display:flex;gap:12px;align-items:flex-start;padding:16px 14px 14px 20px;border-bottom:1px solid var(--border)">
+<span style="flex:none;width:36px;height:36px;border-radius:9px;background:var(--seg);display:grid;place-items:center"><i class="ph ph-envelope-simple" style="font-size:19px;color:var(--accent-text)"></i></span>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><h2 id="{{ ids.title }}" style="margin:0;font-size:18px;line-height:1.25;font-weight:650">Email members</h2><p style="margin:0;font-size:13.5px;line-height:1.45;color:var(--text2)">Each member gets their own email from the club's address. Replies come to you.</p></div>
+<button onClick="{{ close }}" aria-label="Close" style="all:unset;cursor:pointer;flex:none;width:34px;height:34px;border-radius:8px;display:grid;place-items:center;color:var(--text2)" style-hover="background:var(--hover);color:var(--text)"><i class="ph ph-x" style="font-size:17px"></i></button>
+</div>
+
+<sc-if value="{{ isSent }}">
+<div role="status" style="display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:28px 20px 24px">
+<span style="width:44px;height:44px;border-radius:50%;background:color-mix(in srgb,var(--success) 20%,var(--panel));display:grid;place-items:center"><i class="ph-bold ph-check" style="font-size:22px;color:var(--success)"></i></span>
+<span style="font-size:18px;font-weight:650">{{ sentTitle }}</span>
+<span style="font-size:14px;color:var(--text2)">Replies will come to your inbox. {{ quotaText }}.</span>
+<div style="display:flex;gap:8px;margin-top:6px"><button onClick="{{ writeAnother }}" style="all:unset;cursor:pointer;height:38px;padding:0 16px;display:flex;align-items:center;border-radius:8px;border:1px solid var(--border);font-size:14px;font-weight:600" style-hover="border-color:var(--accent)">Write another</button><button onClick="{{ close }}" style="all:unset;cursor:pointer;height:38px;padding:0 16px;display:flex;align-items:center;border-radius:8px;font-size:14px;font-weight:600;color:var(--text2)" style-hover="background:var(--hover);color:var(--text)">Close</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isEditing }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:16px;padding:16px 20px 18px">
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span id="{{ ids.to }}" style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--text2)">TO <span style="font:400 12px ui-monospace,Menlo,monospace;letter-spacing:0">· {{ countText }}</span></span><sc-if value="{{ canClear }}"><button onClick="{{ clearAll }}" style="all:unset;cursor:pointer;font-size:13px;font-weight:600;color:var(--accent-text)">Clear all</button></sc-if></div>
+<div style="position:relative">
+<div onClick="{{ focusSearch }}" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:40px;box-sizing:border-box;padding:6px 8px;border:1px solid {{ toBorder }};border-radius:10px;background:var(--bg);cursor:text">
+<sc-for list="{{ chips }}" as="c" hint-placeholder-count="3"><span style="display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 2px 0 3px;border-radius:999px;background:var(--seg);font-size:12.5px;font-weight:500;max-width:180px"><span aria-hidden="true" style="flex:none;width:18px;height:18px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font:700 8px ui-monospace,Menlo,monospace">{{ c.ini }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span><button onClick="{{ c.remove }}" aria-label="{{ c.removeLabel }}" title="Remove" style="all:unset;cursor:pointer;flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:var(--text2)" style-hover="background:var(--hover);color:var(--text)"><i class="ph-bold ph-x" style="font-size:10px"></i></button></span></sc-for>
+<sc-if value="{{ collapsed }}"><button onClick="{{ expand }}" aria-label="{{ moreAria }}" style="all:unset;cursor:pointer;height:24px;padding:0 10px;border-radius:999px;border:1px dashed var(--text2);font-size:12.5px;font-weight:600;color:var(--text)" style-hover="border-color:var(--accent);color:var(--accent-text)">{{ moreLabel }}</button></sc-if>
+<sc-if value="{{ showLess }}"><button onClick="{{ collapse }}" style="all:unset;cursor:pointer;height:24px;padding:0 8px;font-size:12.5px;font-weight:600;color:var(--accent-text)">Show less</button></sc-if>
+<span style="flex:1;min-width:200px;display:flex;gap:6px;align-items:center;padding-left:4px"><i class="ph ph-user-plus" style="font-size:16px;color:var(--text2)"></i><input ref="{{ searchRef }}" value="{{ query }}" onChange="{{ onQuery }}" onKeyDown="{{ searchKey }}" onFocus="{{ searchFocus }}" onBlur="{{ searchBlur }}" role="combobox" aria-expanded="{{ searchOpen }}" aria-controls="{{ ids.list }}" aria-autocomplete="list" aria-label="Add a member by name" placeholder="Add a member by name" style="all:unset;flex:1;min-width:0;height:30px;font-size:14px;color:var(--text)"></span>
+</div>
+<sc-if value="{{ searchOpen }}">
+<div id="{{ ids.list }}" role="listbox" aria-label="Members" style="position:absolute;z-index:10;left:0;right:0;top:calc(100% + 4px);padding:4px;border:1px solid var(--border);border-radius:10px;background:var(--panel);box-shadow:var(--shadow);display:flex;flex-direction:column">
+<sc-for list="{{ results }}" as="r"><button role="option" aria-selected="{{ r.on }}" onMouseDown="{{ r.add }}" onMouseEnter="{{ r.hover }}" style="all:unset;cursor:pointer;box-sizing:border-box;display:flex;gap:10px;align-items:center;min-height:44px;padding:4px 10px;border-radius:7px;background:{{ r.bg }}"><span aria-hidden="true" style="flex:none;width:28px;height:28px;border-radius:50%;background:var(--seg);display:grid;place-items:center;font:700 10.5px ui-monospace,Menlo,monospace">{{ r.ini }}</span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:14px">{{ r.pre }}<strong style="font-weight:700">{{ r.mid }}</strong>{{ r.post }}</span><span style="font-size:12px;color:var(--text2)">{{ r.meta }}</span></span><span style="font-size:12px;font-weight:600;color:{{ r.hintColor }}">{{ r.hint }}</span></button></sc-for>
+<sc-if value="{{ noResults }}"><div style="padding:12px;font-size:13.5px;color:var(--text2)">{{ noResultsText }}</div></sc-if>
+<div style="padding:6px 10px 4px;border-top:1px solid var(--border);margin-top:4px;font-size:11.5px;color:var(--text2)">↑ ↓ to move · Enter to add · Backspace on empty removes the last</div>
+</div>
+</sc-if>
+</div>
+<sc-if value="{{ noRecipients }}"><span style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--text2)"><i class="ph ph-info"></i>No one to email yet. Add members by name.</span></sc-if>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><label for="{{ ids.subj }}" style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--text2)">SUBJECT</label><span style="font:12px ui-monospace,Menlo,monospace;color:{{ subjCountColor }}">{{ subjCount }}</span></div>
+<input id="{{ ids.subj }}" ref="{{ subjRef }}" value="{{ subject }}" onChange="{{ onSubject }}" aria-invalid="{{ subjInvalid }}" aria-describedby="{{ subjDescribed }}" placeholder="What is this about?" style="all:unset;box-sizing:border-box;height:40px;padding:0 12px;border-radius:8px;border:1px solid {{ subjBorder }};background:var(--bg);font-size:14.5px;color:var(--text)">
+<sc-if value="{{ subjErr }}"><span id="{{ ids.subjErr }}" style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--danger)"><i class="ph-fill ph-warning-circle" style="font-size:15px"></i>{{ subjErr }}</span></sc-if>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;align-items:center"><label for="{{ ids.msg }}" id="{{ ids.msgLabel }}" style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--text2)">MESSAGE</label>
+<div role="tablist" aria-label="Message view" style="display:flex;padding:2px;gap:2px;border:1px solid var(--border);border-radius:8px;background:var(--bg)"><sc-for list="{{ tabs }}" as="t"><button role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:28px;padding:0 12px;border-radius:6px;font-size:13px;font-weight:{{ t.w }};background:{{ t.bg }};color:{{ t.color }}"><i class="ph {{ t.icon }}"></i>{{ t.label }}</button></sc-for></div>
+</div>
+<div style="border:1px solid {{ msgBorder }};border-radius:10px;overflow:hidden;background:var(--panel)">
+<sc-if value="{{ isWrite }}" hint-placeholder-val="{{ true }}">
+<div role="toolbar" aria-label="Formatting" aria-controls="{{ ids.msg }}" style="display:flex;gap:2px;align-items:center;padding:4px 6px;background:var(--bar);border-bottom:1px solid var(--border)">
+<sc-for list="{{ tools }}" as="t"><sc-if value="{{ t.sep }}"><span aria-hidden="true" style="width:1px;height:18px;margin:0 4px;background:var(--border)"></span></sc-if><button onMouseDown="{{ keepSel }}" onClick="{{ t.go }}" aria-label="{{ t.label }}" title="{{ t.title }}" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:7px;display:grid;place-items:center;color:var(--soft)" style-hover="background:var(--hover);color:var(--text)"><i class="ph-bold {{ t.icon }}" style="font-size:16px"></i></button></sc-for>
+<span style="flex:1"></span><span style="font:12px ui-monospace,Menlo,monospace;color:var(--text2);padding-right:6px">**bold** · _italic_ · - list</span>
+</div>
+<textarea id="{{ ids.msg }}" ref="{{ taRef }}" value="{{ message }}" onChange="{{ onMessage }}" onKeyDown="{{ msgKey }}" aria-invalid="{{ msgInvalid }}" aria-describedby="{{ msgDescribed }}" placeholder="Write your message…" style="all:unset;box-sizing:border-box;display:block;width:100%;min-height:220px;max-height:340px;overflow:auto;resize:vertical;padding:12px 14px;font-family:inherit;font-size:14.5px;line-height:1.55;white-space:pre-wrap;color:var(--text)"></textarea>
+</sc-if>
+<sc-if value="{{ isPreview }}">
+<div role="tabpanel" aria-label="Preview" style="box-sizing:border-box;min-height:252px;max-height:372px;overflow:auto;padding:14px 18px 16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;flex-direction:column;gap:2px;padding-bottom:10px;border-bottom:1px dashed var(--border);font-size:12.5px;color:var(--text2)"><span>From <strong style="font-weight:600;color:var(--text)">Victoria Seadragons</strong> · replies go to you</span><span>To <strong style="font-weight:600;color:var(--text)">{{ previewTo }}</strong></span><span style="margin-top:4px;font-size:15.5px;font-weight:650;color:{{ previewSubjectColor }}">{{ previewSubject }}</span></div>
+<sc-for list="{{ blocks }}" as="b">
+<sc-if value="{{ b.isP }}"><p style="margin:0;font-size:14.5px;line-height:1.55"><sc-for list="{{ b.lines }}" as="l"><span style="display:block"><sc-for list="{{ l.segs }}" as="g"><sc-if value="{{ g.isLink }}"><a href="{{ g.href }}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-text);font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</a></sc-if><sc-if value="{{ g.isText }}"><span style="font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</span></sc-if></sc-for></span></sc-for></p></sc-if>
+<sc-if value="{{ b.isUl }}"><ul style="margin:0;padding-left:22px;display:flex;flex-direction:column;gap:3px;font-size:14.5px;line-height:1.5"><sc-for list="{{ b.lines }}" as="l"><li><sc-for list="{{ l.segs }}" as="g"><sc-if value="{{ g.isLink }}"><a href="{{ g.href }}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-text);font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</a></sc-if><sc-if value="{{ g.isText }}"><span style="font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</span></sc-if></sc-for></li></sc-for></ul></sc-if>
+<sc-if value="{{ b.isOl }}"><ol style="margin:0;padding-left:24px;display:flex;flex-direction:column;gap:3px;font-size:14.5px;line-height:1.5"><sc-for list="{{ b.lines }}" as="l"><li><sc-for list="{{ l.segs }}" as="g"><sc-if value="{{ g.isLink }}"><a href="{{ g.href }}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-text);font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</a></sc-if><sc-if value="{{ g.isText }}"><span style="font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</span></sc-if></sc-for></li></sc-for></ol></sc-if>
+</sc-for>
+<sc-if value="{{ previewEmpty }}"><span style="font-size:14px;color:var(--text2)">Nothing to preview yet.</span></sc-if>
+</div>
+</sc-if>
+<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 12px;border-top:1px solid var(--border);background:var(--bar);font-size:12px;color:var(--text2)"><span id="{{ ids.msgHint }}">Bold, italic, links and lists. No images or tables.</span><span style="font-family:ui-monospace,Menlo,monospace;color:{{ msgCountColor }};font-weight:{{ msgCountW }}">{{ msgCount }}</span></div>
+</div>
+<sc-if value="{{ msgErr }}"><span id="{{ ids.msgErr }}" style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--danger)"><i class="ph-fill ph-warning-circle" style="font-size:15px"></i>{{ msgErr }}</span></sc-if>
+</div>
+
+<sc-if value="{{ overQuota }}"><div role="alert" style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--warning) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--warning) 45%,transparent);font-size:13.5px;line-height:1.45"><i class="ph-fill ph-warning" style="font-size:17px;color:var(--warning);margin-top:1px"></i><span>{{ overQuotaText }}</span></div></sc-if>
+<sc-if value="{{ notice }}"><div role="alert" style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--danger) 12%,var(--panel));font-size:13.5px"><i class="ph-fill ph-warning-circle" style="font-size:17px;color:var(--danger)"></i>{{ notice }}</div></sc-if>
+</div>
+
+<div style="display:flex;gap:14px;align-items:center;padding:12px 16px 12px 20px;border-top:1px solid var(--border);background:var(--bar);border-radius:0 0 12px 12px">
+<span style="display:flex;flex-direction:column;gap:5px;min-width:190px"><span style="font-size:12.5px;color:var(--text2)">{{ quotaText }}</span><span style="height:4px;border-radius:2px;background:var(--border);overflow:hidden"><span style="display:block;height:100%;width:{{ quotaPct }};background:{{ quotaColor }}"></span></span></span>
+<sc-if value="{{ errCount }}"><span style="display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600;color:var(--danger)"><i class="ph-fill ph-warning-circle"></i>{{ errSummary }}</span></sc-if>
+<span style="flex:1"></span>
+<button onClick="{{ close }}" style="all:unset;cursor:pointer;height:38px;padding:0 14px;display:flex;align-items:center;border-radius:8px;font-size:14px;font-weight:600;color:var(--soft)" style-hover="background:var(--hover);color:var(--text)">Cancel</button>
+<button onClick="{{ send }}" disabled="{{ sendDisabled }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;height:38px;padding:0 18px;border-radius:8px;background:var(--accent);color:var(--on-accent);font-size:14px;font-weight:700;opacity:{{ sendOp }}"><i class="ph-bold ph-paper-plane-tilt"></i>{{ sendLabel }}</button>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{ confirming }}">
+<div style="position:absolute;inset:0;z-index:20;border-radius:12px;background:color-mix(in srgb,var(--bg) 72%,transparent);display:grid;place-items:center;padding:20px">
+<div role="dialog" aria-modal="true" aria-labelledby="{{ ids.dlg }}" style="width:440px;max-width:100%;box-sizing:border-box;background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;gap:12px;align-items:center"><span style="flex:none;width:40px;height:40px;border-radius:10px;background:var(--seg);display:grid;place-items:center"><i class="ph ph-paper-plane-tilt" style="font-size:20px;color:var(--accent-text)"></i></span><h3 id="{{ ids.dlg }}" style="margin:0;font-size:18px;font-weight:650">{{ dlgTitle }}</h3></div>
+<p style="margin:0;font-size:14px;line-height:1.5;color:var(--soft)">Each one gets their own email from Victoria Seadragons with the subject <strong style="color:var(--text)">“{{ subject }}”</strong>. Replies come to you.</p>
+<div style="display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:10px;background:var(--bar);border:1px solid var(--border)">
+<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px"><span style="color:var(--soft)">Emails left today</span><span style="font:600 14px ui-monospace,Menlo,monospace">{{ quotaBefore }} → {{ quotaAfter }} <span style="font-weight:400;color:var(--text2)">of 50</span></span></div>
+<span style="display:flex;height:6px;border-radius:3px;background:var(--border);overflow:hidden;gap:2px"><span style="width:{{ afterPct }};background:var(--success)"></span><span style="width:{{ usePct }};background:var(--accent)"></span></span>
+<span style="font-size:12.5px;color:var(--text2)">{{ quotaNote }}</span>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px"><button onClick="{{ cancelConfirm }}" disabled="{{ isSending }}" style="all:unset;cursor:pointer;height:38px;padding:0 16px;display:flex;align-items:center;border-radius:8px;border:1px solid var(--border);font-size:14px;font-weight:600" style-hover="border-color:var(--accent)">Cancel</button><button onClick="{{ confirmSend }}" disabled="{{ isSending }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;height:38px;padding:0 18px;border-radius:8px;background:var(--accent);color:var(--on-accent);font-size:14px;font-weight:700"><sc-if value="{{ isSending }}"><i class="ph-bold ph-spinner-gap" style="animation:ec-spin 1s linear infinite"></i></sc-if>{{ confirmLabel }}</button></div>
+</div>
+</div>
+</sc-if>
+</section>
+</sc-if>
+
+<sc-if value="{{ isMob }}">
+<section class="ec-root" aria-labelledby="{{ ids.title }}" style="position:relative;height:100%;display:flex;flex-direction:column;overflow:hidden;background:var(--panel);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--text)">
+<div style="flex:none;display:flex;align-items:center;gap:4px;height:56px;padding:0 10px 0 4px;border-bottom:1px solid var(--border)">
+<button onClick="{{ close }}" aria-label="Close" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;border-radius:10px"><i class="ph ph-x" style="font-size:21px"></i></button>
+<h2 id="{{ ids.title }}" style="margin:0;flex:1;font-size:17px;font-weight:650">Email members</h2>
+<sc-if value="{{ isEditing }}"><button onClick="{{ send }}" disabled="{{ sendDisabled }}" style="all:unset;cursor:pointer;display:flex;gap:7px;align-items:center;height:40px;padding:0 16px;border-radius:10px;background:var(--accent);color:var(--on-accent);font-size:15px;font-weight:700;opacity:{{ sendOp }}"><i class="ph-bold ph-paper-plane-tilt"></i>Send</button></sc-if>
+</div>
+
+<sc-if value="{{ isSent }}">
+<div role="status" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center">
+<span style="width:56px;height:56px;border-radius:50%;background:color-mix(in srgb,var(--success) 20%,var(--panel));display:grid;place-items:center"><i class="ph-bold ph-check" style="font-size:26px;color:var(--success)"></i></span>
+<span style="font-size:20px;font-weight:650">{{ sentTitle }}</span>
+<span style="font-size:14.5px;line-height:1.45;color:var(--text2)">Replies will come to your inbox. {{ quotaText }}.</span>
+<button onClick="{{ writeAnother }}" style="all:unset;cursor:pointer;margin-top:8px;height:48px;padding:0 22px;display:flex;align-items:center;border-radius:10px;border:1px solid var(--border);font-size:15px;font-weight:600">Write another</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ isEditing }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:12px 16px 24px;display:flex;flex-direction:column;gap:16px">
+<p style="margin:0;font-size:13.5px;line-height:1.45;color:var(--text2)">Each member gets their own email from the club's address. Replies come to you.</p>
+<sc-if value="{{ errCount }}"><div role="alert" style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--danger) 12%,var(--panel));font-size:14px;font-weight:600;color:var(--danger)"><i class="ph-fill ph-warning-circle" style="font-size:18px"></i>{{ errSummary }} before sending</div></sc-if>
+
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;align-items:center;min-height:24px"><span id="{{ ids.to }}" style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--text2)">TO <span style="font:400 12.5px ui-monospace,Menlo,monospace;letter-spacing:0">· {{ countText }}</span></span><sc-if value="{{ canClear }}"><button onClick="{{ clearAll }}" style="all:unset;cursor:pointer;min-height:44px;padding:0 4px;display:flex;align-items:center;font-size:14px;font-weight:600;color:var(--accent-text)">Clear all</button></sc-if></div>
+<sc-if value="{{ hasRecipients }}">
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ chips }}" as="c"><span style="display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 0 0 4px;border-radius:999px;background:var(--seg);font-size:13.5px;font-weight:500;max-width:100%"><span aria-hidden="true" style="flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font:700 9px ui-monospace,Menlo,monospace">{{ c.ini }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span><button onClick="{{ c.remove }}" aria-label="{{ c.removeLabel }}" style="all:unset;cursor:pointer;flex:none;position:relative;width:30px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--text2)"><span aria-hidden="true" style="position:absolute;inset:-6px -4px"></span><i class="ph-bold ph-x" style="font-size:12px"></i></button></span></sc-for>
+<sc-if value="{{ collapsed }}"><button onClick="{{ expand }}" aria-label="{{ moreAria }}" style="all:unset;cursor:pointer;height:32px;padding:0 12px;border-radius:999px;border:1px dashed var(--text2);font-size:13.5px;font-weight:600">{{ moreLabel }}</button></sc-if>
+<sc-if value="{{ showLess }}"><button onClick="{{ collapse }}" style="all:unset;cursor:pointer;height:32px;padding:0 10px;font-size:13.5px;font-weight:600;color:var(--accent-text)">Show less</button></sc-if>
+</div>
+</sc-if>
+<label style="display:flex;gap:8px;align-items:center;height:46px;box-sizing:border-box;padding:0 12px;border-radius:10px;border:1px solid {{ toBorder }};background:var(--bg)"><i class="ph ph-user-plus" style="font-size:18px;color:var(--text2)"></i><input ref="{{ searchRef }}" value="{{ query }}" onChange="{{ onQuery }}" onKeyDown="{{ searchKey }}" onFocus="{{ searchFocus }}" onBlur="{{ searchBlur }}" role="combobox" aria-expanded="{{ searchOpen }}" aria-controls="{{ ids.list }}" aria-autocomplete="list" aria-label="Add a member by name" placeholder="Add a member by name" style="all:unset;flex:1;min-width:0;font-size:16px;color:var(--text)"><sc-if value="{{ hasQuery }}"><button onMouseDown="{{ clearQuery }}" aria-label="Clear search" style="all:unset;cursor:pointer;width:36px;height:36px;display:grid;place-items:center;color:var(--text2)"><i class="ph-fill ph-x-circle" style="font-size:18px"></i></button></sc-if></label>
+<sc-if value="{{ searchOpen }}">
+<div id="{{ ids.list }}" role="listbox" aria-label="Members" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
+<sc-for list="{{ results }}" as="r"><button role="option" aria-selected="{{ r.on }}" onMouseDown="{{ r.add }}" style="all:unset;cursor:pointer;box-sizing:border-box;display:flex;gap:12px;align-items:center;min-height:58px;padding:6px 12px;border-top:{{ r.sep }};background:{{ r.bg }}"><span aria-hidden="true" style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--seg);display:grid;place-items:center;font:700 11.5px ui-monospace,Menlo,monospace">{{ r.ini }}</span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:15px">{{ r.pre }}<strong style="font-weight:700">{{ r.mid }}</strong>{{ r.post }}</span><span style="font-size:12.5px;color:var(--text2)">{{ r.meta }}</span></span><i class="ph-bold ph-plus" style="font-size:16px;color:var(--accent-text)"></i></button></sc-for>
+<sc-if value="{{ noResults }}"><div style="padding:14px 12px;font-size:14px;color:var(--text2)">{{ noResultsText }}</div></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ noRecipients }}"><span style="font-size:14px;color:var(--text2)">No one to email yet. Add members by name.</span></sc-if>
+</div>
+
+<sc-if value="{{ overQuota }}"><div role="alert" style="display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:10px;background:color-mix(in srgb,var(--warning) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--warning) 45%,transparent);font-size:14px;line-height:1.45"><i class="ph-fill ph-warning" style="font-size:18px;color:var(--warning);margin-top:1px"></i><span>{{ overQuotaText }}</span></div></sc-if>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><label for="{{ ids.subj }}" style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--text2)">SUBJECT</label><span style="font:12.5px ui-monospace,Menlo,monospace;color:{{ subjCountColor }}">{{ subjCount }}</span></div>
+<input id="{{ ids.subj }}" ref="{{ subjRef }}" value="{{ subject }}" onChange="{{ onSubject }}" aria-invalid="{{ subjInvalid }}" aria-describedby="{{ subjDescribed }}" placeholder="What is this about?" style="all:unset;box-sizing:border-box;height:48px;padding:0 12px;border-radius:10px;border:1px solid {{ subjBorder }};background:var(--bg);font-size:16px;color:var(--text)">
+<sc-if value="{{ subjErr }}"><span id="{{ ids.subjErr }}" style="display:flex;gap:6px;align-items:center;font-size:13.5px;color:var(--danger)"><i class="ph-fill ph-warning-circle" style="font-size:16px"></i>{{ subjErr }}</span></sc-if>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;align-items:center"><label for="{{ ids.msg }}" id="{{ ids.msgLabel }}" style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--text2)">MESSAGE</label><span style="font:12.5px ui-monospace,Menlo,monospace;color:{{ msgCountColor }};font-weight:{{ msgCountW }}">{{ msgCount }}</span></div>
+<div role="tablist" aria-label="Message view" style="display:grid;grid-template-columns:1fr 1fr;padding:3px;gap:3px;border:1px solid var(--border);border-radius:10px;background:var(--bg)"><sc-for list="{{ tabs }}" as="t"><button role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="all:unset;cursor:pointer;display:flex;gap:7px;align-items:center;justify-content:center;height:38px;border-radius:7px;font-size:14px;font-weight:{{ t.w }};background:{{ t.bg }};color:{{ t.color }}"><i class="ph {{ t.icon }}"></i>{{ t.label }}</button></sc-for></div>
+<div style="border:1px solid {{ msgBorder }};border-radius:12px;overflow:hidden;background:var(--panel)">
+<sc-if value="{{ isWrite }}" hint-placeholder-val="{{ true }}">
+<div role="toolbar" aria-label="Formatting" aria-controls="{{ ids.msg }}" style="display:flex;align-items:center;padding:0 4px;background:var(--bar);border-bottom:1px solid var(--border)">
+<sc-for list="{{ tools }}" as="t"><sc-if value="{{ t.sep }}"><span aria-hidden="true" style="width:1px;height:22px;margin:0 2px;background:var(--border)"></span></sc-if><button onMouseDown="{{ keepSel }}" onClick="{{ t.go }}" aria-label="{{ t.label }}" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:var(--soft)"><i class="ph-bold {{ t.icon }}" style="font-size:19px"></i></button></sc-for>
+</div>
+<textarea id="{{ ids.msg }}" ref="{{ taRef }}" value="{{ message }}" onChange="{{ onMessage }}" onKeyDown="{{ msgKey }}" aria-invalid="{{ msgInvalid }}" aria-describedby="{{ msgDescribed }}" placeholder="Write your message…" style="all:unset;box-sizing:border-box;display:block;width:100%;min-height:240px;overflow:auto;padding:12px 14px;font-family:inherit;font-size:16px;line-height:1.5;white-space:pre-wrap;color:var(--text)"></textarea>
+</sc-if>
+<sc-if value="{{ isPreview }}">
+<div role="tabpanel" aria-label="Preview" style="box-sizing:border-box;min-height:284px;padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;flex-direction:column;gap:2px;padding-bottom:10px;border-bottom:1px dashed var(--border);font-size:12.5px;color:var(--text2)"><span>From <strong style="font-weight:600;color:var(--text)">Victoria Seadragons</strong></span><span style="margin-top:4px;font-size:16px;font-weight:650;color:{{ previewSubjectColor }}">{{ previewSubject }}</span></div>
+<sc-for list="{{ blocks }}" as="b">
+<sc-if value="{{ b.isP }}"><p style="margin:0;font-size:15px;line-height:1.55"><sc-for list="{{ b.lines }}" as="l"><span style="display:block"><sc-for list="{{ l.segs }}" as="g"><sc-if value="{{ g.isLink }}"><a href="{{ g.href }}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-text);font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</a></sc-if><sc-if value="{{ g.isText }}"><span style="font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</span></sc-if></sc-for></span></sc-for></p></sc-if>
+<sc-if value="{{ b.isUl }}"><ul style="margin:0;padding-left:22px;display:flex;flex-direction:column;gap:4px;font-size:15px;line-height:1.5"><sc-for list="{{ b.lines }}" as="l"><li><sc-for list="{{ l.segs }}" as="g"><sc-if value="{{ g.isLink }}"><a href="{{ g.href }}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-text);font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</a></sc-if><sc-if value="{{ g.isText }}"><span style="font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</span></sc-if></sc-for></li></sc-for></ul></sc-if>
+<sc-if value="{{ b.isOl }}"><ol style="margin:0;padding-left:24px;display:flex;flex-direction:column;gap:4px;font-size:15px;line-height:1.5"><sc-for list="{{ b.lines }}" as="l"><li><sc-for list="{{ l.segs }}" as="g"><sc-if value="{{ g.isLink }}"><a href="{{ g.href }}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-text);font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</a></sc-if><sc-if value="{{ g.isText }}"><span style="font-weight:{{ g.w }};font-style:{{ g.st }}">{{ g.t }}</span></sc-if></sc-for></li></sc-for></ol></sc-if>
+</sc-for>
+<sc-if value="{{ previewEmpty }}"><span style="font-size:15px;color:var(--text2)">Nothing to preview yet.</span></sc-if>
+</div>
+</sc-if>
+</div>
+<span id="{{ ids.msgHint }}" style="font-size:12.5px;color:var(--text2)">Bold, italic, links and lists. No images or tables.</span>
+<sc-if value="{{ msgErr }}"><span id="{{ ids.msgErr }}" style="display:flex;gap:6px;align-items:flex-start;font-size:13.5px;line-height:1.4;color:var(--danger)"><i class="ph-fill ph-warning-circle" style="font-size:16px;margin-top:1px"></i>{{ msgErr }}</span></sc-if>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px;padding-top:4px"><span style="font-size:13px;color:var(--text2)">{{ quotaText }}</span><span style="height:4px;border-radius:2px;background:var(--border);overflow:hidden"><span style="display:block;height:100%;width:{{ quotaPct }};background:{{ quotaColor }}"></span></span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ confirming }}">
+<div onClick="{{ cancelConfirm }}" style="position:absolute;inset:0;z-index:20;background:color-mix(in srgb,var(--bg) 65%,transparent)"></div>
+<div role="dialog" aria-modal="true" aria-labelledby="{{ ids.dlg }}" style="position:absolute;z-index:21;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--border);border-radius:20px 20px 0 0;box-shadow:var(--shadow);padding:10px 16px 22px;display:flex;flex-direction:column;gap:14px">
+<span aria-hidden="true" style="align-self:center;width:36px;height:4px;border-radius:2px;background:var(--border)"></span>
+<h3 id="{{ ids.dlg }}" style="margin:0;font-size:19px;font-weight:650">{{ dlgTitle }}</h3>
+<p style="margin:0;font-size:14.5px;line-height:1.5;color:var(--soft)">Each one gets their own email from Victoria Seadragons with the subject <strong style="color:var(--text)">“{{ subject }}”</strong>. Replies come to you.</p>
+<div style="display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;background:var(--bar);border:1px solid var(--border)">
+<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:14px"><span style="color:var(--soft)">Emails left today</span><span style="font:600 15px ui-monospace,Menlo,monospace">{{ quotaBefore }} → {{ quotaAfter }} <span style="font-weight:400;color:var(--text2)">of 50</span></span></div>
+<span style="display:flex;height:6px;border-radius:3px;background:var(--border);overflow:hidden;gap:2px"><span style="width:{{ afterPct }};background:var(--success)"></span><span style="width:{{ usePct }};background:var(--accent)"></span></span>
+<span style="font-size:13px;color:var(--text2)">{{ quotaNote }}</span>
+</div>
+<div style="display:flex;gap:8px"><button onClick="{{ cancelConfirm }}" disabled="{{ isSending }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:48px;line-height:46px;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);font-size:15px;font-weight:600">Cancel</button><button onClick="{{ confirmSend }}" disabled="{{ isSending }}" style="all:unset;cursor:pointer;flex:1.6;display:flex;gap:8px;align-items:center;justify-content:center;height:48px;border-radius:10px;background:var(--accent);color:var(--on-accent);font-size:15px;font-weight:700"><sc-if value="{{ isSending }}"><i class="ph-bold ph-spinner-gap" style="animation:ec-spin 1s linear infinite"></i></sc-if>{{ confirmLabel }}</button></div>
+</div>
+</sc-if>
+</section>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:980,&quot;height&quot;:640},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;mobile&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;'desktop' | 'mobile'&quot;},&quot;start&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;edit&quot;,&quot;search&quot;,&quot;preview&quot;,&quot;errors&quot;,&quot;confirm&quot;],&quot;default&quot;:&quot;edit&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;count&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:3,&quot;min&quot;:0,&quot;max&quot;:40,&quot;tsType&quot;:&quot;number&quot;}}">
+const NAMES = ['Sofia Reyes','Liam Carter','Mia Thompson','Noah Williams','Ava Martinez','Ethan Brown','Isla Patel','Zoe Walker','Lucas Kim','Chloe Davis','Jack Wilson','Grace Lee','Henry Clark','Ruby Scott','Leo Harris','Emily Chen','Thomas Wright','Hannah Young','Samuel Adams','Olivia Baker','Daniel Hall','Lily Turner','Oscar Nguyen','Charlotte King','Benjamin Moore',
+  'Mateo Ruiz','Marta Gil','Emma Clarke','Tomás Herrera','Amara Okafor','Max Fischer','Priya Sharma','Jonah Price','Elena Vidal','Kai Morgan','Nina Rossi','Felix Wagner','Aisha Bello','Ruben Ortega','Maximiliano Fernández-Gutiérrez'];
+const OTHER_META = ['Player · Senior men','Coach','Player · Juniors','Committee','Player · Sunday social','Player · Senior men'];
+const MEMBERS = NAMES.map((name, i) => ({ id:'m'+i, name, ini: name.split(/[\s-]+/).map(w=>w[0]).slice(0,2).join(''),
+  meta: i < 25 ? (i % 8 === 4 ? 'Coach · Senior women' : 'Player · Senior women') : OTHER_META[i % OTHER_META.length] }));
+const BY_ID = Object.fromEntries(MEMBERS.map(m=>[m.id, m]));
+const SUBJ_MAX = 150, MSG_MAX = 5000, QUOTA = 50;
+const SAMPLE = "Hi everyone,\n\nThis **Saturday** training starts at **8 am** instead of 9 — the pool has a school event later.\n\n- Bring your _own_ fins and snorkel\n- Spare caps are at the front desk\n- Carpool list: [see the sheet](https://docs.google.com)\n\nSee you there,\nAna";
+const LONG = (() => { let t = SAMPLE; const para = "\n\nTravel for Nationals: we leave the club on Friday 16 April at 6 am. Bring your licence, the signed medical form and the team kit. Rooms are shared in pairs — tell Marta if you have a preference. Dinner on Friday is together at the hotel; lunch on Saturday is packed by the club."; while (t.length < 5240) t += para; return t.slice(0, 5240); })();
+const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const SAFE = /^(https?:\/\/|mailto:)/i;
+const seg = (t, w, st) => ({ t, w, st, isText:true, isLink:false, href:'' });
+function inl(txt, w, st){
+  const out = [], re = /\*\*(.+?)\*\*|_(.+?)_|\*(.+?)\*|\[([^\]]+)\]\(([^)\s]+)\)/g; let last = 0, m;
+  while ((m = re.exec(txt))) {
+    if (m.index > last) out.push(seg(txt.slice(last, m.index), w, st));
+    if (m[1] != null) out.push(...inl(m[1], 700, st));
+    else if (m[2] != null || m[3] != null) out.push(...inl(m[2] ?? m[3], w, 'italic'));
+    else { const ok = SAFE.test(m[5]); out.push(...inl(m[4], w, st).map(x => ok ? {...x, isLink:true, isText:false, href:m[5]} : x)); }
+    last = re.lastIndex;
+  }
+  if (last < txt.length) out.push(seg(txt.slice(last), w, st));
+  return out;
+}
+function parse(md){
+  const blocks = [];
+  md.replace(/\r/g,'').split(/\n{2,}/).forEach(chunk => { let cur = null;
+    chunk.split('\n').forEach(line => { if (!line.trim()) return;
+      const ul = line.match(/^\s*[-*]\s+(.*)$/), ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
+      const kind = ul ? 'ul' : ol ? 'ol' : 'p', text = ul ? ul[1] : ol ? ol[1] : line;
+      if (!cur || cur.kind !== kind) { cur = { kind, lines:[] }; blocks.push(cur); }
+      cur.lines.push({ segs: inl(text, 400, 'normal') }); }); });
+  return blocks.map(b => ({ ...b, isP:b.kind==='p', isUl:b.kind==='ul', isOl:b.kind==='ol' }));
+}
+const fmtN = n => n.toLocaleString('en-US');
+
+class Component extends DCLogic {
+  uid = 'ec' + Math.random().toString(36).slice(2, 8);
+  taRef = React.createRef(); searchRef = React.createRef(); subjRef = React.createRef();
+  init(p){ const start = p.start || 'edit', count = Number(p.count) || 3;
+    return { start, count, ids: MEMBERS.slice(0, count).map(m=>m.id), expanded:false, query: start==='search' ? 'ma' : '', focus: start==='search', hi:0,
+      subject: start==='errors' ? '' : 'Saturday training moves to 8 am', message: start==='errors' ? LONG : SAMPLE,
+      tab: start==='preview' ? 'preview' : 'write', tried: start==='errors', phase: start==='confirm' ? 'confirm' : 'edit', remaining:41, sentN:0, notice:null }; }
+  state = this.init(this.props || {});
+  componentDidMount(){ const p = this.props || {}; if ((p.start || 'edit') !== this.state.start || (Number(p.count) || 3) !== this.state.count) this.setState(this.init(p)); }
+  componentWillUnmount(){ clearTimeout(this._t); clearTimeout(this._b); }
+  fmt(kind){
+    const ta = this.taRef.current, v = this.state.message;
+    let a = ta ? ta.selectionStart : v.length, b = ta ? ta.selectionEnd : v.length; const sel = v.slice(a, b);
+    let ins, ca, cb;
+    if (kind==='b' || kind==='i') { const mk = kind==='b' ? '**' : '_', t = sel || (kind==='b' ? 'bold text' : 'italic text'); ins = mk + t + mk; ca = a + mk.length; cb = ca + t.length; }
+    else if (kind==='link') { const t = sel || 'link text'; ins = `[${t}](https://)`; ca = a + t.length + 3; cb = ca + 8; }
+    else { const ls = v.lastIndexOf('\n', a - 1) + 1; let le = v.indexOf('\n', b); if (le < 0) le = v.length;
+      ins = v.slice(ls, le).split('\n').map((l,i)=>(kind==='ul' ? '- ' : `${i+1}. `) + l.replace(/^\s*([-*]|\d+[.)])\s+/, '')).join('\n'); a = ls; b = le; ca = ls; cb = ls + ins.length; }
+    this.setState({ message: v.slice(0, a) + ins + v.slice(b) }, () => { if (ta) { ta.focus(); ta.setSelectionRange(ca, cb); } });
+  }
+  renderVals(){
+    const s = this.state, p = this.props || {}, mob = p.mode === 'mobile', I = this.uid;
+    const recips = s.ids.map(id=>BY_ID[id]).filter(Boolean), n = recips.length, cap = mob ? 6 : 10;
+    const collapsed = !s.expanded && n > cap + 1, shown = collapsed ? recips.slice(0, cap) : recips;
+    const removeId = id => this.setState(st=>({ ids: st.ids.filter(x=>x!==id) }));
+    const add = m => { this.setState(st=>({ ids:[...st.ids, m.id], query:'', hi:0 })); setTimeout(()=>this.searchRef.current?.focus(), 0); };
+    const q = norm(s.query.trim()), taken = new Set(s.ids);
+    const found = q ? MEMBERS.filter(m=>!taken.has(m.id) && norm(m.name).includes(q)).slice(0, 6) : [];
+    const hi = Math.min(s.hi, Math.max(found.length - 1, 0));
+    const results = found.map((m, i) => { const at = norm(m.name).indexOf(q);
+      return { ini:m.ini, meta:m.meta, pre:m.name.slice(0, at), mid:m.name.slice(at, at + q.length), post:m.name.slice(at + q.length), on: i===hi,
+        bg: i===hi ? 'var(--hover)' : 'transparent', hint: i===hi ? 'Enter ↵' : 'Add', hintColor: i===hi ? 'var(--accent-text)' : 'var(--text2)', sep: i===0 ? 'none' : '1px solid var(--border)',
+        add: e => { e.preventDefault(); add(m); }, hover: () => this.setState({ hi:i }) }; });
+    const alreadyIn = q && found.length === 0 && MEMBERS.some(m=>taken.has(m.id) && norm(m.name).includes(q));
+    const sl = s.subject.length, ml = s.message.length;
+    const subjErr = !s.tried ? '' : !s.subject.trim() ? 'Add a subject.' : sl > SUBJ_MAX ? `Keep the subject to ${SUBJ_MAX} characters (now ${sl}).` : '';
+    const msgErr = !s.tried ? '' : !s.message.trim() ? 'Write a message.' : ml > MSG_MAX ? `The message is ${fmtN(ml - MSG_MAX)} characters too long. Shorten it to ${fmtN(MSG_MAX)}.` : '';
+    const errs = (subjErr ? 1 : 0) + (msgErr ? 1 : 0);
+    const over = n > s.remaining, after = Math.max(s.remaining - n, 0);
+    const send = () => {
+      const subjBad = !s.subject.trim() || sl > SUBJ_MAX, msgBad = !s.message.trim() || ml > MSG_MAX;
+      this.setState({ tried:true, notice:null, ...(msgBad && !subjBad ? { tab:'write' } : {}) });
+      if (subjBad || msgBad) { setTimeout(()=>(subjBad ? this.subjRef : this.taRef).current?.focus(), 30); return; }
+      if (!n || over) return;
+      this.setState({ phase:'confirm' });
+    };
+    const tabs = [['write','Write','ph-pencil-simple'],['preview','Preview','ph-eye']].map(([k,l,ic])=>({ label:l, icon:ic, on:s.tab===k, w: s.tab===k ? 650 : 500,
+      bg: s.tab===k ? 'var(--seg)' : 'transparent', color: s.tab===k ? 'var(--text)' : 'var(--text2)', pick: ()=>this.setState({ tab:k }) }));
+    const mod = /Mac/.test(typeof navigator !== 'undefined' ? navigator.platform : '') ? '⌘' : 'Ctrl+';
+    const tools = [['b','ph-text-b','Bold',`Bold (${mod}B)`],['i','ph-text-italic','Italic',`Italic (${mod}I)`],['link','ph-link-simple','Add link',`Link (${mod}K)`],['ul','ph-list-bullets','Bulleted list','Bulleted list',true],['ol','ph-list-numbers','Numbered list','Numbered list']]
+      .map(([k,icon,label,title,sep])=>({ icon, label, title, sep:!!sep, go: ()=>this.fmt(k) }));
+    const blocks = s.tab==='preview' ? parse(s.message) : [];
+    const describe = (...xs) => xs.filter(Boolean).join(' ') || undefined;
+    return {
+      isDesk: !mob, isMob: mob,
+      ids: { title:I+'-t', to:I+'-to', list:I+'-l', subj:I+'-s', subjErr:I+'-se', msg:I+'-m', msgLabel:I+'-ml', msgHint:I+'-mh', msgErr:I+'-me', dlg:I+'-d' },
+      isEditing: s.phase !== 'sent', isSent: s.phase === 'sent', confirming: s.phase==='confirm' || s.phase==='sending', isSending: s.phase==='sending',
+      close: ()=>this.setState(this.init(p)),
+      countText: n === 0 ? 'nobody yet' : n === 1 ? '1 member' : `${n} members`, canClear: n > 1, hasRecipients: n > 0, noRecipients: n === 0,
+      clearAll: ()=>this.setState({ ids:[], expanded:false }),
+      chips: shown.map(r=>({ name:r.name, ini:r.ini, removeLabel:`Remove ${r.name}`, remove: e=>{ e.stopPropagation(); removeId(r.id); } })),
+      collapsed, moreLabel:`+${n - cap} more`, moreAria:`Show all ${n} recipients`, expand: e=>{ e.stopPropagation(); this.setState({ expanded:true }); },
+      showLess: s.expanded && n > cap + 1, collapse: e=>{ e.stopPropagation(); this.setState({ expanded:false }); },
+      searchRef: this.searchRef, query: s.query, hasQuery: !!s.query,
+      onQuery: e=>this.setState({ query:e.target.value, hi:0, focus:true }),
+      clearQuery: e=>{ e.preventDefault(); this.setState({ query:'' }); },
+      searchFocus: ()=>{ clearTimeout(this._b); this.setState({ focus:true }); },
+      searchBlur: ()=>{ this._b = setTimeout(()=>this.setState({ focus:false }), 120); },
+      focusSearch: ()=>this.searchRef.current?.focus(),
+      searchKey: e=>{
+        if (e.key==='ArrowDown') { e.preventDefault(); this.setState({ hi: Math.min(hi + 1, found.length - 1) }); }
+        else if (e.key==='ArrowUp') { e.preventDefault(); this.setState({ hi: Math.max(hi - 1, 0) }); }
+        else if (e.key==='Enter') { e.preventDefault(); if (found[hi]) add(found[hi]); }
+        else if (e.key==='Escape') this.setState({ query:'' });
+        else if (e.key==='Backspace' && !s.query && s.ids.length) this.setState(st=>({ ids: st.ids.slice(0, -1) }));
+      },
+      searchOpen: s.focus && !!q, results, noResults: !!q && found.length === 0,
+      noResultsText: alreadyIn ? `Everyone matching “${s.query.trim()}” is already on the list.` : `No members match “${s.query.trim()}”.`,
+      toBorder: s.focus ? 'var(--accent)' : 'var(--border)',
+      subjRef: this.subjRef, subject: s.subject, onSubject: e=>this.setState({ subject:e.target.value }),
+      subjCount: `${sl} / ${SUBJ_MAX}`, subjCountColor: sl > SUBJ_MAX ? 'var(--danger)' : 'var(--text2)',
+      subjErr, subjInvalid: !!subjErr, subjBorder: subjErr ? 'var(--danger)' : 'var(--border)', subjDescribed: subjErr ? I+'-se' : undefined,
+      tabs, isWrite: s.tab==='write', isPreview: s.tab==='preview', tools, keepSel: e=>e.preventDefault(),
+      taRef: this.taRef, message: s.message, onMessage: e=>this.setState({ message:e.target.value }),
+      msgKey: e=>{ if (!(e.metaKey || e.ctrlKey)) return; const k = e.key.toLowerCase(); const map = { b:'b', i:'i', k:'link' }; if (map[k]) { e.preventDefault(); this.fmt(map[k]); } },
+      msgCount: `${fmtN(ml)} / ${fmtN(MSG_MAX)}`, msgCountColor: ml > MSG_MAX ? 'var(--danger)' : ml > MSG_MAX * 0.9 ? 'var(--text)' : 'var(--text2)', msgCountW: ml > MSG_MAX ? 700 : 400,
+      msgErr, msgInvalid: !!msgErr, msgBorder: msgErr ? 'var(--danger)' : 'var(--border)', msgDescribed: describe(I+'-mh', msgErr && I+'-me'),
+      blocks, previewEmpty: s.tab==='preview' && blocks.length === 0,
+      previewTo: n === 1 ? recips[0].name : `${n} members · each gets their own copy`,
+      previewSubject: s.subject.trim() || 'No subject yet', previewSubjectColor: s.subject.trim() ? 'var(--text)' : 'var(--text2)',
+      errCount: s.tried && errs > 0 && s.phase==='edit', errSummary: errs === 1 ? '1 thing to fix' : `${errs} things to fix`,
+      overQuota: over && n > 0, overQuotaText: `Only ${s.remaining} emails left today. Remove ${n - s.remaining} ${n - s.remaining === 1 ? 'person' : 'people'} or send the rest tomorrow.`,
+      notice: s.notice,
+      quotaText: `${s.remaining} of ${QUOTA} emails left today`, quotaPct: (s.remaining / QUOTA * 100) + '%', quotaColor: s.remaining < 10 ? 'var(--warning)' : 'var(--success)',
+      send, sendDisabled: n === 0 || over, sendOp: n === 0 || over ? .45 : 1, sendLabel: n ? `Send to ${n}` : 'Send',
+      dlgTitle: n === 1 ? `Send to ${recips[0].name}?` : `Send to ${n} members?`,
+      quotaBefore: s.remaining, quotaAfter: after, afterPct: (after / QUOTA * 100) + '%', usePct: (Math.min(n, s.remaining) / QUOTA * 100) + '%',
+      quotaNote: after === 0 ? 'This uses the last emails for today.' : after < 10 ? `After this, only ${after} left until tomorrow.` : `The count goes back to ${QUOTA} tomorrow.`,
+      cancelConfirm: ()=>{ if (s.phase !== 'sending') this.setState({ phase:'edit' }); },
+      confirmSend: ()=>{ if (s.phase === 'sending') return; this.setState({ phase:'sending' }); this._t = setTimeout(()=>this.setState(st=>({ phase:'sent', sentN: st.ids.length, remaining: st.remaining - st.ids.length })), 900); },
+      confirmLabel: s.phase==='sending' ? 'Sending…' : n === 1 ? 'Send 1 email' : `Send ${n} emails`,
+      sentTitle: s.sentN === 1 ? '1 email sent' : `${s.sentN} emails sent`,
+      writeAnother: ()=>this.setState({ subject:'', message:'', tried:false, phase:'edit', tab:'write' })
+    };
+  }
+}
+</script>
+</body>
+</html>
