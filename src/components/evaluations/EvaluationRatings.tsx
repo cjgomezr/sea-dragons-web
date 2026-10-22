@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import {
   type EvaluationRating,
   RATING_MAX,
@@ -108,9 +109,11 @@ function EditableRating({
 
 function RatingsCard({
   translate,
+  listRef,
   children,
 }: {
   translate: Translator;
+  listRef?: React.Ref<HTMLUListElement>;
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
@@ -119,6 +122,7 @@ function RatingsCard({
         {translate("evaluations.ratings.title")}
       </h3>
       <ul
+        ref={listRef}
         className="evaluation-rating-list"
         aria-labelledby={RATINGS_HEADING_ID}
       >
@@ -178,6 +182,35 @@ function ReadOnlyRatings({
   );
 }
 
+/** Al entrar en edición el botón que se pulsó desaparece (Editar notas,
+ * Empezar evaluación, Guardar y siguiente): el foco pasa al primer
+ * deslizador, que es por donde se sigue. */
+function EditingRatings({
+  translate,
+  rows,
+  onRatingChange,
+}: {
+  translate: Translator;
+  rows: readonly EditingRating[];
+  onRatingChange: (categoryId: string, rating: number) => void;
+}): React.JSX.Element {
+  const listRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    listRef.current?.querySelector("input")?.focus();
+  }, []);
+  return (
+    <RatingsCard translate={translate} listRef={listRef}>
+      {rows.map((row) => (
+        <EditableRating
+          key={row.categoryId}
+          row={row}
+          onChange={(value) => onRatingChange(row.categoryId, value)}
+        />
+      ))}
+    </RatingsCard>
+  );
+}
+
 export function EvaluationRatings({
   translate,
   ratings,
@@ -203,14 +236,10 @@ export function EvaluationRatings({
     );
   }
   return (
-    <RatingsCard translate={translate}>
-      {editingRows.map((row) => (
-        <EditableRating
-          key={row.categoryId}
-          row={row}
-          onChange={(value) => onRatingChange(row.categoryId, value)}
-        />
-      ))}
-    </RatingsCard>
+    <EditingRatings
+      translate={translate}
+      rows={editingRows}
+      onRatingChange={onRatingChange}
+    />
   );
 }

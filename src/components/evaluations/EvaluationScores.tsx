@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { EvaluationCategories } from "@/lib/evaluations/evaluation-categories";
 import type { MemberEvaluation } from "@/lib/evaluations/member-evaluation";
 import { formatClubShortDay } from "@/lib/i18n/format";
@@ -125,11 +126,13 @@ function ReadingFooter({
   translate,
   evaluation,
   updatedBy,
+  editButtonRef,
   onEdit,
 }: {
   translate: Translator;
   evaluation: Evaluated;
   updatedBy: string | null;
+  editButtonRef: React.Ref<HTMLButtonElement>;
   onEdit: () => void;
 }): React.JSX.Element {
   return (
@@ -140,7 +143,12 @@ function ReadingFooter({
         updatedBy={updatedBy}
       />
       <div className="evaluation-actions">
-        <button type="button" className="admin-secondary" onClick={onEdit}>
+        <button
+          ref={editButtonRef}
+          type="button"
+          className="admin-secondary"
+          onClick={onEdit}
+        >
           {translate("evaluations.edit")}
         </button>
       </div>
@@ -167,6 +175,17 @@ export function EvaluationScores({
   hasNext: boolean;
   onReload: () => void;
 }): React.JSX.Element {
+  const isEditing = editor.rows !== null;
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  // Al guardar o cancelar desaparece el botón pulsado: el foco vuelve a
+  // Editar notas, no al principio de la página.
+  const wasEditing = useRef(isEditing);
+  useEffect(() => {
+    if (wasEditing.current && !isEditing) {
+      editButtonRef.current?.focus();
+    }
+    wasEditing.current = isEditing;
+  }, [isEditing]);
   return (
     <div className="evaluation-scores">
       <EvaluationRatings
@@ -177,14 +196,16 @@ export function EvaluationScores({
         onRatingChange={editor.setRating}
       />
       <SaveFailure translate={translate} editor={editor} onReload={onReload} />
-      {editor.rows === null ? (
+      {isEditing ? null : (
         <ReadingFooter
           translate={translate}
           evaluation={evaluation}
           updatedBy={updatedBy}
+          editButtonRef={editButtonRef}
           onEdit={editor.startEditing}
         />
-      ) : (
+      )}
+      {isEditing ? (
         <footer className="evaluation-sheet-footer">
           <EditingActions
             translate={translate}
@@ -192,7 +213,7 @@ export function EvaluationScores({
             hasNext={hasNext}
           />
         </footer>
-      )}
+      ) : null}
     </div>
   );
 }

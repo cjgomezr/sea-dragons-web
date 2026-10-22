@@ -1570,6 +1570,56 @@ describe("editar en el panel (#820)", () => {
     expect(callsTo("PUT")).toHaveLength(0);
   });
 
+  it("al entrar en edición el foco va al primer deslizador", async () => {
+    clubApi();
+    await renderScreen();
+    const sheet = await openCamila();
+
+    await startEditing(sheet);
+
+    expect(
+      within(sheet).getByRole("slider", { name: "Fitness" }),
+    ).toHaveFocus();
+  });
+
+  it("al cancelar o guardar el foco vuelve a Editar notas", async () => {
+    clubApi({ [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: savedWith });
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Cancel" }),
+    );
+    expect(
+      within(sheet).getByRole("button", { name: "Edit ratings" }),
+    ).toHaveFocus();
+    await startEditing(sheet);
+    await userEvent.click(saveButton(sheet));
+
+    await waitFor(() =>
+      expect(
+        within(sheet).getByRole("button", { name: "Edit ratings" }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it("tras Guardar y siguiente el foco está en el primer deslizador del siguiente", async () => {
+    clubApi({ [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: savedWith });
+    await renderScreen();
+    const camila = await openCamila();
+    await startEditing(camila);
+
+    await userEvent.click(saveAndNextButton(camila));
+
+    const jose = await sheetRegion(/evaluation of josé peña/i);
+    await waitFor(() =>
+      expect(
+        within(jose).getByRole("slider", { name: "Fitness" }),
+      ).toHaveFocus(),
+    );
+  });
+
   it("Guardar y siguiente guarda y abre al siguiente de la lista ya en edición", async () => {
     clubApi({ [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: savedWith });
     await renderScreen();
