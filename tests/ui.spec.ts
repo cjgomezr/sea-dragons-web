@@ -16073,6 +16073,23 @@ async function openCamila(page: Page): Promise<void> {
   await expect(page.getByRole("list", { name: RATINGS_LIST })).toBeVisible();
 }
 
+/** El panel sale desde 1024 px (D12); más estrecho no hay resumen (D7) y
+ * basta con la tabla. */
+const EVALUATIONS_PANEL_MIN_WIDTH = 1024;
+
+async function waitForOverview(page: Page, text: string): Promise<void> {
+  await waitForRoster(page);
+  const width = page.viewportSize()?.width;
+  if (width === undefined) {
+    throw new Error("La página no tiene un tamaño de ventana fijo.");
+  }
+  if (width >= EVALUATIONS_PANEL_MIN_WIDTH) {
+    await expect(
+      page.getByRole("region", { name: SQUAD_OVERVIEW }),
+    ).toContainText(text);
+  }
+}
+
 async function openCamilaFromRoster(page: Page): Promise<void> {
   await waitForRoster(page);
   await openCamila(page);
@@ -16151,23 +16168,13 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
     name: "evaluaciones-resumen",
     roster: STUBBED_ROSTER,
     isDesktopOnly: true,
-    ready: async (page) => {
-      await waitForRoster(page);
-      await expect(
-        page.getByRole("region", { name: SQUAD_OVERVIEW }),
-      ).toContainText("Lowest: Defense");
-    },
+    ready: (page) => waitForOverview(page, "Lowest: Defense"),
   },
   {
     name: "evaluaciones-resumen-todos-evaluados",
     roster: STUBBED_ROSTER.filter((member) => member.status === "evaluated"),
     isDesktopOnly: true,
-    ready: async (page) => {
-      await waitForRoster(page);
-      await expect(
-        page.getByText("✓ Everyone has an evaluation."),
-      ).toBeVisible();
-    },
+    ready: (page) => waitForOverview(page, "✓ Everyone has an evaluation."),
   },
   {
     name: "evaluaciones-filtrando",

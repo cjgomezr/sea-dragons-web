@@ -126,7 +126,7 @@ function RatingsCard({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="card evaluation-ratings">
+    <div className="evaluation-ratings">
       <h3 id={RATINGS_HEADING_ID} className="evaluation-card-title">
         {translate("evaluations.ratings.title")}
       </h3>

@@ -11853,13 +11853,18 @@ a.auth-brand-header:focus-visible {
   line-height: 1;
   color: var(--color-text);
   background: none;
-  border: 1px solid var(--color-border);
+  border: none;
   border-radius: var(--radius);
   cursor: pointer;
 }
 
 .evaluation-sheet-nav-button:hover:not(:disabled) {
   background: var(--color-hover);
+}
+
+.evaluation-sheet-nav-button:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 0;
 }
 
 .evaluation-sheet-nav-button:disabled {
@@ -11918,17 +11923,32 @@ a.auth-brand-header:focus-visible {
   border-radius: 50%;
 }
 
+/* La cifra con "OVR" debajo, alineados a la derecha como el handoff. */
 .evaluation-overall {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
   margin: 0;
+}
+
+.evaluation-overall-value {
   font-family: var(--font-family-mono);
   font-size: 30px;
   font-weight: 700;
   line-height: 1;
-  color: var(--color-accent-text);
+  color: var(--color-text);
 }
 
-.evaluation-overall[data-empty="true"] {
+.evaluation-overall[data-empty="true"] .evaluation-overall-value {
   font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.evaluation-overall-caption {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: 700;
   color: var(--color-text-secondary);
 }
 
@@ -12034,7 +12054,9 @@ a.auth-brand-header:focus-visible {
   gap: var(--space-3);
   align-items: center;
   min-height: 38px;
+  padding-block: var(--space-2);
   font-size: 13.5px;
+  border-top: 1px solid var(--color-border);
 }
 
 .evaluation-rating-name {
