@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef } from "react";
 import { type NamedPosition, positionName } from "@/lib/club/club-positions";
 import type { Translator } from "@/lib/i18n/translator";
-import type { MyTeam, PublishedTeam } from "@/lib/teams/my-team";
+import type { LineupPlayer, MyTeam, PublishedTeam } from "@/lib/teams/my-team";
 import { nameTeamColor } from "@/lib/teams/team-color-name";
 import { TEAM_IDS } from "@/lib/teams/team-ids";
 import type { EventTeamState } from "./use-event-team";
@@ -72,6 +72,36 @@ function MyTeamCard({
   );
 }
 
+/** Quien respondió que ya no viene sigue en su sitio hasta que el coach lo
+ * quite: tachado, en gris y con la pastilla. El lector de pantalla oye una
+ * sola frase, porque el tachado no se anuncia. */
+function LineupName({
+  translate,
+  player,
+}: {
+  readonly translate: Translator;
+  readonly player: LineupPlayer;
+}): React.JSX.Element {
+  if (!player.isOutsideSquad) {
+    return <span className="event-lineup-name">{player.fullName}</span>;
+  }
+  return (
+    <span className="event-lineup-name">
+      <span className="visually-hidden">
+        {translate("calendar.teams.notComingPlayer", {
+          name: player.fullName,
+        })}
+      </span>
+      <span className="event-lineup-not-coming" aria-hidden="true">
+        <s>{player.fullName}</s>
+        <span className="event-lineup-pill">
+          {translate("calendar.teams.notComing")}
+        </span>
+      </span>
+    </span>
+  );
+}
+
 function Lineup({
   translate,
   team,
@@ -98,7 +128,7 @@ function Lineup({
         <ul className="event-lineup-list" aria-labelledby={headingId}>
           {team.players.map((player) => (
             <li key={player.userId} className="event-lineup-player">
-              <span className="event-lineup-name">{player.fullName}</span>
+              <LineupName translate={translate} player={player} />
               <span className="team-position">
                 {describePosition(translate, player.position)}
               </span>

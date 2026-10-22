@@ -109,6 +109,7 @@ const KELP_TEAM: NextUpTeam = {
     id: "12121212-0000-4000-8000-000000000012",
     names: { en: "Full back", es: "Defensa" },
   },
+  isOutsideSquad: false,
 };
 
 const ADMIN_DASHBOARD: MemberDashboard = {
@@ -803,6 +804,44 @@ describe("el equipo en la tarjeta Próximo (#747)", () => {
     expect(
       within(nextUpCard()).queryByText("You're playing in"),
     ).not.toBeInTheDocument();
+  });
+
+  describe("MyTeamStrip", () => {
+    const NOT_COMING_TEAM: NextUpTeam = { ...KELP_TEAM, isOutsideSquad: true };
+
+    it("a quien respondió que no puede ir se lo dice en lugar del equipo y la posición", async () => {
+      stubDashboard(withNextUp({ ...NEXT_UP, myTeam: NOT_COMING_TEAM }));
+
+      await renderScreen();
+
+      const card = nextUpCard();
+      expect(
+        within(card).getByText("You said you can't make it"),
+      ).toBeInTheDocument();
+      expect(within(card).queryByText("Team Kelp")).toBeNull();
+      expect(within(card).queryByText(/Full back/)).toBeNull();
+    });
+
+    it("le deja el enlace Ver equipos", async () => {
+      stubDashboard(withNextUp({ ...NEXT_UP, myTeam: NOT_COMING_TEAM }));
+
+      await renderScreen();
+
+      expect(
+        within(nextUpCard()).getByRole("link", { name: "See teams" }),
+      ).toHaveAttribute("href", `/calendario?evento=${NEXT_UP.id}&ver=equipos`);
+    });
+
+    it("se lo dice en español", async () => {
+      stubDashboard(withNextUp({ ...NEXT_UP, myTeam: NOT_COMING_TEAM }));
+
+      await renderScreen({ locale: "es" });
+
+      const card = screen.getByRole("region", { name: "Próximo" });
+      expect(
+        within(card).getByText("Respondiste que no puedes ir"),
+      ).toBeInTheDocument();
+    });
   });
 
   it("a Admin y Coach les avisa del reparto sin publicar y abre ese evento en Equipos", async () => {

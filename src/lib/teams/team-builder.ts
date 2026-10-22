@@ -233,10 +233,9 @@ export type SquadEntry = {
 
 /** Un asignado. Fuera de la escuadra si cambió su RSVP o salió de la
  * audiencia: sigue asignado hasta que el coach lo quite (RF-4). */
-export type BuilderAssignment = SquadEntry & {
-  readonly team: TeamId;
-  readonly isOutsideSquad: boolean;
-};
+export type AssignedEntry = SquadEntry & { readonly isOutsideSquad: boolean };
+
+export type BuilderAssignment = AssignedEntry & { readonly team: TeamId };
 
 export type BuilderSplit = {
   readonly mode: TeamSplitMode;
@@ -471,23 +470,59 @@ async function toSquadEntries(
   );
 }
 
-/** Los jugadores con esos ids ya listos para pintar, por id. */
-export async function readSquadEntries(
+/** Quienes entran en la escuadra: respondieron Sí o Quizás y tienen la
+ * membresía al día (#453). Los demás asignados quedan fuera. */
+function squadIdsOf(
+  responses: readonly SquadResponse[],
+  players: readonly PlayerRecord[],
+): ReadonlySet<string> {
+  const currentIds = new Set(
+    players
+      .filter((player) => player.membershipCurrent)
+      .map((player) => player.userId),
+  );
+  return new Set(
+    responses
+      .map((row) => row.userId)
+      .filter((userId) => currentIds.has(userId)),
+  );
+}
+
+/** Los asignados de un evento ya listos para pintar, por id, marcados fuera
+ * de la escuadra igual que en el builder. */
+export async function readAssignedEntries(
   gateways: {
-    readonly teams: Pick<TeamSplitsGateway, "findPlayers">;
+    readonly teams: Pick<
+      TeamSplitsGateway,
+      "findPlayers" | "findLiveResponses"
+    >;
     readonly positions: ClubPositionsGateway;
   },
-  query: { readonly clubId: string; readonly userIds: readonly string[] },
-): Promise<ReadonlyMap<string, SquadEntry>> {
+  query: {
+    readonly clubId: string;
+    readonly eventId: string;
+    readonly userIds: readonly string[];
+  },
+): Promise<ReadonlyMap<string, AssignedEntry>> {
   if (query.userIds.length === 0) {
     return new Map();
   }
-  const players = await gateways.teams.findPlayers(query);
+  const [responses, players] = await Promise.all([
+    gateways.teams.findLiveResponses(query.eventId),
+    gateways.teams.findPlayers(query),
+  ]);
+  const squadIds = squadIdsOf(responses, players);
   // "Mi equipo" enseña nombres y posiciones, no caras: no firma nada.
-  return toSquadEntries(gateways, query.clubId, {
+  const entries = await toSquadEntries(gateways, query.clubId, {
     players,
     photoUrls: new Map(),
   });
+  return new Map(
+    [...entries].map(([userId, entry]) => [
+      userId,
+      { ...entry, isOutsideSquad: !squadIds.has(userId) },
+    ]),
+  );
 }
 
 /** Sin foto para nadie, para lo que lee la escuadra sólo para validarla. */
@@ -591,14 +626,10 @@ async function readSquad(
     players,
     photoUrls: await signVisiblePhotos(gateways, players, viewerRole),
   });
-  const currentIds = new Set(
-    players
-      .filter((player) => player.membershipCurrent)
-      .map((player) => player.userId),
-  );
+  const squadIds = squadIdsOf(responses, players);
   const withResponse = (response: SquadResponse["response"]): SquadEntry[] =>
     responses
-      .filter((row) => row.response === response && currentIds.has(row.userId))
+      .filter((row) => row.response === response && squadIds.has(row.userId))
       .flatMap((row) => entries.get(row.userId) ?? [])
       .sort(byName);
   return {

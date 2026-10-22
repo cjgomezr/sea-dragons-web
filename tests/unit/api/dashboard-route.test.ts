@@ -108,6 +108,7 @@ function dashboardGateways(): DashboardGateways {
         findEvent: async () => null,
         findSplit: async () => null,
         findPlayers: async () => [],
+        findLiveResponses: async () => [],
       },
       positions: { findClubPositions: async () => [] },
     },

@@ -38,7 +38,11 @@ import type {
 } from "@/lib/events/event-agenda";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
 import type { PublishedSplitDrops } from "@/lib/dashboard/dashboard-management";
-import type { PlayerRecord, StoredTeamSplit } from "@/lib/teams/team-builder";
+import type {
+  PlayerRecord,
+  SquadResponse,
+  StoredTeamSplit,
+} from "@/lib/teams/team-builder";
 import { DEFAULT_TEAM_LABELS } from "@/lib/teams/team-builder";
 import { GOALKEEPER, SEEDED_POSITIONS } from "../helpers/seeded-positions";
 import type {
@@ -111,6 +115,8 @@ type Club = {
   splits: Map<string, StoredTeamSplit>;
   /** Los jugadores que puede leer el reparto. */
   players: PlayerRecord[];
+  /** Quién respondió Sí o Quizás a cada evento, por id. */
+  liveResponses: Map<string, SquadResponse[]>;
   /** Las portadas de noticias que existen en el bucket, por id. */
   newsCoverIds: Set<string>;
   /** `clubs.season_starts_on` (#744). */
@@ -391,6 +397,8 @@ function gateways(): DashboardGateways {
         },
         findPlayers: async ({ userIds }) =>
           club.players.filter((player) => userIds.includes(player.userId)),
+        findLiveResponses: async (eventId) =>
+          club.liveResponses.get(eventId) ?? [],
       },
       positions: { findClubPositions: async () => SEEDED_POSITIONS },
     },
@@ -521,6 +529,7 @@ beforeEach(() => {
     tallies: [],
     splits: new Map(),
     players: [],
+    liveResponses: new Map(),
     newsCoverIds: new Set(),
     seasonStartsOn: null,
     ownSessions: [],
@@ -1144,6 +1153,7 @@ describe("mi equipo en el próximo evento (#745)", () => {
   it("da a un Player del reparto publicado su equipo, su color y su posición", async () => {
     const row = scrimmage();
     club.players = [playerWith(GOALKEEPER.id)];
+    club.liveResponses.set(row.id, [{ userId: CALLER_ID, response: "yes" }]);
     club.splits.set(row.id, splitWith([{ userId: CALLER_ID, team: "b" }]));
 
     const result = await dashboard();
@@ -1152,12 +1162,27 @@ describe("mi equipo en el próximo evento (#745)", () => {
       name: DEFAULT_TEAM_LABELS.b.name,
       color: DEFAULT_TEAM_LABELS.b.color,
       position: { id: GOALKEEPER.id, names: GOALKEEPER.names },
+      isOutsideSquad: false,
+    });
+  });
+
+  it("dice al Player del reparto publicado que ya no viene si respondió que no", async () => {
+    const row = scrimmage();
+    club.players = [playerWith(GOALKEEPER.id)];
+    club.splits.set(row.id, splitWith([{ userId: CALLER_ID, team: "b" }]));
+
+    const result = await dashboard();
+
+    expect(nextUpEventOf(result).myTeam).toMatchObject({
+      name: DEFAULT_TEAM_LABELS.b.name,
+      isOutsideSquad: true,
     });
   });
 
   it("deja la posición en null si no tiene", async () => {
     const row = scrimmage();
     club.players = [playerWith(null)];
+    club.liveResponses.set(row.id, [{ userId: CALLER_ID, response: "maybe" }]);
     club.splits.set(row.id, splitWith([{ userId: CALLER_ID, team: "a" }]));
 
     const result = await dashboard();
@@ -1166,6 +1191,7 @@ describe("mi equipo en el próximo evento (#745)", () => {
       name: DEFAULT_TEAM_LABELS.a.name,
       color: DEFAULT_TEAM_LABELS.a.color,
       position: null,
+      isOutsideSquad: false,
     });
   });
 

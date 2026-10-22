@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { EventNotFoundError } from "@/lib/events/event-rsvp";
-import { openMyTeam } from "@/lib/teams/my-team";
+import {
+  type LineupPlayer,
+  type MyTeam,
+  openMyTeam,
+} from "@/lib/teams/my-team";
 import {
   DEFAULT_TEAM_LABELS,
   type StoredTeamSplit,
@@ -25,12 +29,14 @@ import { FORWARD, GOALKEEPER } from "../helpers/seeded-positions";
 const ME: FakePlayer = {
   userId: TEAMS_CALLER_ID,
   fullName: "Pablo Player",
+  response: "yes",
   positionId: GOALKEEPER.id,
   ratings: [9],
 };
 const ANA: FakePlayer = {
   userId: "4e4e4e4e-0000-4000-8000-000000000001",
   fullName: "Ana Zamora",
+  response: "maybe",
   positionId: FORWARD.id,
   ratings: [8],
 };
@@ -67,7 +73,7 @@ describe("mi equipo", () => {
     expect(team).toEqual({
       status: "published",
       publishedAt: PUBLISHED_AT.toISOString(),
-      me: { team: "b", position: GOALKEEPER_NAMED },
+      me: { team: "b", position: GOALKEEPER_NAMED, isOutsideSquad: false },
       teams: {
         a: {
           ...DEFAULT_TEAM_LABELS.a,
@@ -76,6 +82,7 @@ describe("mi equipo", () => {
               userId: ANA.userId,
               fullName: ANA.fullName,
               position: FORWARD_NAMED,
+              isOutsideSquad: false,
             },
           ],
         },
@@ -86,6 +93,7 @@ describe("mi equipo", () => {
               userId: ME.userId,
               fullName: ME.fullName,
               position: GOALKEEPER_NAMED,
+              isOutsideSquad: false,
             },
           ],
         },
@@ -166,5 +174,50 @@ describe("mi equipo", () => {
         eventId: "e1e1e1e1-0000-4000-8000-0000000000ff",
       }),
     ).rejects.toBeInstanceOf(EventNotFoundError);
+  });
+});
+
+describe("alineación publicada", () => {
+  function playerIn(team: MyTeam, userId: string): LineupPlayer | undefined {
+    if (team.status !== "published") {
+      throw new Error("El reparto debía estar publicado.");
+    }
+    return [...team.teams.a.players, ...team.teams.b.players].find(
+      (player) => player.userId === userId,
+    );
+  }
+
+  it("marca fuera de la escuadra a quien respondió que no puede ir", async () => {
+    const team = await openFor({
+      players: [ME, { ...ANA, response: "no" }],
+      split: PUBLISHED,
+    });
+
+    expect(playerIn(team, ANA.userId)).toMatchObject({ isOutsideSquad: true });
+  });
+
+  it.each(["yes", "maybe"] as const)(
+    "no marca a quien respondió %s",
+    async (response) => {
+      const team = await openFor({
+        players: [ME, { ...ANA, response }],
+        split: PUBLISHED,
+      });
+
+      expect(playerIn(team, ANA.userId)).toMatchObject({
+        isOutsideSquad: false,
+      });
+    },
+  );
+
+  it("dice a quien mira que ya no viene si respondió que no", async () => {
+    const team = await openFor({
+      players: [{ ...ME, response: "no" }, ANA],
+      split: PUBLISHED,
+    });
+
+    expect(team).toMatchObject({
+      me: { team: "b", isOutsideSquad: true },
+    });
   });
 });

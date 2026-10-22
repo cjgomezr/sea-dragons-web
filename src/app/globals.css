@@ -4677,9 +4677,10 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text-secondary);
 }
 
-/* La ficha "Sin activar" ocupa la tercera columna; sin ficha queda vacía. */
-.groups-member-pill {
-  grid-column: 3;
+/* La ficha de aviso: "Sin activar" en los grupos, "Ya no viene" en la
+ * alineación publicada (#839). */
+.groups-member-pill,
+.event-lineup-pill {
   padding: 2px var(--space-2);
   font-size: 12px;
   font-weight: 600;
@@ -4687,6 +4688,11 @@ a.auth-brand-header:focus-visible {
   white-space: nowrap;
   background: color-mix(in srgb, var(--color-warning) 22%, var(--color-panel));
   border-radius: 999px;
+}
+
+/* En los grupos ocupa la tercera columna; sin ficha queda vacía. */
+.groups-member-pill {
+  grid-column: 3;
 }
 
 .groups-member-remove {
@@ -14166,6 +14172,16 @@ a.auth-brand-header:focus-visible {
 .event-lineup-name {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* Quien ya no viene: el nombre tachado en gris y la ficha, que baja de
+ * línea si el nombre no la deja caber. */
+.event-lineup-not-coming {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  color: var(--color-text-secondary);
 }
 
 .event-lineup-player .team-position {

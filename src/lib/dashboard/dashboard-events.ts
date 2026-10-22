@@ -34,6 +34,8 @@ export type NextUpTeam = {
   readonly name: string;
   readonly color: string;
   readonly position: NamedPosition | null;
+  /** Respondió que no va después de publicarse el reparto (#839). */
+  readonly isOutsideSquad: boolean;
 };
 
 /** Lo que el Team builder tiene guardado para el evento. */
@@ -191,7 +193,12 @@ async function readMyTeam(
     return null;
   }
   const { name, color } = team.teams[team.me.team];
-  return { name, color, position: team.me.position };
+  return {
+    name,
+    color,
+    position: team.me.position,
+    isOutsideSquad: team.me.isOutsideSquad,
+  };
 }
 
 type TeamParts = {

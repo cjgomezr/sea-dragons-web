@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgendaScreen } from "@/components/calendar/AgendaScreen";
 import type { AgendaEvent, MemberEventDetail } from "@/lib/events/event-agenda";
 import type { Locale } from "@/lib/i18n/locale";
-import type { MyTeam } from "@/lib/teams/my-team";
+import type { LineupPlayer, MyTeam } from "@/lib/teams/my-team";
 
 /**
  * El equipo de quien mira dentro del panel del evento (#403, RF-8 del PRD de
@@ -61,11 +61,12 @@ function player(
   index: number,
   fullName: string,
   position: typeof FORWARD | null,
-): { userId: string; fullName: string; position: typeof FORWARD | null } {
+): LineupPlayer {
   return {
     userId: `4e4e4e4e-0000-4000-8000-${String(index).padStart(12, "0")}`,
     fullName,
     position,
+    isOutsideSquad: false,
   };
 }
 
@@ -90,7 +91,7 @@ const TIDE = {
 const PLAYING_IN_KELP: MyTeam = {
   status: "published",
   publishedAt: "2026-06-20T08:00:00.000Z",
-  me: { team: "a", position: FORWARD },
+  me: { team: "a", position: FORWARD, isOutsideSquad: false },
   teams: { a: KELP, b: TIDE },
 };
 
@@ -370,7 +371,7 @@ describe("el equipo en el panel del evento", () => {
   it("a quien juega sin posición se lo dice en la frase", async () => {
     stubEvent(SCRIMMAGE, {
       ...PLAYING_IN_KELP,
-      me: { team: "b", position: null },
+      me: { team: "b", position: null, isOutsideSquad: false },
     });
 
     const panel = await openPanel(SCRIMMAGE);
@@ -388,12 +389,98 @@ describe("el equipo en el panel del evento", () => {
   ] as const)("dice el dorado por su nombre (%s)", async (locale, sentence) => {
     stubEvent(SCRIMMAGE, {
       ...PLAYING_IN_KELP,
-      me: { team: "b", position: GOALKEEPER },
+      me: { team: "b", position: GOALKEEPER, isOutsideSquad: false },
     });
 
     const panel = await openPanel(SCRIMMAGE, locale);
 
     expect(await within(panel).findByText(sentence)).toBeInTheDocument();
+  });
+});
+
+/** Mateo respondió "No puedo ir" después de publicarse el reparto. */
+const MATEO_NOT_COMING: MyTeam = {
+  ...PLAYING_IN_KELP,
+  teams: {
+    a: {
+      ...KELP,
+      players: [
+        player(1, "Daniela Vargas", FORWARD),
+        { ...player(2, "Mateo Restrepo", FORWARD), isOutsideSquad: true },
+      ],
+    },
+    b: TIDE,
+  },
+};
+
+async function findKelpPlayer(
+  panel: HTMLElement,
+  name: string,
+): Promise<HTMLElement> {
+  const kelp = await within(panel).findByRole("list", { name: "Team Kelp" });
+  const item = within(kelp)
+    .getAllByRole("listitem")
+    .find((candidate) => candidate.textContent?.includes(name));
+  if (item === undefined) {
+    throw new Error(`${name} no está en Team Kelp.`);
+  }
+  return item;
+}
+
+describe("EventTeams", () => {
+  it("marca con la pastilla a quien ya no viene, en el sitio de su equipo", async () => {
+    stubEvent(SCRIMMAGE, MATEO_NOT_COMING);
+
+    const panel = await openPanel(SCRIMMAGE);
+
+    const mateo = await findKelpPlayer(panel, "Mateo Restrepo");
+    expect(within(mateo).getByText("Can't make it")).toBeInTheDocument();
+  });
+
+  it("tacha el nombre de quien ya no viene", async () => {
+    stubEvent(SCRIMMAGE, MATEO_NOT_COMING);
+
+    const panel = await openPanel(SCRIMMAGE);
+
+    const mateo = await findKelpPlayer(panel, "Mateo Restrepo");
+    const name = within(mateo).getByText("Mateo Restrepo");
+    expect(name.tagName).toBe("S");
+  });
+
+  it("lo anuncia al lector de pantalla con el nombre y que ya no viene", async () => {
+    stubEvent(SCRIMMAGE, MATEO_NOT_COMING);
+
+    const panel = await openPanel(SCRIMMAGE);
+
+    const mateo = await findKelpPlayer(panel, "Mateo Restrepo");
+    expect(
+      within(mateo).getByText("Mateo Restrepo, can't make it"),
+    ).toBeInTheDocument();
+    expect(
+      within(mateo).getByText("Mateo Restrepo").closest("[aria-hidden]"),
+    ).not.toBeNull();
+  });
+
+  it("no marca a nadie cuando vuelve a responder Voy", async () => {
+    stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
+
+    const panel = await openPanel(SCRIMMAGE);
+
+    const mateo = await findKelpPlayer(panel, "Mateo Restrepo");
+    expect(within(mateo).queryByText("Can't make it")).toBeNull();
+    expect(within(mateo).getByText("Mateo Restrepo").tagName).not.toBe("S");
+  });
+
+  it("lo dice en español", async () => {
+    stubEvent(SCRIMMAGE, MATEO_NOT_COMING);
+
+    const panel = await openPanel(SCRIMMAGE, "es");
+
+    const mateo = await findKelpPlayer(panel, "Mateo Restrepo");
+    expect(within(mateo).getByText("Ya no viene")).toBeInTheDocument();
+    expect(
+      within(mateo).getByText("Mateo Restrepo, ya no viene"),
+    ).toBeInTheDocument();
   });
 });
 

@@ -532,6 +532,33 @@ describe("GET /api/v1/events/[id]/team", () => {
     },
   );
 
+  it("dice de cada jugador de la alineación si ya no viene", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
+    givenClub({
+      players: [ANA, { ...BRUNO, response: "no" }],
+      split: {
+        ...DRAFT,
+        publishedAt: PUBLISHED_AT,
+        assignments: [
+          { userId: ANA.userId, team: "a" },
+          { userId: BRUNO.userId, team: "b" },
+        ],
+      },
+    });
+
+    const response = await openMyTeam();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        teams: {
+          a: { players: [{ userId: ANA.userId, isOutsideSquad: false }] },
+          b: { players: [{ userId: BRUNO.userId, isOutsideSquad: true }] },
+        },
+      },
+    });
+  });
+
   it("responde que no hay equipos publicados con un borrador", async () => {
     givenSession({ kind: "active", role: "Player", membershipCurrent: true });
     givenClub({ split: DRAFT });
