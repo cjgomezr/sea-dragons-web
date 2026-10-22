@@ -14282,6 +14282,7 @@ a.auth-brand-header:focus-visible {
    color-mix, como los chips de tipo: el texto sigue en el color de siempre y
    el contraste no depende del color que eligiera el coach. */
 .event-teams {
+  container: event-teams / inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -14340,7 +14341,9 @@ a.auth-brand-header:focus-visible {
   gap: var(--space-3);
 }
 
-@media (min-width: 768px) {
+/* Dos columnas sólo si caben: en escritorio el panel del evento mide unos
+ * 350 px y partidos en dos los nombres se cortaban por la mitad (#839). */
+@container event-teams (min-width: 380px) {
   .event-lineups {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -14390,9 +14393,14 @@ a.auth-brand-header:focus-visible {
 .event-lineup-not-coming {
   display: inline-flex;
   flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   gap: var(--space-1) var(--space-2);
   color: var(--color-text-secondary);
+}
+
+.event-lineup-not-coming s {
+  min-width: 0;
 }
 
 .event-lineup-player .team-position {
