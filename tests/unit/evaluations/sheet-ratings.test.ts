@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationCategories } from "@/lib/evaluations/evaluation-categories";
 import type { EvaluationRating } from "@/lib/evaluations/member-evaluation";
-import { sheetRatings } from "@/lib/evaluations/sheet-ratings";
+import { editingRatings, sheetRatings } from "@/lib/evaluations/sheet-ratings";
 
 /**
  * Las filas de notas de la ficha en lectura (#819, D3 del PRD de E31): las
  * categorías activas en el orden de Categorías, con las que la evaluación no
  * tiene como "nueva · sin nota", y detrás las desactivadas que conserva.
+ * Y las de la edición (#820, D4): sólo las activas, con las nuevas en 5.
  */
 
 const FITNESS: EvaluationRating = {
@@ -64,6 +65,37 @@ describe("sheetRatings", () => {
     expect(rows).toEqual([
       { kind: "rated", entry: FITNESS },
       { kind: "rated", entry: SPEED },
+    ]);
+  });
+});
+
+describe("editingRatings", () => {
+  it("lleva las activas en el orden de Categorías, con su nota o en 5 las nuevas", () => {
+    const rows = editingRatings([FITNESS, SPEED], CATEGORIES);
+
+    expect(rows).toEqual([
+      { categoryId: "speed", name: "Speed", rating: 7 },
+      { categoryId: "breath", name: "Breath hold", rating: 5 },
+      { categoryId: "fitness", name: "Fitness", rating: 8 },
+    ]);
+  });
+
+  it("no lleva las desactivadas que la evaluación conserva", () => {
+    const rows = editingRatings([OLD, FITNESS], CATEGORIES);
+
+    expect(rows.map((row) => row.categoryId)).toEqual([
+      "speed",
+      "breath",
+      "fitness",
+    ]);
+  });
+
+  it("sin las categorías del club lleva las notas que no están desactivadas", () => {
+    const rows = editingRatings([FITNESS, OLD, SPEED], null);
+
+    expect(rows).toEqual([
+      { categoryId: "fitness", name: "Fitness", rating: 8 },
+      { categoryId: "speed", name: "Speed", rating: 7 },
     ]);
   });
 });

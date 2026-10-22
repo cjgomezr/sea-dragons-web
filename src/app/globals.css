@@ -11881,6 +11881,26 @@ a.auth-brand-header:focus-visible {
   max-width: 1180px;
 }
 
+/* El aviso de guardado (#820) cuelga bajo las pestañas, encima de la barra:
+   en el flujo empujaría la tabla arriba y abajo con cada Guardar y
+   siguiente. */
+.evaluations-header {
+  position: relative;
+}
+
+.evaluations-saved {
+  position: absolute;
+  inset-block-start: calc(100% + var(--space-2));
+  inset-inline-end: 0;
+  z-index: 2;
+  max-width: 100%;
+  margin: 0;
+}
+
+.evaluations-saved.admin-notice {
+  box-shadow: var(--shadow-sm);
+}
+
 .evaluations-header h1 {
   margin: 0;
 }
@@ -12132,26 +12152,6 @@ a.auth-brand-header:focus-visible {
 .evaluation-categories-rename-input.club-positions-input[aria-invalid="true"],
 .evaluation-categories-add-input.club-positions-input[aria-invalid="true"] {
   border-color: var(--color-danger);
-}
-
-/* La oferta de poner al día (#323), bajo el OVR con las demás acciones. */
-.evaluation-refresh {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
-}
-
-.evaluation-refresh .auth-note,
-.evaluation-refresh .auth-error {
-  margin: 0;
-}
-
-/* Tan ancho como "Editar valoraciones", encima; el texto es largo y en la
-   columna estrecha parte en dos líneas, que necesitan su propio aire. */
-.evaluation-refresh .admin-secondary {
-  align-self: stretch;
-  padding-block: var(--space-2);
 }
 
 .evaluations-panes {
@@ -12576,6 +12576,47 @@ a.auth-brand-header:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
+}
+
+/* En edición (#820) el borde pasa a acento, y el pie lleva Cancelar a la
+   izquierda y los dos guardar a la derecha, como el handoff. */
+.evaluation-sheet[data-editing="true"] {
+  border-color: var(--color-accent);
+}
+
+.evaluation-sheet[data-editing="true"] .evaluation-actions {
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.evaluation-cancel {
+  min-height: var(--touch-target-min);
+  margin-inline-end: auto;
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.evaluation-cancel:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.evaluation-cancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.evaluation-save-next {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-4);
 }
 
 .evaluation-save-error {

@@ -16160,8 +16160,10 @@ async function stubEvaluationReads(
 }
 
 const RATINGS_LIST = /^(Ratings · 1–10|Notas · 1–10)$/;
-const REFRESH =
-  /^(Update to the current categories|Poner al día con las categorías actuales)$/;
+/** Una evaluación que no está al día ya no ofrece ponerla al día aparte
+ * (#820, D4): se ve en la categoría nueva sin nota. */
+const UNRATED = /^(new · not rated|nueva · sin nota)$/;
+const SAVE_AND_NEXT = /^(Save & next|Guardar y siguiente)/;
 const OUTDATED_CAMILA = stubbedEvaluation(
   CAMILA_OUTDATED_RATINGS,
   "Experience",
@@ -16251,7 +16253,7 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
     camilaEvaluation: OUTDATED_CAMILA,
     ready: async (page) => {
       await openCamilaFromRoster(page);
-      await expect(page.getByRole("button", { name: REFRESH })).toBeVisible();
+      await expect(page.getByText(UNRATED)).toBeVisible();
     },
   },
   {
@@ -16261,7 +16263,7 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
     isSpanish: true,
     ready: async (page) => {
       await openCamilaFromRoster(page);
-      await expect(page.getByRole("button", { name: REFRESH })).toBeVisible();
+      await expect(page.getByText(UNRATED)).toBeVisible();
     },
   },
   {
@@ -16271,6 +16273,28 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
       await openCamilaFromRoster(page);
       await page.getByRole("button", { name: EDIT_RATINGS }).click();
       await expect(page.getByRole("slider", { name: "Fitness" })).toBeVisible();
+    },
+  },
+  {
+    // El siguiente de la lista abierto ya en edición (#820). La red sirve
+    // la misma evaluación a cualquiera que no sea Mateo, y el PUT de
+    // Camila la devuelve como guardada. Se espera a que se vaya el aviso de
+    // guardado, que dura unos 3 segundos, para que la captura no dependa de
+    // cuándo se tome.
+    name: "evaluaciones-guardar-y-siguiente",
+    roster: STUBBED_ROSTER,
+    isDesktopOnly: true,
+    ready: async (page) => {
+      await openCamilaFromRoster(page);
+      await page.getByRole("button", { name: EDIT_RATINGS }).click();
+      await page.getByRole("button", { name: SAVE_AND_NEXT }).click();
+      const chloe = page.getByRole("region", {
+        name: /^(Evaluation of|Evaluación de) Chloe Nguyen$/,
+      });
+      await expect(
+        chloe.getByRole("slider", { name: "Fitness" }),
+      ).toBeFocused();
+      await expect(page.getByText("Camila Ortiz saved")).toBeHidden();
     },
   },
   {
@@ -16519,36 +16543,46 @@ test.describe("evaluaciones en el navegador", () => {
     ).toBeHidden();
   });
 
-  test("poner al día enseña el conjunto nuevo y el OVR recalculado", async ({
+  test("guardar una evaluación que no está al día la pone al día en la misma petición (#820, D4)", async ({
     page,
   }) => {
     await goToEvaluations(page, {
       ...EVALUATIONS_LIST,
       camilaEvaluation: OUTDATED_CAMILA,
     });
+    const saves: unknown[] = [];
     await page.route(
-      (url) => url.pathname === `${EVALUATIONS_ENDPOINT}/${CAMILA_ID}/refresh`,
-      (route) =>
-        route.fulfill(
-          jsonBody({
-            outcome: { kind: "refreshed", addedCount: 1, removedCount: 1 },
-            evaluation: stubbedEvaluation(CAMILA_REFRESHED_RATINGS),
-          }),
-        ),
+      (url) => url.pathname === `${EVALUATIONS_ENDPOINT}/${CAMILA_ID}`,
+      (route, request) => {
+        if (request.method() !== "PUT") {
+          return route.fallback();
+        }
+        saves.push(request.postDataJSON());
+        return route.fulfill(
+          jsonBody(stubbedEvaluation(CAMILA_REFRESHED_RATINGS)),
+        );
+      },
     );
     await openCamila(page);
-
-    await page.getByRole("button", { name: REFRESH }).click();
+    await page.getByRole("button", { name: EDIT_RATINGS }).click();
 
     await expect(
-      page.getByText("This evaluation now uses the current categories."),
-    ).toBeVisible();
+      page.getByRole("slider", { name: /^Underwater orientation/ }),
+    ).toHaveValue("5");
+    await expect(page.getByRole("slider", { name: "Experience" })).toHaveCount(
+      0,
+    );
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+
     const ratings = page.getByRole("list", { name: RATINGS_LIST });
     await expect(ratings).toContainText("Underwater orientation");
     await expect(ratings).not.toContainText("Experience");
     await expect(ratings).not.toContainText("not rated");
     await expect(rosterButton(page, CAMILA_BUTTON)).toContainText("7.6");
-    await expect(page.getByRole("button", { name: REFRESH })).toHaveCount(0);
+    expect(saves).toHaveLength(1);
+    expect(JSON.stringify(saves[0])).not.toContain(
+      stubbedCategoryId("Experience"),
+    );
   });
 
   test("guardar pone el OVR al día sin recargar la página", async ({
@@ -16572,9 +16606,9 @@ test.describe("evaluaciones en el navegador", () => {
     await page.getByRole("button", { name: EDIT_RATINGS }).click();
 
     await page.getByRole("slider", { name: "Defense" }).fill("10");
-    await page.getByRole("button", { name: "Save ratings" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
 
-    await expect(page.getByText("Ratings saved.")).toBeVisible();
+    await expect(page.getByText("Camila Ortiz saved")).toBeVisible();
     await expect(rosterButton(page, CAMILA_BUTTON)).toContainText("8.3");
     expect(
       await page.evaluate(

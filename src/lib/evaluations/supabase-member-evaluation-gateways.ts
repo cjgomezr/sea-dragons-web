@@ -37,7 +37,7 @@ const MEMBERS_TABLE = "members";
 const EVALUATIONS_TABLE = "member_evaluations";
 const CATEGORIES_TABLE = "evaluation_categories";
 const CREATE_FUNCTION = "create_member_evaluation";
-const SAVE_FUNCTION = "save_member_evaluation_ratings";
+const SAVE_FUNCTION = "save_member_evaluation";
 const REFRESH_FUNCTION = "refresh_member_evaluation";
 
 const EVALUATION_COLUMNS =

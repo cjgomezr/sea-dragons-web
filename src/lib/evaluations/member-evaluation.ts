@@ -26,6 +26,9 @@ import { calculateOverallRating } from "./overall-rating";
 
 export const RATING_MIN = 1;
 export const RATING_MAX = 10;
+/** Con la que nace cada categoría de una evaluación (FR-051), y la que lleva
+ * en la edición una que la evaluación aún no tiene (D4 del PRD de E31). */
+export const INITIAL_RATING = 5;
 
 /** Los `reason` con los que la API distingue los casos que comparten código. */
 export const EVALUATION_EXISTS_REASON = "evaluation_exists";
@@ -147,7 +150,10 @@ export type MemberEvaluationGateways = {
      * sola escritura. */
     createEvaluation(scope: EvaluationWriteScope): Promise<EvaluationCreation>;
     /** Aplica todas las valoraciones o ninguna, y sólo si la evaluación
-     * sigue en `expectedUpdatedAt`. */
+     * sigue en `expectedUpdatedAt`. De paso la pone al día (D4 del PRD de
+     * E31): las activas que le faltan y no llegan entran en 5 y las
+     * desactivadas salen. Una categoría que no es activa del club es
+     * `unknown_category`. */
     saveRatings(
       scope: EvaluationWriteScope,
       submission: RatingsSubmission,
@@ -437,8 +443,10 @@ function assertSaved(save: RatingsSave): void {
 }
 
 /** Valida después de saber quién pide y antes de escribir nada: a quien no
- * puede ver evaluaciones no se le explica qué valoración falla. Sólo las
- * categorías que llegan: las demás de la evaluación se quedan como estaban. */
+ * puede ver evaluaciones no se le explica qué valoración falla. Las
+ * categorías activas que no llegan se quedan como estaban, o en 5 si la
+ * evaluación no las tenía: guardar la pone al día (#820, D4 del PRD de
+ * E31). */
 export async function saveEvaluationRatings(
   gateways: MemberEvaluationGateways,
   request: EvaluationRequest & RatingsSubmission,
@@ -480,8 +488,9 @@ function assertRefreshed(refresh: EvaluationRefresh): RefreshOutcome {
   }
 }
 
-/** Lleva la evaluación al conjunto activo del club (FR-053, AC-054). Es una
- * acción aparte y no un efecto de guardar: editar no migra (AC-035). Si ya
+/** Lleva la evaluación al conjunto activo del club sin tocar sus notas
+ * (FR-053, AC-054). La pantalla ya no la ofrece aparte, porque guardar hace
+ * lo mismo (D4 del PRD de E31); el endpoint sigue para quien lo use. Si ya
  * estaba al día no se anota nada, porque nada cambió. */
 export async function refreshMemberEvaluation(
   gateways: MemberEvaluationGateways,

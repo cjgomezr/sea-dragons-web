@@ -285,6 +285,58 @@ describeRls("la evaluación de un miembro en Supabase", () => {
   );
 
   it(
+    "guardar una evaluación que no está al día la pone al día en la misma escritura (#820, D4)",
+    async () => {
+      await withCoachAndPlayer(async ({ coach, player }) => {
+        const serviceClient = createServiceRoleTestClient(process.env);
+        const gateways = createMemberEvaluationGateways(serviceClient.client);
+        const categoriesGateways = createEvaluationCategoriesGateways(
+          serviceClient.client,
+        );
+        const request = { callerId: coach.id, memberId: player.id };
+        const created = asEvaluated(
+          await createMemberEvaluation(gateways, request),
+        );
+        const teamworkId = String(
+          created.ratings.find((entry) => entry.name === "Teamwork")
+            ?.categoryId,
+        );
+        const catalogue = await createEvaluationCategory(categoriesGateways, {
+          callerId: coach.id,
+          name: "Breath hold",
+        });
+        const breathHoldId = String(
+          catalogue.find((category) => category.name === "Breath hold")?.id,
+        );
+        await setEvaluationCategoryActive(categoriesGateways, {
+          callerId: coach.id,
+          categoryId: teamworkId,
+          isActive: false,
+        });
+        const outdated = asEvaluated(
+          await readMemberEvaluation(gateways, request),
+        );
+
+        const saved = asEvaluated(
+          await saveEvaluationRatings(gateways, {
+            ...request,
+            expectedUpdatedAt: outdated.updatedAt,
+            ratings: [{ categoryId: breathHoldId, rating: 10 }],
+          }),
+        );
+
+        const names = saved.ratings.map((entry) => entry.name);
+        expect(names).toContain("Breath hold");
+        expect(names).not.toContain("Teamwork");
+        expect(saved.ratings).toHaveLength(DEFAULT_CATEGORY_COUNT);
+        expect(saved.overallRating).toBe(5.5);
+        expect(saved.isCurrent).toBe(true);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS * 3,
+  );
+
+  it(
     "la sesión de un Player no saca nada de la base, ni lo suyo",
     async () => {
       await withCoachAndPlayer(async ({ coach, player }) => {
@@ -307,6 +359,15 @@ describeRls("la evaluación de un miembro en Supabase", () => {
         );
         await assertDenied(playerClient, (client) =>
           client.from("member_evaluation_ratings").select("*"),
+        );
+        await assertDenied(playerClient, (client) =>
+          client.rpc("save_member_evaluation", {
+            acting_club_id: null,
+            acting_user_id: null,
+            target_user_id: player.id,
+            expected_updated_at: null,
+            ratings: [],
+          }),
         );
         await assertDenied(playerClient, (client) =>
           client.rpc("save_member_evaluation_ratings", {
