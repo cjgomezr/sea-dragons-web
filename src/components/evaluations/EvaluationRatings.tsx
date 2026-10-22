@@ -3,14 +3,19 @@ import {
   RATING_MAX,
   RATING_MIN,
 } from "@/lib/evaluations/member-evaluation";
+import type { EvaluationCategories } from "@/lib/evaluations/evaluation-categories";
+import {
+  type SheetRating,
+  sheetRatings,
+} from "@/lib/evaluations/sheet-ratings";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
  * Las categorías de una evaluación con su barra y su número, como el mockup
- * (#322). La barra es sólo dibujo: lo que se lee, y lo que anuncia un lector
- * de pantalla, es la categoría y su número (PRD, accesibilidad). Al editar,
- * cada barra pasa a ser un deslizador con el mismo nombre y el número al
- * lado.
+ * (#322), desde #819 con la rejilla del panel de E31. La barra es sólo
+ * dibujo: lo que se lee, y lo que anuncia un lector de pantalla, es la
+ * categoría y su número (PRD, accesibilidad). Al editar, cada barra pasa a
+ * ser un deslizador con el mismo nombre y el número al lado.
  */
 
 const RATINGS_HEADING_ID = "evaluation-ratings";
@@ -135,23 +140,52 @@ function RatingsCard({
   );
 }
 
-/** Sólo para leer: la usa también el perfil (#324), donde no se edita. */
-export function ReadOnlyRatings({
+function UnratedRating({
   translate,
-  ratings,
+  name,
 }: {
   translate: Translator;
-  ratings: readonly EvaluationRating[];
+  name: string;
+}): React.JSX.Element {
+  return (
+    <li className="evaluation-rating" data-unrated="true">
+      <span className="evaluation-rating-name">{name}</span>
+      <span className="evaluation-rating-unrated">
+        {translate("evaluations.ratings.unrated")}
+      </span>
+      <span className="evaluation-rating-value" aria-hidden="true">
+        —
+      </span>
+    </li>
+  );
+}
+
+/** En lectura, en el orden de Categorías y con las que faltan como "nueva ·
+ * sin nota" (#819, D3). */
+function ReadOnlyRatings({
+  translate,
+  rows,
+}: {
+  translate: Translator;
+  rows: readonly SheetRating[];
 }): React.JSX.Element {
   return (
     <RatingsCard translate={translate}>
-      {ratings.map((entry) => (
-        <ReadOnlyRating
-          key={entry.categoryId}
-          translate={translate}
-          entry={entry}
-        />
-      ))}
+      {rows.map((row) =>
+        row.kind === "rated" ? (
+          <ReadOnlyRating
+            key={row.entry.categoryId}
+            translate={translate}
+            entry={row.entry}
+          />
+        ) : (
+          <UnratedRating
+            key={row.categoryId}
+            translate={translate}
+            name={row.name}
+          />
+        ),
+      )}
     </RatingsCard>
   );
 }
@@ -159,17 +193,26 @@ export function ReadOnlyRatings({
 export function EvaluationRatings({
   translate,
   ratings,
+  categories,
   draft,
   onDraftChange,
 }: {
   translate: Translator;
   ratings: readonly EvaluationRating[];
+  /** Las del club, para las que la evaluación no tiene; `null` si no se
+   * pudieron leer. */
+  categories: EvaluationCategories | null;
   /** `null` mientras no se edita. */
   draft: RatingsDraft | null;
   onDraftChange: (draft: RatingsDraft) => void;
 }): React.JSX.Element {
   if (draft === null) {
-    return <ReadOnlyRatings translate={translate} ratings={ratings} />;
+    return (
+      <ReadOnlyRatings
+        translate={translate}
+        rows={sheetRatings(ratings, categories)}
+      />
+    );
   }
   return (
     <RatingsCard translate={translate}>

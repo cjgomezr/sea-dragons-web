@@ -50,14 +50,39 @@ const rosterEntrySchema = z.discriminatedUnion("status", [
   }),
 ]);
 
-/** Cada fila de la tabla (#818). El resumen de la plantilla que la lista
- * trae desde #817 se descarta al leer hasta que lo pinte el panel (#819). */
+/** Cada fila de la tabla (#818). */
 export type ScreenRosterEntry = z.infer<typeof rosterEntrySchema>;
 
-export type ScreenRoster = { readonly members: readonly ScreenRosterEntry[] };
+/** Lo que el panel (#819) pinta del resumen que la lista trae desde #817.
+ * Cuántos están evaluados no se lee de aquí: lo cuenta la pantalla con la
+ * misma lista que las fichas de filtro, para que los dos números no se
+ * separen tras crear una evaluación. */
+const rosterSummarySchema = z.object({
+  categoryAverages: z.array(
+    z.object({ categoryId: z.uuid(), name: z.string(), average: z.number() }),
+  ),
+  averageOverall: z.number().nullable(),
+  longestUnreviewed: z.array(
+    z.object({
+      userId: z.uuid(),
+      fullName: z.string(),
+      updatedAt: z.iso.datetime({ offset: true }),
+    }),
+  ),
+});
+
+export type ScreenRosterSummary = z.infer<typeof rosterSummarySchema>;
+
+export type ScreenRoster = {
+  readonly members: readonly ScreenRosterEntry[];
+  readonly summary: ScreenRosterSummary;
+};
 
 const rosterResponseSchema = z.object({
-  data: z.object({ members: z.array(rosterEntrySchema) }),
+  data: z.object({
+    members: z.array(rosterEntrySchema),
+    summary: rosterSummarySchema,
+  }),
 });
 
 const memberEvaluationSchema = z.discriminatedUnion("status", [
