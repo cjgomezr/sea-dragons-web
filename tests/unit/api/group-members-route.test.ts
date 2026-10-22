@@ -112,6 +112,29 @@ function mockWiring(options: WiringOptions = {}): void {
               : { kind: "removed" };
           },
         },
+        bulkMemberships: {
+          findClubMembers: async (input: {
+            clubId: string;
+            userIds: readonly string[];
+          }) => {
+            databaseCalls.push(
+              `club members ${input.clubId} ${input.userIds.join(",")}`,
+            );
+            return [{ ...ANA, accountStatus: "active" }];
+          },
+          insertMemberships: async (memberships: {
+            clubId: string;
+            groupId: string;
+            userIds: readonly string[];
+          }) => {
+            databaseCalls.push(
+              `bulk insert ${memberships.clubId} ${memberships.groupId} ${memberships.userIds.join(",")}`,
+            );
+            return options.missingGroup
+              ? { kind: "group_not_found" }
+              : { kind: "assigned" };
+          },
+        },
         photos: {
           signPhotoUrls: async () => new Map([["paula.webp", PAULA_PHOTO_URL]]),
         },
@@ -169,6 +192,24 @@ async function getCandidates(groupId: string = GROUP_ID): Promise<Response> {
     params: Promise.resolve({ id: groupId }),
   });
 }
+
+async function postMembers(
+  body: unknown,
+  groupId: string = GROUP_ID,
+): Promise<Response> {
+  const { POST } = await import("@/app/api/v1/groups/[id]/members/route");
+  return POST(
+    new NextRequest(new URL(membersPath(groupId), ORIGIN), {
+      method: "POST",
+      headers: { "content-type": "application/json", "accept-language": "es" },
+      body: JSON.stringify(body),
+    }),
+    { params: Promise.resolve({ id: groupId }) },
+  );
+}
+
+/** Un id de otro club: la base no lo devuelve entre los socios del club. */
+const OUTSIDER_ID = "f5f5f5f5-0000-4000-8000-00000000000f";
 
 type MembershipCall = { readonly groupId?: string; readonly userId?: string };
 
@@ -279,10 +320,58 @@ describe("endpoints de socios de un grupo", () => {
     ]);
   });
 
+  it("POST responde 200 con la lista, los candidatos y los rechazados", async () => {
+    mockWiring();
+
+    const response = await postMembers({ userIds: [ANA.id, OUTSIDER_ID] });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.members[0]).toEqual({
+      ...PAULA,
+      positionName: "Delantera",
+      photoUrl: PAULA_PHOTO_URL,
+    });
+    expect(body.data.candidates[0]).toEqual({
+      ...ANA,
+      positionName: null,
+      photoUrl: null,
+      groupCount: 0,
+    });
+    expect(body.data.rejected).toEqual([
+      { userId: OUTSIDER_ID, reason: "not_in_club" },
+    ]);
+    expect(databaseCalls).toEqual([
+      `club members ${CLUB_ID} ${ANA.id},${OUTSIDER_ID}`,
+      `bulk insert ${CLUB_ID} ${GROUP_ID} ${ANA.id}`,
+      `assignable ${CLUB_ID}`,
+    ]);
+  });
+
+  it.each([
+    ["una lista vacía", { userIds: [] }],
+    ["un cuerpo sin la lista", {}],
+    ["un id que no es un uuid", { userIds: ["no-es-un-uuid"] }],
+  ])(
+    "POST responde 400 a %s nombrando el campo, sin tocar la base",
+    async (_case, body) => {
+      mockWiring();
+
+      const response = await postMembers(body);
+
+      expect(response.status).toBe(400);
+      const { error } = await response.json();
+      expect(error.code).toBe("validation_error");
+      expect(error.message).toContain("userIds");
+      expect(databaseCalls).toEqual([]);
+    },
+  );
+
   it.each([
     ["GET members", () => getMembers()],
     ["PUT", () => putMember()],
     ["DELETE", () => deleteMember()],
+    ["POST", () => postMembers({ userIds: [ANA.id] })],
   ] as const)(
     "%s responde 404 a un grupo que no existe o es de otro club",
     async (_method, call) => {
@@ -316,6 +405,7 @@ describe("endpoints de socios de un grupo", () => {
     ["PUT con socio", () => putMember({ userId: "no-es-un-uuid" })],
     ["DELETE con grupo", () => deleteMember({ groupId: "no-es-un-uuid" })],
     ["DELETE con socio", () => deleteMember({ userId: "no-es-un-uuid" })],
+    ["POST", () => postMembers({ userIds: [ANA.id] }, "no-es-un-uuid")],
   ] as const)(
     "%s responde 404 a un id que no es un uuid, sin tocar la base",
     async (_case, call) => {
@@ -333,6 +423,7 @@ describe("endpoints de socios de un grupo", () => {
     ["GET candidates", () => getCandidates()],
     ["PUT", () => putMember()],
     ["DELETE", () => deleteMember()],
+    ["POST", () => postMembers({ userIds: [ANA.id] })],
   ] as const)(
     "%s responde 403 a un Player aunque llegue a la ruta, sin tocar la base",
     async (_method, call) => {
@@ -405,4 +496,26 @@ describe("los socios de un grupo en la frontera", () => {
       await expectErrorCode(response, 403, "forbidden");
     },
   );
+
+  it("responde 403 a un Player que manda el alta masiva, sin llegar a la ruta", async () => {
+    mockSessionClient();
+    vi.doMock("@/lib/auth/session-reader", () => ({
+      readSessionState: async () => ({
+        kind: "active",
+        role: "Player",
+        membershipCurrent: true,
+      }),
+    }));
+    const { proxy } = await import("@/proxy");
+
+    const response = await proxy(
+      new NextRequest(new URL(membersPath(), ORIGIN), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userIds: [MEMBER_ID] }),
+      }),
+    );
+
+    await expectErrorCode(response, 403, "forbidden");
+  });
 });

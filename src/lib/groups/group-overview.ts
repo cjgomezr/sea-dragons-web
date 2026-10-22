@@ -34,13 +34,16 @@ export type StandaloneEventUse = {
   readonly status: EventStatus;
 };
 
+/** Una sesión de una serie: el evento al que enlaza y su fecha. */
+export type SeriesSession = { readonly id: string; readonly startsOn: string };
+
 /** Cancelar una serie cancela sus sesiones y no la marca a ella, así que
  * sigue en pie mientras le quede alguna sesión programada de hoy en
- * adelante. */
+ * adelante: `nextSession` es la primera, o null si no queda ninguna. */
 export type SeriesUse = {
   readonly groupIds: readonly string[];
   readonly endsOn: string;
-  readonly hasSessionsLeft: boolean;
+  readonly nextSession: SeriesSession | null;
 };
 
 export type PostUse = {
@@ -68,15 +71,21 @@ export type GroupMembershipRecord = {
 
 export type GroupPreviewRecord = GroupMembershipRecord["member"];
 
-function isUpcomingEvent(event: StandaloneEventUse, today: string): boolean {
+export function isUpcomingEvent(
+  event: StandaloneEventUse,
+  today: string,
+): boolean {
   return event.status === "scheduled" && event.startsOn >= today;
 }
 
-function isOngoingSeries(series: SeriesUse, today: string): boolean {
-  return series.hasSessionsLeft && series.endsOn >= today;
+export function isOngoingSeries<Series extends SeriesUse>(
+  series: Series,
+  today: string,
+): series is Series & { readonly nextSession: SeriesSession } {
+  return series.nextSession !== null && series.endsOn >= today;
 }
 
-function isPublishedPost(post: PostUse): boolean {
+export function isPublishedPost(post: PostUse): boolean {
   return post.status === "published";
 }
 

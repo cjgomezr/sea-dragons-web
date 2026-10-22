@@ -92,6 +92,11 @@ const CAMILA_RATINGS: readonly EvaluationRating[] = [
   { categoryId: SPEED_ID, name: "Speed", rating: 7, isRetired: false },
 ];
 
+const JOSE_RATINGS: readonly EvaluationRating[] = [
+  { categoryId: FITNESS_ID, name: "Fitness", rating: 7, isRetired: false },
+  { categoryId: SPEED_ID, name: "Speed", rating: 5, isRetired: false },
+];
+
 function evaluated(
   memberId: string,
   ratings: readonly EvaluationRating[],
@@ -145,8 +150,45 @@ function stubApi(respond: Responder): void {
   );
 }
 
-function rosterResponse(members: readonly ScreenRosterEntry[]): Response {
-  return jsonResponse(200, { data: { members } });
+const JOSE_UPDATED_AT = "2026-06-03T02:00:00+00:00";
+
+/** El resumen de la plantilla de siempre (#817): Speed es la más baja y José
+ * lleva más tiempo sin revisar. */
+const SUMMARY = {
+  evaluatedCount: 2,
+  playerCount: 3,
+  categoryAverages: [
+    {
+      categoryId: "ca7e0000-0000-4000-8000-000000000001",
+      name: "Fitness",
+      average: 7.5,
+    },
+    {
+      categoryId: "ca7e0000-0000-4000-8000-000000000002",
+      name: "Speed",
+      average: 6.1,
+    },
+  ],
+  averageOverall: 6.9,
+  longestUnreviewed: [
+    {
+      userId: "dddddddd-0000-4000-8000-00000000000d",
+      fullName: "José Peña",
+      updatedAt: JOSE_UPDATED_AT,
+    },
+    {
+      userId: "aaaaaaaa-0000-4000-8000-00000000000a",
+      fullName: "Camila Ortiz",
+      updatedAt: READ_AT,
+    },
+  ],
+};
+
+function rosterResponse(
+  members: readonly ScreenRosterEntry[],
+  summary: unknown = SUMMARY,
+): Response {
+  return jsonResponse(200, { data: { members, summary } });
 }
 
 /** Lo que responde un club con Camila y José evaluados, Mateo sin evaluar y
@@ -166,6 +208,11 @@ function clubApi(overrides: Partial<Record<string, Responder>> = {}): void {
     if (call.url === `${ROSTER_PATH}/${CAMILA.userId}`) {
       return jsonResponse(200, {
         data: evaluated(CAMILA.userId, CAMILA_RATINGS),
+      });
+    }
+    if (call.url === `${ROSTER_PATH}/${JOSE.userId}`) {
+      return jsonResponse(200, {
+        data: evaluated(JOSE.userId, JOSE_RATINGS, JOSE_UPDATED_AT),
       });
     }
     if (call.url === `${ROSTER_PATH}/${MATEO.userId}`) {
@@ -211,6 +258,7 @@ type ScreenOptions = {
   readonly initialMemberId?: string | null;
   readonly initialTab?: EvaluationsTab;
   readonly initialView?: Partial<RosterView>;
+  readonly canOpenMemberRecords?: boolean;
 };
 
 /** Pinta la pantalla como la deja la dirección `/evaluaciones` con lo que
@@ -220,6 +268,7 @@ function mountScreen({
   initialMemberId = null,
   initialTab = "players",
   initialView = {},
+  canOpenMemberRecords = true,
 }: ScreenOptions = {}): void {
   render(
     <EvaluationsScreen
@@ -227,6 +276,7 @@ function mountScreen({
       initialMemberId={initialMemberId}
       initialTab={initialTab}
       initialView={{ ...DEFAULT_ROSTER_VIEW, ...initialView }}
+      canOpenMemberRecords={canOpenMemberRecords}
     />,
   );
 }
@@ -236,8 +286,12 @@ async function renderScreen(options: ScreenOptions = {}): Promise<void> {
   await screen.findByRole("list", { name: /^(players|jugadores)$/i });
 }
 
+const RATINGS_LIST = /^ratings · 1–10$/i;
+
+/** La fila de la tabla: el resumen también lleva botones con nombres. */
 function memberButton(name: RegExp): HTMLElement {
-  return screen.getByRole("button", { name });
+  const list = screen.getByRole("list", { name: /^(players|jugadores)$/i });
+  return within(list).getByRole("button", { name });
 }
 
 /** Los nombres de las filas, en el orden en que salen. */
@@ -263,7 +317,7 @@ async function openMember(name: RegExp): Promise<HTMLElement> {
 
 async function openCamila(): Promise<HTMLElement> {
   const sheet = await openMember(/camila ortiz/i);
-  await within(sheet).findByRole("list", { name: /skill ratings/i });
+  await within(sheet).findByRole("list", { name: RATINGS_LIST });
   return sheet;
 }
 
@@ -317,7 +371,7 @@ describe("pestañas", () => {
 
     const panel = screen.getByRole("tabpanel", { name: /categories/i });
     expect(
-      await within(panel).findByRole("heading", { name: "Active categories" }),
+      await within(panel).findByRole("list", { name: "Active categories" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Players" })).toBeNull();
     expect(addressParams()).toEqual({ tab: "categories" });
@@ -435,9 +489,8 @@ describe("tabla de jugadores", () => {
       await screen.findByRole("button", { name: /try again/i }),
     );
 
-    expect(
-      await screen.findByRole("button", { name: /camila ortiz/i }),
-    ).toBeInTheDocument();
+    await screen.findByRole("list", { name: "Players" });
+    expect(memberButton(/camila ortiz/i)).toBeInTheDocument();
   });
 });
 
@@ -688,7 +741,7 @@ describe("ficha de evaluación", () => {
 
     const sheet = await openCamila();
 
-    const ratings = within(sheet).getByRole("list", { name: /skill ratings/i });
+    const ratings = within(sheet).getByRole("list", { name: RATINGS_LIST });
     const items = within(ratings).getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
       "Fitness8 out of 10",
@@ -713,7 +766,7 @@ describe("ficha de evaluación", () => {
     const sheet = await openMember(/mateo ruiz/i);
 
     await userEvent.click(
-      await within(sheet).findByRole("button", { name: /create evaluation/i }),
+      await within(sheet).findByRole("button", { name: /start evaluation/i }),
     );
 
     expect(
@@ -850,7 +903,7 @@ describe("ficha de evaluación", () => {
     const sheet = await openMember(/mateo ruiz/i);
 
     await userEvent.click(
-      await within(sheet).findByRole("button", { name: /create evaluation/i }),
+      await within(sheet).findByRole("button", { name: /start evaluation/i }),
     );
     expect(await within(sheet).findByRole("alert")).toHaveTextContent(
       /someone else just created/i,
@@ -887,13 +940,13 @@ describe("ficha de evaluación", () => {
     expect(memberButton(/mateo ruiz/i)).toHaveTextContent(/sin evaluar/i);
     const sheet = await openMember(/camila ortiz/i);
     const ratings = await within(sheet).findByRole("list", {
-      name: /valoraciones/i,
+      name: /^notas/i,
     });
     expect(within(ratings).getAllByRole("listitem")[0]).toHaveTextContent(
       "Fitness8 de 10",
     );
     expect(
-      within(sheet).getByRole("button", { name: /editar valoraciones/i }),
+      within(sheet).getByRole("button", { name: /editar notas/i }),
     ).toBeInTheDocument();
   });
 });
@@ -924,8 +977,18 @@ describe("poner al día una evaluación", () => {
     });
   }
 
+  /** El club desactivó Speed y añadió Breath hold después de evaluarla. */
+  const CHANGED_CATEGORIES = [
+    CATEGORIES[0],
+    { id: BREATH_HOLD_ID, name: "Breath hold", isActive: true },
+    { ...CATEGORIES[1], isActive: false },
+    CATEGORIES[2],
+  ];
+
   function outdatedApi(refresh: Responder): void {
     clubApi({
+      [`GET ${CATEGORIES_PATH}`]: () =>
+        jsonResponse(200, { data: { categories: CHANGED_CATEGORIES } }),
       [`GET ${ROSTER_PATH}/${CAMILA.userId}`]: () =>
         jsonResponse(200, {
           data: evaluated(CAMILA.userId, OUTDATED_RATINGS, READ_AT, false),
@@ -948,7 +1011,7 @@ describe("poner al día una evaluación", () => {
     await userEvent.click(refreshButton(sheet));
 
     expect(await within(sheet).findByText("6.5")).toBeInTheDocument();
-    const ratings = within(sheet).getByRole("list", { name: /skill ratings/i });
+    const ratings = within(sheet).getByRole("list", { name: RATINGS_LIST });
     expect(
       within(ratings)
         .getAllByRole("listitem")
@@ -1038,7 +1101,7 @@ describe("abrir la ficha desde el directorio (#324)", () => {
       name: /evaluation of mateo ruiz/i,
     });
     expect(
-      await within(sheet).findByRole("button", { name: /create evaluation/i }),
+      await within(sheet).findByRole("button", { name: /start evaluation/i }),
     ).toBeVisible();
   });
 
@@ -1063,5 +1126,380 @@ describe("permisos", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /only coaches and admins/i,
     );
+  });
+});
+
+function overviewPanel(): HTMLElement {
+  return screen.getByRole("region", { name: /squad overview/i });
+}
+
+function sheetRegion(name: RegExp): Promise<HTMLElement> {
+  return screen.findByRole("region", { name });
+}
+
+describe("resumen de la plantilla (#819)", () => {
+  it("sin nadie elegido dice cuántos están evaluados y ofrece evaluar a los pendientes", async () => {
+    clubApi();
+
+    await renderScreen();
+
+    const overview = overviewPanel();
+    expect(overview).toHaveTextContent("2 of 3 players evaluated");
+    expect(
+      within(overview).getByRole("button", { name: "Evaluate the 1 pending" }),
+    ).toBeVisible();
+  });
+
+  it("con todos evaluados lo dice y no ofrece evaluar a nadie", async () => {
+    rosterApi([CAMILA, JOSE]);
+
+    await renderScreen();
+
+    const overview = overviewPanel();
+    expect(overview).toHaveTextContent("2 of 2 players evaluated");
+    expect(
+      within(overview).getByText("✓ Everyone has an evaluation."),
+    ).toBeVisible();
+    expect(
+      within(overview).queryByRole("button", { name: /^evaluate the/i }),
+    ).toBeNull();
+  });
+
+  it("enseña la media de cada categoría y la de los OVR, con la más baja en aviso", async () => {
+    clubApi();
+
+    await renderScreen();
+
+    const overview = overviewPanel();
+    const averages = within(overview).getByRole("list", {
+      name: /squad average by category/i,
+    });
+    const rows = within(averages).getAllByRole("listitem");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "Fitness7.5",
+      "Speed6.1",
+    ]);
+    expect(rows[1]).toHaveAttribute("data-lowest", "true");
+    expect(rows[0]).not.toHaveAttribute("data-lowest");
+    expect(overview).toHaveTextContent("6.9");
+    expect(overview).toHaveTextContent(
+      "Lowest: Speed, something to work on in training.",
+    );
+  });
+
+  it("Evaluar a los pendientes deja el filtro en Sin evaluar, ordena por nombre y abre al primero", async () => {
+    clubApi();
+    window.history.replaceState(
+      null,
+      "",
+      `${SCREEN_PATH}?q=cam&posicion=${FORWARD.id}&orden=ovr-desc`,
+    );
+    await renderScreen({
+      initialView: {
+        search: "cam",
+        positionId: FORWARD.id,
+        sort: "overall_desc",
+      },
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Evaluate the 1 pending" }),
+    );
+
+    expect(rowNames()).toEqual(["Mateo Ruiz"]);
+    expect(screen.getByRole("searchbox", { name: /search/i })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "Sort by" })).toHaveValue(
+      "name",
+    );
+    expect(addressParams()).toEqual({ filtro: "sin-evaluar" });
+    expect(await sheetRegion(/evaluation of mateo ruiz/i)).toBeInTheDocument();
+  });
+
+  it("Más tiempo sin revisar lista a los más antiguos con su fecha y los abre", async () => {
+    clubApi();
+    await renderScreen();
+    const longest = within(overviewPanel()).getByRole("list", {
+      name: /longest without review/i,
+    });
+    const rows = within(longest).getAllByRole("button");
+    expect(rows[0]).toHaveTextContent(/José Peña.*3 Jun/);
+    expect(rows[1]).toHaveTextContent(/Camila Ortiz.*27 Sep/);
+
+    await userEvent.click(rows[0]!);
+
+    expect(await sheetRegion(/evaluation of josé peña/i)).toBeInTheDocument();
+    expect(memberButton(/josé peña/i)).toHaveAttribute("aria-current", "true");
+  });
+
+  it("vuelve al resumen al soltar la fila elegida", async () => {
+    clubApi();
+    await renderScreen();
+    await openCamila();
+
+    await userEvent.click(memberButton(/camila ortiz/i));
+
+    expect(overviewPanel()).toBeInTheDocument();
+  });
+
+  it("sale en español", async () => {
+    clubApi();
+
+    await renderScreen({ locale: "es" });
+
+    const overview = screen.getByRole("region", {
+      name: /resumen de la plantilla/i,
+    });
+    expect(overview).toHaveTextContent("2 de 3 jugadores evaluados");
+    expect(
+      within(overview).getByRole("button", { name: /^evaluar a/i }),
+    ).toBeVisible();
+    expect(overview).toHaveTextContent(
+      "Más baja: Speed, algo para trabajar en el entrenamiento.",
+    );
+    expect(
+      within(overview).getByRole("list", { name: /más tiempo sin revisar/i }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("ficha en lectura (#819)", () => {
+  const BREATH_HOLD = {
+    id: "ca7e0000-0000-4000-8000-000000000011",
+    name: "Breath hold",
+    isActive: true,
+  } as const;
+
+  it("lleva la identidad con la posición y el OVR, y las notas en el orden de Categorías", async () => {
+    clubApi();
+    await renderScreen();
+
+    const sheet = await openCamila();
+
+    expect(
+      within(sheet).getByRole("heading", { level: 2, name: "Camila Ortiz" }),
+    ).toBeInTheDocument();
+    expect(sheet).toHaveTextContent("Forward");
+    expect(within(sheet).getByText("7.5")).toBeInTheDocument();
+    const ratings = within(sheet).getByRole("list", { name: RATINGS_LIST });
+    expect(
+      within(ratings)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Fitness8 out of 10", "Speed7 out of 10"]);
+  });
+
+  it("una categoría activa que la evaluación no tiene sale como nueva sin nota, en su sitio", async () => {
+    clubApi({
+      [`GET ${CATEGORIES_PATH}`]: () =>
+        jsonResponse(200, {
+          data: {
+            categories: [
+              CATEGORIES[0],
+              BREATH_HOLD,
+              CATEGORIES[1],
+              CATEGORIES[2],
+            ],
+          },
+        }),
+    });
+    await renderScreen();
+
+    const sheet = await openCamila();
+
+    const ratings = within(sheet).getByRole("list", { name: RATINGS_LIST });
+    await waitFor(() =>
+      expect(
+        within(ratings)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual([
+        "Fitness8 out of 10",
+        "Breath holdnew · not rated—",
+        "Speed7 out of 10",
+      ]),
+    );
+    expect(within(sheet).getByText("7.5")).toBeInTheDocument();
+  });
+
+  it("el pie dice cuándo y quién la actualizó y lleva Editar notas", async () => {
+    clubApi();
+    await renderScreen();
+
+    const sheet = await openCamila();
+
+    expect(sheet).toHaveTextContent(/Updated 27 Sep.* by Carla Coach/);
+    expect(
+      within(sheet).getByRole("button", { name: "Edit ratings" }),
+    ).toBeVisible();
+  });
+
+  it("tras guardar no atribuye la edición nueva a quien hizo la anterior", async () => {
+    clubApi({ [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: savedWith });
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+
+    setSlider(sheet, "Fitness", 10);
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: /save ratings/i }),
+    );
+
+    expect(await within(sheet).findByText(/^Updated 27 Sep/)).toBeVisible();
+    expect(sheet).not.toHaveTextContent(/by Carla Coach/);
+  });
+
+  it("sin quién la actualizó, el pie dice sólo la fecha", async () => {
+    clubApi();
+    await renderScreen();
+
+    const sheet = await openMember(/josé peña/i);
+
+    await within(sheet).findByRole("list", { name: RATINGS_LIST });
+    expect(sheet).toHaveTextContent(/Updated 3 Jun/);
+    expect(sheet).not.toHaveTextContent(/ by /);
+  });
+
+  it("a un jugador sin evaluar le ofrece empezar la evaluación", async () => {
+    clubApi();
+    await renderScreen();
+
+    const sheet = await openMember(/mateo ruiz/i);
+
+    expect(
+      await within(sheet).findByText("Mateo Ruiz hasn't been evaluated yet"),
+    ).toBeVisible();
+    expect(sheet).toHaveTextContent(
+      "Every category starts at 5. Until then, Teams counts this player as 5.",
+    );
+    expect(
+      within(sheet).getByRole("button", { name: "Start evaluation" }),
+    ).toBeVisible();
+  });
+
+  it("enlaza al perfil del socio si quien mira puede abrir su ficha", async () => {
+    clubApi();
+    await renderScreen({ canOpenMemberRecords: true });
+
+    const sheet = await openCamila();
+
+    expect(
+      within(sheet).getByRole("link", { name: "Profile" }),
+    ).toHaveAttribute("href", `/directorio/${CAMILA.userId}`);
+  });
+
+  it("no enlaza al perfil si quien mira no puede abrir la ficha", async () => {
+    clubApi();
+    await renderScreen({ canOpenMemberRecords: false });
+
+    const sheet = await openCamila();
+
+    expect(within(sheet).queryByRole("link", { name: "Profile" })).toBeNull();
+  });
+
+  it("cerrar vuelve al resumen", async () => {
+    clubApi();
+    await renderScreen();
+    const sheet = await openCamila();
+
+    await userEvent.click(within(sheet).getByRole("button", { name: "Close" }));
+
+    expect(screen.queryByRole("region", { name: /evaluation of/i })).toBeNull();
+    expect(overviewPanel()).toBeInTheDocument();
+  });
+
+  it("sale en español", async () => {
+    clubApi();
+    await renderScreen({ locale: "es" });
+
+    const sheet = await openMember(/camila ortiz/i);
+
+    expect(
+      await within(sheet).findByRole("list", { name: "Notas · 1–10" }),
+    ).toBeInTheDocument();
+    expect(sheet).toHaveTextContent(/Actualizada 27 sept.* por Carla Coach/);
+    expect(sheet).toHaveTextContent("1 de 3 en esta lista");
+    expect(within(sheet).getByRole("link", { name: "Perfil" })).toBeVisible();
+  });
+});
+
+describe("anterior y siguiente (#819)", () => {
+  function previousButton(sheet: HTMLElement): HTMLElement {
+    return within(sheet).getByRole("button", { name: "Previous player" });
+  }
+
+  function nextButton(sheet: HTMLElement): HTMLElement {
+    return within(sheet).getByRole("button", { name: "Next player" });
+  }
+
+  it("recorren la lista y se deshabilitan en los extremos", async () => {
+    clubApi();
+    await renderScreen();
+    const camila = await openCamila();
+    expect(camila).toHaveTextContent("1 of 3 in this list");
+    expect(previousButton(camila)).toBeDisabled();
+
+    await userEvent.click(nextButton(camila));
+    const jose = await sheetRegion(/evaluation of josé peña/i);
+    expect(jose).toHaveTextContent("2 of 3 in this list");
+    expect(memberButton(/josé peña/i)).toHaveAttribute("aria-current", "true");
+
+    await userEvent.click(nextButton(jose));
+    const mateo = await sheetRegion(/evaluation of mateo ruiz/i);
+    expect(mateo).toHaveTextContent("3 of 3 in this list");
+    expect(nextButton(mateo)).toBeDisabled();
+    expect(previousButton(mateo)).toBeEnabled();
+  });
+
+  it("siguen la lista filtrada", async () => {
+    clubApi();
+    await renderScreen({ initialView: { positionId: FORWARD.id } });
+    const camila = await openCamila();
+    expect(camila).toHaveTextContent("1 of 2 in this list");
+
+    await userEvent.click(nextButton(camila));
+
+    const jose = await sheetRegion(/evaluation of josé peña/i);
+    expect(jose).toHaveTextContent("2 of 2 in this list");
+    expect(nextButton(jose)).toBeDisabled();
+  });
+
+  it("dice que el jugador abierto no está en el filtro y siguiente lleva al primero de la lista", async () => {
+    clubApi();
+    await renderScreen();
+    const camila = await openCamila();
+
+    await userEvent.type(
+      screen.getByRole("searchbox", { name: /search by name/i }),
+      "mateo",
+    );
+
+    expect(camila).toHaveTextContent("Not in the current filter");
+    await userEvent.click(nextButton(camila));
+    expect(await sheetRegion(/evaluation of mateo ruiz/i)).toBeInTheDocument();
+  });
+});
+
+describe("?miembro= en la dirección (#819, D8)", () => {
+  it("abre el panel de ese jugador en vez del resumen", async () => {
+    clubApi();
+
+    await renderScreen({ initialMemberId: CAMILA.userId });
+
+    expect(
+      await sheetRegion(/evaluation of camila ortiz/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: /squad overview/i }),
+    ).toBeNull();
+  });
+
+  it("con un id que no está en la lista enseña el resumen", async () => {
+    clubApi();
+
+    await renderScreen({
+      initialMemberId: "cccccccc-0000-4000-8000-00000000000c",
+    });
+
+    expect(overviewPanel()).toBeInTheDocument();
   });
 });

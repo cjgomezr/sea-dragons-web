@@ -10,6 +10,7 @@ import {
   type EvaluationCategoriesGateways,
   createEvaluationCategory,
   findCategoryNameIssues,
+  isCategoryNameTaken,
   listEvaluationCategories,
   renameEvaluationCategory,
   reorderEvaluationCategories,
@@ -387,5 +388,39 @@ describe("bitácora", () => {
     }).catch(() => undefined);
 
     expect(auditRows).toEqual([]);
+  });
+});
+
+describe("nombre repetido", () => {
+  const TACTICA_ID = "ca7e0000-0000-4000-8000-000000000001";
+  const catalog: readonly EvaluationCategory[] = [
+    {
+      id: TACTICA_ID,
+      name: "Táctica",
+      isActive: true,
+    },
+    {
+      id: "ca7e0000-0000-4000-8000-000000000002",
+      name: "Experience",
+      isActive: false,
+    },
+  ];
+
+  it.each([
+    ["el mismo nombre", "Táctica"],
+    ["otras mayúsculas", "TÁCTICA"],
+    ["sin tilde", "tactica"],
+    ["con espacios alrededor", "  Táctica "],
+    ["el de una desactivada", "experience"],
+  ])("lo da por repetido con %s", (_case, name) => {
+    expect(isCategoryNameTaken(catalog, name)).toBe(true);
+  });
+
+  it("no lo da por repetido con un nombre nuevo", () => {
+    expect(isCategoryNameTaken(catalog, "Tácticas")).toBe(false);
+  });
+
+  it("no cuenta la categoría que se renombra", () => {
+    expect(isCategoryNameTaken(catalog, "tactica", TACTICA_ID)).toBe(false);
   });
 });

@@ -85,9 +85,15 @@ const MEMBERSHIPS: readonly GroupMembershipRecord[] = [
   membership("Dani Diaz", "active", "dani.webp"),
 ];
 
+/** La próxima sesión programada de una serie que sigue en pie. */
+const NEXT_SESSION = {
+  id: "5e5e5e5e-0000-4000-8000-00000000005e",
+  startsOn: TODAY,
+};
+
 const AUDIENCE_USES: GroupAudienceUses = {
   events: [{ groupIds: [GROUP_ID], startsOn: TODAY, status: "scheduled" }],
-  series: [{ groupIds: [GROUP_ID], endsOn: TODAY, hasSessionsLeft: true }],
+  series: [{ groupIds: [GROUP_ID], endsOn: TODAY, nextSession: NEXT_SESSION }],
   posts: [{ groupIds: [GROUP_ID], status: "published" }],
 };
 

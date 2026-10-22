@@ -484,9 +484,10 @@ export const TEAMS_EVENT_QUERY_PARAM = "evento";
 /** Las evaluaciones. Un Player no las ve, ni las propias (FR-055). */
 export const EVALUATIONS_PATH = "/evaluaciones";
 
-/** Las categorías que se evalúan (#323, RF-3 del PRD de E9). Cuelga de
- * `EVALUATIONS_PATH` y no de la configuración del club (decisión D1): quien
- * evalúa decide qué se mide, y la frontera ya la reserva a Admin y Coach. */
+/** La dirección vieja de las categorías que se evalúan (#323). Desde #821
+ * son una pestaña de Evaluaciones (D1 del PRD de E31) y `next.config.ts`
+ * lleva esta dirección a la pestaña. Cuelga de `EVALUATIONS_PATH`, así que la
+ * frontera la sigue reservando a Admin y Coach. */
 export const EVALUATION_CATEGORIES_PATH = `${EVALUATIONS_PATH}/categorias`;
 
 /** Con el `user_id` de un miembro, Evaluaciones abre ya su ficha: es a donde
