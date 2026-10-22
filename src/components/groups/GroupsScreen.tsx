@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GroupRosterMember } from "@/lib/groups/group-members";
 import { GROUP_PREVIEW_SIZE } from "@/lib/groups/group-overview";
 import type { Group, GroupOverview } from "@/lib/groups/groups";
@@ -144,6 +144,17 @@ export function GroupsScreen({
   const pendingAction = usePendingAction<GroupAction>();
   const { pending, run } = pendingAction;
   const { notice, announce } = useChangeNotice();
+  // Tras borrar, el botón que tenía el foco desaparece con su panel: el foco
+  // pasa a "Elige un grupo" en cuanto se pinta, y no cae al principio.
+  const placeholderRef = useRef<HTMLParagraphElement>(null);
+  const isFocusingPlaceholderRef = useRef(false);
+
+  useEffect(() => {
+    if (isFocusingPlaceholderRef.current && placeholderRef.current !== null) {
+      placeholderRef.current.focus();
+      isFocusingPlaceholderRef.current = false;
+    }
+  });
 
   // Volver a intentarlo cuenta como una lectura más, y por eso es el efecto
   // quien pide la lista: así el pedido vive en un solo sitio y el estado se
@@ -223,6 +234,7 @@ export function GroupsScreen({
       }
       forgetGroup(group.id);
       setFailure(null);
+      isFocusingPlaceholderRef.current = true;
       announce(translate("groups.deleted", { name: group.name }));
     });
   }
@@ -291,7 +303,11 @@ export function GroupsScreen({
           </section>
           {selectedGroup === undefined ? (
             groups.length === 0 ? null : (
-              <p className="groups-panel-placeholder">
+              <p
+                ref={placeholderRef}
+                className="groups-panel-placeholder"
+                tabIndex={-1}
+              >
                 {translate("groups.panel.empty")}
               </p>
             )

@@ -890,6 +890,21 @@ describe("borrar un grupo", () => {
     ]);
   });
 
+  it("tras borrar, el foco pasa a la caja de elegir un grupo", async () => {
+    const user = userEvent.setup();
+    stubApi({ groups: [SENIOR, MASTERS] });
+    await renderScreen();
+
+    await askToDelete("Senior Squad");
+    await user.click(screen.getByRole("button", { name: "Delete group" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Pick a group to see and manage its members."),
+      ).toHaveFocus(),
+    );
+  });
+
   it("cancelar el aviso no borra nada", async () => {
     const user = userEvent.setup();
     stubApi({ groups: [SENIOR] });
@@ -1098,6 +1113,31 @@ describe("los miembros del grupo", () => {
       expect(within(groupRow("Senior Squad")).queryByText("NR")).toBeNull(),
     );
     expect(within(groupRow("Senior Squad")).getByText("AA")).toBeVisible();
+  });
+
+  it("quitar a alguien de un grupo que otro borró vuelve a elegir y lo explica", async () => {
+    const user = userEvent.setup();
+    stubApi({
+      groups: [SENIOR, MASTERS],
+      members: [NEREA],
+      removeMember: () => errorResponse(404, "not_found"),
+    });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+
+    await user.click(
+      within(panel).getByRole("button", {
+        name: "Remove Nerea Ruiz from Senior Squad",
+      }),
+    );
+
+    expect(
+      await screen.findByText("That group is no longer in the club."),
+    ).toBeVisible();
+    expect(rowNames()).toEqual(["Masters Squad"]);
+    expect(
+      screen.getByText("Pick a group to see and manage its members."),
+    ).toBeVisible();
   });
 
   it("un error al cargar los socios deja volver a intentarlo", async () => {
