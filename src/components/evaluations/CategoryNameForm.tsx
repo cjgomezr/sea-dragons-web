@@ -39,6 +39,7 @@ export function CategoryNameForm({
   translate,
   formLabel,
   fieldLabel,
+  isLabelVisible = false,
   fieldClassName,
   placeholder,
   initialName,
@@ -53,8 +54,11 @@ export function CategoryNameForm({
   translate: Translator;
   /** El nombre accesible del formulario. */
   formLabel: string;
-  /** El nombre accesible del campo: en la fila no cabe una etiqueta. */
+  /** La etiqueta del campo. */
   fieldLabel: string;
+  /** En la fila de la tabla no cabe y sólo se lee; en la hoja del móvil se
+   * ve. */
+  isLabelVisible?: boolean;
   /** La clase del campo, que cambia entre añadir y renombrar. */
   fieldClassName: string;
   placeholder?: string;
@@ -134,6 +138,14 @@ export function CategoryNameForm({
       noValidate
     >
       <div className="club-positions-cell club-positions-names-cell">
+        <label
+          className={
+            isLabelVisible ? "club-positions-name-label" : "visually-hidden"
+          }
+          htmlFor={fieldId}
+        >
+          {fieldLabel}
+        </label>
         <input
           ref={fieldRef}
           id={fieldId}
@@ -144,7 +156,6 @@ export function CategoryNameForm({
           maxLength={CATEGORY_NAME_MAX_LENGTH}
           autoComplete="off"
           disabled={isDisabled}
-          aria-label={fieldLabel}
           aria-invalid={issueCode !== null}
           aria-describedby={issueCode === null ? undefined : issueId}
           onChange={(event) => update(event.target.value)}

@@ -6,6 +6,7 @@ import { X } from "@phosphor-icons/react/dist/ssr/X";
 import { useEffect, useId, useRef, useState } from "react";
 import { SortableList } from "@/components/club/SortableRows";
 import { usePendingAction } from "@/components/groups/use-pending-action";
+import { useIsPhone } from "@/components/use-is-phone";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import type {
   EvaluationCategories,
@@ -13,6 +14,12 @@ import type {
 } from "@/lib/evaluations/evaluation-categories";
 import type { Translator } from "@/lib/i18n/translator";
 import { type CategoryFormOutcome, CategoryNameForm } from "./CategoryNameForm";
+import {
+  CategorySheet,
+  openSheetFocusKey,
+  PhoneAddCategory,
+  PhoneCategoryRow,
+} from "./EvaluationCategoriesPhone";
 import {
   ActiveCategoryRow,
   type Direction,
@@ -48,6 +55,11 @@ import {
  * aviso corto, además del anuncio. La excepción es soltar una fila
  * arrastrada: se queda donde se soltó mientras el servidor contesta, y si
  * falla vuelve a su sitio.
+ *
+ * En el móvil (#823, RF-7) la tabla no cabe: cada activa es una fila de una
+ * tarjeta que abre una hoja para renombrarla o desactivarla
+ * (`EvaluationCategoriesPhone`). Lo que se manda y lo que se anuncia es lo
+ * mismo, y también se arrastra.
  */
 
 type LoadState = { readonly kind: "loading" } | CategoriesRead;
@@ -64,6 +76,14 @@ type CategoriesAction = {
   readonly send: () => Promise<CategoriesRead>;
   /** Lo que se anuncia cuando sale bien, con el catálogo que quedó. */
   readonly describeDone: (categories: EvaluationCategories) => string;
+};
+
+/** Lo que una fila activa necesita de la lista en la que va. */
+type ActiveRowsContext = {
+  /** En el orden que se pinta, el soltado si aún no está confirmado. */
+  readonly active: EvaluationCategories;
+  /** Todas, para avisar del nombre repetido al renombrar. */
+  readonly categories: EvaluationCategories;
 };
 
 /** El aviso de guardado. Un objeto nuevo en cada guardado para que el
@@ -195,6 +215,8 @@ export function EvaluationCategoriesManager({
   const [announcement, setAnnouncement] = useState("");
   const [notice, showNotice] = useSavedNotice();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const isPhone = useIsPhone();
   /** El orden de las activas que se soltó y el servidor aún no confirma. */
   const [droppedOrder, setDroppedOrder] = useState<EvaluationCategories | null>(
     null,
@@ -235,7 +257,7 @@ export function EvaluationCategoriesManager({
         ?.querySelector<HTMLElement>(`[${FOCUS_KEY_ATTRIBUTE}="${key}"]`)
         ?.focus();
     }
-  }, [state, editingId, listFailure, pending, droppedOrder]);
+  }, [state, editingId, sheetId, listFailure, pending, droppedOrder]);
 
   function reload(): void {
     setListFailure(null);
@@ -322,8 +344,11 @@ export function EvaluationCategoriesManager({
     }
   }
 
-  function setActive(category: EvaluationCategory, isActive: boolean): void {
-    void runListAction({
+  function activeAction(
+    category: EvaluationCategory,
+    isActive: boolean,
+  ): CategoriesAction {
+    return {
       key: `${category.id}:active`,
       send: () => setCategoryActive(category.id, isActive),
       describeDone: () =>
@@ -333,7 +358,11 @@ export function EvaluationCategoriesManager({
             : "evaluations.categories.deactivated",
           { name: category.name },
         ),
-    });
+    };
+  }
+
+  function setActive(category: EvaluationCategory, isActive: boolean): void {
+    void runListAction(activeAction(category, isActive));
   }
 
   function closeEditor(categoryId: string): void {
@@ -341,19 +370,32 @@ export function EvaluationCategoriesManager({
     setEditingId(null);
   }
 
-  async function rename(
+  function saveName(
     category: EvaluationCategory,
     name: string,
   ): Promise<CategoryFormOutcome> {
-    const outcome = await runFormAction({
+    return runFormAction({
       key: `${category.id}:rename`,
       send: () => renameCategory(category.id, name),
       describeDone: () => translate("evaluations.categories.renamed"),
     });
+  }
+
+  async function rename(
+    category: EvaluationCategory,
+    name: string,
+  ): Promise<CategoryFormOutcome> {
+    const outcome = await saveName(category, name);
     if (outcome?.kind === "done") {
       closeEditor(category.id);
     }
     return outcome;
+  }
+
+  /** El foco vuelve a la fila que la abrió; si se desactivó, ya no está. */
+  function closeSheet(categoryId: string): void {
+    focusAfterUpdate.current = openSheetFocusKey(categoryId);
+    setSheetId(null);
   }
 
   function create(name: string): Promise<CategoryFormOutcome> {
@@ -413,16 +455,67 @@ export function EvaluationCategoriesManager({
     );
   }
 
+  function renderTableRow(
+    category: EvaluationCategory,
+    index: number,
+    { active, categories }: ActiveRowsContext,
+  ): React.JSX.Element {
+    return (
+      <ActiveCategoryRow
+        key={category.id}
+        translate={translate}
+        category={category}
+        rank={index + 1}
+        total={active.length}
+        handleHintId={handleHintId}
+        isBusy={isBusy}
+        renameForm={
+          editingId === category.id
+            ? renderRenameForm(category, categories)
+            : null
+        }
+        onMove={(direction) =>
+          void reorder(category, movedOrder(active, category.id, direction))
+        }
+        onRename={() => setEditingId(category.id)}
+        onDeactivate={() => setActive(category, false)}
+      />
+    );
+  }
+
+  function renderPhoneRow(
+    category: EvaluationCategory,
+    index: number,
+    { active }: ActiveRowsContext,
+  ): React.JSX.Element {
+    return (
+      <PhoneCategoryRow
+        key={category.id}
+        translate={translate}
+        category={category}
+        rank={index + 1}
+        total={active.length}
+        handleHintId={handleHintId}
+        onMove={(direction) =>
+          void reorder(category, movedOrder(active, category.id, direction))
+        }
+        onOpen={() => setSheetId(category.id)}
+      />
+    );
+  }
+
   function renderActive(categories: EvaluationCategories): React.JSX.Element {
     const saved = activeOf(categories);
+    const cardClassName = isPhone ? " club-positions-phone-card" : "";
     if (saved.length === 0) {
       return (
-        <p className="club-positions-empty">
+        <p className={`club-positions-empty${cardClassName}`}>
           {translate("evaluations.categories.active.empty")}
         </p>
       );
     }
     const active = droppedOrder ?? saved;
+    const renderRow = isPhone ? renderPhoneRow : renderTableRow;
     return (
       <SortableList
         translate={translate}
@@ -433,35 +526,66 @@ export function EvaluationCategoriesManager({
         onDrop={(order, moved) => void drop(moved, order)}
       >
         <ol
-          className="club-positions-rows"
+          className={`club-positions-rows${cardClassName}`}
           aria-label={translate("evaluations.categories.active.title")}
         >
-          {active.map((category, index) => (
-            <ActiveCategoryRow
-              key={category.id}
-              translate={translate}
-              category={category}
-              rank={index + 1}
-              total={active.length}
-              handleHintId={handleHintId}
-              isBusy={isBusy}
-              renameForm={
-                editingId === category.id
-                  ? renderRenameForm(category, categories)
-                  : null
-              }
-              onMove={(direction) =>
-                void reorder(
-                  category,
-                  movedOrder(active, category.id, direction),
-                )
-              }
-              onRename={() => setEditingId(category.id)}
-              onDeactivate={() => setActive(category, false)}
-            />
-          ))}
+          {active.map((category, index) =>
+            renderRow(category, index, { active, categories }),
+          )}
         </ol>
       </SortableList>
+    );
+  }
+
+  /** Se busca entre todas: al desactivarla desde la hoja, sigue abierta hasta
+   * que se cierra. */
+  function renderSheet(
+    categories: EvaluationCategories,
+  ): React.JSX.Element | null {
+    const category = categories.find(({ id }) => id === sheetId);
+    if (category === undefined) {
+      return null;
+    }
+    return (
+      <CategorySheet
+        key={category.id}
+        translate={translate}
+        category={category}
+        categories={categories}
+        isBusy={isBusy}
+        onRename={(name) => saveName(category, name)}
+        onDeactivate={() => send(activeAction(category, false))}
+        onClosed={() => closeSheet(category.id)}
+      />
+    );
+  }
+
+  function renderPhoneList(
+    categories: EvaluationCategories,
+  ): React.JSX.Element {
+    return (
+      <>
+        {renderActive(categories)}
+        <PhoneAddCategory
+          translate={translate}
+          categories={categories}
+          isBusy={isBusy}
+          onSubmit={create}
+        />
+        {renderSheet(categories)}
+      </>
+    );
+  }
+
+  function renderTable(categories: EvaluationCategories): React.JSX.Element {
+    return (
+      <div className="club-positions-table-scroll">
+        <div className="club-positions-table">
+          <TableHead translate={translate} />
+          {renderActive(categories)}
+          {renderAddRow(categories)}
+        </div>
+      </div>
     );
   }
 
@@ -505,13 +629,7 @@ export function EvaluationCategoriesManager({
   function renderCatalog(categories: EvaluationCategories): React.JSX.Element {
     return (
       <>
-        <div className="club-positions-table-scroll">
-          <div className="club-positions-table">
-            <TableHead translate={translate} />
-            {renderActive(categories)}
-            {renderAddRow(categories)}
-          </div>
-        </div>
+        {isPhone ? renderPhoneList(categories) : renderTable(categories)}
         <p className="visually-hidden" id={handleHintId}>
           {translate("clubSettings.reorder.hint")}
         </p>
@@ -536,7 +654,11 @@ export function EvaluationCategoriesManager({
   return (
     <div ref={tabRef} className="club-positions evaluation-categories">
       <p className="auth-hint evaluation-categories-lead">
-        {translate("evaluations.categories.lead")}
+        {translate(
+          isPhone
+            ? "evaluations.categories.phone.hint"
+            : "evaluations.categories.lead",
+        )}
       </p>
       {state.kind === "loading" ? (
         <p className="admin-empty">
