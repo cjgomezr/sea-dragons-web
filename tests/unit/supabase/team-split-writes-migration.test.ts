@@ -104,8 +104,8 @@ function publishSplit(
   eventId: string,
 ): Promise<string> {
   return database.query(
-    `select public.publish_team_split('${coach.clubId}', '${eventId}')
-              ->> 'outcome'`,
+    `select public.publish_team_split('${coach.clubId}', '${coach.userId}',
+              '${eventId}') ->> 'outcome'`,
   );
 }
 
@@ -307,7 +307,8 @@ describeConPostgres("guardar y publicar el reparto en la base", () => {
               || (r -> 'current' = '${current}'::jsonb) || '|'
               || ((r ->> 'published_at') is not null) || '|'
               || (r ->> 'team_a_name') || '|' || (r ->> 'team_b_color')
-         from public.publish_team_split('${coach.clubId}', '${eventId}') r`,
+         from public.publish_team_split('${coach.clubId}', '${coach.userId}',
+                                        '${eventId}') r`,
     );
 
     expect(published).toBe("true|true|true|Team Kelp|#C99A3E");
@@ -321,7 +322,8 @@ describeConPostgres("guardar y publicar el reparto en la base", () => {
 
   it.each([
     "public.save_team_split(uuid, uuid, uuid, jsonb)",
-    "public.publish_team_split(uuid, uuid)",
+    // Desde `0079` publicar recibe también a quien publica.
+    "public.publish_team_split(uuid, uuid, uuid)",
   ])("sólo service_role ejecuta %s", async (signature) => {
     const database = await migratedDatabase();
 

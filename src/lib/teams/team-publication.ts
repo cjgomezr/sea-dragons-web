@@ -149,6 +149,7 @@ export async function publishTeamSplit(
   const publication = await gateways.teams.publishSplit({
     clubId: actor.clubId,
     eventId: event.id,
+    publisherId: actor.id,
   });
   if (publication.kind === "empty") {
     throw new TeamSplitEmptyError();

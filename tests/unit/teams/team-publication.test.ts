@@ -94,6 +94,16 @@ describe("publicar", () => {
     expect(club.split()?.publishedAt).toEqual(PUBLISHED_AT);
   });
 
+  it("guarda quién publicó: quien llama (#838)", async () => {
+    const { club, publishing } = publish({
+      split: draftWith([{ userId: ANA, team: "a" }]),
+    });
+
+    await publishing;
+
+    expect(club.publisherIds).toEqual([TEAMS_CALLER_ID]);
+  });
+
   it("no avisa a quien publica aunque juegue", async () => {
     const { club, publishing } = publish({
       split: draftWith([

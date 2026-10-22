@@ -35,7 +35,7 @@ function listedNames(result: RunResult): string[] {
 }
 
 /** Una socia del club de la semilla con un aviso de cada tipo que añadieron
- * las migraciones 0035, 0037, 0042, 0047 y 0054, en ese orden. */
+ * las migraciones 0035, 0037, 0042, 0047, 0054 y 0079, en ese orden. */
 const NOTIFICATIONS_OF_LATER_TYPES = `
   insert into auth.users (id) values (
     'a0000000-0000-4000-8000-000000000001'
@@ -51,7 +51,8 @@ const NOTIFICATIONS_OF_LATER_TYPES = `
            'event_created',
            'event_changed',
            'team_assigned',
-           'membership_renewal_upcoming'
+           'membership_renewal_upcoming',
+           'team_player_dropped'
          ]) as tipo;
 `;
 
@@ -397,7 +398,7 @@ describeConPostgres(
       expect(segunda.code, segunda.stderr).toBe(0);
       expect(
         await database.query("select count(*) from public.notifications"),
-      ).toBe("5");
+      ).toBe("6");
     });
 
     it("--write regenera una descripción con la que la comparación vuelve a pasar", async () => {

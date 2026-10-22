@@ -6,6 +6,8 @@ import {
   DIRECTORY_PATH,
   NEWS_POST_PATH,
   PAYMENTS_PATH,
+  TEAMS_EVENT_QUERY_PARAM,
+  TEAMS_PATH,
 } from "@/lib/auth/routes";
 import { ROLES } from "@/lib/auth/roles";
 import { EVENT_TYPES } from "@/lib/events/event-creation";
@@ -157,6 +159,25 @@ const teamAssignedData = teamUnassignedData.extend({
   teamName: z.string().min(1),
   teamColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
 });
+
+const teamPlayerChangeData = z.object({
+  eventId: z.uuid(),
+  title: z.string().min(1),
+  playerId: z.uuid(),
+  playerName: z.string().min(1),
+  teamName: z.string().min(1),
+});
+
+/** #838: el Team builder de ese evento, donde se decide si se cambia a
+ * alguien. */
+function teamBuilderDestination(
+  data: Readonly<Record<string, unknown>>,
+): string | null {
+  const parsed = teamPlayerChangeData.safeParse(data);
+  return parsed.success
+    ? `${TEAMS_PATH}?${TEAMS_EVENT_QUERY_PARAM}=${parsed.data.eventId}`
+    : null;
+}
 
 const membershipRenewalUpcomingData = z.object({
   amountCents: z.number().int().nonnegative(),
@@ -400,6 +421,38 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         body: describeRenewalCharge(translate, parsed.data),
       };
     },
+    team_player_dropped: (translate, data) => {
+      const parsed = teamPlayerChangeData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      const change = parsed.data;
+      return {
+        title: translate("notifications.team_player_dropped.title", {
+          name: change.playerName,
+          title: change.title,
+        }),
+        body: translate("notifications.team_player_dropped.body", {
+          team: change.teamName,
+        }),
+      };
+    },
+    team_player_returned: (translate, data) => {
+      const parsed = teamPlayerChangeData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      const change = parsed.data;
+      return {
+        title: translate("notifications.team_player_returned.title", {
+          name: change.playerName,
+          title: change.title,
+        }),
+        body: translate("notifications.team_player_returned.body", {
+          team: change.teamName,
+        }),
+      };
+    },
   };
 
 function isKnownType(type: string): type is NotificationType {
@@ -449,6 +502,8 @@ const DESTINATION_BY_TYPE: Readonly<Record<NotificationType, DestinationOf>> = {
     membershipRenewalUpcomingData.safeParse(data).success
       ? PAYMENTS_PATH
       : null,
+  team_player_dropped: teamBuilderDestination,
+  team_player_returned: teamBuilderDestination,
 };
 
 /** `null` para un tipo que esta pantalla no reconoce, o para unos datos que

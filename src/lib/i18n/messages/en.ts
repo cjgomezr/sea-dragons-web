@@ -1270,6 +1270,12 @@ export const englishMessages = {
   "notifications.team_assigned.body": "{title}: {moment}",
   "notifications.team_unassigned.title": "You're no longer in a team",
   "notifications.team_unassigned.body": "{title}: {moment}",
+  // #838: a quien publicó el reparto.
+  "notifications.team_player_dropped.title": "{name} can't make {title}",
+  "notifications.team_player_dropped.body": "Was on {team}",
+  "notifications.team_player_returned.title":
+    "{name} is coming to {title} again",
+  "notifications.team_player_returned.body": "Still on {team}",
   // #470: siete días antes de cada renovación.
   "notifications.membership_renewal_upcoming.title":
     "Your membership renews soon",

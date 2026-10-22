@@ -7,6 +7,7 @@ import {
   DIRECTORY_PATH,
   NEWS_POST_PATH,
   PAYMENTS_PATH,
+  TEAMS_PATH,
 } from "@/lib/auth/routes";
 import {
   describeNotification,
@@ -81,6 +82,20 @@ const DATA_FOR_EVERY_TYPE = {
     title: "Scrimmage",
     startsOn: "2027-07-10",
     startTime: "10:00",
+  },
+  team_player_dropped: {
+    eventId: "e1e1e1e1-0000-4000-8000-00000000000e",
+    title: "Scrimmage",
+    playerId: "a0a0a0a0-0000-4000-8000-00000000000a",
+    playerName: "Nerea Silva",
+    teamName: "Team Kelp",
+  },
+  team_player_returned: {
+    eventId: "e1e1e1e1-0000-4000-8000-00000000000e",
+    title: "Scrimmage",
+    playerId: "a0a0a0a0-0000-4000-8000-00000000000a",
+    playerName: "Nerea Silva",
+    teamName: "Team Kelp",
   },
   membership_renewal_upcoming: {
     amountCents: 4500,
@@ -668,6 +683,60 @@ describe("texto de los avisos de cambio, cancelación y equipos", () => {
       const text = describeNotification(createTranslator("en"), {
         type,
         data: { ...DATA_FOR_EVERY_TYPE[type], startTime: "7pm" },
+      });
+
+      expect(text.title).toBe("New notification");
+    });
+  }
+});
+
+// #838: a quien publicó el reparto, cuando uno de sus jugadores deja de ir o
+// vuelve a ir.
+describe("team_player_dropped y team_player_returned", () => {
+  const cases = [
+    {
+      type: "team_player_dropped",
+      en: { title: "Nerea Silva can't make Scrimmage", body: "Was on Team Kelp" },
+      es: {
+        title: "Nerea Silva ya no viene a Scrimmage",
+        body: "Estaba en Team Kelp",
+      },
+    },
+    {
+      type: "team_player_returned",
+      en: {
+        title: "Nerea Silva is coming to Scrimmage again",
+        body: "Still on Team Kelp",
+      },
+      es: {
+        title: "Nerea Silva vuelve a ir a Scrimmage",
+        body: "Sigue en Team Kelp",
+      },
+    },
+  ] as const;
+
+  for (const { type, ...byLocale } of cases) {
+    for (const locale of ["en", "es"] as const) {
+      it(`cuenta ${type} en ${locale} con el jugador, el evento y el equipo`, () => {
+        const text = describeNotification(createTranslator(locale), {
+          type,
+          data: DATA_FOR_EVERY_TYPE[type],
+        });
+
+        expect(text).toEqual(byLocale[locale]);
+      });
+    }
+
+    it(`${type} lleva al Team builder de ese evento`, () => {
+      expect(
+        notificationDestination({ type, data: DATA_FOR_EVERY_TYPE[type] }),
+      ).toBe(`${TEAMS_PATH}?evento=e1e1e1e1-0000-4000-8000-00000000000e`);
+    });
+
+    it(`${type} da el texto genérico sin el nombre del jugador`, () => {
+      const text = describeNotification(createTranslator("en"), {
+        type,
+        data: { ...DATA_FOR_EVERY_TYPE[type], playerName: "" },
       });
 
       expect(text.title).toBe("New notification");
