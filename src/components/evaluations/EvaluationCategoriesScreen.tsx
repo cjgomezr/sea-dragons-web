@@ -1,22 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Check } from "@phosphor-icons/react/dist/ssr/Check";
+import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
+import { X } from "@phosphor-icons/react/dist/ssr/X";
+import { useEffect, useId, useRef, useState } from "react";
+import { SortableList } from "@/components/club/SortableRows";
 import { usePendingAction } from "@/components/groups/use-pending-action";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
-import { EVALUATIONS_PATH } from "@/lib/auth/routes";
 import type {
   EvaluationCategories,
   EvaluationCategory,
 } from "@/lib/evaluations/evaluation-categories";
-import type { Locale } from "@/lib/i18n/locale";
-import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { Translator } from "@/lib/i18n/translator";
 import { type CategoryFormOutcome, CategoryNameForm } from "./CategoryNameForm";
 import {
-  ActiveCategoryItem,
+  ActiveCategoryRow,
   type Direction,
   FOCUS_KEY_ATTRIBUTE,
-  InactiveCategoryItem,
-  moveFocusKey,
+  InactiveCategories,
+  handleFocusKey,
   renameFocusKey,
 } from "./EvaluationCategoryItems";
 import {
@@ -29,19 +31,23 @@ import {
   reorderCategories,
   setCategoryActive,
 } from "./evaluation-categories-client";
-import { BackLink } from "@/components/BackLink";
 
 /**
- * Las categorías de evaluación (#323, RF-3 del PRD de E9). Vive dentro de
- * Evaluaciones y no en la configuración del club (decisión D1): quien evalúa
- * decide qué se mide, y un Coach no entra en la configuración. La frontera ya
- * la reserva a Admin y Coach, porque cuelga de `EVALUATIONS_PATH`.
+ * La pestaña Categorías de Evaluaciones (#821, RF-5 del PRD de E31). Antes
+ * era su propia pantalla (#323); ahora `/evaluaciones/categorias` lleva aquí
+ * (D1). La gestionan Admin y Coach, como siempre (D2).
  *
- * Copia la forma de las posiciones de #300, porque el problema es el mismo:
- * las activas en su orden, el alta y las desactivadas aparte. Reordenar es con
- * botones, para que se pueda con el teclado, y cada movimiento manda la lista
- * entera en el orden nuevo. Nada cambia hasta que el servidor lo confirma:
- * cada respuesta trae el catálogo tal como quedó, y eso es lo que se pinta.
+ * Es una tabla con la forma de las posiciones del club (#723): cada activa es
+ * una fila con su asa, su número, su nombre y sus acciones; la última fila es
+ * la de añadir, y las desactivadas van plegadas debajo. El orden se cambia
+ * arrastrando por el asa, o con ↑ y ↓ sobre ella (D9); cada movimiento manda
+ * la lista entera en el orden nuevo y el foco se queda en el asa.
+ *
+ * Nada cambia hasta que el servidor lo confirma: cada respuesta trae el
+ * catálogo tal como quedó, y eso es lo que se pinta. Entonces sale abajo un
+ * aviso corto, además del anuncio. La excepción es soltar una fila
+ * arrastrada: se queda donde se soltó mientras el servidor contesta, y si
+ * falla vuelve a su sitio.
  */
 
 type LoadState = { readonly kind: "loading" } | CategoriesRead;
@@ -60,10 +66,14 @@ type CategoriesAction = {
   readonly describeDone: (categories: EvaluationCategories) => string;
 };
 
-const ACTIVE_TITLE_ID = "categorias-activas";
-const INACTIVE_TITLE_ID = "categorias-desactivadas";
-const CREATE_TITLE_ID = "categorias-nueva";
+/** El aviso de guardado. Un objeto nuevo en cada guardado para que el
+ * temporizador vuelva a empezar aunque el texto se repita. */
+type SavedNotice = { readonly text: string };
+
 const CREATE_ACTION = "create";
+/** Lo que dura a la vista el aviso de guardado: lo bastante para leerlo, y
+ * el anuncio `aria-live` no depende de él. */
+const SAVED_NOTICE_MS = 2500;
 
 function activeOf(categories: EvaluationCategories): EvaluationCategories {
   return categories.filter((category) => category.isActive);
@@ -80,10 +90,6 @@ function movedOrder(
   const reordered = ids.filter((id) => id !== categoryId);
   reordered.splice(direction === "up" ? from - 1 : from + 1, 0, categoryId);
   return reordered;
-}
-
-function opposite(direction: Direction): Direction {
-  return direction === "up" ? "down" : "up";
 }
 
 function LoadFailure({
@@ -142,36 +148,61 @@ function ActionFailure({
   );
 }
 
-function Header({ translate }: { translate: Translator }): React.JSX.Element {
+/** La cabecera se ve pero no se lee: cada control ya dice de qué es. */
+function TableHead({
+  translate,
+}: {
+  translate: Translator;
+}): React.JSX.Element {
   return (
-    <header className="evaluation-categories-header">
-      <BackLink href={EVALUATIONS_PATH}>
-        {translate("evaluations.categories.back")}
-      </BackLink>
-      <h1>{translate("evaluations.categories.title")}</h1>
-      <p className="app-lead">{translate("evaluations.categories.lead")}</p>
-    </header>
+    <div
+      className="club-positions-row club-positions-table-head"
+      aria-hidden="true"
+    >
+      <span />
+      <span>#</span>
+      <span>{translate("evaluations.categories.column.category")}</span>
+      <span />
+    </div>
   );
 }
 
-/** El catálogo sin la cabecera: lo pinta esta pantalla y, desde #818, la
- * pestaña Categorías de Evaluaciones. `onCategoriesChange` recibe cada
- * catálogo que confirma el servidor, para el número de la pestaña. */
+/** Lo que dura el aviso de guardado a la vista. */
+function useSavedNotice(): [SavedNotice | null, (text: string) => void] {
+  const [notice, setNotice] = useState<SavedNotice | null>(null);
+  useEffect(() => {
+    if (notice === null) {
+      return;
+    }
+    const timer = setTimeout(() => setNotice(null), SAVED_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
+  return [notice, (text) => setNotice({ text })];
+}
+
 export function EvaluationCategoriesManager({
   translate,
   onCategoriesChange,
 }: {
   translate: Translator;
+  /** Recibe cada catálogo que confirma el servidor, para el número de la
+   * pestaña. */
   onCategoriesChange?: (categories: EvaluationCategories) => void;
 }): React.JSX.Element {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
   const [listFailure, setListFailure] = useState<ListFailure | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [notice, showNotice] = useSavedNotice();
   const [editingId, setEditingId] = useState<string | null>(null);
+  /** El orden de las activas que se soltó y el servidor aún no confirma. */
+  const [droppedOrder, setDroppedOrder] = useState<EvaluationCategories | null>(
+    null,
+  );
   const { pending, run } = usePendingAction<string>();
-  const screenRef = useRef<HTMLDivElement>(null);
+  const tabRef = useRef<HTMLDivElement>(null);
   const focusAfterUpdate = useRef<string | null>(null);
+  const handleHintId = useId();
 
   useEffect(() => {
     let isCurrent = true;
@@ -191,17 +222,20 @@ export function EvaluationCategoriesManager({
     }
   }, [state, onCategoriesChange]);
 
-  // El foco vuelve a su sitio cuando la lista nueva ya está pintada: mientras
-  // esperaba, el botón pulsado estaba desactivado y lo había perdido.
+  // El foco vuelve a su sitio cuando la lista nueva ya está pintada y no
+  // queda nada en vuelo: un control todavía desactivado no acepta el foco.
   useEffect(() => {
+    if (pending !== null) {
+      return;
+    }
     const key = focusAfterUpdate.current;
     focusAfterUpdate.current = null;
     if (key !== null) {
-      screenRef.current
-        ?.querySelector<HTMLButtonElement>(`[${FOCUS_KEY_ATTRIBUTE}="${key}"]`)
+      tabRef.current
+        ?.querySelector<HTMLElement>(`[${FOCUS_KEY_ATTRIBUTE}="${key}"]`)
         ?.focus();
     }
-  }, [state, editingId]);
+  }, [state, editingId, listFailure, pending, droppedOrder]);
 
   function reload(): void {
     setListFailure(null);
@@ -214,25 +248,35 @@ export function EvaluationCategoriesManager({
    * fallo; `null` es que había otra acción en vuelo. */
   async function send(
     action: CategoriesAction,
+    focusKey?: string,
   ): Promise<CategoriesRead | null> {
     const result = await run(action.key, action.send);
+    // Antes de pintar la respuesta: si el foco se apunta después, el efecto
+    // que lo devuelve puede correr con la lista nueva y no encontrarlo.
+    if (result !== null && focusKey !== undefined) {
+      focusAfterUpdate.current = focusKey;
+    }
     if (result?.kind === "loaded") {
+      const done = action.describeDone(result.categories);
       setListFailure(null);
       setState(result);
-      setAnnouncement(action.describeDone(result.categories));
+      setAnnouncement(done);
+      showNotice(done);
     }
     return result;
   }
 
-  async function runListAction(action: CategoriesAction): Promise<boolean> {
-    const result = await send(action);
+  async function runListAction(
+    action: CategoriesAction,
+    focusKey?: string,
+  ): Promise<void> {
+    const result = await send(action, focusKey);
     if (result?.kind === "failed") {
       setListFailure({
         failure: result,
-        retry: () => void runListAction(action),
+        retry: () => void runListAction(action, focusKey),
       });
     }
-    return result?.kind === "loaded";
   }
 
   async function runFormAction(
@@ -242,32 +286,39 @@ export function EvaluationCategoriesManager({
     return result?.kind === "loaded" ? { kind: "done" } : result;
   }
 
-  async function move(
-    active: EvaluationCategories,
+  function reorder(
     category: EvaluationCategory,
-    direction: Direction,
+    order: readonly string[],
   ): Promise<void> {
-    const isMoved = await runListAction({
-      key: moveFocusKey(category.id, direction),
-      send: () => reorderCategories(movedOrder(active, category.id, direction)),
-      describeDone: (categories) => {
-        const nowActive = activeOf(categories);
-        return translate("evaluations.categories.moved", {
-          name: category.name,
-          rank: nowActive.findIndex(({ id }) => id === category.id) + 1,
-          total: nowActive.length,
-        });
+    return runListAction(
+      {
+        key: `${category.id}:move`,
+        send: () => reorderCategories(order),
+        describeDone: (categories) => {
+          const nowActive = activeOf(categories);
+          return translate("evaluations.categories.moved", {
+            name: category.name,
+            rank: nowActive.findIndex(({ id }) => id === category.id) + 1,
+            total: nowActive.length,
+          });
+        },
       },
-    });
-    if (isMoved) {
-      // En la primera o la última, el botón pulsado queda desactivado: el
-      // foco pasa al de la otra dirección.
-      const newRank = active.indexOf(category) + (direction === "up" ? -1 : 1);
-      const isAtEdge = newRank === 0 || newRank === active.length - 1;
-      focusAfterUpdate.current = moveFocusKey(
-        category.id,
-        isAtEdge ? opposite(direction) : direction,
+      handleFocusKey(category.id),
+    );
+  }
+
+  async function drop(
+    category: EvaluationCategory,
+    order: EvaluationCategories,
+  ): Promise<void> {
+    setDroppedOrder(order);
+    try {
+      await reorder(
+        category,
+        order.map(({ id }) => id),
       );
+    } finally {
+      setDroppedOrder(null);
     }
   }
 
@@ -315,131 +366,178 @@ export function EvaluationCategoriesManager({
 
   const isBusy = pending !== null;
 
-  function renderActive(active: EvaluationCategories): React.JSX.Element {
-    if (active.length === 0) {
+  function renderRenameForm(
+    category: EvaluationCategory,
+    categories: EvaluationCategories,
+  ): React.JSX.Element {
+    return (
+      <CategoryNameForm
+        translate={translate}
+        formLabel={translate("evaluations.categories.rename.label", {
+          name: category.name,
+        })}
+        fieldLabel={translate("evaluations.categories.rename.field", {
+          name: category.name,
+        })}
+        fieldClassName="evaluation-categories-rename-input"
+        initialName={category.name}
+        categories={categories}
+        renamingId={category.id}
+        isDisabled={isBusy}
+        shouldFocusOnOpen
+        onSubmit={(name) => rename(category, name)}
+        onCancel={() => closeEditor(category.id)}
+      >
+        {(canSubmit) => (
+          <div className="club-positions-cell club-positions-actions">
+            <button
+              type="submit"
+              className="club-positions-icon-button club-positions-icon-button-primary"
+              aria-label={translate("evaluations.categories.rename.submit")}
+              disabled={isBusy || !canSubmit}
+            >
+              <Check aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="club-positions-icon-button"
+              aria-label={translate("evaluations.categories.cancel")}
+              disabled={isBusy}
+              onClick={() => closeEditor(category.id)}
+            >
+              <X aria-hidden="true" />
+            </button>
+          </div>
+        )}
+      </CategoryNameForm>
+    );
+  }
+
+  function renderActive(categories: EvaluationCategories): React.JSX.Element {
+    const saved = activeOf(categories);
+    if (saved.length === 0) {
       return (
-        <p className="admin-empty">
+        <p className="club-positions-empty">
           {translate("evaluations.categories.active.empty")}
         </p>
       );
     }
+    const active = droppedOrder ?? saved;
     return (
-      <ol className="groups-items" aria-labelledby={ACTIVE_TITLE_ID}>
-        {active.map((category, index) => (
-          <ActiveCategoryItem
-            key={category.id}
-            translate={translate}
-            category={category}
-            rank={index + 1}
-            total={active.length}
-            isBusy={isBusy}
-            isEditing={editingId === category.id}
-            onMove={(direction) => void move(active, category, direction)}
-            onToggleRename={() =>
-              editingId === category.id
-                ? closeEditor(category.id)
-                : setEditingId(category.id)
-            }
-            onDeactivate={() => setActive(category, false)}
-          >
-            {editingId === category.id ? (
-              <CategoryNameForm
-                translate={translate}
-                formLabel={translate("evaluations.categories.rename.label", {
-                  name: category.name,
-                })}
-                submitText={translate("evaluations.categories.rename.submit")}
-                savingText={translate("evaluations.categories.rename.saving")}
-                initialName={category.name}
-                isDisabled={isBusy}
-                isSaving={pending === `${category.id}:rename`}
-                shouldFocusOnOpen
-                onSubmit={(name) => rename(category, name)}
-                onCancel={() => closeEditor(category.id)}
-              />
-            ) : null}
-          </ActiveCategoryItem>
-        ))}
-      </ol>
+      <SortableList
+        translate={translate}
+        items={active}
+        idOf={(category) => category.id}
+        describeItem={(category) => category.name}
+        isDisabled={isBusy}
+        onDrop={(order, moved) => void drop(moved, order)}
+      >
+        <ol
+          className="club-positions-rows"
+          aria-label={translate("evaluations.categories.active.title")}
+        >
+          {active.map((category, index) => (
+            <ActiveCategoryRow
+              key={category.id}
+              translate={translate}
+              category={category}
+              rank={index + 1}
+              total={active.length}
+              handleHintId={handleHintId}
+              isBusy={isBusy}
+              renameForm={
+                editingId === category.id
+                  ? renderRenameForm(category, categories)
+                  : null
+              }
+              onMove={(direction) =>
+                void reorder(
+                  category,
+                  movedOrder(active, category.id, direction),
+                )
+              }
+              onRename={() => setEditingId(category.id)}
+              onDeactivate={() => setActive(category, false)}
+            />
+          ))}
+        </ol>
+      </SortableList>
     );
   }
 
-  function renderInactive(inactive: EvaluationCategories): React.JSX.Element {
-    if (inactive.length === 0) {
-      return (
-        <p className="admin-empty">
-          {translate("evaluations.categories.inactive.empty")}
-        </p>
-      );
-    }
+  function renderAddRow(categories: EvaluationCategories): React.JSX.Element {
     return (
-      <ul className="groups-items" aria-labelledby={INACTIVE_TITLE_ID}>
-        {inactive.map((category) => (
-          <InactiveCategoryItem
-            key={category.id}
-            translate={translate}
-            category={category}
-            isBusy={isBusy}
-            onReactivate={() => setActive(category, true)}
-          />
-        ))}
-      </ul>
+      <div className="club-positions-row club-positions-add-row">
+        <span className="club-positions-cell club-positions-add-icon">
+          <Plus aria-hidden="true" />
+        </span>
+        <CategoryNameForm
+          translate={translate}
+          formLabel={translate("evaluations.categories.create.label")}
+          fieldLabel={translate("evaluations.categories.create.label")}
+          fieldClassName="evaluation-categories-add-input"
+          placeholder={translate("evaluations.categories.create.placeholder")}
+          initialName=""
+          categories={categories}
+          isDisabled={isBusy}
+          onSubmit={create}
+        >
+          {(canSubmit) => (
+            <div className="club-positions-cell club-positions-actions">
+              <button
+                type="submit"
+                className="auth-submit club-positions-add-button"
+                disabled={isBusy || !canSubmit}
+              >
+                {translate(
+                  pending === CREATE_ACTION
+                    ? "evaluations.categories.create.saving"
+                    : "evaluations.categories.create.submit",
+                )}
+              </button>
+            </div>
+          )}
+        </CategoryNameForm>
+      </div>
     );
   }
 
   function renderCatalog(categories: EvaluationCategories): React.JSX.Element {
     return (
       <>
-        <section
-          className="evaluation-categories-group"
-          aria-labelledby={ACTIVE_TITLE_ID}
-        >
-          <h2 id={ACTIVE_TITLE_ID}>
-            {translate("evaluations.categories.active.title")}
-          </h2>
-          {renderActive(activeOf(categories))}
-          {listFailure === null ? null : (
-            <ActionFailure
-              translate={translate}
-              listFailure={listFailure}
-              isBusy={isBusy}
-              onReload={reload}
-            />
-          )}
-        </section>
-        <section
-          className="evaluation-categories-group"
-          aria-labelledby={CREATE_TITLE_ID}
-        >
-          <h2 id={CREATE_TITLE_ID}>
-            {translate("evaluations.categories.create.title")}
-          </h2>
-          <CategoryNameForm
+        <div className="club-positions-table-scroll">
+          <div className="club-positions-table">
+            <TableHead translate={translate} />
+            {renderActive(categories)}
+            {renderAddRow(categories)}
+          </div>
+        </div>
+        <p className="visually-hidden" id={handleHintId}>
+          {translate("clubSettings.reorder.hint")}
+        </p>
+        {listFailure === null ? null : (
+          <ActionFailure
             translate={translate}
-            formLabel={translate("evaluations.categories.create.title")}
-            submitText={translate("evaluations.categories.create.submit")}
-            savingText={translate("evaluations.categories.create.saving")}
-            initialName=""
-            isDisabled={isBusy}
-            isSaving={pending === CREATE_ACTION}
-            onSubmit={create}
+            listFailure={listFailure}
+            isBusy={isBusy}
+            onReload={reload}
           />
-        </section>
-        <section
-          className="evaluation-categories-group"
-          aria-labelledby={INACTIVE_TITLE_ID}
-        >
-          <h2 id={INACTIVE_TITLE_ID}>
-            {translate("evaluations.categories.inactive.title")}
-          </h2>
-          {renderInactive(categories.filter((category) => !category.isActive))}
-        </section>
+        )}
+        <InactiveCategories
+          translate={translate}
+          inactive={categories.filter((category) => !category.isActive)}
+          isBusy={isBusy}
+          onReactivate={(category) => setActive(category, true)}
+        />
       </>
     );
   }
 
   return (
-    <div ref={screenRef} className="evaluation-categories-body">
+    <div ref={tabRef} className="club-positions evaluation-categories">
+      <p className="auth-hint evaluation-categories-lead">
+        {translate("evaluations.categories.lead")}
+      </p>
       {state.kind === "loading" ? (
         <p className="admin-empty">
           {translate("evaluations.categories.loading")}
@@ -449,24 +547,18 @@ export function EvaluationCategoriesManager({
         <LoadFailure translate={translate} failure={state} onRetry={reload} />
       ) : null}
       {state.kind === "loaded" ? renderCatalog(state.categories) : null}
+      {/* El aviso se ve pero no se lee: lo que dice ya lo anuncia la región
+          viva de abajo. */}
+      {notice === null ? null : (
+        <p className="club-saved-notice" aria-hidden="true">
+          <Check />
+          <span>{notice.text}</span>
+        </p>
+      )}
       {/* Sólo anuncia: los avisos que piden algo llevan su propio rol. */}
       <p className="visually-hidden" aria-live="polite">
         {announcement}
       </p>
-    </div>
-  );
-}
-
-export function EvaluationCategoriesScreen({
-  locale,
-}: {
-  locale: Locale;
-}): React.JSX.Element {
-  const translate = createTranslator(locale);
-  return (
-    <div className="evaluation-categories">
-      <Header translate={translate} />
-      <EvaluationCategoriesManager translate={translate} />
     </div>
   );
 }

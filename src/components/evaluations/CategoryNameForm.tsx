@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { TextField } from "@/components/directory/record-fields";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import {
   CATEGORY_NAME_MAX_LENGTH,
   type CategoryIssueCode,
-  findCategoryNameIssues,
+  type EvaluationCategories,
+  isCategoryNameTaken,
 } from "@/lib/evaluations/evaluation-categories";
 import type { Translator } from "@/lib/i18n/translator";
 import {
@@ -16,13 +16,18 @@ import {
 } from "./evaluation-categories-client";
 
 /**
- * El nombre de una categoría de evaluación (#323): el mismo formulario para
- * añadirla y para renombrarla, como el de las posiciones (#300). Lo que se
- * sabe sin el servidor (vacío, demasiado largo) se avisa sin mandar nada; el
- * nombre repetido lo dice el servidor, y va junto al campo igual.
+ * El nombre de una categoría de evaluación en una fila de la tabla (#821,
+ * RF-5 del PRD de E31): el mismo formulario para la fila de añadir y para
+ * renombrar en la fila, como el de las posiciones (#723).
  *
- * Un fallo que no es del campo, como uno de red, se queda aquí con lo
- * escrito: reintentar es volver a pulsar el botón.
+ * El formulario no tiene caja propia (`display: contents`): su campo es una
+ * celda de la fila, y los botones que van detrás los pone quien lo usa.
+ *
+ * El nombre repetido se avisa mientras se escribe, sin distinguir mayúsculas
+ * ni tildes y contra las activas y las desactivadas; el servidor lo vuelve a
+ * comprobar, y su respuesta va junto al campo igual. Un fallo que no es del
+ * campo, como uno de red, se queda aquí con lo escrito: reintentar es volver
+ * a mandarlo.
  */
 
 /** Qué pasó con lo que se mandó. `done` vacía el formulario (al añadir) o lo
@@ -33,53 +38,70 @@ export type CategoryFormOutcome =
 export function CategoryNameForm({
   translate,
   formLabel,
-  submitText,
-  savingText,
+  fieldLabel,
+  fieldClassName,
+  placeholder,
   initialName,
+  categories,
+  renamingId,
   isDisabled,
-  isSaving,
   shouldFocusOnOpen = false,
   onSubmit,
   onCancel,
+  children,
 }: {
   translate: Translator;
   /** El nombre accesible del formulario. */
   formLabel: string;
-  submitText: string;
-  savingText: string;
+  /** El nombre accesible del campo: en la fila no cabe una etiqueta. */
+  fieldLabel: string;
+  /** La clase del campo, que cambia entre añadir y renombrar. */
+  fieldClassName: string;
+  placeholder?: string;
   initialName: string;
-  /** Hay una acción en vuelo, sea esta o cualquier otra de la pantalla. */
+  /** Todas, desactivadas incluidas, para avisar del nombre repetido. */
+  categories: EvaluationCategories;
+  /** La que se renombra, que no cuenta como repetida consigo misma. */
+  renamingId?: string;
+  /** Hay una acción en vuelo, sea esta o cualquier otra de la pestaña. */
   isDisabled: boolean;
-  /** La que está en vuelo es justo la de este formulario. */
-  isSaving: boolean;
   /** Al abrir el de renombrar, el foco va al campo. */
   shouldFocusOnOpen?: boolean;
   onSubmit: (name: string) => Promise<CategoryFormOutcome>;
+  /** Esc lo llama, si lo hay. */
   onCancel?: () => void;
+  /** Las celdas que siguen al campo; saben si se puede mandar. */
+  children: (canSubmit: boolean) => React.ReactNode;
 }): React.JSX.Element {
   const idPrefix = useId();
-  const formRef = useRef<HTMLFormElement>(null);
+  const fieldRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(initialName);
-  const [issueCode, setIssueCode] = useState<CategoryIssueCode | null>(null);
+  const [serverIssue, setServerIssue] = useState<CategoryIssueCode | null>(
+    null,
+  );
   const [failure, setFailure] = useState<ApiRequestFailure | null>(null);
 
   useEffect(() => {
     if (shouldFocusOnOpen) {
-      formRef.current?.querySelector("input")?.focus();
+      fieldRef.current?.focus();
     }
   }, [shouldFocusOnOpen]);
 
+  const isTaken = isCategoryNameTaken(categories, name, renamingId);
+  const issueCode: CategoryIssueCode | null = isTaken
+    ? "name_taken"
+    : serverIssue;
+  const canSubmit = name.trim() !== "" && !isTaken;
+
   function update(nextName: string): void {
     setName(nextName);
-    setIssueCode(null);
+    setServerIssue(null);
     setFailure(null);
   }
 
   async function submit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
-    const [localIssue] = findCategoryNameIssues(name);
-    if (localIssue !== undefined) {
-      setIssueCode(localIssue.code);
+    if (!canSubmit) {
       return;
     }
     const outcome = await onSubmit(name.trim());
@@ -91,59 +113,55 @@ export function CategoryNameForm({
       return;
     }
     const code = readCategoryIssueCode(outcome);
-    setIssueCode(code);
+    setServerIssue(code);
     setFailure(code === null ? outcome : null);
   }
 
-  const hintId = `${idPrefix}-ayuda`;
+  function handleKey(event: React.KeyboardEvent): void {
+    if (event.key === "Escape" && onCancel !== undefined) {
+      event.preventDefault();
+      onCancel();
+    }
+  }
+
+  const fieldId = `${idPrefix}-nombre`;
+  const issueId = `${fieldId}-aviso`;
   return (
     <form
-      ref={formRef}
       className="club-positions-form"
       aria-label={formLabel}
       onSubmit={(event) => void submit(event)}
       noValidate
     >
-      <fieldset className="club-positions-fields" disabled={isDisabled}>
-        <TextField
-          id={`${idPrefix}-nombre`}
-          label={translate("evaluations.categories.name.label")}
+      <div className="club-positions-cell club-positions-names-cell">
+        <input
+          ref={fieldRef}
+          id={fieldId}
+          className={`club-positions-input ${fieldClassName}`}
           type="text"
           value={name}
-          issueText={
-            issueCode === null
-              ? null
-              : describeCategoryIssue(translate, issueCode)
-          }
-          hintIds={[hintId]}
-          onChange={update}
+          placeholder={placeholder}
+          maxLength={CATEGORY_NAME_MAX_LENGTH}
+          autoComplete="off"
+          disabled={isDisabled}
+          aria-label={fieldLabel}
+          aria-invalid={issueCode !== null}
+          aria-describedby={issueCode === null ? undefined : issueId}
+          onChange={(event) => update(event.target.value)}
+          onKeyDown={handleKey}
         />
-      </fieldset>
-      <p className="auth-hint" id={hintId}>
-        {translate("evaluations.categories.name.hint", {
-          max: CATEGORY_NAME_MAX_LENGTH,
-        })}
-      </p>
-      {failure === null ? null : (
-        <p className="auth-error" role="alert">
-          {describeCategoriesFailure(translate, failure)}
-        </p>
-      )}
-      <div className="groups-actions">
-        <button type="submit" className="auth-submit" disabled={isDisabled}>
-          {isSaving ? savingText : submitText}
-        </button>
-        {onCancel === undefined ? null : (
-          <button
-            type="button"
-            className="admin-secondary"
-            disabled={isDisabled}
-            onClick={onCancel}
-          >
-            {translate("evaluations.categories.cancel")}
-          </button>
+        {issueCode === null ? null : (
+          <p className="auth-field-error" id={issueId}>
+            {describeCategoryIssue(translate, issueCode)}
+          </p>
+        )}
+        {failure === null ? null : (
+          <p className="auth-error" role="alert">
+            {describeCategoriesFailure(translate, failure)}
+          </p>
         )}
       </div>
+      {children(canSubmit)}
     </form>
   );
 }

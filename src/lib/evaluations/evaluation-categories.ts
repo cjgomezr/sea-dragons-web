@@ -137,6 +137,31 @@ export function findCategoryNameIssues(name: string): readonly CategoryIssue[] {
   return [];
 }
 
+/** El nombre tal como se compara: sin espacios alrededor, sin tildes y sin
+ * distinguir mayúsculas. */
+function comparableName(name: string): string {
+  return name
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase();
+}
+
+/** Si otra categoría del catálogo, activa o desactivada, ya se llama así
+ * (#821). Es el aviso de la pantalla antes de mandar nada; la última palabra
+ * la sigue teniendo la base. `exceptId` es la que se está renombrando. */
+export function isCategoryNameTaken(
+  categories: EvaluationCategories,
+  name: string,
+  exceptId?: string,
+): boolean {
+  const wanted = comparableName(name);
+  return categories.some(
+    (category) =>
+      category.id !== exceptId && comparableName(category.name) === wanted,
+  );
+}
+
 function requireValidName(name: string): string {
   const issues = findCategoryNameIssues(name);
   if (issues.length > 0) {
