@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+.if-root button:focus-visible,.if-root a:focus-visible,.if-root input:focus-visible,.if-root select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.if-root input::placeholder{color:var(--text2);opacity:.8}
+.if-root input[type=date]{color-scheme:var(--scheme)}
+@keyframes if-spin{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+<section class="if-root" aria-labelledby="{{ ids.title }}" style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:{{ radius }};box-shadow:var(--shadow);overflow:hidden;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--text)">
+
+<div style="flex:none;display:flex;gap:12px;align-items:flex-start;padding:16px 12px 14px 20px;border-bottom:1px solid var(--border)">
+<span style="flex:none;width:36px;height:36px;border-radius:9px;background:var(--seg);display:grid;place-items:center"><i class="ph ph-user-plus" style="font-size:19px;color:var(--accent-text)"></i></span>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><h2 id="{{ ids.title }}" style="margin:0;font-size:18px;line-height:1.25;font-weight:650">Invite a member</h2><p style="margin:0;font-size:13.5px;line-height:1.45;color:var(--text2)">They get an email from the club to set a password and sign in.</p></div>
+<button onClick="{{ reset }}" aria-label="Close" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:var(--text2)" style-hover="background:var(--hover);color:var(--text)"><i class="ph ph-x" style="font-size:18px"></i></button>
+</div>
+
+<sc-if value="{{ isDone }}">
+<div role="{{ doneRole }}" style="flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:24px 20px">
+<span style="width:48px;height:48px;border-radius:50%;background:{{ doneTint }};display:grid;place-items:center"><i class="ph-bold {{ doneIcon }}" style="font-size:22px;color:{{ doneColor }}"></i></span>
+<span style="font-size:19px;font-weight:650;line-height:1.3">{{ doneTitle }}</span>
+<span style="font-size:14px;line-height:1.5;color:var(--soft);max-width:520px">{{ doneText }}</span>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+<sc-if value="{{ isNotSent }}"><button onClick="{{ resend }}" disabled="{{ resending }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;height:44px;padding:0 18px;border-radius:10px;background:var(--accent);color:var(--on-accent);font-size:14.5px;font-weight:700"><i class="ph-bold {{ resendIcon }}" style="animation:{{ resendAnim }}"></i>{{ resendLabel }}</button></sc-if>
+<button onClick="{{ another }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center;height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--border);font-size:14.5px;font-weight:600" style-hover="border-color:var(--accent)"><i class="ph ph-user-plus"></i>Invite another</button>
+<a href="#" style="display:flex;gap:8px;align-items:center;height:44px;padding:0 12px;border-radius:10px;font-size:14.5px;font-weight:600;color:var(--accent-text);text-decoration:none;white-space:nowrap"><span>{{ profileLabel }}</span><i class="ph ph-arrow-right"></i></a>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isEditing }}" hint-placeholder-val="{{ true }}">
+<form onSubmit="{{ submit }}" noValidate="true" style="flex:1;min-height:0;display:flex;flex-direction:column">
+<div style="flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin">
+<fieldset disabled="{{ sending }}" style="margin:0;border:0;min-width:0;padding:16px 20px 24px;display:flex;flex-direction:column;gap:18px">
+
+<sc-if value="{{ errCount }}"><div ref="{{ sumRef }}" tabIndex="-1" role="alert" style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--danger) 12%,var(--panel));border:1px solid color-mix(in srgb,var(--danger) 40%,transparent);outline:none"><i class="ph-fill ph-warning-circle" style="font-size:18px;color:var(--danger);margin-top:1px"></i><span style="display:flex;flex-direction:column;gap:4px;font-size:14px"><strong style="font-weight:650">{{ errTitle }}</strong><sc-for list="{{ errLinks }}" as="e"><button type="button" onClick="{{ e.go }}" style="all:unset;cursor:pointer;color:var(--danger);text-decoration:underline;text-underline-offset:2px;font-size:13.5px">{{ e.label }}</button></sc-for></span></div></sc-if>
+
+<div style="display:flex;flex-direction:column;gap:12px">
+<span style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--text2)">WHO</span>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+<sc-for list="{{ who }}" as="f">
+<div style="display:flex;flex-direction:column;gap:6px">
+<label for="{{ f.id }}" style="font-size:13.5px;font-weight:600">{{ f.label }}</label>
+<input id="{{ f.id }}" ref="{{ f.ref }}" type="{{ f.type }}" value="{{ f.value }}" onChange="{{ f.set }}" autoComplete="off" inputMode="{{ f.mode }}" placeholder="{{ f.ph }}" aria-invalid="{{ f.invalid }}" aria-describedby="{{ f.desc }}" style="all:unset;box-sizing:border-box;height:44px;padding:0 12px;border-radius:8px;border:1px solid {{ f.border }};background:var(--bg);font-size:16px;color:var(--text)">
+<sc-if value="{{ f.err }}"><span id="{{ f.errId }}" style="display:flex;gap:6px;align-items:flex-start;font-size:13px;line-height:1.4;color:var(--danger)"><i class="ph-fill ph-warning-circle" style="font-size:15px;margin-top:1px"></i><span>{{ f.err }}<sc-if value="{{ f.taken }}"> <a href="#" style="color:var(--danger);font-weight:600">Open {{ takenName }}'s profile</a></sc-if></span></span></sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span id="{{ ids.groups }}" style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:var(--text2)">GROUPS <span style="font:400 12px ui-monospace,Menlo,monospace;letter-spacing:0">· {{ groupCount }}</span></span><span style="font-size:12.5px;color:var(--text2)">Optional</span></div>
+<div role="group" aria-labelledby="{{ ids.groups }}" style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ groups }}" as="g"><button type="button" onClick="{{ g.toggle }}" aria-pressed="{{ g.on }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:36px;padding:0 13px 0 10px;border-radius:999px;border:1px solid {{ g.border }};background:{{ g.bg }};font-size:13.5px;font-weight:{{ g.w }};color:{{ g.color }}" style-hover="border-color:var(--accent)"><i class="{{ g.icon }}" style="font-size:15px;color:{{ g.iconColor }}"></i>{{ g.name }}</button></sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;border:1px solid var(--border);border-radius:12px;overflow:hidden">
+<button type="button" onClick="{{ toggleMore }}" aria-expanded="{{ moreOpen }}" aria-controls="{{ ids.more }}" style="all:unset;cursor:pointer;display:flex;gap:12px;align-items:center;min-height:56px;padding:8px 14px;background:var(--bar)" style-hover="background:var(--hover)">
+<i class="ph-bold {{ moreIcon }}" style="font-size:15px;color:var(--text2)"></i>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14.5px;font-weight:600">{{ moreTitle }}</span><span style="font-size:12.5px;line-height:1.4;color:var(--text2)">{{ moreSub }}</span></span>
+<sc-if value="{{ moreBadge }}"><span style="flex:none;height:22px;padding:0 8px;border-radius:999px;background:{{ moreBadgeBg }};display:flex;align-items:center;font:600 11.5px ui-monospace,Menlo,monospace;color:{{ moreBadgeColor }}">{{ moreBadge }}</span></sc-if>
+</button>
+<sc-if value="{{ moreOpen }}">
+<div id="{{ ids.more }}" style="display:flex;flex-direction:column;gap:14px;padding:14px;border-top:1px solid var(--border)">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+<div style="display:flex;flex-direction:column;gap:6px">
+<label for="{{ country.id }}" style="font-size:13.5px;font-weight:600">Country</label>
+<select id="{{ country.id }}" ref="{{ country.ref }}" value="{{ country.value }}" onChange="{{ country.set }}" aria-invalid="{{ country.invalid }}" aria-describedby="{{ country.desc }}" style="box-sizing:border-box;height:44px;padding:0 10px;border-radius:8px;border:1px solid {{ country.border }};background:var(--bg);color:{{ country.color }};font-size:16px"><option value="">{{ country.ph }}</option><sc-for list="{{ country.groups }}" as="g"><optgroup label="{{ g.label }}"><sc-for list="{{ g.options }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></optgroup></sc-for></select>
+<sc-if value="{{ country.err }}"><span id="{{ country.errId }}" style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--danger)"><i class="ph-fill ph-warning-circle" style="font-size:15px"></i>{{ country.err }}</span></sc-if>
+</div>
+<sc-for list="{{ selects }}" as="f">
+<div style="display:flex;flex-direction:column;gap:6px">
+<label for="{{ f.id }}" style="font-size:13.5px;font-weight:600;display:flex;gap:6px;align-items:center">{{ f.label }}<sc-if value="{{ f.lock }}"><span style="display:flex;gap:4px;align-items:center;font-size:12px;font-weight:400;color:var(--text2)"><i class="ph ph-lock-simple" style="font-size:12px"></i>only Admins and the member</span></sc-if></label>
+<select id="{{ f.id }}" ref="{{ f.ref }}" value="{{ f.value }}" onChange="{{ f.set }}" aria-invalid="{{ f.invalid }}" aria-describedby="{{ f.desc }}" style="box-sizing:border-box;height:44px;padding:0 10px;border-radius:8px;border:1px solid {{ f.border }};background:var(--bg);color:{{ f.color }};font-size:16px"><option value="">{{ f.ph }}</option><sc-for list="{{ f.options }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select>
+<sc-if value="{{ f.err }}"><span id="{{ f.errId }}" style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--danger)"><i class="ph-fill ph-warning-circle" style="font-size:15px"></i>{{ f.err }}</span></sc-if>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<span id="{{ ids.level }}" style="font-size:13.5px;font-weight:600">Experience</span>
+<div role="radiogroup" aria-labelledby="{{ ids.level }}" style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:3px;border:1px solid {{ levelBorder }};border-radius:10px;background:var(--bg)">
+<sc-for list="{{ levels }}" as="l"><button type="button" role="radio" aria-checked="{{ l.on }}" onClick="{{ l.pick }}" style="all:unset;cursor:pointer;text-align:center;height:38px;line-height:38px;border-radius:7px;font-size:14px;font-weight:{{ l.w }};background:{{ l.bg }};color:{{ l.color }}">{{ l.label }}</button></sc-for>
+</div>
+<sc-if value="{{ levelErr }}"><span style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--danger)"><i class="ph-fill ph-warning-circle" style="font-size:15px"></i>{{ levelErr }}</span></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;padding-top:12px;border-top:1px dashed var(--border)">
+<span style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><span style="font-size:13.5px;font-weight:650">AUF registration</span><span style="font-size:12.5px;color:var(--text2)">{{ aufHint }}</span></span>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+<sc-for list="{{ auf }}" as="f">
+<div style="display:flex;flex-direction:column;gap:6px">
+<label for="{{ f.id }}" style="font-size:13.5px;font-weight:600">{{ f.label }}</label>
+<input id="{{ f.id }}" ref="{{ f.ref }}" type="{{ f.type }}" value="{{ f.value }}" onChange="{{ f.set }}" inputMode="{{ f.mode }}" placeholder="{{ f.ph }}" aria-invalid="{{ f.invalid }}" aria-describedby="{{ f.desc }}" style="all:unset;box-sizing:border-box;height:44px;padding:0 12px;border-radius:8px;border:1px solid {{ f.border }};background:var(--bg);font-size:16px;font-family:ui-monospace,Menlo,monospace;color:var(--text)">
+<sc-if value="{{ f.err }}"><span id="{{ f.errId }}" style="display:flex;gap:6px;align-items:flex-start;font-size:13px;line-height:1.4;color:var(--danger)"><i class="ph-fill ph-warning-circle" style="font-size:15px;margin-top:1px"></i>{{ f.err }}</span></sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{ notice }}"><div role="alert" style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--danger) 12%,var(--panel));font-size:13.5px"><i class="ph-fill ph-wifi-slash" style="font-size:17px;color:var(--danger)"></i>{{ notice }}</div></sc-if>
+
+<div style="display:flex;flex-direction:column;border-radius:12px;border:1px dashed var(--border)">
+<button type="button" onClick="{{ togglePreview }}" aria-expanded="{{ previewOpen }}" style="all:unset;cursor:pointer;display:flex;gap:10px;align-items:center;min-height:48px;padding:6px 14px;font-size:13.5px;color:var(--soft)" style-hover="color:var(--text)"><i class="ph ph-envelope-open" style="font-size:17px;color:var(--text2)"></i><span style="flex:1">What {{ first }} will receive</span><i class="ph-bold {{ previewIcon }}" style="font-size:13px;color:var(--text2)"></i></button>
+<sc-if value="{{ previewOpen }}"><div style="display:flex;flex-direction:column;gap:8px;padding:2px 14px 14px;font-size:13.5px;line-height:1.5">
+<span style="font-size:12.5px;color:var(--text2)">From <strong style="font-weight:600;color:var(--text)">Victoria Seadragons</strong> · to <strong style="font-weight:600;color:var(--text)">{{ emailShown }}</strong></span>
+<span style="font-size:15px;font-weight:650">You're invited to Victoria Seadragons</span>
+<span style="color:var(--soft)">Hi {{ first }}, Ana Gómez added you to the club on Seadragons. Set a password to see the calendar, RSVP to trainings and keep your details up to date.</span>
+<span style="align-self:flex-start;height:34px;padding:0 14px;border-radius:8px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;font-size:13.5px;font-weight:700">Set my password</span>
+<span style="font-size:12px;color:var(--text2)">The link works for 7 days. You can resend it from their profile.</span>
+</div></sc-if>
+</div>
+</fieldset>
+</div>
+
+<div style="flex:none;display:flex;gap:10px;align-items:center;padding:12px 16px 12px 20px;border-top:1px solid var(--border);background:var(--bar)">
+<span style="flex:1;min-width:0;font-size:12.5px;line-height:1.4;color:var(--text2)">{{ footNote }}</span>
+<button type="button" onClick="{{ reset }}" disabled="{{ sending }}" style="all:unset;cursor:pointer;height:44px;padding:0 14px;display:flex;align-items:center;border-radius:10px;font-size:14.5px;font-weight:600;color:var(--soft)" style-hover="background:var(--hover);color:var(--text)">Cancel</button>
+<button type="submit" disabled="{{ sending }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;height:44px;padding:0 18px;border-radius:10px;background:var(--accent);color:var(--on-accent);font-size:14.5px;font-weight:700;white-space:nowrap"><i class="ph-bold {{ sendIcon }}" style="animation:{{ sendAnim }}"></i>{{ sendLabel }}</button>
+</div>
+</form>
+</sc-if>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:760,&quot;height&quot;:760},&quot;start&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;empty&quot;,&quot;filled&quot;,&quot;errors&quot;,&quot;sent&quot;,&quot;notSent&quot;],&quot;default&quot;:&quot;filled&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;rules&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;recommended&quot;,&quot;current&quot;],&quot;default&quot;:&quot;recommended&quot;,&quot;tsType&quot;:&quot;'recommended' | 'current'&quot;},&quot;frame&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;panel&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;panel&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const GROUPS = ['Senior women','Senior men','Juniors','Sunday social','Island Cup squad'];
+const CODES = 'AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW'.split(' ');
+const DN = (() => { try { return new Intl.DisplayNames(['en'], { type:'region' }); } catch (e) { return null; } })();
+const cName = c => (DN && DN.of(c)) || c;
+const COMMON = ['AU','CO','NZ','GB'];
+const COUNTRY_GROUPS = [
+  { label:'Most common in the club', options: COMMON.map(v=>({ v, l:cName(v) })) },
+  { label:'All countries', options: CODES.map(v=>({ v, l:cName(v) })).sort((a,b)=>a.l.localeCompare(b.l)) }
+];
+const POSITIONS = ['Goalkeeper','Full back','Half back','Centre','Forward'];
+const GENDERS = [['female','Female'],['male','Male'],['non_binary','Non-binary'],['undisclosed','Prefer not to say']];
+const LEVELS = [['beginner','Beginner'],['intermediate','Intermediate'],['advanced','Advanced']];
+const TAKEN = { 'sofia.reyes@mail.com':'Sofia Reyes' };
+const TODAY = '2026-10-23';
+const EMPTY = { name:'', email:'', country:'', position:'', level:'', gender:'', auf:'', aufExp:'', groups:[] };
+const FILLED = { name:'Marta Gil', email:'marta.gil@gmail.com', country:'', position:'', level:'', gender:'', auf:'', aufExp:'', groups:['Senior women','Sunday social'] };
+const ERR = { name:'', email:'sofia.reyes@mail.com', country:'ES', position:'Centre', level:'', gender:'', auf:'48213', aufExp:'2026-03-31', groups:['Senior women'] };
+const looksEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
+
+class Component extends DCLogic {
+  uid = 'if' + Math.random().toString(36).slice(2, 7);
+  refs = {}; sumRef = React.createRef();
+  ref(k){ return this.refs[k] || (this.refs[k] = React.createRef()); }
+  init(p){ const s = p.start || 'empty';
+    const d = s === 'errors' ? ERR : s === 'empty' ? EMPTY : FILLED;
+    return { start:s, strict: p.rules === 'current', d:{ ...d, groups:[...d.groups] }, tried: s === 'errors', server: s === 'errors' ? 'taken' : null,
+      moreOpen: s === 'errors' || p.rules === 'current', previewOpen:false, phase: s === 'sent' ? 'sent' : s === 'notSent' ? 'notSent' : 'edit', resent:false, resending:false, notice:null }; }
+  state = this.init(this.props || {});
+  componentDidUpdate(prev){ const p = this.props || {}; if (prev.start !== p.start || prev.rules !== p.rules) this.setState(this.init(p)); }
+  componentDidMount(){ const p = this.props || {}; if ((p.start || 'empty') !== this.state.start || (p.rules === 'current') !== this.state.strict) this.setState(this.init(p)); }
+  componentWillUnmount(){ clearTimeout(this._t); }
+  issues(){
+    const { d, strict, server } = this.state, out = {};
+    if (!d.name.trim()) out.name = 'Add their full name.';
+    if (!looksEmail(d.email)) out.email = d.email.trim() ? 'That email doesn\u2019t look right. Check for typos.' : 'Add their email so we can send the invitation.';
+    else if (server === 'taken' || TAKEN[d.email.trim().toLowerCase()] && this.state.tried) out.email = 'This email already belongs to a member.';
+    if (strict) {
+      if (!d.country) out.country = 'Choose a country.';
+      if (!d.position) out.position = 'Choose a position.';
+      if (!d.level) out.level = 'Choose a level.';
+      if (!d.gender) out.gender = 'Choose an option.';
+      if (!d.auf.trim()) out.auf = 'Add the AUF number.';
+    }
+    if (d.auf.trim() && d.auf.trim().length > 20) out.auf = 'Keep the AUF number to 20 characters.';
+    if (d.auf.trim() && !d.aufExp) out.aufExp = 'Add when this registration expires.';
+    else if (!d.auf.trim() && d.aufExp && !strict) out.auf = 'Add the number for this expiry date.';
+    else if (d.aufExp && d.aufExp < TODAY) out.aufExp = 'This registration has already expired. Use the new expiry date.';
+    else if (strict && !d.aufExp) out.aufExp = 'Add the expiry date.';
+    return out;
+  }
+  renderVals(){
+    const s = this.state, p = this.props || {}, d = s.d, I = this.uid, strict = s.strict;
+    const iss = s.tried ? this.issues() : {};
+    const set = k => e => { const v = e.target.value; this.setState(st=>({ d:{ ...st.d, [k]:v }, server: k === 'email' ? null : st.server, notice:null })); };
+    const field = (k, label, type, extra = {}) => ({ id:I+'-'+k, errId:I+'-'+k+'-e', ref:this.ref(k), label, type, value:d[k], set:set(k), err:iss[k] || '', invalid:!!iss[k],
+      desc: iss[k] ? I+'-'+k+'-e' : undefined, border: iss[k] ? 'var(--danger)' : 'var(--border)', mode: extra.mode, ph: extra.ph || '', taken: k === 'email' && iss.email === 'This email already belongs to a member.' });
+    const sel = (k, label, options, ph, lock) => ({ ...field(k, label), options, ph, lock:!!lock, color: d[k] ? 'var(--text)' : 'var(--text2)' });
+    const ORDER = [['name','Full name'],['email','Email'],['country','Country'],['position','Position'],['level','Experience'],['gender','Gender'],['auf','AUF number'],['aufExp','AUF expiry']];
+    const errList = ORDER.filter(([k])=>iss[k]);
+    const filledMore = ['country','position','level','gender','auf','aufExp'].filter(k=>d[k]).length;
+    const moreErrs = ['country','position','level','gender','auf','aufExp'].filter(k=>iss[k]).length;
+    const first = (d.name.trim().split(/\s+/)[0]) || 'they';
+    const firstCap = first === 'they' ? 'The new member' : first;
+    const focus = k => { const needsMore = !['name','email'].includes(k); this.setState({ moreOpen: needsMore || s.moreOpen }, ()=>setTimeout(()=>this.refs[k]?.current?.focus(), 0)); };
+    const submit = e => { e.preventDefault(); if (s.phase === 'sending') return;
+      this.setState({ tried:true, notice:null }, () => {
+        const now = this.issues(), keys = ORDER.map(o=>o[0]).filter(k=>now[k]);
+        if (keys.length) { if (keys.some(k=>!['name','email'].includes(k))) this.setState({ moreOpen:true }); setTimeout(()=>this.sumRef.current?.focus(), 30); return; }
+        this.setState({ phase:'sending' });
+        this._t = setTimeout(()=>{ if (TAKEN[d.email.trim().toLowerCase()]) { this.setState({ phase:'edit', server:'taken' }); setTimeout(()=>this.sumRef.current?.focus(), 30); } else this.setState({ phase: p.start === 'notSent' ? 'notSent' : 'sent' }); }, 900);
+      });
+    };
+    const notSent = s.phase === 'notSent' && !s.resent;
+    return {
+      ids:{ title:I+'-t', groups:I+'-g', more:I+'-m', level:I+'-l' }, radius: p.frame === 'phone' ? '0' : '12px',
+      isEditing: s.phase === 'edit' || s.phase === 'sending', isDone: s.phase === 'sent' || s.phase === 'notSent', sending: s.phase === 'sending',
+      reset: ()=>this.setState(this.init({ ...p, start:'empty' })),
+      sumRef: this.sumRef, errCount: errList.length > 0,
+      errTitle: errList.length === 1 ? '1 thing to fix before sending' : `${errList.length} things to fix before sending`,
+      errLinks: errList.map(([k,l])=>({ label:`${l}: ${iss[k]}`, go: ()=>focus(k) })),
+      takenName: TAKEN[d.email.trim().toLowerCase()] || 'the member',
+      who: [field('name','Full name','text',{ ph:'e.g. Marta Gil' }), field('email','Email','email',{ mode:'email', ph:'name@example.com' })],
+      groupCount: d.groups.length ? `${d.groups.length} chosen` : 'none',
+      groups: GROUPS.map(g=>{ const on = d.groups.includes(g); return { name:g, on, w: on ? 600 : 500, bg: on ? 'var(--seg)' : 'transparent', border: on ? 'var(--accent)' : 'var(--border)', color: on ? 'var(--text)' : 'var(--soft)',
+        icon: on ? 'ph-bold ph-check' : 'ph ph-plus', iconColor: on ? 'var(--accent-text)' : 'var(--text2)', toggle: ()=>this.setState(st=>({ d:{ ...st.d, groups: on ? st.d.groups.filter(x=>x!==g) : [...st.d.groups, g] } })) }; }),
+      moreOpen: s.moreOpen, toggleMore: ()=>this.setState(st=>({ moreOpen:!st.moreOpen })), moreIcon: s.moreOpen ? 'ph-caret-down' : 'ph-caret-right',
+      moreTitle: strict ? 'Player details' : 'Player details · optional',
+      moreSub: strict ? 'Country, position, experience, gender and AUF registration.' : first === 'they' ? 'Leave them empty and the member fills them in after signing in.' : `Leave them empty and ${first} fills them in after signing in.`,
+      profileLabel: first === 'they' ? 'Open their profile' : `Open ${first}\u2019s profile`,
+      moreBadge: moreErrs ? `${moreErrs} to fix` : filledMore ? `${filledMore} of 6` : '', moreBadgeBg: moreErrs ? 'color-mix(in srgb,var(--danger) 18%,var(--panel))' : 'var(--seg)', moreBadgeColor: moreErrs ? 'var(--danger)' : 'var(--text)',
+      country: { ...sel('country','Country',[],'Choose a country…'), groups: COUNTRY_GROUPS },
+      selects: [sel('position','Position',POSITIONS.map(v=>({v,l:v})),'Choose…'), sel('gender','Gender',GENDERS.map(([v,l])=>({v,l})),'Choose…',true)],
+      levels: LEVELS.map(([v,l])=>({ label:l, on:d.level===v, w: d.level===v ? 650 : 500, bg: d.level===v ? 'var(--seg)' : 'transparent', color: d.level===v ? 'var(--text)' : 'var(--text2)', pick: ()=>this.setState(st=>({ d:{ ...st.d, level: st.d.level===v && !strict ? '' : v } })) })),
+      levelErr: iss.level || '', levelBorder: iss.level ? 'var(--danger)' : 'var(--border)',
+      aufHint: strict ? 'Required' : 'Both or neither',
+      auf: [field('auf','Number','text',{ ph:'e.g. 48213', mode:'numeric' }), field('aufExp','Expires','date')],
+      notice: s.notice,
+      previewOpen: s.previewOpen, togglePreview: ()=>this.setState(st=>({ previewOpen:!st.previewOpen })), previewIcon: s.previewOpen ? 'ph-caret-up' : 'ph-caret-down',
+      first: first === 'they' ? 'they' : first, emailShown: d.email.trim() || 'their email',
+      footNote: strict ? 'All fields are required.' : 'Only name and email are required.',
+      sendLabel: s.phase === 'sending' ? 'Sending…' : 'Send invitation', sendIcon: s.phase === 'sending' ? 'ph-spinner-gap' : 'ph-paper-plane-tilt', sendAnim: s.phase === 'sending' ? 'if-spin 1s linear infinite' : 'none',
+      submit,
+      isNotSent: notSent, doneRole: notSent ? 'alert' : 'status',
+      doneTint: notSent ? 'color-mix(in srgb,var(--warning) 20%,var(--panel))' : 'color-mix(in srgb,var(--success) 20%,var(--panel))',
+      doneIcon: notSent ? 'ph-envelope-simple-open' : 'ph-check', doneColor: notSent ? 'var(--warning)' : 'var(--success)',
+      doneTitle: notSent ? `${firstCap} was added, but the email didn\u2019t go out` : s.resent ? `Invitation sent again to ${d.email}` : `Invitation sent to ${d.email}`,
+      doneText: notSent ? `${d.name} is in the directory as Invited. Try sending the invitation again; if it keeps failing, check the address.` : `${d.name} shows as Invited in the directory until they sign in. The link works for 7 days and you can resend it from their profile.`,
+      resend: ()=>{ this.setState({ resending:true }); this._t = setTimeout(()=>this.setState({ resending:false, resent:true, phase:'sent' }), 900); },
+      resending: s.resending, resendLabel: s.resending ? 'Sending…' : 'Resend invitation', resendIcon: s.resending ? 'ph-spinner-gap' : 'ph-arrow-clockwise', resendAnim: s.resending ? 'if-spin 1s linear infinite' : 'none',
+      another: ()=>this.setState({ ...this.init({ ...p, start:'empty' }), d:{ ...EMPTY, groups:[...d.groups] } })
+    };
+  }
+}
+</script>
+</body>
+</html>
