@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { EvaluationCategories } from "@/lib/evaluations/evaluation-categories";
 import {
   type EvaluationsTab,
@@ -210,11 +210,7 @@ function useClubCategories(): {
     };
   }, []);
 
-  const updateFrom = useCallback((next: EvaluationCategories) => {
-    setCategories(next);
-  }, []);
-
-  return { categories, updateFrom };
+  return { categories, updateFrom: setCategories };
 }
 
 /** Lo que enseña la tabla: las posiciones del club, la vista sin una
@@ -356,9 +352,9 @@ export function EvaluationsScreen({
   const selected = members?.find((member) => member.userId === selectedId);
 
   /** Hasta #820 el primero se abre en lectura. */
-  function evaluatePending(): void {
+  function evaluatePending(players: readonly ScreenRosterEntry[]): void {
     changeView(PENDING_VIEW);
-    const [first] = applyRosterView(members ?? [], PENDING_VIEW);
+    const [first] = applyRosterView(players, PENDING_VIEW);
     if (first !== undefined) {
       openMember(first.userId);
     }
@@ -389,7 +385,7 @@ export function EvaluationsScreen({
           total: roster.members.length,
         }}
         summary={roster.summary}
-        onEvaluatePending={evaluatePending}
+        onEvaluatePending={() => evaluatePending(roster.members)}
         onOpen={openMember}
       />
     );
