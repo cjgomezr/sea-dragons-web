@@ -1,4 +1,7 @@
+import { Minus } from "@phosphor-icons/react/dist/ssr/Minus";
+import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { useEffect, useRef } from "react";
+import { Icon } from "@/components/Icon";
 import {
   type EvaluationRating,
   RATING_MAX,
@@ -11,6 +14,7 @@ import {
   sheetRatings,
 } from "@/lib/evaluations/sheet-ratings";
 import type { Translator } from "@/lib/i18n/translator";
+import type { EvaluationsLayout } from "./evaluations-layout";
 
 /**
  * Las categorías de una evaluación con su barra y su número, como el mockup
@@ -18,7 +22,8 @@ import type { Translator } from "@/lib/i18n/translator";
  * dibujo: lo que se lee, y lo que anuncia un lector de pantalla, es la
  * categoría y su número (PRD, accesibilidad). Al editar (#820), cada
  * categoría activa lleva un deslizador nativo con su etiqueta y el número al
- * lado, que cambia mientras se mueve.
+ * lado, que cambia mientras se mueve. En el móvil (#822) el deslizador va
+ * entre − y +, que bajan y suben de uno en uno.
  */
 
 const RATINGS_HEADING_ID = "evaluation-ratings";
@@ -77,11 +82,94 @@ function ReadOnlyRating({
   );
 }
 
-function EditableRating({
+function RatingSlider({
+  id,
   row,
   onChange,
 }: {
+  id: string;
   row: EditingRating;
+  onChange: (value: number) => void;
+}): React.JSX.Element {
+  return (
+    <input
+      id={id}
+      type="range"
+      className="evaluation-rating-slider"
+      min={RATING_MIN}
+      max={RATING_MAX}
+      step={1}
+      value={row.rating}
+      onChange={(event) => onChange(Number(event.target.value))}
+    />
+  );
+}
+
+function StepButton({
+  label,
+  glyph,
+  target,
+  onChange,
+}: {
+  label: string;
+  glyph: React.ReactNode;
+  target: number;
+  onChange: (value: number) => void;
+}): React.JSX.Element {
+  const isOutOfRange = target < RATING_MIN || target > RATING_MAX;
+  return (
+    <button
+      type="button"
+      className="evaluation-rating-step"
+      aria-label={label}
+      disabled={isOutOfRange}
+      onClick={() => onChange(target)}
+    >
+      {glyph}
+    </button>
+  );
+}
+
+/** − [deslizador] +, con los botones deshabilitados en 1 y en 10. */
+function RatingStepper({
+  translate,
+  id,
+  row,
+  onChange,
+}: {
+  translate: Translator;
+  id: string;
+  row: EditingRating;
+  onChange: (value: number) => void;
+}): React.JSX.Element {
+  return (
+    <span className="evaluation-rating-stepper">
+      <StepButton
+        label={translate("evaluations.ratings.lower", { category: row.name })}
+        glyph={<Icon glyph={Minus} weight="bold" />}
+        target={row.rating - 1}
+        onChange={onChange}
+      />
+      <RatingSlider id={id} row={row} onChange={onChange} />
+      <StepButton
+        label={translate("evaluations.ratings.raise", { category: row.name })}
+        glyph={<Icon glyph={Plus} weight="bold" />}
+        target={row.rating + 1}
+        onChange={onChange}
+      />
+    </span>
+  );
+}
+
+function EditableRating({
+  translate,
+  row,
+  layout,
+  onChange,
+}: {
+  translate: Translator;
+  row: EditingRating;
+  layout: EvaluationsLayout;
   onChange: (value: number) => void;
 }): React.JSX.Element {
   const id = sliderId(row.categoryId);
@@ -90,16 +178,16 @@ function EditableRating({
       <span className="evaluation-rating-name">
         <label htmlFor={id}>{row.name}</label>
       </span>
-      <input
-        id={id}
-        type="range"
-        className="evaluation-rating-slider"
-        min={RATING_MIN}
-        max={RATING_MAX}
-        step={1}
-        value={row.rating}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
+      {layout === "compact" ? (
+        <RatingStepper
+          translate={translate}
+          id={id}
+          row={row}
+          onChange={onChange}
+        />
+      ) : (
+        <RatingSlider id={id} row={row} onChange={onChange} />
+      )}
       <output htmlFor={id} className="evaluation-rating-value">
         {row.rating}
       </output>
@@ -188,10 +276,12 @@ function ReadOnlyRatings({
 function EditingRatings({
   translate,
   rows,
+  layout,
   onRatingChange,
 }: {
   translate: Translator;
   rows: readonly EditingRating[];
+  layout: EvaluationsLayout;
   onRatingChange: (categoryId: string, rating: number) => void;
 }): React.JSX.Element {
   const listRef = useRef<HTMLUListElement>(null);
@@ -203,7 +293,9 @@ function EditingRatings({
       {rows.map((row) => (
         <EditableRating
           key={row.categoryId}
+          translate={translate}
           row={row}
+          layout={layout}
           onChange={(value) => onRatingChange(row.categoryId, value)}
         />
       ))}
@@ -216,6 +308,7 @@ export function EvaluationRatings({
   ratings,
   categories,
   editingRows,
+  layout,
   onRatingChange,
 }: {
   translate: Translator;
@@ -225,6 +318,7 @@ export function EvaluationRatings({
   categories: EvaluationCategories | null;
   /** Las de la edición con su valor de ahora; `null` mientras no se edita. */
   editingRows: readonly EditingRating[] | null;
+  layout: EvaluationsLayout;
   onRatingChange: (categoryId: string, rating: number) => void;
 }): React.JSX.Element {
   if (editingRows === null) {
@@ -239,6 +333,7 @@ export function EvaluationRatings({
     <EditingRatings
       translate={translate}
       rows={editingRows}
+      layout={layout}
       onRatingChange={onRatingChange}
     />
   );

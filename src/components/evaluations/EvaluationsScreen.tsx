@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useIsBelowDesktop } from "@/components/use-is-phone";
 import type { EvaluationCategories } from "@/lib/evaluations/evaluation-categories";
 import {
   type EvaluationsTab,
@@ -38,6 +39,7 @@ import {
   describeEvaluationFailure,
   loadEvaluationRoster,
 } from "./evaluations-client";
+import type { EvaluationsLayout } from "./evaluations-layout";
 
 /**
  * La pantalla de Evaluaciones (#322, RF-6 del PRD de E9). Desde #818 (RF-2
@@ -62,7 +64,9 @@ import {
  * existe o está de baja), el panel enseña el resumen (D8).
  *
  * Hasta 1024 px la tabla y la ficha son dos pasos: `data-step` le dice al CSS
- * cuál enseñar, igual que la lista de avisos de #266.
+ * cuál enseñar, igual que la lista de avisos de #266. Ahí (#822, D12) la
+ * tabla es una lista y la ficha ocupa la pantalla, con sus botones en una
+ * barra fija abajo.
  */
 
 type RosterState =
@@ -335,6 +339,7 @@ function PlayersPanel({
   members,
   display,
   selectedId,
+  layout,
   onViewChange,
   onSelect,
   side,
@@ -343,6 +348,7 @@ function PlayersPanel({
   members: readonly ScreenRosterEntry[];
   display: RosterDisplay;
   selectedId: string | null;
+  layout: EvaluationsLayout;
   onViewChange: (view: RosterView) => void;
   onSelect: (userId: string) => void;
   side: React.ReactNode;
@@ -361,6 +367,7 @@ function PlayersPanel({
           notEvaluated: countNotEvaluated(members),
         }}
         positions={positions}
+        layout={layout}
         onViewChange={onViewChange}
       />
       <div className="evaluations-panes">
@@ -369,6 +376,7 @@ function PlayersPanel({
           members={listed}
           totalCount={members.length}
           selectedId={selectedId}
+          layout={layout}
           onSelect={onSelect}
           onClearFilters={() => onViewChange(clearRosterFilters(shownView))}
         />
@@ -393,6 +401,7 @@ export function EvaluationsScreen({
   canOpenMemberRecords: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
+  const layout: EvaluationsLayout = useIsBelowDesktop() ? "compact" : "desktop";
   const { state, retry, applyEvaluation, refreshSummary } =
     useEvaluationRoster();
   const savedNotice = useSavedNotice();
@@ -479,6 +488,7 @@ export function EvaluationsScreen({
             display.listed.map((member) => member.userId),
             selected.userId,
           ),
+          layout,
           onClose: goBack,
           onNavigate: (userId) => openMember(userId),
         }}
@@ -509,6 +519,7 @@ export function EvaluationsScreen({
         members={roster.members}
         display={display}
         selectedId={selectedId}
+        layout={layout}
         onViewChange={changeView}
         onSelect={toggleSelection}
         side={renderSide(roster, display)}

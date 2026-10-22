@@ -1,4 +1,8 @@
+import { ArrowDown } from "@phosphor-icons/react/dist/ssr/ArrowDown";
+import { ArrowUp } from "@phosphor-icons/react/dist/ssr/ArrowUp";
+import { CaretLeft } from "@phosphor-icons/react/dist/ssr/CaretLeft";
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import { MemberAvatar } from "@/components/MemberAvatar";
 import { memberRecordHref } from "@/lib/auth/routes";
 import { positionName } from "@/lib/club/club-positions";
@@ -6,16 +10,22 @@ import type { ListPosition } from "@/lib/evaluations/sheet-navigation";
 import type { Translator } from "@/lib/i18n/translator";
 import { OverallScore } from "./OverallScore";
 import type { ScreenRosterEntry } from "./evaluations-client";
+import type { EvaluationsLayout } from "./evaluations-layout";
 
 /**
  * La caja del panel de un jugador (#819, RF-3 del PRD de E31): arriba dice
  * dónde está en la lista filtrada, con cerrar, anterior y siguiente; debajo,
- * la identidad con el OVR. En el móvil es el segundo paso, así que lleva
- * además su propio botón de volver a la lista. En edición (#820) el borde
- * pasa a acento y el OVR es el de lo ajustado.
+ * la identidad con el OVR. En edición (#820) el borde pasa a acento y el
+ * OVR es el de lo ajustado.
+ *
+ * En el móvil (#822) la ficha ocupa la pantalla: arriba, una barra con volver
+ * a la lista, dónde está y ↑ ↓ para el anterior y el siguiente.
  */
 
-const AVATAR_SIZE = 56;
+const AVATAR_SIZE: Readonly<Record<EvaluationsLayout, number>> = {
+  desktop: 56,
+  compact: 60,
+};
 
 /** Lo que la caja necesita del jugador y de la lista, sea cual sea el estado
  * de su evaluación. */
@@ -24,6 +34,7 @@ export type SheetContext = {
   readonly member: ScreenRosterEntry;
   readonly canOpenMemberRecords: boolean;
   readonly position: ListPosition;
+  readonly layout: EvaluationsLayout;
   readonly onClose: () => void;
   readonly onNavigate: (userId: string) => void;
 };
@@ -35,7 +46,7 @@ function NavButton({
   onNavigate,
 }: {
   label: string;
-  glyph: string;
+  glyph: React.ReactNode;
   targetId: string | null;
   onNavigate: (userId: string) => void;
 }): React.JSX.Element {
@@ -56,8 +67,24 @@ function NavButton({
   );
 }
 
-/** "{i} de {n} en esta lista" o que no está en el filtro, con cerrar,
- * anterior y siguiente. */
+/** "{i} de {n} en esta lista", o que no está en el filtro. */
+function ListPlace({
+  translate,
+  position,
+}: Pick<SheetContext, "translate" | "position">): React.JSX.Element {
+  return (
+    <p>
+      {position.kind === "listed"
+        ? translate("evaluations.sheet.listPosition", {
+            position: position.index + 1,
+            total: position.count,
+          })
+        : translate("evaluations.sheet.outOfFilter")}
+    </p>
+  );
+}
+
+/** Escritorio: dónde está, con cerrar, anterior y siguiente. */
 function SheetNav({
   translate,
   position,
@@ -69,14 +96,7 @@ function SheetNav({
 >): React.JSX.Element {
   return (
     <div className="evaluation-sheet-nav">
-      <p>
-        {position.kind === "listed"
-          ? translate("evaluations.sheet.listPosition", {
-              position: position.index + 1,
-              total: position.count,
-            })
-          : translate("evaluations.sheet.outOfFilter")}
-      </p>
+      <ListPlace translate={translate} position={position} />
       <button
         type="button"
         className="evaluation-sheet-nav-button evaluation-sheet-close"
@@ -94,6 +114,43 @@ function SheetNav({
       <NavButton
         label={translate("evaluations.sheet.next")}
         glyph="›"
+        targetId={position.nextId}
+        onNavigate={onNavigate}
+      />
+    </div>
+  );
+}
+
+/** Móvil: volver a la lista, dónde está, y ↑ ↓. */
+function CompactSheetNav({
+  translate,
+  position,
+  onClose,
+  onNavigate,
+}: Pick<
+  SheetContext,
+  "translate" | "position" | "onClose" | "onNavigate"
+>): React.JSX.Element {
+  return (
+    <div className="evaluation-sheet-nav">
+      <button
+        type="button"
+        className="evaluation-sheet-nav-button"
+        aria-label={translate("evaluations.sheet.back")}
+        onClick={onClose}
+      >
+        <Icon glyph={CaretLeft} />
+      </button>
+      <ListPlace translate={translate} position={position} />
+      <NavButton
+        label={translate("evaluations.sheet.previous")}
+        glyph={<Icon glyph={ArrowUp} />}
+        targetId={position.previousId}
+        onNavigate={onNavigate}
+      />
+      <NavButton
+        label={translate("evaluations.sheet.next")}
+        glyph={<Icon glyph={ArrowDown} />}
         targetId={position.nextId}
         onNavigate={onNavigate}
       />
@@ -143,30 +200,28 @@ export function EvaluationSheetFrame({
   isEditing: boolean;
   children: React.ReactNode;
 }): React.JSX.Element {
-  const { translate, member, onClose } = context;
+  const { translate, member, layout } = context;
+  const Nav = layout === "compact" ? CompactSheetNav : SheetNav;
   return (
     <section
       className="evaluation-sheet"
       aria-label={translate("evaluations.sheet.label", {
         name: member.fullName,
       })}
+      data-layout={layout}
       data-editing={isEditing ? "true" : undefined}
     >
-      <button type="button" className="evaluation-back" onClick={onClose}>
-        <span aria-hidden="true">←</span>
-        {translate("evaluations.sheet.back")}
-      </button>
-      <SheetNav
+      <Nav
         translate={translate}
         position={context.position}
-        onClose={onClose}
+        onClose={context.onClose}
         onNavigate={context.onNavigate}
       />
       <header className="evaluation-sheet-header">
         <MemberAvatar
           fullName={member.fullName}
           photoUrl={member.photoUrl}
-          size={AVATAR_SIZE}
+          size={AVATAR_SIZE[layout]}
           className="evaluation-avatar"
         />
         <div className="evaluation-sheet-who">
