@@ -1,8 +1,11 @@
+import { CaretRight } from "@phosphor-icons/react/dist/ssr/CaretRight";
+import { Icon } from "@/components/Icon";
 import { MemberAvatar } from "@/components/MemberAvatar";
 import { positionName } from "@/lib/club/club-positions";
 import { formatClubShortDay, formatOverallRating } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import type { ScreenRosterEntry } from "./evaluations-client";
+import type { EvaluationsLayout } from "./evaluations-layout";
 
 /**
  * La tabla de jugadores de Evaluaciones (#818, RF-2 del PRD de E31): cada
@@ -12,10 +15,16 @@ import type { ScreenRosterEntry } from "./evaluations-client";
  *
  * La cabecera de columnas es sólo para la vista: cada fila ya lleva escrito
  * para el lector de pantalla qué es cada dato.
+ *
+ * En el móvil (#822) no hay columnas: la fila lleva el nombre en hasta dos
+ * líneas, debajo "posición · fecha" (o Sin evaluar), el OVR y una flecha.
  */
 
 /** Lo que mide el avatar de cada fila; `.evaluation-row-avatar` dice igual. */
-const ROW_AVATAR_SIZE = 36;
+const ROW_AVATAR_SIZE: Readonly<Record<EvaluationsLayout, number>> = {
+  desktop: 36,
+  compact: 40,
+};
 
 /** El id del botón de cada miembro: la ficha devuelve el foco ahí al volver. */
 export function rosterButtonId(userId: string): string {
@@ -76,15 +85,77 @@ function RowUpdated({
   );
 }
 
+function RowPosition({
+  translate,
+  member,
+}: {
+  translate: Translator;
+  member: ScreenRosterEntry;
+}): React.JSX.Element | null {
+  return member.position === null ? null : (
+    <span className="evaluation-row-position">
+      {positionName(member.position.names, translate.locale)}
+    </span>
+  );
+}
+
+/** Escritorio: nombre y posición, OVR y fecha en sus columnas. */
+function DesktopRowCells({
+  translate,
+  member,
+}: {
+  translate: Translator;
+  member: ScreenRosterEntry;
+}): React.JSX.Element {
+  return (
+    <>
+      <span className="evaluation-row-identity">
+        <span className="evaluation-row-name">{member.fullName}</span>
+        <RowPosition translate={translate} member={member} />
+      </span>
+      <RowOverall translate={translate} member={member} />
+      <RowUpdated translate={translate} member={member} />
+    </>
+  );
+}
+
+/** Móvil: la fecha va con la posición, bajo el nombre. */
+function CompactRowCells({
+  translate,
+  member,
+}: {
+  translate: Translator;
+  member: ScreenRosterEntry;
+}): React.JSX.Element {
+  return (
+    <>
+      <span className="evaluation-row-identity">
+        <span className="evaluation-row-name">{member.fullName}</span>
+        <span className="evaluation-row-detail">
+          <RowPosition translate={translate} member={member} />
+          {member.position === null ? null : " · "}
+          <RowUpdated translate={translate} member={member} />
+        </span>
+      </span>
+      <RowOverall translate={translate} member={member} />
+      <span className="evaluation-row-caret">
+        <Icon glyph={CaretRight} />
+      </span>
+    </>
+  );
+}
+
 function RosterRow({
   translate,
   member,
   isSelected,
+  layout,
   onSelect,
 }: {
   translate: Translator;
   member: ScreenRosterEntry;
   isSelected: boolean;
+  layout: EvaluationsLayout;
   onSelect: (userId: string) => void;
 }): React.JSX.Element {
   return (
@@ -99,19 +170,14 @@ function RosterRow({
         <MemberAvatar
           fullName={member.fullName}
           photoUrl={member.photoUrl}
-          size={ROW_AVATAR_SIZE}
+          size={ROW_AVATAR_SIZE[layout]}
           className="evaluation-row-avatar"
         />
-        <span className="evaluation-row-identity">
-          <span className="evaluation-row-name">{member.fullName}</span>
-          {member.position === null ? null : (
-            <span className="evaluation-row-position">
-              {positionName(member.position.names, translate.locale)}
-            </span>
-          )}
-        </span>
-        <RowOverall translate={translate} member={member} />
-        <RowUpdated translate={translate} member={member} />
+        {layout === "compact" ? (
+          <CompactRowCells translate={translate} member={member} />
+        ) : (
+          <DesktopRowCells translate={translate} member={member} />
+        )}
       </button>
     </li>
   );
@@ -143,6 +209,7 @@ export function EvaluationRoster({
   members,
   totalCount,
   selectedId,
+  layout,
   onSelect,
   onClearFilters,
 }: {
@@ -152,6 +219,7 @@ export function EvaluationRoster({
   /** Todos los de la plantilla, para el pie. */
   totalCount: number;
   selectedId: string | null;
+  layout: EvaluationsLayout;
   onSelect: (userId: string) => void;
   onClearFilters: () => void;
 }): React.JSX.Element {
@@ -176,6 +244,7 @@ export function EvaluationRoster({
               translate={translate}
               member={member}
               isSelected={member.userId === selectedId}
+              layout={layout}
               onSelect={onSelect}
             />
           ))}
