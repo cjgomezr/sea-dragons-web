@@ -10,6 +10,7 @@ import {
   InvalidGroupNameError,
 } from "./groups";
 import {
+  EmptyMemberSelectionError,
   GroupMemberNotFoundError,
   type GroupMembersGateways,
   InactiveMemberError,
@@ -64,7 +65,10 @@ export function requireGroupMembersGateways(): GroupMembersGateways {
 }
 
 export function asGroupsApiError(error: unknown): never {
-  if (error instanceof InvalidGroupNameError) {
+  if (
+    error instanceof InvalidGroupNameError ||
+    error instanceof EmptyMemberSelectionError
+  ) {
     throw new ApiError("validation_error", error.message);
   }
   if (error instanceof GroupNameTakenError) {

@@ -7,7 +7,9 @@ import {
   GroupMemberNotFoundError,
   type GroupMembersGateways,
   InactiveMemberError,
+  EmptyMemberSelectionError,
   assignGroupMember,
+  assignGroupMembers,
   listGroupCandidates,
   listGroupMembers,
   removeGroupMember,
@@ -75,6 +77,13 @@ const BEA_RECORD: AssignableMember = {
 
 const ASSIGNABLE = [ZOE_RECORD, NEREA_RECORD, PAULA_RECORD, BEA_RECORD];
 
+/** Dada de baja: es del club, pero no sale en ninguna lista. */
+const INES_ID = "f5f5f5f5-0000-4000-8000-00000000000f";
+const CLUB_MEMBERS = [
+  ...ASSIGNABLE,
+  { id: INES_ID, fullName: "Inés Inactiva", accountStatus: "inactive" as const },
+];
+
 type GatewayOptions = {
   readonly role?: Role;
   readonly memberStatus?: AccountStatus;
@@ -83,21 +92,37 @@ type GatewayOptions = {
   readonly memberVanished?: true;
 };
 
-type Write = {
-  readonly kind: "insert" | "delete";
-  readonly clubId: string;
-  readonly groupId: string;
-  readonly userId: string;
-};
+type Write =
+  | {
+      readonly kind: "insert" | "delete";
+      readonly clubId: string;
+      readonly groupId: string;
+      readonly userId: string;
+    }
+  | {
+      readonly kind: "bulk insert";
+      readonly clubId: string;
+      readonly groupId: string;
+      readonly userIds: readonly string[];
+    };
 
 const writes: Write[] = [];
 const scopesRead: string[] = [];
 const signedPaths: string[] = [];
+/** Quien entró al grupo por el alta masiva: la lista siguiente lo ve dentro. */
+const joined = new Set<string>();
+
+function withJoined(member: AssignableMember): AssignableMember {
+  return joined.has(member.id) && !member.groupIds.includes(GROUP_ID)
+    ? { ...member, groupIds: [...member.groupIds, GROUP_ID] }
+    : member;
+}
 
 function gateways(options: GatewayOptions = {}): GroupMembersGateways {
   writes.length = 0;
   scopesRead.length = 0;
   signedPaths.length = 0;
+  joined.clear();
   return {
     members: {
       findRoleRequestMember: async () => ({
@@ -111,7 +136,7 @@ function gateways(options: GatewayOptions = {}): GroupMembersGateways {
         scopesRead.push(`assignable ${clubId} ${groupId}`);
         return options.missingGroup
           ? { kind: "group_not_found" }
-          : { kind: "found", members: ASSIGNABLE };
+          : { kind: "found", members: ASSIGNABLE.map(withJoined) };
       },
       findClubMember: async ({ clubId, userId }) => {
         scopesRead.push(`member ${clubId} ${userId}`);
@@ -136,6 +161,22 @@ function gateways(options: GatewayOptions = {}): GroupMembersGateways {
         return options.missingGroup
           ? { kind: "group_not_found" }
           : { kind: "removed" };
+      },
+    },
+    bulkMemberships: {
+      findClubMembers: async ({ clubId, userIds }) => {
+        scopesRead.push(`club members ${clubId} ${userIds.join(",")}`);
+        return CLUB_MEMBERS.filter(({ id }) => userIds.includes(id));
+      },
+      insertMemberships: async (memberships) => {
+        writes.push({ kind: "bulk insert", ...memberships });
+        if (options.missingGroup) {
+          return { kind: "group_not_found" };
+        }
+        for (const userId of memberships.userIds) {
+          joined.add(userId);
+        }
+        return { kind: "assigned" };
       },
     },
     photos: {
@@ -348,5 +389,151 @@ describe("candidatos", () => {
       listGroupCandidates(gateways({ role: "Player" }), LIST_REQUEST),
     ).rejects.toBeInstanceOf(GroupsForbiddenError);
     expect(scopesRead).toEqual([]);
+  });
+});
+
+describe("socios de un grupo: añadir varios", () => {
+  const OUTSIDE_CLUB_ID = "abababab-0000-4000-8000-0000000000ab";
+
+  function bulkRequest(userIds: readonly string[]) {
+    return {
+      callerId: CALLER_ID,
+      groupId: GROUP_ID,
+      locale: "es" as const,
+      userIds,
+    };
+  }
+
+  it("asigna a todos en una sola escritura y devuelve la lista y los candidatos actualizados", async () => {
+    const result = await assignGroupMembers(
+      gateways(),
+      bulkRequest([BEA_RECORD.id, NEREA_RECORD.id]),
+    );
+
+    expect(writes).toEqual([
+      {
+        kind: "bulk insert",
+        clubId: CLUB_ID,
+        groupId: GROUP_ID,
+        userIds: [BEA_RECORD.id, NEREA_RECORD.id],
+      },
+    ]);
+    expect(result.members.map(({ fullName }) => fullName)).toEqual([
+      "Bea Bravo",
+      "nerea Navarro",
+      "Paula Player",
+      "Zoe Zapata",
+    ]);
+    expect(result.candidates).toEqual([]);
+    expect(result.rejected).toEqual([]);
+  });
+
+  it("devuelve a los socios con su posición y su foto firmada, como la lista del grupo", async () => {
+    const result = await assignGroupMembers(
+      gateways(),
+      bulkRequest([NEREA_RECORD.id]),
+    );
+
+    expect(result.members[0]).toEqual({
+      id: NEREA_RECORD.id,
+      fullName: "nerea Navarro",
+      isPendingActivation: false,
+      positionName: "Goalkeeper",
+      photoUrl: `${SIGNED_URL_PREFIX}nerea.webp`,
+    });
+    expect(result.candidates).toEqual([
+      expect.objectContaining({ id: BEA_RECORD.id, groupCount: 0 }),
+    ]);
+  });
+
+  it("no duplica ni rechaza a quien ya estaba en el grupo", async () => {
+    const result = await assignGroupMembers(
+      gateways(),
+      bulkRequest([PAULA_RECORD.id, BEA_RECORD.id]),
+    );
+
+    expect(result.rejected).toEqual([]);
+    expect(
+      result.members.filter(({ id }) => id === PAULA_RECORD.id),
+    ).toHaveLength(1);
+    expect(result.members.map(({ id }) => id)).toContain(BEA_RECORD.id);
+  });
+
+  it("pide una sola vez al socio que llega repetido", async () => {
+    await assignGroupMembers(
+      gateways(),
+      bulkRequest([BEA_RECORD.id, BEA_RECORD.id]),
+    );
+
+    expect(writes).toEqual([
+      expect.objectContaining({ userIds: [BEA_RECORD.id] }),
+    ]);
+  });
+
+  it("asigna a los demás y devuelve en rejected al dado de baja y al de otro club con su motivo", async () => {
+    const result = await assignGroupMembers(
+      gateways(),
+      bulkRequest([INES_ID, BEA_RECORD.id, OUTSIDE_CLUB_ID]),
+    );
+
+    expect(writes).toEqual([
+      expect.objectContaining({ userIds: [BEA_RECORD.id] }),
+    ]);
+    expect(result.rejected).toEqual([
+      { userId: INES_ID, reason: "inactive" },
+      { userId: OUTSIDE_CLUB_ID, reason: "not_in_club" },
+    ]);
+    expect(result.members.map(({ id }) => id)).toContain(BEA_RECORD.id);
+  });
+
+  it("no escribe nada cuando todos se rechazan, y devuelve igualmente las listas", async () => {
+    const result = await assignGroupMembers(
+      gateways(),
+      bulkRequest([INES_ID, OUTSIDE_CLUB_ID]),
+    );
+
+    expect(writes).toEqual([]);
+    expect(result.rejected).toHaveLength(2);
+    expect(result.members.map(({ fullName }) => fullName)).toEqual([
+      "Paula Player",
+      "Zoe Zapata",
+    ]);
+  });
+
+  it("rechaza una lista vacía sin leer ni escribir nada", async () => {
+    await expect(
+      assignGroupMembers(gateways(), bulkRequest([])),
+    ).rejects.toBeInstanceOf(EmptyMemberSelectionError);
+    expect(scopesRead).toEqual([]);
+    expect(writes).toEqual([]);
+  });
+
+  it("rechaza un grupo que no existe, es de otro club o acaban de borrar", async () => {
+    await expect(
+      assignGroupMembers(
+        gateways({ missingGroup: true }),
+        bulkRequest([BEA_RECORD.id]),
+      ),
+    ).rejects.toBeInstanceOf(GroupNotFoundError);
+  });
+
+  it("rechaza un grupo borrado aunque todos los socios se rechacen", async () => {
+    await expect(
+      assignGroupMembers(
+        gateways({ missingGroup: true }),
+        bulkRequest([INES_ID]),
+      ),
+    ).rejects.toBeInstanceOf(GroupNotFoundError);
+  });
+
+  it("rechaza a un Player sin leer ni escribir nada", async () => {
+    await expect(
+      assignGroupMembers(
+        gateways({ role: "Player" }),
+        bulkRequest([BEA_RECORD.id]),
+      ),
+    ).rejects.toBeInstanceOf(GroupsForbiddenError);
+    expect(scopesRead).toEqual([]);
+    expect(writes).toEqual([]);
   });
 });
