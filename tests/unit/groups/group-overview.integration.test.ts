@@ -1,8 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import type { AccountStatus } from "@/lib/auth/account-status";
-import { type GroupsGateways, listGroups } from "@/lib/groups/groups";
-import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
+import {
+  type GroupAudienceGateways,
+  listGroupAudience,
+} from "@/lib/groups/group-audience";
+import {
+  GroupNotFoundError,
+  type GroupsGateways,
+  listGroups,
+} from "@/lib/groups/groups";
+import {
+  createGroupAudienceGateways,
+  createGroupsGateways,
+} from "@/lib/groups/supabase-groups-gateways";
 import { PROFILE_PHOTO_BUCKET } from "@/lib/members/supabase-profile-photo-gateways";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
@@ -122,7 +133,10 @@ async function withPhoto<T>(
   }
 }
 
-function asCoachOf(gateways: GroupsGateways, clubId: string): GroupsGateways {
+function asCoachOf<Gateways extends Pick<GroupsGateways, "members">>(
+  gateways: Gateways,
+  clubId: string,
+): Gateways {
   return {
     ...gateways,
     members: {
@@ -382,6 +396,94 @@ describeRls(
                         ]);
                       }),
                     ),
+                  );
+                },
+              ),
+          ),
+        );
+      },
+      RLS_NETWORK_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "la audiencia de un grupo trae lo vigente de ese grupo con sus datos, y responde 404 al de otro club",
+      async () => {
+        const serviceClient = createServiceRoleTestClient(process.env);
+
+        await withClubs(serviceClient, ({ clubId, otherClubId }) =>
+          withMembers(
+            serviceClient,
+            clubId,
+            [{ fullName: "Dani Diaz", accountStatus: "active" }],
+            ([dani]) =>
+              withSeededRows(
+                serviceClient,
+                "groups",
+                [
+                  { club_id: clubId, name: "Senior Squad" },
+                  { club_id: clubId, name: "Masters Squad" },
+                  { club_id: otherClubId, name: "Senior Squad" },
+                ],
+                async ([senior, masters, otherClubGroup]) => {
+                  const scene = {
+                    clubId,
+                    userId: dani!.id,
+                    groupId: senior!.id as string,
+                  };
+                  const gateways: GroupAudienceGateways = asCoachOf(
+                    createGroupAudienceGateways(serviceClient.client),
+                    clubId,
+                  );
+                  const audienceOf = (groupId: unknown) =>
+                    listGroupAudience(gateways, {
+                      callerId: CALLER_ID,
+                      groupId: groupId as string,
+                      now: NOW,
+                    });
+
+                  await withSeries(scene, serviceClient, () =>
+                    withStandaloneUses(scene, serviceClient, async () => {
+                      const audience = await audienceOf(senior!.id);
+
+                      expect(audience.events.total).toBe(2);
+                      expect(audience.events.items).toEqual([
+                        {
+                          kind: "event",
+                          id: expect.any(String),
+                          title: `Uso ${TODAY}`,
+                          startsOn: TODAY,
+                          startTime: "19:00",
+                        },
+                        {
+                          kind: "series",
+                          id: expect.any(String),
+                          title: `Serie hasta ${MONTH_END}`,
+                          weekdays: [3],
+                          startTime: "19:00",
+                          nextSession: {
+                            id: expect.any(String),
+                            startsOn: NEXT_WEEK,
+                          },
+                        },
+                      ]);
+                      expect(audience.posts).toEqual({
+                        total: 1,
+                        items: [
+                          {
+                            id: expect.any(String),
+                            title: "Noticia published",
+                            publishedAt: expect.stringMatching(/Z$/),
+                          },
+                        ],
+                      });
+                      await expect(audienceOf(masters!.id)).resolves.toEqual({
+                        events: { items: [], total: 0 },
+                        posts: { items: [], total: 0 },
+                      });
+                      await expect(
+                        audienceOf(otherClubGroup!.id),
+                      ).rejects.toBeInstanceOf(GroupNotFoundError);
+                    }),
                   );
                 },
               ),

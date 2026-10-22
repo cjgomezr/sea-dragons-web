@@ -125,7 +125,10 @@ function mockWiring(options: WiringOptions = {}): void {
                 {
                   groupIds: [GROUP_ID],
                   endsOn: "2099-12-31",
-                  hasSessionsLeft: true,
+                  nextSession: {
+                    id: "5e5e5e5e-0000-4000-8000-00000000005e",
+                    startsOn: "2099-12-31",
+                  },
                 },
               ],
               posts: [{ groupIds: [GROUP_ID], status: "published" }],

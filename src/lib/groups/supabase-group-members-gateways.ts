@@ -96,7 +96,8 @@ function toAssignableMember(row: AssignableRow): AssignableMember {
   };
 }
 
-async function groupExists(
+/** Si el grupo existe y es del club. */
+export async function groupExists(
   serviceClient: SupabaseClient,
   { clubId, groupId }: GroupScope,
 ): Promise<boolean> {

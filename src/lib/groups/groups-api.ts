@@ -15,11 +15,16 @@ import {
   type GroupMembersGateways,
   InactiveMemberError,
 } from "./group-members";
+import type { GroupAudienceGateways } from "./group-audience";
 import { createSupabaseGroupMembersGateways } from "./supabase-group-members-gateways";
-import { createSupabaseGroupsGateways } from "./supabase-groups-gateways";
+import {
+  createSupabaseGroupAudienceGateways,
+  createSupabaseGroupsGateways,
+} from "./supabase-groups-gateways";
 
 /**
- * Lo que comparten los endpoints de grupos (#226) y de sus socios (#227):
+ * Lo que comparten los endpoints de grupos (#226), de sus socios (#227) y de
+ * su audiencia (#827):
  * cómo se cablean, cómo leen los ids del camino y cómo responde cada error del
  * dominio con su código de la convención.
  */
@@ -55,6 +60,17 @@ export function requireGroupsGateways(): GroupsGateways {
 
 export function requireGroupMembersGateways(): GroupMembersGateways {
   const wiring = createSupabaseGroupMembersGateways(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new ApiError(
+      "service_unavailable",
+      describeMissingAuthKeys(wiring.missingKeys),
+    );
+  }
+  return wiring.gateways;
+}
+
+export function requireGroupAudienceGateways(): GroupAudienceGateways {
+  const wiring = createSupabaseGroupAudienceGateways(process.env);
   if (wiring.kind === "unconfigured") {
     throw new ApiError(
       "service_unavailable",

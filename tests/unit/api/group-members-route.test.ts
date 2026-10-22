@@ -496,4 +496,26 @@ describe("los socios de un grupo en la frontera", () => {
       await expectErrorCode(response, 403, "forbidden");
     },
   );
+
+  it("responde 403 a un Player que manda el alta masiva, sin llegar a la ruta", async () => {
+    mockSessionClient();
+    vi.doMock("@/lib/auth/session-reader", () => ({
+      readSessionState: async () => ({
+        kind: "active",
+        role: "Player",
+        membershipCurrent: true,
+      }),
+    }));
+    const { proxy } = await import("@/proxy");
+
+    const response = await proxy(
+      new NextRequest(new URL(membersPath(), ORIGIN), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userIds: [MEMBER_ID] }),
+      }),
+    );
+
+    await expectErrorCode(response, 403, "forbidden");
+  });
 });

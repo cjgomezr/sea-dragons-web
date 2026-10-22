@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
+import { ISO_WEEKDAYS } from "@/lib/events/event-occurrences";
+import { toHoursAndMinutes } from "@/lib/events/supabase-event-management-gateways";
 import { readRequiredText } from "@/lib/auth/supabase-auth-gateways";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { signProfilePhotoUrls } from "@/lib/members/supabase-profile-photo-gateways";
@@ -8,12 +10,14 @@ import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { compareNames } from "@/lib/text/name-order";
 import type {
-  GroupAudienceUses,
-  GroupMembershipRecord,
-  PostUse,
-  SeriesUse,
-  StandaloneEventUse,
-} from "./group-overview";
+  AudienceEventRecord,
+  AudiencePostRecord,
+  AudienceSeriesRecord,
+  GroupAudienceGateways,
+  GroupAudienceRecords,
+} from "./group-audience";
+import type { GroupMembershipRecord } from "./group-overview";
+import { groupExists } from "./supabase-group-members-gateways";
 import type { Group, GroupsGateways } from "./groups";
 
 /**
@@ -139,15 +143,17 @@ const POSTS_TABLE = "news_posts";
 const MEMBERSHIP_PREVIEW_COLUMNS =
   "user_id, full_name, account_status, photo_path, group_memberships(group_id)";
 
-/** `!inner`: sólo lo que tiene algún grupo en su audiencia. */
-const STANDALONE_EVENT_COLUMNS =
-  "starts_on, status, audience:event_groups!inner(group_id)";
-const POST_COLUMNS = "status, audience:news_post_groups!inner(group_id)";
+/** `!inner`: sólo lo que tiene algún grupo en su audiencia. Con un filtro
+ * sobre `audience`, sólo lo que tiene a ese grupo. */
+const AUDIENCE_EMBED = "audience";
+const AUDIENCE_GROUP_FILTER = `${AUDIENCE_EMBED}.group_id`;
+const STANDALONE_EVENT_COLUMNS = `id, title, starts_on, start_time, status, ${AUDIENCE_EMBED}:event_groups!inner(group_id)`;
+const POST_COLUMNS = `id, title, status, published_at, ${AUDIENCE_EMBED}:news_post_groups!inner(group_id)`;
 
 /** Las sesiones que le quedan a la serie, filtradas abajo a las programadas
- * de hoy en adelante y cortadas a una: basta para saber si sigue en pie. */
+ * de hoy en adelante, ordenadas y cortadas a una: la próxima. */
 const SESSIONS_LEFT = "sessions_left";
-const SERIES_COLUMNS = `ends_on, audience:event_series_groups!inner(group_id), ${SESSIONS_LEFT}:events(id)`;
+const SERIES_COLUMNS = `id, title, weekdays, start_time, ends_on, ${AUDIENCE_EMBED}:event_series_groups!inner(group_id), ${SESSIONS_LEFT}:events(id, starts_on)`;
 
 const SCHEDULED_STATUS = "scheduled";
 
@@ -162,21 +168,39 @@ const membershipPreviewRowSchema = z.object({
 });
 
 const standaloneEventRowSchema = z.object({
+  id: z.uuid(),
+  title: z.string(),
   starts_on: z.string(),
+  start_time: z.string(),
   status: z.enum(["scheduled", "cancelled"]),
   audience: audienceSchema,
 });
 
 const seriesRowSchema = z.object({
+  id: z.uuid(),
+  title: z.string(),
+  weekdays: z.array(z.union(ISO_WEEKDAYS.map((day) => z.literal(day)))),
+  start_time: z.string(),
   ends_on: z.string(),
   audience: audienceSchema,
-  [SESSIONS_LEFT]: z.array(z.object({ id: z.uuid() })),
+  [SESSIONS_LEFT]: z.array(z.object({ id: z.uuid(), starts_on: z.string() })),
 });
 
 const postRowSchema = z.object({
+  id: z.uuid(),
+  title: z.string(),
   status: z.enum(["published", "withdrawn"]),
+  published_at: z.string(),
   audience: audienceSchema,
 });
+
+/** El club y hoy, y el grupo cuando se pide la audiencia de uno solo (D9);
+ * null es todo el club, para el uso de la lista (D4). */
+type AudienceQuery = {
+  readonly clubId: string;
+  readonly today: string;
+  readonly groupId: string | null;
+};
 
 function toGroupIds(audience: z.infer<typeof audienceSchema>): string[] {
   return audience.map(({ group_id: groupId }) => groupId);
@@ -230,13 +254,19 @@ async function findMemberships(
   );
 }
 
+/** El filtro del grupo, o ninguno: con él, `audience` trae sólo esa fila y el
+ * `!inner` deja fuera lo que no la tiene. */
+function groupFilter(groupId: string | null): Record<string, string> {
+  return groupId === null ? {} : { [AUDIENCE_GROUP_FILTER]: groupId };
+}
+
 /** Los eventos sueltos con grupos que no empezaron antes de hoy. Las
  * ocurrencias de una serie llevan su copia de la audiencia, pero cuentan como
  * su serie. */
-async function findStandaloneEventUses(
+async function findStandaloneEvents(
   serviceClient: SupabaseClient,
-  query: { readonly clubId: string; readonly today: string },
-): Promise<readonly StandaloneEventUse[]> {
+  query: AudienceQuery,
+): Promise<readonly AudienceEventRecord[]> {
   const rows = parseRows(
     standaloneEventRowSchema,
     await serviceClient
@@ -244,20 +274,24 @@ async function findStandaloneEventUses(
       .select(STANDALONE_EVENT_COLUMNS)
       .eq("club_id", query.clubId)
       .is("series_id", null)
-      .gte("starts_on", query.today),
+      .gte("starts_on", query.today)
+      .match(groupFilter(query.groupId)),
     `los eventos del club ${query.clubId}`,
   );
   return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
     groupIds: toGroupIds(row.audience),
     startsOn: row.starts_on,
+    startTime: toHoursAndMinutes(row.start_time),
     status: row.status,
   }));
 }
 
-async function findSeriesUses(
+async function findSeries(
   serviceClient: SupabaseClient,
-  query: { readonly clubId: string; readonly today: string },
-): Promise<readonly SeriesUse[]> {
+  query: AudienceQuery,
+): Promise<readonly AudienceSeriesRecord[]> {
   const rows = parseRows(
     seriesRowSchema,
     await serviceClient
@@ -265,44 +299,59 @@ async function findSeriesUses(
       .select(SERIES_COLUMNS)
       .eq("club_id", query.clubId)
       .gte("ends_on", query.today)
+      .match(groupFilter(query.groupId))
       .eq(`${SESSIONS_LEFT}.status`, SCHEDULED_STATUS)
       .gte(`${SESSIONS_LEFT}.starts_on`, query.today)
+      .order("starts_on", { referencedTable: SESSIONS_LEFT })
+      .order("start_time", { referencedTable: SESSIONS_LEFT })
       .limit(1, { referencedTable: SESSIONS_LEFT }),
     `las series del club ${query.clubId}`,
   );
-  return rows.map((row) => ({
-    groupIds: toGroupIds(row.audience),
-    endsOn: row.ends_on,
-    hasSessionsLeft: row[SESSIONS_LEFT].length > 0,
-  }));
+  return rows.map((row) => {
+    const [next] = row[SESSIONS_LEFT];
+    return {
+      id: row.id,
+      title: row.title,
+      groupIds: toGroupIds(row.audience),
+      weekdays: row.weekdays,
+      startTime: toHoursAndMinutes(row.start_time),
+      endsOn: row.ends_on,
+      nextSession:
+        next === undefined ? null : { id: next.id, startsOn: next.starts_on },
+    };
+  });
 }
 
-async function findPostUses(
+async function findPosts(
   serviceClient: SupabaseClient,
-  clubId: string,
-): Promise<readonly PostUse[]> {
+  query: AudienceQuery,
+): Promise<readonly AudiencePostRecord[]> {
   const rows = parseRows(
     postRowSchema,
     await serviceClient
       .from(POSTS_TABLE)
       .select(POST_COLUMNS)
-      .eq("club_id", clubId),
-    `las noticias del club ${clubId}`,
+      .eq("club_id", query.clubId)
+      .match(groupFilter(query.groupId)),
+    `las noticias del club ${query.clubId}`,
   );
   return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
     groupIds: toGroupIds(row.audience),
     status: row.status,
+    publishedAt: new Date(row.published_at).toISOString(),
   }));
 }
 
-async function findAudienceUses(
+async function findAudienceRecords(
   serviceClient: SupabaseClient,
-  query: { readonly clubId: string; readonly today: string },
-): Promise<GroupAudienceUses> {
+  query: AudienceQuery,
+): Promise<GroupAudienceRecords> {
   const [events, series, posts] = await Promise.all([
-    findStandaloneEventUses(serviceClient, query),
-    findSeriesUses(serviceClient, query),
-    findPostUses(serviceClient, query.clubId),
+    findStandaloneEvents(serviceClient, query),
+    findSeries(serviceClient, query),
+    findPosts(serviceClient, query),
   ]);
   return { events, series, posts };
 }
@@ -397,7 +446,8 @@ export function createGroupsGateways(
     },
     overview: {
       findMemberships: (clubId) => findMemberships(serviceClient, clubId),
-      findAudienceUses: (query) => findAudienceUses(serviceClient, query),
+      findAudienceUses: (query) =>
+        findAudienceRecords(serviceClient, { ...query, groupId: null }),
     },
     photos: {
       signPhotoUrls: (photoPaths) =>
@@ -422,5 +472,44 @@ export function createSupabaseGroupsGateways(
   return {
     kind: "ready",
     gateways: createGroupsGateways(createServiceRoleClient(env)),
+  };
+}
+
+/** La audiencia de un grupo (D9), leída a la vez que se comprueba que el
+ * grupo sigue siendo del club. */
+export function createGroupAudienceGateways(
+  serviceClient: SupabaseClient,
+): GroupAudienceGateways {
+  return {
+    members: createRoleRequestGateways(serviceClient).members,
+    audience: {
+      async findGroupAudience(query) {
+        const [isGroupOfClub, records] = await Promise.all([
+          groupExists(serviceClient, query),
+          findAudienceRecords(serviceClient, query),
+        ]);
+        return isGroupOfClub
+          ? { kind: "found", records }
+          : { kind: "group_not_found" };
+      },
+    },
+  };
+}
+
+export type GroupAudienceGatewaysResult =
+  | { readonly kind: "ready"; readonly gateways: GroupAudienceGateways }
+  | { readonly kind: "unconfigured"; readonly missingKeys: readonly string[] };
+
+/** Raíz de composición para la audiencia de un grupo. */
+export function createSupabaseGroupAudienceGateways(
+  env: Environment,
+): GroupAudienceGatewaysResult {
+  const config = readSupabaseServiceRoleConfig(env);
+  if (config.kind === "missing") {
+    return { kind: "unconfigured", missingKeys: config.missingKeys };
+  }
+  return {
+    kind: "ready",
+    gateways: createGroupAudienceGateways(createServiceRoleClient(env)),
   };
 }
