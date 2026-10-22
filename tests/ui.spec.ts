@@ -17756,6 +17756,16 @@ async function openFirstPanelWithTeams(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+/** En escritorio el panel corta en la cabecera de los equipos: la captura
+ * baja hasta el segundo para que se vea a quien ya no viene (#839). */
+async function showNotComingTeammates(page: Page): Promise<void> {
+  await openFirstPanelWithTeams(page);
+  await eventPanel(page, STUBBED_AGENDA_EVENTS[0].title)
+    .getByRole("list", { name: PUBLISHED_TEAMS.teams.b.name })
+    .scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+}
+
 /** Cambia a los pasados y espera a que estén pintados. */
 async function showPastEvents(page: Page): Promise<void> {
   await waitForAgendaRows(page);
@@ -17886,14 +17896,14 @@ const CALENDAR_STATES: readonly CalendarState[] = [
     ...CALENDAR_EXPANDED_AS_PLAYER,
     name: "evento-equipos-ya-no-viene",
     teams: NOT_COMING_TEAMS,
-    ready: openFirstPanelWithTeams,
+    ready: showNotComingTeammates,
   },
   {
     ...CALENDAR_EXPANDED_AS_PLAYER,
     name: "evento-equipos-ya-no-viene-es",
     teams: NOT_COMING_TEAMS,
     beforeVisit: chooseSpanish,
-    ready: openFirstPanelWithTeams,
+    ready: showNotComingTeammates,
   },
   {
     name: "calendario-sin-membresia",
