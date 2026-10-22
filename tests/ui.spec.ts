@@ -3746,6 +3746,30 @@ const STUBBED_GROUP_CANDIDATES = [
     photoUrl: null,
     groupCount: 1,
   },
+  {
+    id: "eeeeeeee-0000-4000-8000-00000000000e",
+    fullName: "Iker Salazar",
+    isPendingActivation: false,
+    positionName: "Back",
+    photoUrl: null,
+    groupCount: 0,
+  },
+  {
+    id: "ffffffff-0000-4000-8000-00000000000f",
+    fullName: "Lucía Ferrer",
+    isPendingActivation: false,
+    positionName: null,
+    photoUrl: null,
+    groupCount: 2,
+  },
+  {
+    id: "abababab-0000-4000-8000-0000000000ab",
+    fullName: "Marta Quintana Olabarrieta",
+    isPendingActivation: false,
+    positionName: "Forward",
+    photoUrl: null,
+    groupCount: 3,
+  },
 ];
 
 /** La vista previa: los activos del grupo en orden de nombre, sin foto. */
@@ -3865,6 +3889,27 @@ async function startRenamingGroup(page: Page): Promise<void> {
   ).toBeFocused();
 }
 
+const OPEN_PICKER_BUTTON = /^(Add members|Añadir miembros)$/;
+const PICKER_LABEL = `Add members to ${OPENED_GROUP_NAME}`;
+
+/** Los tres que marca la captura del selector: el mockup enseña tres. */
+const CHOSEN_CANDIDATES = STUBBED_GROUP_CANDIDATES.slice(0, 3);
+
+async function openMemberPicker(page: Page): Promise<void> {
+  await selectGroup(page);
+  await page.getByRole("button", { name: OPEN_PICKER_BUTTON }).click();
+  await expect(page.getByRole("group", { name: PICKER_LABEL })).toBeVisible();
+}
+
+async function chooseThreeCandidates(page: Page): Promise<void> {
+  await openMemberPicker(page);
+  for (const candidate of CHOSEN_CANDIDATES) {
+    await page.getByRole("checkbox", { name: candidate.fullName }).check();
+  }
+  await expect(page.getByText("3 selected")).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
 type GroupsState = {
   readonly name: string;
   readonly withGroups: boolean;
@@ -3907,6 +3952,7 @@ const GROUPS_STATES: readonly GroupsState[] = [
     withGroups: true,
     prepare: startRenamingGroup,
   },
+  { name: "grupos-anadir", withGroups: true, prepare: chooseThreeCandidates },
 ];
 
 async function goToGroups(
@@ -4042,6 +4088,88 @@ test.describe("la sección Grupos en escritorio", () => {
     expect(rename?.height).toBe(38);
     expect(remove?.width).toBe(32);
     expect(remove?.height).toBe(32);
+  });
+});
+
+test.describe("el selector de añadir miembros en escritorio", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 1440, height: 900 },
+  });
+
+  test("va en línea, con el borde de acento y radio 10, como el botón que lo abre", async ({
+    page,
+  }) => {
+    await goToGroups(page, { name: "grupos-anadir", withGroups: true });
+    await openMemberPicker(page);
+
+    const picker = page.getByRole("group", { name: PICKER_LABEL });
+    const toggle = page.getByRole("button", { name: OPEN_PICKER_BUTTON });
+    const accent = await page.evaluate(() =>
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--color-accent")
+        .trim(),
+    );
+    const pickerBorder = await picker.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { color: style.borderTopColor, radius: style.borderTopLeftRadius };
+    });
+    const toggleBorder = await toggle.evaluate(
+      (element) => getComputedStyle(element).borderTopColor,
+    );
+    const toggleBackground = await toggle.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    const activeTint = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      probe.style.background = "var(--color-segment-selected)";
+      document.body.append(probe);
+      const rgb = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return rgb;
+    });
+    const accentAsRgb = await page.evaluate((color) => {
+      const probe = document.createElement("span");
+      probe.style.color = color;
+      document.body.append(probe);
+      const rgb = getComputedStyle(probe).color;
+      probe.remove();
+      return rgb;
+    }, accent);
+
+    expect(pickerBorder.radius).toBe("10px");
+    expect(pickerBorder.color).toBe(accentAsRgb);
+    expect(toggleBorder).toBe(accentAsRgb);
+    expect(toggleBackground).toBe(activeTint);
+  });
+
+  test("cada fila mide al menos 42px, con el avatar de 28px", async ({
+    page,
+  }) => {
+    await goToGroups(page, { name: "grupos-anadir", withGroups: true });
+    await openMemberPicker(page);
+
+    const picker = page.getByRole("group", { name: PICKER_LABEL });
+    const row = picker.getByRole("listitem").first();
+    const avatar = row.locator(".groups-picker-avatar");
+    expect((await row.boundingBox())?.height).toBeGreaterThanOrEqual(42);
+    expect((await avatar.boundingBox())?.width).toBe(28);
+    expect((await avatar.boundingBox())?.height).toBe(28);
+  });
+
+  test("la lista no pasa de 220px y se desplaza dentro", async ({ page }) => {
+    await goToGroups(page, { name: "grupos-anadir", withGroups: true });
+    await openMemberPicker(page);
+
+    const list = page
+      .getByRole("group", { name: PICKER_LABEL })
+      .getByRole("list");
+    expect((await list.boundingBox())?.height).toBeLessThanOrEqual(220);
+    expect(
+      await list.evaluate((element) => getComputedStyle(element).overflowY),
+    ).toBe("auto");
   });
 });
 

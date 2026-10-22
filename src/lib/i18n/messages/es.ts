@@ -695,12 +695,36 @@ export const spanishMessages: MessageCatalog = {
   "groups.members.removeLabel": "Quitar a {name} de {group}",
   "groups.members.removed": "{name} ya no está en {group}",
   "groups.members.openPicker": "Añadir miembros",
-  "groups.members.addLabel": "Miembro para agregar",
-  "groups.members.add": "Agregar al grupo",
-  "groups.members.adding": "Agregando…",
-  "groups.members.added": "{name} ya está en {group}",
-  "groups.members.noCandidates":
-    "Todos los miembros del club ya están en este grupo.",
+  // El selector de varios a la vez (#829, RF-4 de E32).
+  "groups.picker.label": "Añadir miembros a {group}",
+  "groups.picker.search": "Buscar miembros que no están en este grupo",
+  "groups.picker.groupCount": {
+    one: "en {count} grupo",
+    other: "en {count} grupos",
+  },
+  "groups.picker.selected": {
+    one: "{count} elegido",
+    other: "{count} elegidos",
+  },
+  "groups.picker.outside": {
+    one: "{count} miembro no está en este grupo",
+    other: "{count} miembros no están en este grupo",
+  },
+  "groups.picker.submit": {
+    one: "Añadir {count} miembro",
+    other: "Añadir {count} miembros",
+  },
+  "groups.picker.adding": "Añadiendo…",
+  "groups.picker.added": {
+    one: "{count} añadido a {group}",
+    other: "{count} añadidos a {group}",
+  },
+  "groups.picker.everyoneIn": "Todo el club está ya en este grupo.",
+  "groups.picker.noMatch": "Nadie se llama así.",
+  "groups.picker.rejected": "No se pudo añadir a: {members}.",
+  "groups.picker.rejectedMember": "{name} ({reason})",
+  "groups.picker.reason.inactive": "tiene la cuenta desactivada",
+  "groups.picker.reason.not_in_club": "ya no está en el club",
   "groups.error.nameTaken": "El club ya tiene un grupo con ese nombre.",
   "groups.error.invalidName":
     "El nombre tiene que tener entre 1 y {max} caracteres.",

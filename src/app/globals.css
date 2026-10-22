@@ -4593,24 +4593,126 @@ a.auth-brand-header:focus-visible {
   background: var(--color-hover);
 }
 
+/* Como el segmento elegido: el tinte con --color-text encima. El texto de
+   acento del tema claro se queda ahí en 4.3:1. */
 .groups-add-toggle[aria-expanded="true"] {
+  color: var(--color-text);
   background: var(--color-segment-selected);
   border-color: var(--color-accent);
 }
 
-/* El selector de uno en uno de E4, hasta que llegue el de varios (#829). */
+/* El selector de varios a la vez (#829, RF-4 de E32): en línea, debajo de la
+   barra, con el borde de acento que lo une al botón que lo abrió. */
 .groups-picker {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border);
+  flex-direction: column;
+  margin: var(--space-3) var(--space-4);
+  overflow: hidden;
+  background: var(--color-background);
+  border: 1px solid var(--color-accent);
+  border-radius: 10px;
 }
 
-.groups-picker .auth-field {
-  flex: 1 1 220px;
-  min-width: 0;
+.groups-picker-search {
+  flex: none;
+}
+
+/* La búsqueda es la primera franja del selector, no una caja dentro de él. */
+.groups-picker-search input,
+.groups-picker-search input:hover {
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+}
+
+.groups-picker-search input:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Unas cinco filas a la vista; el resto, desplazándose dentro. */
+.groups-picker-list {
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.groups-picker-list li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.groups-picker-row {
+  display: grid;
+  grid-template-columns: 18px 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 42px;
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+
+.groups-picker-row:hover {
+  background: var(--color-hover);
+}
+
+.groups-picker-row input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.groups-picker-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-hover);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.groups-picker-name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.groups-picker-detail {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: right;
+}
+
+.groups-picker-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-editor-bar);
+  border-top: 1px solid var(--color-border);
+}
+
+.groups-picker-count {
+  margin: 0 auto 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.groups-picker-submit {
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  font-size: 14px;
 }
 
 .groups-picker-empty,
@@ -4618,10 +4720,6 @@ a.auth-brand-header:focus-visible {
   margin: 0;
   padding: var(--space-4);
   color: var(--color-text-secondary);
-}
-
-.groups-picker-empty {
-  border-bottom: 1px solid var(--color-border);
 }
 
 /* La lista se desplaza sola: un grupo de todo el club no estira la página. */
