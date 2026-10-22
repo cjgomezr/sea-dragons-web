@@ -117,7 +117,9 @@ function targets(
   return use.groupIds.includes(groupId);
 }
 
-/** Fecha y hora juntas: `YYYY-MM-DD HH:MM` ordena igual como texto. */
+/** Fecha y hora juntas: `YYYY-MM-DD HH:MM` ordena igual como texto. Una
+ * serie va con la hora de la serie, que es la que enseña la tarjeta ("mié
+ * 18:00"), aunque alguien haya movido la hora de su próxima sesión. */
 function eventMoment(event: AudienceEvent): string {
   const startsOn =
     event.kind === "event" ? event.startsOn : event.nextSession.startsOn;
