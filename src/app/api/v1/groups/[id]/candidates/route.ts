@@ -2,7 +2,7 @@ import type { NextRequest, NextResponse } from "next/server";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
 import {
-  type GroupMember,
+  type GroupCandidate,
   listGroupCandidates,
 } from "@/lib/groups/group-members";
 import {
@@ -10,23 +10,24 @@ import {
   readGroupId,
   requireGroupMembersGateways,
 } from "@/lib/groups/groups-api";
+import { readApiRequestLocale } from "@/lib/i18n/request-locale";
 
 /**
  * A quién se puede agregar a un grupo (RF-6 del PRD de E4).
  *
  * Coach y Committee no pueden leer `GET /api/v1/members`, que es de Admin, así
- * que esta es su lista para elegir: sólo id y nombre, sin correo ni ningún
- * otro dato de la ficha. Quién puede llamarlo lo decide la frontera, como el
- * resto de `/api/v1/groups`.
+ * que esta es su lista para elegir: nombre, posición, foto y en cuántos grupos
+ * está ya, sin correo ni ningún otro dato de contacto. Quién puede llamarlo lo
+ * decide la frontera, como el resto de `/api/v1/groups`.
  */
 
 // Depende de la sesión de quien llama y de los socios de ahora.
 export const dynamic = "force-dynamic";
 
 /** Los socios del club que no están en el grupo ni dados de baja, en orden
- * alfabético. */
+ * alfabético, con `groupCount`: en cuántos grupos del club están ya. */
 export type GroupCandidatesResponse = {
-  readonly candidates: readonly GroupMember[];
+  readonly candidates: readonly GroupCandidate[];
 };
 
 type GroupRouteContext = {
@@ -49,7 +50,7 @@ export function GET(
           data: {
             candidates: await listGroupCandidates(
               requireGroupMembersGateways(),
-              { callerId, groupId },
+              { callerId, groupId, locale: readApiRequestLocale(apiRequest) },
             ),
           },
         };

@@ -1,19 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseAccountStatus } from "@/lib/auth/account-status";
+import { z } from "zod";
+import {
+  ACCOUNT_STATUSES,
+  parseAccountStatus,
+} from "@/lib/auth/account-status";
 import { readRequiredText } from "@/lib/auth/supabase-auth-gateways";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { toPositionNames } from "@/lib/club/supabase-club-positions";
+import { signProfilePhotoUrls } from "@/lib/members/supabase-profile-photo-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
-import { compareNames } from "@/lib/text/name-order";
 import type {
+  AssignableMember,
+  AssignableMembersResult,
   ClubMember,
-  GroupMember,
   GroupMembersGateways,
-  GroupMembersResult,
   GroupScope,
   MembershipInsertResult,
 } from "./group-members";
-import { toGroupMember } from "./group-members";
 
 /**
  * Adaptadores entre los socios de un grupo y Supabase.
@@ -23,17 +27,38 @@ import { toGroupMember } from "./group-members";
  * club de quien llama, y al escribir, las claves foráneas compuestas impiden
  * además mezclar un grupo o un socio de otro club.
  *
- * Las listas se arman con consultas fijas y no incrustando `members` en las
- * pertenencias, por lo mismo que `supabase-groups-gateways.ts`: esa relación
- * va por una clave compuesta y PostgREST podría dejar de deducirla. El club
- * tiene decenas de socios, no miles.
+ * Las listas salen de una lectura de los socios del club con su posición y
+ * sus pertenencias incrustadas, como el directorio: el reparto entre los del
+ * grupo y los candidatos lo hace el dominio. El club tiene decenas de socios,
+ * no miles.
  */
 
 const GROUPS_TABLE = "groups";
 const MEMBERSHIPS_TABLE = "group_memberships";
 const MEMBERS_TABLE = "members";
 const MEMBER_COLUMNS = "user_id, full_name, account_status";
+const ASSIGNABLE_COLUMNS = [
+  "user_id, full_name, account_status, photo_path",
+  "position:club_positions!members_position_same_club_fkey(id, names:club_position_names(locale, name))",
+  "group_memberships(group_id)",
+].join(", ");
 const INACTIVE_STATUS = "inactive";
+
+const assignableRowSchema = z.object({
+  user_id: z.uuid(),
+  full_name: z.string(),
+  account_status: z.enum(ACCOUNT_STATUSES),
+  photo_path: z.string().nullable(),
+  position: z
+    .object({
+      id: z.uuid(),
+      names: z.array(z.object({ locale: z.string(), name: z.string() })),
+    })
+    .nullable(),
+  group_memberships: z.array(z.object({ group_id: z.uuid() })),
+});
+
+type AssignableRow = z.infer<typeof assignableRowSchema>;
 
 /** El código de Postgres de una clave foránea violada, y las dos claves de las
  * pertenencias. Se mira el nombre para saber cuál de las dos no encontró su
@@ -60,8 +85,15 @@ function toClubMember(row: Row): ClubMember {
   };
 }
 
-function compareMemberNames(a: GroupMember, b: GroupMember): number {
-  return compareNames(a.fullName, b.fullName);
+function toAssignableMember(row: AssignableRow): AssignableMember {
+  return {
+    id: row.user_id,
+    fullName: row.full_name,
+    accountStatus: row.account_status,
+    photoPath: row.photo_path,
+    position: row.position === null ? null : toPositionNames(row.position),
+    groupIds: row.group_memberships.map(({ group_id: groupId }) => groupId),
+  };
 }
 
 async function groupExists(
@@ -82,38 +114,15 @@ async function groupExists(
   return data !== null;
 }
 
-/** Los ids de los socios asignados al grupo, o `null` si el grupo no es del
- * club. */
-async function readAssignedIds(
-  serviceClient: SupabaseClient,
-  scope: GroupScope,
-): Promise<ReadonlySet<string> | null> {
-  if (!(await groupExists(serviceClient, scope))) {
-    return null;
-  }
-  const { data, error } = await serviceClient
-    .from(MEMBERSHIPS_TABLE)
-    .select("user_id")
-    .eq("group_id", scope.groupId)
-    .eq("club_id", scope.clubId);
-  if (error) {
-    throw new Error(
-      `No se pudieron leer los socios del grupo ${scope.groupId}: ${error.message}`,
-    );
-  }
-  return new Set(
-    data.map((row: Row) => readRequiredText(row, "user_id", MEMBERSHIPS_TABLE)),
-  );
-}
-
-/** Los socios del club que no están dados de baja. */
+/** Los socios del club que no están dados de baja, con los grupos del club
+ * en los que está cada uno. */
 async function readAssignableMembers(
   serviceClient: SupabaseClient,
   clubId: string,
-): Promise<readonly GroupMember[]> {
+): Promise<readonly AssignableMember[]> {
   const { data, error } = await serviceClient
     .from(MEMBERS_TABLE)
-    .select(MEMBER_COLUMNS)
+    .select(ASSIGNABLE_COLUMNS)
     .eq("club_id", clubId)
     .neq("account_status", INACTIVE_STATUS);
   if (error) {
@@ -121,29 +130,26 @@ async function readAssignableMembers(
       `No se pudieron leer los socios del club ${clubId}: ${error.message}`,
     );
   }
-  return data.map((row: Row) => toGroupMember(toClubMember(row)));
+  const parsed = z.array(assignableRowSchema).safeParse(data);
+  if (!parsed.success) {
+    throw new Error(
+      `Los socios del club ${clubId} volvieron con una forma que el dominio no reconoce: ${parsed.error.message}`,
+    );
+  }
+  return parsed.data.map(toAssignableMember);
 }
 
-/** Los socios del club que no están de baja, repartidos según estén o no en
- * el grupo: `isAssigned` elige qué mitad se devuelve. */
-async function findMembersBy(
+async function findAssignableMembers(
   serviceClient: SupabaseClient,
   scope: GroupScope,
-  isAssigned: boolean,
-): Promise<GroupMembersResult> {
-  const [assignedIds, members] = await Promise.all([
-    readAssignedIds(serviceClient, scope),
+): Promise<AssignableMembersResult> {
+  const [isGroupOfClub, members] = await Promise.all([
+    groupExists(serviceClient, scope),
     readAssignableMembers(serviceClient, scope.clubId),
   ]);
-  if (assignedIds === null) {
-    return { kind: "group_not_found" };
-  }
-  return {
-    kind: "found",
-    members: members
-      .filter((member) => assignedIds.has(member.id) === isAssigned)
-      .sort(compareMemberNames),
-  };
+  return isGroupOfClub
+    ? { kind: "found", members }
+    : { kind: "group_not_found" };
 }
 
 function toInsertFailure(
@@ -169,8 +175,8 @@ export function createGroupMembersGateways(
   return {
     members: createRoleRequestGateways(serviceClient).members,
     groupMembers: {
-      findGroupMembers: (scope) => findMembersBy(serviceClient, scope, true),
-      findCandidates: (scope) => findMembersBy(serviceClient, scope, false),
+      findAssignableMembers: (scope) =>
+        findAssignableMembers(serviceClient, scope),
 
       async findClubMember({ clubId, userId }) {
         const { data, error } = await serviceClient
@@ -220,6 +226,10 @@ export function createGroupMembersGateways(
         }
         return { kind: "removed" };
       },
+    },
+    photos: {
+      signPhotoUrls: (photoPaths) =>
+        signProfilePhotoUrls(serviceClient, photoPaths),
     },
   };
 }

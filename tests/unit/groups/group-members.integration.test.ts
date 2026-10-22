@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import type { AccountStatus } from "@/lib/auth/account-status";
-import type { GroupMembersGateways } from "@/lib/groups/group-members";
+import {
+  type GroupMembersGateways,
+  listGroupCandidates,
+  listGroupMembers,
+} from "@/lib/groups/group-members";
 import { createGroupMembersGateways } from "@/lib/groups/supabase-group-members-gateways";
 import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
 import {
@@ -34,7 +38,29 @@ type SeedMember = {
   readonly clubId: string;
   readonly fullName: string;
   readonly accountStatus: AccountStatus;
+  /** El nombre en inglés de una de las posiciones que trae un club nuevo. */
+  readonly position?: "Goalkeeper" | "Defender" | "Forward";
 };
+
+const CALLER_ID = randomUUID();
+
+/** El adaptador real con un Coach del club delante: el dominio reparte y
+ * ordena lo que la base devuelve. Quién llama ya lo prueban los unitarios. */
+function asCoachOf(
+  gateways: GroupMembersGateways,
+  clubId: string,
+): GroupMembersGateways {
+  return {
+    ...gateways,
+    members: {
+      findRoleRequestMember: async () => ({
+        clubId,
+        fullName: "Carla Coach",
+        role: "Coach",
+      }),
+    },
+  };
+}
 
 async function withTwoClubs<T>(
   serviceClient: ServiceRoleClient,
@@ -64,6 +90,7 @@ async function withMember<T>(
       full_name: seed.fullName,
       email: user.email,
       account_status: seed.accountStatus,
+      position: seed.position ?? null,
       role: "Player",
     });
     if (error) {
@@ -140,7 +167,14 @@ describeRls("los socios de un grupo contra seadragons-dev", () => {
       await withTwoClubs(serviceClient, ([clubId, otherClubId]) =>
         withMembers(
           serviceClient,
-          [{ clubId, fullName: "paula Player", accountStatus: "active" }],
+          [
+            {
+              clubId,
+              fullName: "paula Player",
+              accountStatus: "active",
+              position: "Forward",
+            },
+          ],
           ([paula]) =>
             withGroups(
               serviceClient,
@@ -169,20 +203,22 @@ describeRls("los socios de un grupo contra seadragons-dev", () => {
                   }),
                 ).resolves.toEqual({ kind: "assigned" });
 
-                const paulaInList = {
-                  kind: "found",
-                  members: [
+                for (const groupId of [seniorId, mastersId]) {
+                  await expect(
+                    listGroupMembers(asCoachOf(gateways, clubId), {
+                      callerId: CALLER_ID,
+                      groupId,
+                      locale: "es",
+                    }),
+                  ).resolves.toEqual([
                     {
                       id: paulaId,
                       fullName: "paula Player",
                       isPendingActivation: false,
+                      positionName: "Ataque",
+                      photoUrl: null,
                     },
-                  ],
-                };
-                for (const groupId of [seniorId, mastersId]) {
-                  await expect(
-                    gateways.groupMembers.findGroupMembers({ clubId, groupId }),
-                  ).resolves.toEqual(paulaInList);
+                  ]);
                 }
                 await expect(
                   readCounts(serviceClient, clubId),
@@ -216,7 +252,7 @@ describeRls("los socios de un grupo contra seadragons-dev", () => {
   );
 
   it(
-    "los candidatos excluyen a los asignados, a los inactive y a los de otro club, en orden alfabético",
+    "los candidatos excluyen a los asignados, a los inactive y a los de otro club, en orden alfabético y con sus grupos",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
       const gateways = createGroupMembersGateways(serviceClient.client);
@@ -231,7 +267,12 @@ describeRls("los socios de un grupo contra seadragons-dev", () => {
               fullName: "ivan Incomplete",
               accountStatus: "incomplete",
             },
-            { clubId, fullName: "Ana Active", accountStatus: "active" },
+            {
+              clubId,
+              fullName: "Ana Active",
+              accountStatus: "active",
+              position: "Goalkeeper",
+            },
             { clubId, fullName: "Bea Inactive", accountStatus: "inactive" },
             {
               clubId: otherClubId,
@@ -243,7 +284,7 @@ describeRls("los socios de un grupo contra seadragons-dev", () => {
             withGroups(
               serviceClient,
               [clubId, otherClubId],
-              async ({ seniorId }) => {
+              async ({ seniorId, mastersId }) => {
                 for (const member of [assigned!, inactive!]) {
                   await gateways.groupMembers.insertMembership({
                     clubId,
@@ -251,43 +292,50 @@ describeRls("los socios de un grupo contra seadragons-dev", () => {
                     userId: member.id,
                   });
                 }
+                await gateways.groupMembers.insertMembership({
+                  clubId,
+                  groupId: mastersId,
+                  userId: active!.id,
+                });
+                const coach = asCoachOf(gateways, clubId);
+                const request = {
+                  callerId: CALLER_ID,
+                  groupId: seniorId,
+                  locale: "en" as const,
+                };
 
                 await expect(
-                  gateways.groupMembers.findCandidates({
-                    clubId,
-                    groupId: seniorId,
-                  }),
-                ).resolves.toEqual({
-                  kind: "found",
-                  members: [
-                    {
-                      id: active!.id,
-                      fullName: "Ana Active",
-                      isPendingActivation: false,
-                    },
-                    {
-                      id: incomplete!.id,
-                      fullName: "ivan Incomplete",
-                      isPendingActivation: true,
-                    },
-                  ],
-                });
+                  listGroupCandidates(coach, request),
+                ).resolves.toEqual([
+                  {
+                    id: active!.id,
+                    fullName: "Ana Active",
+                    isPendingActivation: false,
+                    positionName: "Goalkeeper",
+                    photoUrl: null,
+                    groupCount: 1,
+                  },
+                  {
+                    id: incomplete!.id,
+                    fullName: "ivan Incomplete",
+                    isPendingActivation: true,
+                    positionName: null,
+                    photoUrl: null,
+                    groupCount: 0,
+                  },
+                ]);
                 // El inactive sigue asignado, pero no cuenta ni se lista.
-                await expect(
-                  gateways.groupMembers.findGroupMembers({
-                    clubId,
-                    groupId: seniorId,
-                  }),
-                ).resolves.toEqual({
-                  kind: "found",
-                  members: [
+                await expect(listGroupMembers(coach, request)).resolves.toEqual(
+                  [
                     {
                       id: assigned!.id,
                       fullName: "Zoe Assigned",
                       isPendingActivation: false,
+                      positionName: null,
+                      photoUrl: null,
                     },
                   ],
-                });
+                );
               },
             ),
         ),
@@ -344,10 +392,10 @@ describeRls("los socios de un grupo contra seadragons-dev", () => {
                     gateways.groupMembers.deleteMembership(membership),
                   ).resolves.toEqual({ kind: "group_not_found" });
                   await expect(
-                    gateways.groupMembers.findGroupMembers({ clubId, groupId }),
-                  ).resolves.toEqual({ kind: "group_not_found" });
-                  await expect(
-                    gateways.groupMembers.findCandidates({ clubId, groupId }),
+                    gateways.groupMembers.findAssignableMembers({
+                      clubId,
+                      groupId,
+                    }),
                   ).resolves.toEqual({ kind: "group_not_found" });
                 }
 

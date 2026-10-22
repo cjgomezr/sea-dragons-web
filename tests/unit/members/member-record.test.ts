@@ -337,8 +337,7 @@ function fake(options: FakeOptions = {}): Fake {
       },
     },
     groupMembers: {
-      findGroupMembers: async () => ({ kind: "found", members: [] }),
-      findCandidates: async () => ({ kind: "found", members: [] }),
+      findAssignableMembers: async () => ({ kind: "found", members: [] }),
       findClubMember: async ({ clubId, userId }) =>
         isClubMember(clubId, userId)
           ? {

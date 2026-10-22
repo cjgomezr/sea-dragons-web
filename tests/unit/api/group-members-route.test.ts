@@ -54,11 +54,27 @@ function describeMembership(verb: string, membership: Membership): string {
   return `${verb} ${membership.clubId} ${membership.groupId} ${membership.userId}`;
 }
 
+const PAULA_PHOTO_URL = "https://storage.test/photos/paula.webp";
+
+/** Paula está en el grupo; Ana, en ninguno. */
+const ASSIGNABLE = [
+  {
+    ...PAULA,
+    accountStatus: "active",
+    photoPath: "paula.webp",
+    position: { en: "Forward", es: "Delantera" },
+    groupIds: [GROUP_ID],
+  },
+  {
+    ...ANA,
+    accountStatus: "active",
+    photoPath: null,
+    position: null,
+    groupIds: [],
+  },
+];
+
 function mockWiring(options: WiringOptions = {}): void {
-  const groupResult = (members: readonly GroupMember[]) =>
-    options.missingGroup
-      ? { kind: "group_not_found" }
-      : { kind: "found", members };
   vi.doMock("@/lib/groups/supabase-group-members-gateways", () => ({
     createSupabaseGroupMembersGateways: () => ({
       kind: "ready",
@@ -71,13 +87,11 @@ function mockWiring(options: WiringOptions = {}): void {
           }),
         },
         groupMembers: {
-          findGroupMembers: async (scope: { clubId: string }) => {
-            databaseCalls.push(`members ${scope.clubId}`);
-            return groupResult([PAULA]);
-          },
-          findCandidates: async (scope: { clubId: string }) => {
-            databaseCalls.push(`candidates ${scope.clubId}`);
-            return groupResult([ANA]);
+          findAssignableMembers: async (scope: { clubId: string }) => {
+            databaseCalls.push(`assignable ${scope.clubId}`);
+            return options.missingGroup
+              ? { kind: "group_not_found" }
+              : { kind: "found", members: ASSIGNABLE };
           },
           findClubMember: async (input: { clubId: string; userId: string }) => {
             databaseCalls.push(`member ${input.clubId} ${input.userId}`);
@@ -97,6 +111,9 @@ function mockWiring(options: WiringOptions = {}): void {
               ? { kind: "group_not_found" }
               : { kind: "removed" };
           },
+        },
+        photos: {
+          signPhotoUrls: async () => new Map([["paula.webp", PAULA_PHOTO_URL]]),
         },
       },
     }),
@@ -131,16 +148,24 @@ function memberPath(groupId: string, userId: string): string {
   return `${membersPath(groupId)}/${userId}`;
 }
 
+/** La posición sale en el idioma de quien pide; la app nativa lo manda en
+ * `accept-language` (CON-002). */
+function spanishRequest(path: string): NextRequest {
+  return new NextRequest(new URL(path, ORIGIN), {
+    headers: { "accept-language": "es" },
+  });
+}
+
 async function getMembers(groupId: string = GROUP_ID): Promise<Response> {
   const { GET } = await import("@/app/api/v1/groups/[id]/members/route");
-  return GET(new NextRequest(new URL(membersPath(groupId), ORIGIN)), {
+  return GET(spanishRequest(membersPath(groupId)), {
     params: Promise.resolve({ id: groupId }),
   });
 }
 
 async function getCandidates(groupId: string = GROUP_ID): Promise<Response> {
   const { GET } = await import("@/app/api/v1/groups/[id]/candidates/route");
-  return GET(new NextRequest(new URL(candidatesPath(groupId), ORIGIN)), {
+  return GET(spanishRequest(candidatesPath(groupId)), {
     params: Promise.resolve({ id: groupId }),
   });
 }
@@ -195,16 +220,20 @@ afterEach(() => {
 });
 
 describe("endpoints de socios de un grupo", () => {
-  it("GET members responde 200 con los socios del grupo, sólo id y nombre", async () => {
+  it("GET members responde 200 con los socios del grupo, su posición y su foto, sin correo", async () => {
     mockWiring();
 
     const response = await getMembers();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: { members: [PAULA] },
+      data: {
+        members: [
+          { ...PAULA, positionName: "Delantera", photoUrl: PAULA_PHOTO_URL },
+        ],
+      },
     });
-    expect(databaseCalls).toEqual([`members ${CLUB_ID}`]);
+    expect(databaseCalls).toEqual([`assignable ${CLUB_ID}`]);
   });
 
   it("PUT responde 200 con el socio asignado", async () => {
@@ -326,16 +355,20 @@ describe("endpoints de socios de un grupo", () => {
 });
 
 describe("candidatos", () => {
-  it("GET candidates responde 200 con los candidatos, sólo id y nombre", async () => {
+  it("GET candidates responde 200 con los candidatos, su posición, su foto y en cuántos grupos están", async () => {
     mockWiring();
 
     const response = await getCandidates();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: { candidates: [ANA] },
+      data: {
+        candidates: [
+          { ...ANA, positionName: null, photoUrl: null, groupCount: 0 },
+        ],
+      },
     });
-    expect(databaseCalls).toEqual([`candidates ${CLUB_ID}`]);
+    expect(databaseCalls).toEqual([`assignable ${CLUB_ID}`]);
   });
 
   it("GET candidates responde 404 a un grupo que no existe o es de otro club", async () => {

@@ -1,5 +1,10 @@
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { NamedPosition } from "@/lib/club/club-positions";
+import {
+  type ProfilePhotoSigner,
+  signPhotosOrNone,
+  signedPhotoUrl,
+} from "@/lib/members/profile-photo-urls";
 import { compareNames } from "@/lib/text/name-order";
 import {
   type EvaluationRosterSummary,
@@ -88,35 +93,8 @@ export type EvaluationRosterGateways = Pick<
      * (PRD de E9, rendimiento, y D5 del de E31: nada de una por miembro). */
     findRosterMembers(clubId: string): Promise<readonly RosterMemberRecord[]>;
   };
-  readonly photos: {
-    /** Las miniaturas firmadas, por ruta. La que no se firma no está. */
-    signPhotoUrls(
-      photoPaths: readonly string[],
-    ): Promise<ReadonlyMap<string, string>>;
-  };
+  readonly photos: ProfilePhotoSigner;
 };
-
-/** Una foto que no se firma deja las iniciales, como en el team builder: no
- * tumba la lista. El fallo queda registrado con su motivo. */
-async function signPhotosOrNone(
-  gateways: Pick<EvaluationRosterGateways, "photos">,
-  records: readonly RosterMemberRecord[],
-): Promise<ReadonlyMap<string, string>> {
-  const photoPaths = records.flatMap((record) =>
-    record.photoPath === null ? [] : [record.photoPath],
-  );
-  if (photoPaths.length === 0) {
-    return new Map();
-  }
-  try {
-    return await gateways.photos.signPhotoUrls(photoPaths);
-  } catch (error) {
-    console.error(
-      `[evaluations] no se pudieron firmar ${photoPaths.length} fotos; salen las iniciales: ${String(error)}`,
-    );
-    return new Map();
-  }
-}
 
 function toRosterEntry(
   record: RosterMemberRecord,
@@ -127,7 +105,7 @@ function toRosterEntry(
     userId,
     fullName,
     position,
-    photoUrl: photoPath === null ? null : (photoUrls.get(photoPath) ?? null),
+    photoUrl: signedPhotoUrl(photoUrls, photoPath),
   };
   if (evaluation === null) {
     return { status: "not_evaluated", ...player };
@@ -151,7 +129,12 @@ export async function listEvaluationRoster(
   const records = (await gateways.roster.findRosterMembers(actor.clubId))
     .filter((record) => record.status !== INACTIVE_STATUS)
     .sort((first, second) => compareNames(first.fullName, second.fullName));
-  const photoUrls = await signPhotosOrNone(gateways, records);
+  // Una foto que no se firma deja las iniciales, como en el team builder.
+  const photoUrls = await signPhotosOrNone(
+    gateways.photos,
+    records.map(({ photoPath }) => photoPath),
+    "evaluations",
+  );
   return {
     members: records.map((record) => toRosterEntry(record, photoUrls)),
     summary: summarizeEvaluationRoster(records),

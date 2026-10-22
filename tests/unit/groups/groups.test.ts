@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
+import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
+import type {
+  GroupAudienceUses,
+  GroupMembershipRecord,
+} from "@/lib/groups/group-overview";
 import {
   GROUP_NAME_MAX_LENGTH,
   type Group,
@@ -54,10 +59,43 @@ type Write =
 
 const clubsRead: string[] = [];
 const writes: Write[] = [];
+const audienceQueries: string[] = [];
+const signedPaths: string[] = [];
+
+const NOW = new Date("2026-10-22T09:00:00Z");
+const TODAY = "2026-10-22";
+const SIGNED_URL_PREFIX = "https://storage.test/photos/";
+
+function membership(
+  fullName: string,
+  accountStatus: AccountStatus,
+  photoPath: string | null,
+): GroupMembershipRecord {
+  return {
+    groupId: GROUP_ID,
+    member: { id: `id-${fullName}`, fullName, accountStatus, photoPath },
+  };
+}
+
+const MEMBERSHIPS: readonly GroupMembershipRecord[] = [
+  membership("Zoe Zapata", "active", "zoe.webp"),
+  membership("Ana Alba", "active", "ana.webp"),
+  membership("Bea Bravo", "incomplete", "bea.webp"),
+  membership("Carla Cruz", "active", null),
+  membership("Dani Diaz", "active", "dani.webp"),
+];
+
+const AUDIENCE_USES: GroupAudienceUses = {
+  events: [{ groupIds: [GROUP_ID], startsOn: TODAY, status: "scheduled" }],
+  series: [{ groupIds: [GROUP_ID], endsOn: TODAY, hasSessionsLeft: true }],
+  posts: [{ groupIds: [GROUP_ID], status: "published" }],
+};
 
 function gateways(options: GatewayOptions = {}): GroupsGateways {
   clubsRead.length = 0;
   writes.length = 0;
+  audienceQueries.length = 0;
+  signedPaths.length = 0;
   return {
     members: {
       findRoleRequestMember: async () =>
@@ -97,6 +135,24 @@ function gateways(options: GatewayOptions = {}): GroupsGateways {
         return options.missingGroup
           ? { kind: "not_found" }
           : { kind: "deleted" };
+      },
+    },
+    overview: {
+      findMemberships: async (clubId) => {
+        clubsRead.push(clubId);
+        return MEMBERSHIPS;
+      },
+      findAudienceUses: async ({ clubId, today }) => {
+        audienceQueries.push(`${clubId} ${today}`);
+        return AUDIENCE_USES;
+      },
+    },
+    photos: {
+      signPhotoUrls: async (photoPaths) => {
+        signedPaths.push(...photoPaths);
+        return new Map(
+          photoPaths.map((path) => [path, `${SIGNED_URL_PREFIX}${path}`]),
+        );
       },
     },
   };
@@ -172,12 +228,62 @@ describe("grupos: crear", () => {
   });
 });
 
+const LIST_REQUEST = { callerId: CALLER_ID, now: NOW };
+
 describe("grupos: listar", () => {
   it("devuelve los grupos del club de quien llama", async () => {
-    const groups = await listGroups(gateways(), CALLER_ID);
+    const [group] = await listGroups(gateways(), LIST_REQUEST);
 
-    expect(groups).toEqual([SENIOR_SQUAD]);
-    expect(clubsRead).toEqual([CLUB_ID]);
+    expect(group).toMatchObject(SENIOR_SQUAD);
+    expect(clubsRead).toEqual([CLUB_ID, CLUB_ID]);
+  });
+
+  it("trae el uso de cada grupo contado desde el día de hoy en Melbourne", async () => {
+    const [group] = await listGroups(gateways(), LIST_REQUEST);
+
+    expect(group?.usage).toEqual({ events: 2, posts: 1 });
+    expect(audienceQueries).toEqual([`${CLUB_ID} ${TODAY}`]);
+  });
+
+  it("trae a tres miembros activos con su foto firmada o null", async () => {
+    const [group] = await listGroups(gateways(), LIST_REQUEST);
+
+    expect(group?.previewMembers).toEqual([
+      {
+        id: "id-Ana Alba",
+        fullName: "Ana Alba",
+        photoUrl: `${SIGNED_URL_PREFIX}ana.webp`,
+      },
+      { id: "id-Carla Cruz", fullName: "Carla Cruz", photoUrl: null },
+      {
+        id: "id-Dani Diaz",
+        fullName: "Dani Diaz",
+        photoUrl: `${SIGNED_URL_PREFIX}dani.webp`,
+      },
+    ]);
+  });
+
+  it("firma sólo las fotos de la vista previa, en una llamada", async () => {
+    await listGroups(gateways(), LIST_REQUEST);
+
+    expect(signedPaths).toEqual(["ana.webp", "dani.webp"]);
+  });
+
+  it("un grupo sin uso ni miembros activos sale con ceros y la vista previa vacía", async () => {
+    const empty = gateways();
+    const [group] = await listGroups(
+      {
+        ...empty,
+        overview: {
+          findMemberships: async () => [],
+          findAudienceUses: async () => ({ events: [], series: [], posts: [] }),
+        },
+      },
+      LIST_REQUEST,
+    );
+
+    expect(group?.usage).toEqual({ events: 0, posts: 0 });
+    expect(group?.previewMembers).toEqual([]);
   });
 });
 
@@ -253,7 +359,7 @@ describe("grupos: borrar", () => {
 
 describe("grupos: quién puede", () => {
   const operations = [
-    ["listar", (g: GroupsGateways) => listGroups(g, CALLER_ID)],
+    ["listar", (g: GroupsGateways) => listGroups(g, LIST_REQUEST)],
     [
       "crear",
       (g: GroupsGateways) =>

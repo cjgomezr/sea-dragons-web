@@ -25,6 +25,12 @@ const GROUPS: readonly Group[] = [
   },
 ];
 
+const ANA_PREVIEW = {
+  id: "c2c2c2c2-0000-4000-8000-00000000000c",
+  fullName: "Ana Active",
+  photoUrl: "https://storage.test/photos/ana.webp",
+};
+
 type WiringOptions = {
   readonly callerRole?: Role;
   readonly nameTaken?: true;
@@ -95,6 +101,40 @@ function mockWiring(options: WiringOptions = {}): void {
               ? { kind: "not_found" }
               : { kind: "deleted" };
           },
+        },
+        overview: {
+          findMemberships: async (clubId: string) => {
+            databaseCalls.push(`memberships ${clubId}`);
+            return [
+              {
+                groupId: GROUP_ID,
+                member: {
+                  id: ANA_PREVIEW.id,
+                  fullName: ANA_PREVIEW.fullName,
+                  accountStatus: "active",
+                  photoPath: "ana.webp",
+                },
+              },
+            ];
+          },
+          findAudienceUses: async (query: { clubId: string }) => {
+            databaseCalls.push(`uses ${query.clubId}`);
+            return {
+              events: [],
+              series: [
+                {
+                  groupIds: [GROUP_ID],
+                  endsOn: "2099-12-31",
+                  hasSessionsLeft: true,
+                },
+              ],
+              posts: [{ groupIds: [GROUP_ID], status: "published" }],
+            };
+          },
+        },
+        photos: {
+          signPhotoUrls: async () =>
+            new Map([["ana.webp", ANA_PREVIEW.photoUrl]]),
         },
       },
     }),
@@ -183,16 +223,33 @@ afterEach(() => {
 });
 
 describe("GET/POST /api/v1/groups", () => {
-  it("GET responde 200 con los grupos del club y su conteo", async () => {
+  it("GET responde 200 con los grupos del club, su conteo, su uso y su vista previa", async () => {
     mockWiring();
 
     const response = await listGroups();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: { groups: GROUPS },
+      data: {
+        groups: [
+          {
+            ...GROUPS[0],
+            usage: { events: 1, posts: 1 },
+            previewMembers: [ANA_PREVIEW],
+          },
+          {
+            ...GROUPS[1],
+            usage: { events: 0, posts: 0 },
+            previewMembers: [],
+          },
+        ],
+      },
     });
-    expect(databaseCalls).toEqual([`list ${CLUB_ID}`]);
+    expect([...databaseCalls].sort()).toEqual([
+      `list ${CLUB_ID}`,
+      `memberships ${CLUB_ID}`,
+      `uses ${CLUB_ID}`,
+    ]);
   });
 
   it("POST responde 201 con el grupo y su conteo en 0", async () => {

@@ -1,9 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
+import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
 import { readRequiredText } from "@/lib/auth/supabase-auth-gateways";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { signProfilePhotoUrls } from "@/lib/members/supabase-profile-photo-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { compareNames } from "@/lib/text/name-order";
+import type {
+  GroupAudienceUses,
+  GroupMembershipRecord,
+  PostUse,
+  SeriesUse,
+  StandaloneEventUse,
+} from "./group-overview";
 import type { Group, GroupsGateways } from "./groups";
 
 /**
@@ -82,7 +92,9 @@ async function readActiveMemberIds(
  * esa relación va por una clave foránea compuesta contra una restricción única,
  * y una lectura que depende de cómo PostgREST la deduzca se rompe sin que nadie
  * toque este archivo (lo mismo que evita `supabase-club-administration-
- * gateways.ts`). El club tiene decenas de socios, no miles.
+ * gateways.ts`). Lo que se evita es ese sentido; el contrario, las
+ * pertenencias incrustadas bajo `members`, es el que usan el directorio y
+ * `findMemberships`. El club tiene decenas de socios, no miles.
  */
 async function readActiveMemberCounts(
   serviceClient: SupabaseClient,
@@ -118,6 +130,181 @@ async function withMemberCount(
 ): Promise<Group> {
   const counts = await readActiveMemberCounts(serviceClient, clubId);
   return { ...group, memberCount: counts.get(group.id) ?? 0 };
+}
+
+const EVENTS_TABLE = "events";
+const SERIES_TABLE = "event_series";
+const POSTS_TABLE = "news_posts";
+
+const MEMBERSHIP_PREVIEW_COLUMNS =
+  "user_id, full_name, account_status, photo_path, group_memberships(group_id)";
+
+/** `!inner`: sólo lo que tiene algún grupo en su audiencia. */
+const STANDALONE_EVENT_COLUMNS =
+  "starts_on, status, audience:event_groups!inner(group_id)";
+const POST_COLUMNS = "status, audience:news_post_groups!inner(group_id)";
+
+/** Las sesiones que le quedan a la serie, filtradas abajo a las programadas
+ * de hoy en adelante y cortadas a una: basta para saber si sigue en pie. */
+const SESSIONS_LEFT = "sessions_left";
+const SERIES_COLUMNS = `ends_on, audience:event_series_groups!inner(group_id), ${SESSIONS_LEFT}:events(id)`;
+
+const SCHEDULED_STATUS = "scheduled";
+
+const audienceSchema = z.array(z.object({ group_id: z.uuid() })).min(1);
+
+const membershipPreviewRowSchema = z.object({
+  user_id: z.uuid(),
+  full_name: z.string(),
+  account_status: z.enum(ACCOUNT_STATUSES),
+  photo_path: z.string().nullable(),
+  group_memberships: z.array(z.object({ group_id: z.uuid() })),
+});
+
+const standaloneEventRowSchema = z.object({
+  starts_on: z.string(),
+  status: z.enum(["scheduled", "cancelled"]),
+  audience: audienceSchema,
+});
+
+const seriesRowSchema = z.object({
+  ends_on: z.string(),
+  audience: audienceSchema,
+  [SESSIONS_LEFT]: z.array(z.object({ id: z.uuid() })),
+});
+
+const postRowSchema = z.object({
+  status: z.enum(["published", "withdrawn"]),
+  audience: audienceSchema,
+});
+
+function toGroupIds(audience: z.infer<typeof audienceSchema>): string[] {
+  return audience.map(({ group_id: groupId }) => groupId);
+}
+
+/** Lo que volvió de la base, o un error que dice qué lectura no encajó. */
+function parseRows<T>(
+  schema: z.ZodType<T>,
+  result: {
+    readonly data: unknown;
+    readonly error: { message: string } | null;
+  },
+  what: string,
+): readonly T[] {
+  if (result.error) {
+    throw new Error(`No se pudieron leer ${what}: ${result.error.message}`);
+  }
+  const parsed = z.array(schema).safeParse(result.data);
+  if (!parsed.success) {
+    throw new Error(
+      `${what} volvieron con una forma que el dominio no reconoce: ${parsed.error.message}`,
+    );
+  }
+  return parsed.data;
+}
+
+/** Cada pertenencia del club con su socio, de una lectura de los socios con
+ * sus pertenencias incrustadas, como el directorio. */
+async function findMemberships(
+  serviceClient: SupabaseClient,
+  clubId: string,
+): Promise<readonly GroupMembershipRecord[]> {
+  const rows = parseRows(
+    membershipPreviewRowSchema,
+    await serviceClient
+      .from(MEMBERS_TABLE)
+      .select(MEMBERSHIP_PREVIEW_COLUMNS)
+      .eq("club_id", clubId),
+    `las pertenencias del club ${clubId}`,
+  );
+  return rows.flatMap((row) =>
+    row.group_memberships.map(({ group_id: groupId }) => ({
+      groupId,
+      member: {
+        id: row.user_id,
+        fullName: row.full_name,
+        accountStatus: row.account_status,
+        photoPath: row.photo_path,
+      },
+    })),
+  );
+}
+
+/** Los eventos sueltos con grupos que no empezaron antes de hoy. Las
+ * ocurrencias de una serie llevan su copia de la audiencia, pero cuentan como
+ * su serie. */
+async function findStandaloneEventUses(
+  serviceClient: SupabaseClient,
+  query: { readonly clubId: string; readonly today: string },
+): Promise<readonly StandaloneEventUse[]> {
+  const rows = parseRows(
+    standaloneEventRowSchema,
+    await serviceClient
+      .from(EVENTS_TABLE)
+      .select(STANDALONE_EVENT_COLUMNS)
+      .eq("club_id", query.clubId)
+      .is("series_id", null)
+      .gte("starts_on", query.today),
+    `los eventos del club ${query.clubId}`,
+  );
+  return rows.map((row) => ({
+    groupIds: toGroupIds(row.audience),
+    startsOn: row.starts_on,
+    status: row.status,
+  }));
+}
+
+async function findSeriesUses(
+  serviceClient: SupabaseClient,
+  query: { readonly clubId: string; readonly today: string },
+): Promise<readonly SeriesUse[]> {
+  const rows = parseRows(
+    seriesRowSchema,
+    await serviceClient
+      .from(SERIES_TABLE)
+      .select(SERIES_COLUMNS)
+      .eq("club_id", query.clubId)
+      .gte("ends_on", query.today)
+      .eq(`${SESSIONS_LEFT}.status`, SCHEDULED_STATUS)
+      .gte(`${SESSIONS_LEFT}.starts_on`, query.today)
+      .limit(1, { referencedTable: SESSIONS_LEFT }),
+    `las series del club ${query.clubId}`,
+  );
+  return rows.map((row) => ({
+    groupIds: toGroupIds(row.audience),
+    endsOn: row.ends_on,
+    hasSessionsLeft: row[SESSIONS_LEFT].length > 0,
+  }));
+}
+
+async function findPostUses(
+  serviceClient: SupabaseClient,
+  clubId: string,
+): Promise<readonly PostUse[]> {
+  const rows = parseRows(
+    postRowSchema,
+    await serviceClient
+      .from(POSTS_TABLE)
+      .select(POST_COLUMNS)
+      .eq("club_id", clubId),
+    `las noticias del club ${clubId}`,
+  );
+  return rows.map((row) => ({
+    groupIds: toGroupIds(row.audience),
+    status: row.status,
+  }));
+}
+
+async function findAudienceUses(
+  serviceClient: SupabaseClient,
+  query: { readonly clubId: string; readonly today: string },
+): Promise<GroupAudienceUses> {
+  const [events, series, posts] = await Promise.all([
+    findStandaloneEventUses(serviceClient, query),
+    findSeriesUses(serviceClient, query),
+    findPostUses(serviceClient, query.clubId),
+  ]);
+  return { events, series, posts };
 }
 
 export function createGroupsGateways(
@@ -207,6 +394,14 @@ export function createGroupsGateways(
         }
         return data.length === 0 ? { kind: "not_found" } : { kind: "deleted" };
       },
+    },
+    overview: {
+      findMemberships: (clubId) => findMemberships(serviceClient, clubId),
+      findAudienceUses: (query) => findAudienceUses(serviceClient, query),
+    },
+    photos: {
+      signPhotoUrls: (photoPaths) =>
+        signProfilePhotoUrls(serviceClient, photoPaths),
     },
   };
 }

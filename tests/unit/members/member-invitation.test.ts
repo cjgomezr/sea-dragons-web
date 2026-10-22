@@ -122,8 +122,7 @@ function fake(options: FakeOptions = {}): Fake {
       },
     },
     groupMembers: {
-      findGroupMembers: async () => ({ kind: "found", members: [] }),
-      findCandidates: async () => ({ kind: "found", members: [] }),
+      findAssignableMembers: async () => ({ kind: "found", members: [] }),
       findClubMember: async ({ userId }) =>
         insertedRows.some((row) => row.user_id === userId)
           ? { id: userId, fullName: "Nerea Silva", accountStatus: "incomplete" }
