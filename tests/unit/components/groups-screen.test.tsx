@@ -1878,6 +1878,39 @@ describe("escribir a todos y abrir en el directorio", () => {
     );
   });
 
+  it("con el redactor abierto, Escribir a todos en otro grupo le escribe a ese grupo", async () => {
+    stubApi({
+      groups: [SENIOR, MASTERS],
+      loadDetail: (url) =>
+        MEMBERS_PATH.test(url)
+          ? jsonResponse(200, {
+              data: { members: url.includes(SENIOR.id) ? [NEREA] : [TOMAS] },
+            })
+          : null,
+    });
+    await renderScreen();
+    const user = userEvent.setup();
+    const senior = await openGroup("Senior Squad");
+    await user.click(
+      within(senior).getByRole("button", {
+        name: "Email everyone in Senior Squad",
+      }),
+    );
+
+    const masters = await openGroup("Masters Squad");
+    await user.click(
+      within(masters).getByRole("button", {
+        name: "Email everyone in Masters Squad",
+      }),
+    );
+
+    const recipients = within(
+      screen.getByRole("region", { name: "Email members" }),
+    ).getByRole("list", { name: "1 recipient" });
+    expect(within(recipients).getByText("Tomás Errekondo")).toBeVisible();
+    expect(within(recipients).queryByText("Nerea Ruiz")).toBeNull();
+  });
+
   it("cerrar el redactor lo quita", async () => {
     stubApi({ groups: [SENIOR], members: [NEREA] });
     await renderScreen();

@@ -52,6 +52,11 @@ type ScreenState =
   | { readonly kind: "failed"; readonly failure: GroupsFailure }
   | { readonly kind: "ready"; readonly groups: readonly GroupOverview[] };
 
+type EmailDraft = {
+  readonly groupId: string;
+  readonly recipients: readonly EmailRecipient[];
+};
+
 const UNUSED: GroupOverview["usage"] = { events: 0, posts: 0 };
 
 /** La lista se ordena aquí y no sólo en el servidor porque cambia sin volver a
@@ -155,9 +160,9 @@ export function GroupsScreen({
   const pendingAction = usePendingAction<GroupAction>();
   const { pending, run } = pendingAction;
   const { notice, announce } = useChangeNotice();
-  const [emailRecipients, setEmailRecipients] = useState<
-    readonly EmailRecipient[] | null
-  >(null);
+  // El redactor copia sus destinatarios al montarse: se guarda de qué grupo
+  // son para montarlo de nuevo si se le escribe a otro con él abierto.
+  const [emailDraft, setEmailDraft] = useState<EmailDraft | null>(null);
   // Tras borrar, el botón que tenía el foco desaparece con su panel: el foco
   // pasa a "Elige un grupo" en cuanto se pinta, y no cae al principio.
   const placeholderRef = useRef<HTMLParagraphElement>(null);
@@ -290,11 +295,12 @@ export function GroupsScreen({
           {describeGroupsFailure(translate, failure)}
         </p>
       )}
-      {emailRecipients === null ? null : (
+      {emailDraft === null ? null : (
         <DirectoryEmailComposer
+          key={emailDraft.groupId}
           locale={locale}
-          recipients={emailRecipients}
-          onClose={() => setEmailRecipients(null)}
+          recipients={emailDraft.recipients}
+          onClose={() => setEmailDraft(null)}
         />
       )}
       {state.kind === "ready" ? (
@@ -347,7 +353,12 @@ export function GroupsScreen({
               onRename={(name) => rename(selectedGroup, name)}
               onDelete={() => remove(selectedGroup)}
               onNotice={announce}
-              onWriteToAll={canWriteEmails ? setEmailRecipients : null}
+              onWriteToAll={
+                canWriteEmails
+                  ? (recipients) =>
+                      setEmailDraft({ groupId: selectedGroup.id, recipients })
+                  : null
+              }
             />
           )}
         </div>
