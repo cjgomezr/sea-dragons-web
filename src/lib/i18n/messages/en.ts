@@ -624,47 +624,94 @@ export const englishMessages = {
     "Create the club's groups and choose which members belong to each one.",
   "groups.title": "Groups",
   "groups.lead":
-    "Groups gather members so a session, an event or a post can be aimed at them.",
+    "Groups are audiences: pick them when you create an event or a news post, and only their members see it.",
   "groups.loading": "Loading the club's groups…",
   "groups.loadFailed": "We couldn't load the club's groups.",
   "groups.retry": "Try again",
+  // El rediseño de escritorio (#828, E32). La cabecera de la lista va en
+  // mayúsculas en el propio texto, como la pinta el handoff.
   "groups.list.title": "Club groups",
-  "groups.list.empty":
-    "This club has no groups yet. Create the first one to start gathering members.",
+  "groups.list.empty": "No groups yet. Create the first one above.",
+  "groups.list.count": {
+    one: "{count} GROUP",
+    other: "{count} GROUPS",
+  },
+  "groups.list.members": "MEMBERS",
   "groups.memberCount": {
     one: "{count} member",
     other: "{count} members",
   },
-  "groups.create.label": "Name of the new group",
-  "groups.create.submit": "Create group",
+  "groups.usage.events": {
+    one: "{count} event",
+    other: "{count} events",
+  },
+  "groups.usage.posts": {
+    one: "{count} post",
+    other: "{count} posts",
+  },
+  "groups.usage.none": "Not used yet",
+  "groups.summary.notActivated": "{count} not activated",
+  "groups.create.label": "New group name",
+  "groups.create.submit": "Create",
   "groups.create.saving": "Creating…",
-  "groups.rename": "Rename",
+  "groups.create.duplicate": "There is already a group with that name.",
+  "groups.create.done": "{name} created · now add its members",
   "groups.renameLabel": "Rename {name}",
   "groups.renameField": "New name for {name}",
   "groups.renameSubmit": "Save the new name",
-  "groups.renameSaving": "Saving…",
+  "groups.renameCancel": "Cancel renaming",
+  "groups.renamed": "Group renamed",
   "groups.cancel": "Cancel",
-  "groups.delete": "Delete",
   "groups.deleteLabel": "Delete {name}",
-  "groups.deleteQuestion": {
-    one: "Delete “{name}”? It has {count} member. They stay in the club.",
-    other: "Delete “{name}”? It has {count} members. They stay in the club.",
+  "groups.deleteTitle": "Delete “{name}”?",
+  // El aviso de borrar dice quién sigue viendo lo que se queda sin grupos:
+  // el evento, el Admin y el Committee; la noticia, sólo su autor (#826).
+  "groups.deleteUnused": {
+    one: "Its {count} member stays in the club. It isn't the audience of anything.",
+    other:
+      "Its {count} members stay in the club. It isn't the audience of anything.",
   },
+  "groups.deleteEmptyUnused":
+    "It has no members and isn't the audience of anything.",
+  "groups.deleteUsed": {
+    one: "Members stay in the club, but {uses} will lose this audience.",
+    other: "Members stay in the club, but {uses} will lose this audience.",
+  },
+  "groups.deleteUses.posts": {
+    one: "{count} news post",
+    other: "{count} news posts",
+  },
+  "groups.deleteUses.both": "{events} and {posts}",
+  "groups.deleteFallback.events": {
+    one: "If this was its only group, only Admins and the Committee will still see it.",
+    other:
+      "If this was their only group, only Admins and the Committee will still see them.",
+  },
+  "groups.deleteFallback.posts": {
+    one: "If this was its only group, only whoever published it will still see it.",
+    other:
+      "If this was their only group, only whoever published them will still see them.",
+  },
+  "groups.deleteFallback.both":
+    "If this was their only group, events stay visible to Admins and the Committee, and posts only to whoever published them.",
   "groups.deleteSubmit": "Delete group",
   "groups.deleting": "Deleting…",
-  "groups.members.title": "Members of {name}",
+  "groups.deleted": "{name} deleted",
+  "groups.panel.empty": "Pick a group to see and manage its members.",
   "groups.members.loading": "Loading this group's members…",
   "groups.members.loadFailed": "We couldn't load this group's members.",
+  "groups.members.search": "Search in this group",
+  "groups.members.noMatch": "No one in this group matches.",
   "groups.members.empty":
-    "This group has no members yet. Add the first one from the list.",
-  "groups.members.close": "Close the group",
-  "groups.members.remove": "Remove",
-  "groups.members.pendingActivation": "Pending activation",
-  "groups.members.removeLabel": "Remove {name} from the group",
-  "groups.members.removing": "Removing…",
+    "No members yet. Use “Add members” to pick several at once.",
+  "groups.members.notActivated": "Not activated",
+  "groups.members.removeLabel": "Remove {name} from {group}",
+  "groups.members.removed": "{name} removed from {group}",
+  "groups.members.openPicker": "Add members",
   "groups.members.addLabel": "Member to add",
   "groups.members.add": "Add to the group",
   "groups.members.adding": "Adding…",
+  "groups.members.added": "{name} added to {group}",
   "groups.members.noCandidates":
     "Every member of the club is already in this group.",
   "groups.error.nameTaken": "The club already has a group with that name.",

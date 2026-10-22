@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Group } from "@/lib/groups/groups";
-import { compareNames } from "@/lib/text/name-order";
+import type { GroupRosterMember } from "@/lib/groups/group-members";
+import { GROUP_PREVIEW_SIZE } from "@/lib/groups/group-overview";
+import type { Group, GroupOverview } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import { compareNames } from "@/lib/text/name-order";
 import { GroupList } from "./GroupList";
 import { GroupMembersPanel } from "./GroupMembersPanel";
-import type { GroupActionResult } from "./GroupNameForm";
+import { type GroupActionResult, GroupCreateForm } from "./GroupNameForm";
+import type { GroupAction } from "./group-action";
 import {
   GROUP_GONE,
   type GroupsFailure,
@@ -20,14 +23,17 @@ import {
   loadGroups,
   renameGroup,
 } from "./groups-client";
+import { useChangeNotice } from "./use-change-notice";
+import { usePendingAction } from "./use-pending-action";
 
 /**
- * La pantalla Grupos (#228, RF-2 a RF-7 del PRD de E4): los grupos del club
- * con su conteo, y quién está en el que se abra. Sólo la alcanzan Admin, Coach
- * y Committee, y quien lo comprueba es la frontera, no esta pantalla.
+ * La pantalla Grupos (#228, rehecha en escritorio por #828, E32): la lista
+ * compacta de los grupos del club a la izquierda y el panel del elegido a la
+ * derecha. Sólo la alcanzan Admin, Coach y Committee, y quien lo comprueba es
+ * la frontera, no esta pantalla.
  *
  * Es de cliente porque su razón de ser es cambiar sin recargar: crear un grupo
- * lo pone en la lista y meter un socio sube el conteo de su fila. Lee y
+ * lo pone en la lista y quitar un socio baja el conteo de su fila. Lee y
  * escribe por la API v1, nunca contra la base, porque la aplicación nativa de
  * Release 2 usará esos mismos endpoints (CON-002). El idioma llega como prop
  * porque el traductor no puede cruzar del servidor al navegador.
@@ -36,44 +42,67 @@ import {
 type ScreenState =
   | { readonly kind: "loading" }
   | { readonly kind: "failed"; readonly failure: GroupsFailure }
-  | { readonly kind: "ready"; readonly groups: readonly Group[] };
+  | { readonly kind: "ready"; readonly groups: readonly GroupOverview[] };
+
+const UNUSED: GroupOverview["usage"] = { events: 0, posts: 0 };
 
 /** La lista se ordena aquí y no sólo en el servidor porque cambia sin volver a
  * pedirla: un grupo recién creado o renombrado tiene que caer en su sitio. */
-function byName(groups: readonly Group[]): readonly Group[] {
+function byName(groups: readonly GroupOverview[]): readonly GroupOverview[] {
   return [...groups].sort((one, other) => compareNames(one.name, other.name));
 }
 
-function withGroup(state: ScreenState, group: Group): ScreenState {
-  if (state.kind !== "ready") {
-    return state;
-  }
-  const others = state.groups.filter((existing) => existing.id !== group.id);
-  return { kind: "ready", groups: byName([...others, group]) };
+function updateGroups(
+  state: ScreenState,
+  update: (groups: readonly GroupOverview[]) => readonly GroupOverview[],
+): ScreenState {
+  return state.kind === "ready"
+    ? { kind: "ready", groups: update(state.groups) }
+    : state;
+}
+
+/** Crear y renombrar responden el grupo a secas: el uso y la vista previa
+ * son los que ya había, o ninguno si es nuevo. */
+function withSavedGroup(state: ScreenState, saved: Group): ScreenState {
+  return updateGroups(state, (groups) => {
+    const existing = groups.find((group) => group.id === saved.id);
+    const others = groups.filter((group) => group.id !== saved.id);
+    const merged: GroupOverview = {
+      usage: UNUSED,
+      previewMembers: [],
+      ...existing,
+      ...saved,
+    };
+    return byName([...others, merged]);
+  });
 }
 
 function withoutGroup(state: ScreenState, groupId: string): ScreenState {
-  return state.kind === "ready"
-    ? {
-        kind: "ready",
-        groups: state.groups.filter((group) => group.id !== groupId),
-      }
-    : state;
+  return updateGroups(state, (groups) =>
+    groups.filter((group) => group.id !== groupId),
+  );
 }
 
-function withMemberCount(
+/** El conteo y los avatares de la fila, con la misma regla que el servidor:
+ * quien no activó su cuenta está en el grupo, pero no cuenta ni sale. */
+function withMembers(
   state: ScreenState,
   groupId: string,
-  memberCount: number,
+  members: readonly GroupRosterMember[],
 ): ScreenState {
-  return state.kind === "ready"
-    ? {
-        kind: "ready",
-        groups: state.groups.map((group) =>
-          group.id === groupId ? { ...group, memberCount } : group,
-        ),
-      }
-    : state;
+  const active = members
+    .filter((member) => !member.isPendingActivation)
+    .sort((one, other) => compareNames(one.fullName, other.fullName));
+  const previewMembers = active
+    .slice(0, GROUP_PREVIEW_SIZE)
+    .map(({ id, fullName, photoUrl }) => ({ id, fullName, photoUrl }));
+  return updateGroups(state, (groups) =>
+    groups.map((group) =>
+      group.id === groupId
+        ? { ...group, memberCount: active.length, previewMembers }
+        : group,
+    ),
+  );
 }
 
 /** Una causa que se arregla de otra forma se dice tal cual: quien perdió la
@@ -108,10 +137,13 @@ export function GroupsScreen({
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
-  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   // Se guarda el fallo y no la frase, para que el aviso que ya está a la vista
   // cambie de idioma con el interruptor en vez de quedarse en el de antes.
   const [failure, setFailure] = useState<GroupsFailure | null>(null);
+  const pendingAction = usePendingAction<GroupAction>();
+  const { pending, run } = pendingAction;
+  const { notice, announce } = useChangeNotice();
 
   // Volver a intentarlo cuenta como una lectura más, y por eso es el efecto
   // quien pide la lista: así el pedido vive en un solo sitio y el estado se
@@ -134,11 +166,11 @@ export function GroupsScreen({
     setReloads((count) => count + 1);
   }
 
-  /** Un grupo que el servidor ya no reconoce sale de la lista y se cierra si
-   * estaba abierto: otro lo borró mientras esta pantalla lo tenía delante. */
+  /** Un grupo que el servidor ya no reconoce sale de la lista y el panel
+   * vuelve a "Elige un grupo": otro lo borró mientras estaba a la vista. */
   function forgetGroup(groupId: string): void {
     setState((current) => withoutGroup(current, groupId));
-    setOpenGroupId((open) => (open === groupId ? null : open));
+    setSelectedGroupId((selected) => (selected === groupId ? null : selected));
   }
 
   function reportFailure(outcome: GroupsFailure, groupId: string): "failed" {
@@ -150,57 +182,73 @@ export function GroupsScreen({
   }
 
   async function create(name: string): Promise<GroupActionResult> {
-    const outcome = await createGroup(name);
-    if (outcome.kind === "failed") {
-      setFailure(outcome);
-      return "failed";
-    }
-    setState((current) => withGroup(current, outcome.group));
-    setFailure(null);
-    return "done";
+    const result = await run({ kind: "create" }, async () => {
+      const outcome = await createGroup(name);
+      if (outcome.kind === "failed") {
+        setFailure(outcome);
+        return "failed";
+      }
+      setState((current) => withSavedGroup(current, outcome.group));
+      setSelectedGroupId(outcome.group.id);
+      setFailure(null);
+      announce(translate("groups.create.done", { name: outcome.group.name }));
+      return "done";
+    });
+    return result ?? "failed";
   }
 
   async function rename(
-    group: Group,
+    group: GroupOverview,
     name: string,
   ): Promise<GroupActionResult> {
-    const outcome = await renameGroup(group.id, name);
-    if (outcome.kind === "failed") {
-      return reportFailure(outcome, group.id);
-    }
-    setState((current) => withGroup(current, outcome.group));
-    setFailure(null);
-    return "done";
+    const result = await run({ kind: "rename" }, async () => {
+      const outcome = await renameGroup(group.id, name);
+      if (outcome.kind === "failed") {
+        return reportFailure(outcome, group.id);
+      }
+      setState((current) => withSavedGroup(current, outcome.group));
+      setFailure(null);
+      announce(translate("groups.renamed"));
+      return "done";
+    });
+    return result ?? "failed";
   }
 
-  async function remove(group: Group): Promise<GroupActionResult> {
-    const outcome = await deleteGroup(group.id);
-    if (outcome.kind === "failed") {
-      return reportFailure(outcome, group.id);
-    }
-    forgetGroup(group.id);
-    setFailure(null);
-    return "done";
+  function remove(group: GroupOverview): void {
+    void run({ kind: "delete" }, async () => {
+      const outcome = await deleteGroup(group.id);
+      if (outcome.kind === "failed") {
+        reportFailure(outcome, group.id);
+        return;
+      }
+      forgetGroup(group.id);
+      setFailure(null);
+      announce(translate("groups.deleted", { name: group.name }));
+    });
   }
 
   /** Lo llama el panel cuando el servidor le dice que su grupo ya no está. */
-  function forgetOpenGroup(): void {
-    if (openGroupId === null) {
+  function forgetSelectedGroup(): void {
+    if (selectedGroupId === null) {
       return;
     }
-    forgetGroup(openGroupId);
+    forgetGroup(selectedGroupId);
     setFailure(GROUP_GONE);
   }
 
-  const openGroup =
-    state.kind === "ready"
-      ? state.groups.find((group) => group.id === openGroupId)
-      : undefined;
+  const groups = state.kind === "ready" ? state.groups : [];
+  const selectedGroup = groups.find((group) => group.id === selectedGroupId);
+  const isDisabled = pending !== null;
 
   return (
     <div className="groups">
-      <h1>{translate("groups.title")}</h1>
-      <p className="app-lead">{translate("groups.lead")}</p>
+      <div className="groups-head">
+        <h1>{translate("groups.title")}</h1>
+        <p className="app-lead">{translate("groups.lead")}</p>
+      </div>
+      <p className="groups-notice" role="status">
+        {notice}
+      </p>
       {state.kind === "loading" ? (
         <p className="admin-empty">{translate("groups.loading")}</p>
       ) : null}
@@ -211,36 +259,61 @@ export function GroupsScreen({
           onRetry={retryLoad}
         />
       ) : null}
-      {state.kind === "ready" ? (
-        <GroupList
-          translate={translate}
-          groups={state.groups}
-          notice={
-            failure === null ? null : describeGroupsFailure(translate, failure)
-          }
-          openGroupId={openGroupId}
-          onOpen={(group) =>
-            setOpenGroupId((open) => (open === group.id ? null : group.id))
-          }
-          onCreate={create}
-          onRename={rename}
-          onDelete={remove}
-        />
-      ) : null}
-      {openGroup === undefined ? null : (
-        <GroupMembersPanel
-          key={openGroup.id}
-          translate={translate}
-          group={openGroup}
-          onMemberCountChange={(memberCount) =>
-            setState((current) =>
-              withMemberCount(current, openGroup.id, memberCount),
-            )
-          }
-          onGroupGone={forgetOpenGroup}
-          onClose={() => setOpenGroupId(null)}
-        />
+      {failure === null ? null : (
+        <p className="auth-error" role="alert">
+          {describeGroupsFailure(translate, failure)}
+        </p>
       )}
+      {state.kind === "ready" ? (
+        <div className="groups-layout">
+          <section className="groups-column" aria-labelledby="grupos-del-club">
+            <h2 id="grupos-del-club" className="visually-hidden">
+              {translate("groups.list.title")}
+            </h2>
+            <GroupCreateForm
+              translate={translate}
+              takenNames={groups.map((group) => group.name)}
+              isDisabled={isDisabled}
+              isSaving={pending?.kind === "create"}
+              onSubmit={create}
+            />
+            <GroupList
+              translate={translate}
+              groups={groups}
+              selectedGroupId={selectedGroupId}
+              isDisabled={isDisabled}
+              onSelect={(group) =>
+                setSelectedGroupId((selected) =>
+                  selected === group.id ? null : group.id,
+                )
+              }
+            />
+          </section>
+          {selectedGroup === undefined ? (
+            groups.length === 0 ? null : (
+              <p className="groups-panel-placeholder">
+                {translate("groups.panel.empty")}
+              </p>
+            )
+          ) : (
+            <GroupMembersPanel
+              key={selectedGroup.id}
+              translate={translate}
+              group={selectedGroup}
+              pendingAction={pendingAction}
+              onMembersChange={(members) =>
+                setState((current) =>
+                  withMembers(current, selectedGroup.id, members),
+                )
+              }
+              onGroupGone={forgetSelectedGroup}
+              onRename={(name) => rename(selectedGroup, name)}
+              onDelete={() => remove(selectedGroup)}
+              onNotice={announce}
+            />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

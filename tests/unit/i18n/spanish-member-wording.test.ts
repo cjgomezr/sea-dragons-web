@@ -40,15 +40,15 @@ describe("plurales", () => {
     expect(translate("groups.memberCount", { count: 2 })).toBe("2 miembros");
   });
 
-  it("pregunta por el grupo que borra nombrando a su único miembro", () => {
-    expect(
-      translate("groups.deleteQuestion", { name: "Senior", count: 1 }),
-    ).toBe("¿Borrar «Senior»? Tiene 1 miembro, que sigue en el club.");
+  it("avisa al borrar un grupo nombrando a su único miembro", () => {
+    expect(translate("groups.deleteUnused", { count: 1 })).toBe(
+      "Su 1 miembro sigue en el club. No es la audiencia de nada.",
+    );
   });
 
-  it("pregunta por el grupo que borra nombrando a sus miembros", () => {
-    expect(
-      translate("groups.deleteQuestion", { name: "Senior", count: 2 }),
-    ).toBe("¿Borrar «Senior»? Tiene 2 miembros, que siguen en el club.");
+  it("avisa al borrar un grupo nombrando a sus miembros", () => {
+    expect(translate("groups.deleteUnused", { count: 2 })).toBe(
+      "Sus 2 miembros siguen en el club. No es la audiencia de nada.",
+    );
   });
 });

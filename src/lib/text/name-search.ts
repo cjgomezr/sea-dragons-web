@@ -11,3 +11,9 @@ function normalizeForSearch(text: string): string {
 export function matchesNameSearch(fullName: string, search: string): boolean {
   return normalizeForSearch(fullName).includes(normalizeForSearch(search));
 }
+
+/** Dos nombres que se leen igual sin mirar mayúsculas, tildes ni los espacios
+ * de los bordes: "Señor Squad" y " senor squad" (E32, D1). */
+export function isSameName(one: string, other: string): boolean {
+  return normalizeForSearch(one.trim()) === normalizeForSearch(other.trim());
+}
