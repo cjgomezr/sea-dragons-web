@@ -1,8 +1,9 @@
+import type { EvaluationCategories } from "@/lib/evaluations/evaluation-categories";
 import type { MemberEvaluation } from "@/lib/evaluations/member-evaluation";
+import { formatClubShortDay } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import { EvaluationRatings } from "./EvaluationRatings";
 import { EvaluationRefreshOffer } from "./EvaluationRefreshOffer";
-import { OverallScore } from "./OverallScore";
 import {
   describeEvaluationFailure,
   isStaleEvaluation,
@@ -10,10 +11,10 @@ import {
 import { type RatingsEditor, useRatingsEditor } from "./use-ratings-editor";
 
 /**
- * Una evaluación que existe (#322): el OVR grande, las categorías con su
- * barra y su número, y el botón de editar, como el mockup. La tarjeta de
- * "Position score" del mockup no está: la v1.1 del SRD la sustituyó por las
- * categorías configurables (PRD, fuera de alcance).
+ * Una evaluación que existe (#322): las categorías con su barra y su número
+ * y, al pie, cuándo y quién la actualizó con el botón de editar (#819, RF-3
+ * del PRD de E31). El OVR va arriba, con la identidad del jugador. La
+ * edición sigue siendo la de E9 hasta que #820 la rehaga.
  */
 
 type Evaluated = Extract<MemberEvaluation, { status: "evaluated" }>;
@@ -93,9 +94,32 @@ function EditActions({
   );
 }
 
+/** "Actualizada {fecha} por {nombre}"; sólo la fecha si no se sabe quién
+ * (D6). */
+function UpdatedNote({
+  translate,
+  updatedAt,
+  updatedBy,
+}: {
+  translate: Translator;
+  updatedAt: string;
+  updatedBy: string | null;
+}): React.JSX.Element {
+  const date = formatClubShortDay(translate.locale, new Date(updatedAt));
+  return (
+    <p className="evaluation-updated">
+      {updatedBy === null
+        ? translate("evaluations.sheet.updated", { date })
+        : translate("evaluations.sheet.updatedBy", { date, name: updatedBy })}
+    </p>
+  );
+}
+
 export function EvaluationScores({
   translate,
   evaluation,
+  categories,
+  updatedBy,
   isEditingAtStart,
   onSaved,
   onRefreshed,
@@ -103,6 +127,9 @@ export function EvaluationScores({
 }: {
   translate: Translator;
   evaluation: Evaluated;
+  categories: EvaluationCategories | null;
+  /** Quién hizo la última edición, si se sabe. */
+  updatedBy: string | null;
   /** Recién creada, se abre ya para ajustar: es a lo que se venía. */
   isEditingAtStart: boolean;
   onSaved: (evaluation: MemberEvaluation) => void;
@@ -115,31 +142,35 @@ export function EvaluationScores({
   const isEditing = editor.draft !== null;
   return (
     <div className="evaluation-scores">
-      <div className="evaluation-summary">
-        <OverallScore
-          translate={translate}
-          overallRating={evaluation.overallRating}
-        />
-        <EditActions translate={translate} editor={editor} />
-        <SaveStatusMessage
-          translate={translate}
-          editor={editor}
-          onReload={onReload}
-        />
-        {isEditing ? null : (
-          <EvaluationRefreshOffer
-            translate={translate}
-            evaluation={evaluation}
-            onRefreshed={onRefreshed}
-          />
-        )}
-      </div>
       <EvaluationRatings
         translate={translate}
         ratings={evaluation.ratings}
+        categories={categories}
         draft={editor.draft}
         onDraftChange={editor.setDraft}
       />
+      <SaveStatusMessage
+        translate={translate}
+        editor={editor}
+        onReload={onReload}
+      />
+      {isEditing ? null : (
+        <EvaluationRefreshOffer
+          translate={translate}
+          evaluation={evaluation}
+          onRefreshed={onRefreshed}
+        />
+      )}
+      <footer className="evaluation-sheet-footer">
+        {isEditing ? null : (
+          <UpdatedNote
+            translate={translate}
+            updatedAt={evaluation.updatedAt}
+            updatedBy={updatedBy}
+          />
+        )}
+        <EditActions translate={translate} editor={editor} />
+      </footer>
     </div>
   );
 }

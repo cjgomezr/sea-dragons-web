@@ -3257,9 +3257,7 @@ test.describe("notas privadas en el perfil de un Player", () => {
     const section = page.getByRole("region", { name: "Evaluation" });
     await expect(section.getByText(STAFF_ONLY_NOTICE)).toBeVisible();
     await expect(page.getByText("Overall score")).toHaveCount(0);
-    await expect(page.getByRole("list", { name: "Skill ratings" })).toHaveCount(
-      0,
-    );
+    await expect(page.getByRole("list", { name: RATINGS_LIST })).toHaveCount(0);
   });
 
   test("en español, el aviso sale en español", async ({ page }) => {
@@ -15765,6 +15763,39 @@ test.describe("publicar en el móvil: la barra y las medidas (#602)", () => {
    los endpoints responden se prueba contra la base (#319 y #322).
    --------------------------------------------------------------------------- */
 
+type StubbedCategory = {
+  readonly id: string;
+  readonly name: string;
+  readonly isActive: boolean;
+};
+
+/** Las diez del SRD, con Experience desactivada, y una de 40 caracteres
+ * para el caso de contenido largo. Va antes que las fichas de prueba de
+ * Evaluaciones, que casan cada nota con su categoría (#819). */
+const STUBBED_CATEGORIES: readonly StubbedCategory[] = [
+  ...[
+    "Fitness",
+    "Speed",
+    "Endurance",
+    "Game awareness",
+    "Tactical",
+    "Passing",
+    "Ball control",
+    "Defense",
+    "Teamwork",
+    "Underwater orientation and breath contro",
+  ].map((name, index) => ({
+    id: `ca7e0000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    name,
+    isActive: true,
+  })),
+  {
+    id: "ca7e0000-0000-4000-8000-000000000099",
+    name: "Experience",
+    isActive: false,
+  },
+];
+
 const EVALUATIONS_SCREEN_PATH = "/evaluaciones";
 const EVALUATIONS_ENDPOINT = "/api/v1/evaluations";
 const EVALUATIONS_NARROW_WIDTHS = [320, 375, 768] as const;
@@ -15871,30 +15902,71 @@ const CROWDED_ROSTER = Array.from(
   }),
 );
 
-/** El resumen que la lista trae desde #817 (D5 de E31). La pantalla de hoy
- * no lo pinta: basta con que tenga la forma del contrato. */
-const STUBBED_ROSTER_SUMMARY = {
-  evaluatedCount: 4,
-  playerCount: 6,
-  categoryAverages: [],
-  averageOverall: 7.5,
-  longestUnreviewed: [],
-} as const;
+/** El resumen que la lista trae desde #817 (D5 de E31), con lo que pinta el
+ * panel sin nadie elegido (#819): Defense es la más baja, y Valentina,
+ * Chloe y Camila son las que llevan más tiempo sin revisar. */
+function stubbedRosterSummary(): unknown {
+  return {
+    evaluatedCount: 4,
+    playerCount: 6,
+    categoryAverages: (
+      [
+        ["Fitness", 7.7],
+        ["Speed", 8.3],
+        ["Endurance", 7],
+        ["Game awareness", 7.3],
+        ["Tactical", 6.7],
+        ["Passing", 7.7],
+        ["Ball control", 8],
+        ["Defense", 5.7],
+        ["Teamwork", 8.7],
+        ["Underwater orientation and breath contro", 7.3],
+      ] as const
+    ).map(([name, average]) => ({
+      categoryId: stubbedCategoryId(name),
+      name,
+      average,
+    })),
+    averageOverall: 7.5,
+    longestUnreviewed: [
+      {
+        userId: "e1e1e1e1-0000-4000-8000-0000000000e5",
+        fullName: "Valentina Maximiliana Rodríguez-Etxeberria de la Fuente",
+        updatedAt: "2026-06-21T04:00:00+00:00",
+      },
+      {
+        userId: "e1e1e1e1-0000-4000-8000-0000000000e3",
+        fullName: "Chloe Nguyen",
+        updatedAt: "2026-08-28T03:00:00+00:00",
+      },
+      { userId: CAMILA_ID, fullName: "Camila Ortiz", updatedAt: EVALUATED_AT },
+    ],
+  };
+}
 
-/** Las del mockup, más Experience, que es una de las diez del SRD. Suman 79:
- * el OVR es 7.9, como en el mockup. */
+/** Las diez activas del club, como en el mockup. Suman 79: el OVR es 7.9. */
 const CAMILA_RATINGS: readonly (readonly [string, number])[] = [
   ["Fitness", 8],
   ["Speed", 9],
   ["Endurance", 7],
-  ["Experience", 8],
   ["Game awareness", 8],
   ["Tactical", 7],
   ["Passing", 8],
   ["Ball control", 9],
   ["Defense", 6],
   ["Teamwork", 9],
+  ["Underwater orientation and breath contro", 8],
 ];
+
+/** El id de la categoría del catálogo con ese nombre, para que la ficha
+ * case cada nota con su categoría (#819). */
+function stubbedCategoryId(name: string): string {
+  const category = STUBBED_CATEGORIES.find((entry) => entry.name === name);
+  if (category === undefined) {
+    throw new Error(`No hay ninguna categoría de prueba llamada ${name}.`);
+  }
+  return category.id;
+}
 
 /** `retiredName` es una categoría que el club desactivó después de evaluar:
  * la evaluación ya no está al día (#323). */
@@ -15908,8 +15980,8 @@ function stubbedEvaluation(
     memberId: CAMILA_ID,
     updatedAt: EVALUATED_AT,
     overallRating: Math.round((sum * 10) / ratings.length) / 10,
-    ratings: ratings.map(([name, rating], index) => ({
-      categoryId: `ca7e0000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    ratings: ratings.map(([name, rating]) => ({
+      categoryId: stubbedCategoryId(name),
       name,
       rating,
       isRetired: name === retiredName,
@@ -15918,11 +15990,21 @@ function stubbedEvaluation(
   };
 }
 
-/** Lo que queda al poner al día a Camila con Experience desactivada y
- * Breath hold nueva: 79 - 8 + 5 = 76 en diez, un OVR de 7.6. */
+/** Camila evaluada antes de que el club añadiera Underwater orientation y
+ * desactivara Experience: la primera sale "nueva · sin nota" (D3) y la
+ * segunda, retirada al final. 71 + 8 = 79 en diez: el OVR sigue en 7.9. */
+const CAMILA_OUTDATED_RATINGS: readonly (readonly [string, number])[] = [
+  ...CAMILA_RATINGS.filter(
+    ([name]) => name !== "Underwater orientation and breath contro",
+  ),
+  ["Experience", 8],
+];
+
+/** Lo que queda al ponerla al día: Experience sale y Underwater orientation
+ * entra en 5. 71 + 5 = 76 en diez, un OVR de 7.6. */
 const CAMILA_REFRESHED_RATINGS: readonly (readonly [string, number])[] = [
-  ...CAMILA_RATINGS.filter(([name]) => name !== "Experience"),
-  ["Breath hold", 5],
+  ...CAMILA_OUTDATED_RATINGS.filter(([name]) => name !== "Experience"),
+  ["Underwater orientation and breath contro", 5],
 ];
 
 async function stubEvaluationReads(
@@ -15934,7 +16016,7 @@ async function stubEvaluationReads(
     (url) => url.pathname === EVALUATIONS_ENDPOINT,
     (route) =>
       route.fulfill(
-        jsonBody({ members: roster, summary: STUBBED_ROSTER_SUMMARY }),
+        jsonBody({ members: roster, summary: stubbedRosterSummary() }),
       ),
   );
   await page.route(
@@ -15958,24 +16040,54 @@ async function stubEvaluationReads(
   );
 }
 
-const RATINGS_LIST = /^(Skill ratings|Valoraciones)$/;
+const RATINGS_LIST = /^(Ratings · 1–10|Notas · 1–10)$/;
 const REFRESH =
   /^(Update to the current categories|Poner al día con las categorías actuales)$/;
-const OUTDATED_CAMILA = stubbedEvaluation(CAMILA_RATINGS, "Experience");
-const EDIT_RATINGS = /^(Edit ratings|Editar valoraciones)$/;
+const OUTDATED_CAMILA = stubbedEvaluation(
+  CAMILA_OUTDATED_RATINGS,
+  "Experience",
+);
+const EDIT_RATINGS = /^(Edit ratings|Editar notas)$/;
+const START_EVALUATION = /^(Start evaluation|Empezar evaluación)$/;
+const SQUAD_OVERVIEW = /^(Squad overview|Resumen de la plantilla)$/;
 const CAMILA_BUTTON = /Camila Ortiz/;
 const PLAYERS_LIST = /^(Players|Jugadores)$/;
 const NOT_EVALUATED_CHIP = /^(Not evaluated|Sin evaluar)/;
 const SEARCH_BY_NAME = /^(Search by name|Buscar por nombre)$/;
 const SORT_BY = /^(Sort by|Ordenar por)$/;
 
+/** La fila de la tabla: el resumen del panel también lleva botones con
+ * nombres (#819). */
+function rosterButton(page: Page, name: RegExp): Locator {
+  return page
+    .getByRole("list", { name: PLAYERS_LIST })
+    .getByRole("button", { name });
+}
+
 async function waitForRoster(page: Page): Promise<void> {
-  await expect(page.getByRole("button", { name: CAMILA_BUTTON })).toBeVisible();
+  await expect(rosterButton(page, CAMILA_BUTTON)).toBeVisible();
 }
 
 async function openCamila(page: Page): Promise<void> {
-  await page.getByRole("button", { name: CAMILA_BUTTON }).click();
+  await rosterButton(page, CAMILA_BUTTON).click();
   await expect(page.getByRole("list", { name: RATINGS_LIST })).toBeVisible();
+}
+
+/** El panel sale desde 1024 px (D12); más estrecho no hay resumen (D7) y
+ * basta con la tabla. */
+const EVALUATIONS_PANEL_MIN_WIDTH = 1024;
+
+async function waitForOverview(page: Page, text: string): Promise<void> {
+  await waitForRoster(page);
+  const width = page.viewportSize()?.width;
+  if (width === undefined) {
+    throw new Error("La página no tiene un tamaño de ventana fijo.");
+  }
+  if (width >= EVALUATIONS_PANEL_MIN_WIDTH) {
+    await expect(
+      page.getByRole("region", { name: SQUAD_OVERVIEW }),
+    ).toContainText(text);
+  }
 }
 
 async function openCamilaFromRoster(page: Page): Promise<void> {
@@ -16046,11 +16158,23 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
     name: "evaluaciones-sin-evaluar",
     roster: STUBBED_ROSTER,
     ready: async (page) => {
-      await page.getByRole("button", { name: /Mateo Fernández/ }).click();
+      await rosterButton(page, /Mateo Fernández/).click();
       await expect(
-        page.getByRole("button", { name: "Create evaluation" }),
+        page.getByRole("button", { name: START_EVALUATION }),
       ).toBeVisible();
     },
+  },
+  {
+    name: "evaluaciones-resumen",
+    roster: STUBBED_ROSTER,
+    isDesktopOnly: true,
+    ready: (page) => waitForOverview(page, "Lowest: Defense"),
+  },
+  {
+    name: "evaluaciones-resumen-todos-evaluados",
+    roster: STUBBED_ROSTER.filter((member) => member.status === "evaluated"),
+    isDesktopOnly: true,
+    ready: (page) => waitForOverview(page, "✓ Everyone has an evaluation."),
   },
   {
     name: "evaluaciones-filtrando",
@@ -16200,12 +16324,8 @@ test.describe("evaluaciones en el navegador", () => {
     await expect(page.getByRole("combobox", { name: SORT_BY })).toHaveValue(
       "oldest",
     );
-    await expect(
-      page.getByRole("button", { name: /Mateo Fernández/ }),
-    ).toBeVisible();
-    await expect(page.getByRole("button", { name: CAMILA_BUTTON })).toHaveCount(
-      0,
-    );
+    await expect(rosterButton(page, /Mateo Fernández/)).toBeVisible();
+    await expect(rosterButton(page, CAMILA_BUTTON)).toHaveCount(0);
   });
 
   test("la pestaña Categorías va en la dirección y sobrevive a recargar (#818)", async ({
@@ -16262,7 +16382,7 @@ test.describe("evaluaciones en el navegador", () => {
     await page.goto(`${APP_URL}${EVALUATIONS_SCREEN_PATH}?miembro=${MATEO_ID}`);
 
     await expect(
-      page.getByRole("button", { name: "Create evaluation" }),
+      page.getByRole("button", { name: START_EVALUATION }),
     ).toBeVisible();
   });
 
@@ -16305,11 +16425,10 @@ test.describe("evaluaciones en el navegador", () => {
       page.getByText("This evaluation now uses the current categories."),
     ).toBeVisible();
     const ratings = page.getByRole("list", { name: RATINGS_LIST });
-    await expect(ratings).toContainText("Breath hold");
+    await expect(ratings).toContainText("Underwater orientation");
     await expect(ratings).not.toContainText("Experience");
-    await expect(
-      page.getByRole("button", { name: CAMILA_BUTTON }),
-    ).toContainText("7.6");
+    await expect(ratings).not.toContainText("not rated");
+    await expect(rosterButton(page, CAMILA_BUTTON)).toContainText("7.6");
     await expect(page.getByRole("button", { name: REFRESH })).toHaveCount(0);
   });
 
@@ -16337,9 +16456,7 @@ test.describe("evaluaciones en el navegador", () => {
     await page.getByRole("button", { name: "Save ratings" }).click();
 
     await expect(page.getByText("Ratings saved.")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: CAMILA_BUTTON }),
-    ).toContainText("8.3");
+    await expect(rosterButton(page, CAMILA_BUTTON)).toContainText("8.3");
     expect(
       await page.evaluate(
         () => (window as { sinRecargar?: boolean }).sinRecargar,
@@ -16360,38 +16477,6 @@ const EVALUATION_CATEGORIES_ENDPOINT = "/api/v1/evaluations/categories";
 const EVALUATION_CATEGORIES_HEADING =
   /^(Evaluation categories|Categorías de evaluación)$/;
 const ACTIVE_CATEGORIES_LIST = /^(Active categories|Categorías activas)$/;
-
-type StubbedCategory = {
-  readonly id: string;
-  readonly name: string;
-  readonly isActive: boolean;
-};
-
-/** Las diez del SRD, con Experience desactivada, y una de 40 caracteres
- * para el caso de contenido largo. */
-const STUBBED_CATEGORIES: readonly StubbedCategory[] = [
-  ...[
-    "Fitness",
-    "Speed",
-    "Endurance",
-    "Game awareness",
-    "Tactical",
-    "Passing",
-    "Ball control",
-    "Defense",
-    "Teamwork",
-    "Underwater orientation and breath contro",
-  ].map((name, index) => ({
-    id: `ca7e0000-0000-4000-8000-${String(index).padStart(12, "0")}`,
-    name,
-    isActive: true,
-  })),
-  {
-    id: "ca7e0000-0000-4000-8000-000000000099",
-    name: "Experience",
-    isActive: false,
-  },
-];
 
 const REJECTED_CATEGORY_NAME = {
   code: "validation_error",

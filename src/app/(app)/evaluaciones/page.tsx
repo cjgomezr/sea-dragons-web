@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { EvaluationsScreen } from "@/components/evaluations/EvaluationsScreen";
+import { readCallerRole } from "@/lib/auth/caller-role";
+import { hasCapability } from "@/lib/auth/roles";
 import { EVALUATION_MEMBER_QUERY_PARAM } from "@/lib/auth/routes";
 import { readMetadataContext } from "@/lib/club/metadata-context";
 import {
@@ -19,7 +21,8 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
  *
  * `?miembro=<user_id>` abre ya la ficha de esa persona (#324). La pestaña,
  * los filtros y el orden también llegan en la dirección (#818, D8 del PRD de
- * E31).
+ * E31). El enlace al perfil de la ficha (#819) sale sólo a quien puede
+ * abrir la ficha del socio, leído aquí y no en el navegador.
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -52,9 +55,10 @@ export default async function EvaluacionesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<React.JSX.Element> {
-  const [locale, params] = await Promise.all([
+  const [locale, params, role] = await Promise.all([
     readRequestLocale(),
     searchParams,
+    readCallerRole(),
   ]);
   const address = singleValuedParams(params);
   return (
@@ -65,6 +69,7 @@ export default async function EvaluacionesPage({
       )}
       initialTab={readEvaluationsTab(address)}
       initialView={readRosterView(address)}
+      canOpenMemberRecords={hasCapability(role, "viewMemberRecords")}
     />
   );
 }

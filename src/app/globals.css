@@ -11612,8 +11612,7 @@ a.auth-brand-header:focus-visible {
 /* Hasta que caben las dos, la tabla y la ficha son dos pasos, como la lista
    de avisos de #266: o se elige a alguien, o se mira su ficha. */
 .evaluations[data-step="sheet"] .evaluations-toolbar,
-.evaluations[data-step="sheet"] .evaluation-table,
-.evaluations[data-step="list"] .evaluation-sheet-placeholder {
+.evaluations[data-step="sheet"] .evaluation-table {
   display: none;
 }
 
@@ -11785,21 +11784,24 @@ a.auth-brand-header:focus-visible {
   border-top: 1px solid var(--color-border);
 }
 
-.evaluation-sheet {
+/* El panel lateral (#819, RF-3 del PRD de E31): sin nadie elegido, el
+   resumen de la plantilla; con alguien, su ficha. Los dos son la misma caja,
+   pegada arriba en escritorio. En el móvil el resumen no sale (D7) y la
+   ficha es el segundo paso, que rehace #822. */
+.evaluation-sheet,
+.evaluation-overview {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-4);
   min-width: 0;
+  padding: var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
 }
 
-.evaluation-sheet-placeholder {
-  margin: 0;
-  padding: var(--space-6);
-  color: var(--color-text-secondary);
-  text-align: center;
-  background: var(--color-panel);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius);
+.evaluation-overview {
+  display: none;
 }
 
 .evaluation-back {
@@ -11823,22 +11825,86 @@ a.auth-brand-header:focus-visible {
   border-color: var(--color-accent);
 }
 
-.evaluation-sheet-header {
+.evaluation-sheet-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  min-width: 0;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.evaluation-sheet-header > div {
+.evaluation-sheet-nav p {
+  flex: 1;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.evaluation-sheet-nav-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--color-text);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.evaluation-sheet-nav-button:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.evaluation-sheet-nav-button:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 0;
+}
+
+.evaluation-sheet-nav-button:disabled {
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* En el móvil ya cierra el botón de volver. */
+.evaluation-sheet-close {
+  display: none;
+}
+
+.evaluation-sheet-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.evaluation-sheet-who {
   min-width: 0;
 }
 
 .evaluation-sheet-header h2 {
   margin: 0;
-  font-size: 24px;
-  line-height: 1.2;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.25;
   overflow-wrap: anywhere;
+}
+
+.evaluation-sheet-identity {
+  margin: var(--space-1) 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.evaluation-sheet-identity a {
+  color: var(--color-accent-text);
 }
 
 .evaluation-avatar {
@@ -11852,35 +11918,61 @@ a.auth-brand-header:focus-visible {
   font-size: 18px;
   font-weight: 700;
   color: var(--color-text);
-  background: var(--color-panel);
+  background: var(--color-background);
   border: 1px solid var(--color-border);
   border-radius: 50%;
 }
 
-.evaluation-eyebrow,
-.evaluation-card-title {
-  margin: 0 0 var(--space-1);
+/* La cifra con "OVR" debajo, alineados a la derecha como el handoff. */
+.evaluation-overall {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.evaluation-overall-value {
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: 30px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  line-height: 1;
+  color: var(--color-text);
+}
+
+.evaluation-overall[data-empty="true"] .evaluation-overall-value {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.evaluation-overall-caption {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: 700;
   color: var(--color-text-secondary);
 }
 
 .evaluation-card-title {
-  margin-bottom: var(--space-4);
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
 }
 
+/* Sin evaluar: el recuadro discontinuo con el atajo a empezar. */
 .evaluation-missing {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-dashed);
+  border-radius: 10px;
 }
 
-/* Con el prefijo de su tarjeta: `.card p` pinta todo párrafo de secundario y
-   le pone margen, y aquí el hueco lo pone la columna. */
 .evaluation-missing p {
   margin: 0;
 }
@@ -11889,49 +11981,43 @@ a.auth-brand-header:focus-visible {
   color: var(--color-danger);
 }
 
-.evaluation-missing .evaluation-missing-title {
-  color: var(--color-text);
-  font-size: 18px;
+.evaluation-missing-title {
+  font-size: 15px;
   font-weight: 700;
+  color: var(--color-text);
   overflow-wrap: anywhere;
 }
 
-.evaluation-scores {
-  display: grid;
-  gap: var(--space-4);
-  align-items: start;
+.evaluation-missing-hint {
+  font-size: 13px;
+  color: var(--color-text-secondary);
 }
 
-.evaluation-summary {
+.evaluation-scores {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
-.evaluation-overall {
-  text-align: center;
+.evaluation-ratings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
-.evaluation-overall .evaluation-overall-value {
+.evaluation-sheet-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.evaluation-updated {
   margin: 0;
-  font-family: var(--font-family-mono);
-  font-size: 40px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--color-accent-text);
-}
-
-.evaluation-overall .evaluation-overall-scale {
-  margin: var(--space-1) 0 0;
-  font-family: var(--font-family-mono);
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.evaluation-overall .evaluation-overall-empty {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 12.5px;
   color: var(--color-text-secondary);
 }
 
@@ -11939,10 +12025,6 @@ a.auth-brand-header:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
-}
-
-.evaluation-actions button {
-  flex: 1 1 auto;
 }
 
 .evaluation-save-error {
@@ -11959,20 +12041,22 @@ a.auth-brand-header:focus-visible {
 .evaluation-rating-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* Nombre, barra y número. La columna del nombre no crece sin límite: con uno
-   de 40 caracteres, la barra seguiría teniendo sitio a 320px. */
+/* Nombre, barra y número, con la rejilla del handoff. Un nombre de 40
+   caracteres parte en líneas dentro de sus 104 px. */
 .evaluation-rating {
   display: grid;
-  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr) 3ch;
+  grid-template-columns: 104px minmax(0, 1fr) 28px;
   gap: var(--space-3);
   align-items: center;
-  font-size: 14px;
+  min-height: 38px;
+  padding-block: var(--space-2);
+  font-size: 13.5px;
+  border-top: 1px solid var(--color-border);
 }
 
 .evaluation-rating-name {
@@ -11995,22 +12079,35 @@ a.auth-brand-header:focus-visible {
 
 .evaluation-rating-bar {
   display: block;
-  height: var(--space-2);
+  height: 6px;
   overflow: hidden;
   background: var(--color-background);
-  border-radius: var(--radius);
+  border-radius: 999px;
 }
 
 .evaluation-rating-fill {
   display: block;
   height: 100%;
   background: var(--color-accent);
+  border-radius: inherit;
+}
+
+/* Una categoría que la evaluación no tiene (D3), en aviso como "Sin
+   evaluar" de la tabla. */
+.evaluation-rating-unrated {
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--color-warning) 55%, var(--color-text));
 }
 
 .evaluation-rating-value {
   font-family: var(--font-family-mono);
   font-weight: 700;
   text-align: right;
+}
+
+.evaluation-rating[data-unrated="true"] .evaluation-rating-value {
+  font-weight: 400;
+  color: var(--color-text-secondary);
 }
 
 .evaluation-rating-slider {
@@ -12020,6 +12117,160 @@ a.auth-brand-header:focus-visible {
   accent-color: var(--color-accent);
 }
 
+.evaluation-overview-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.evaluation-overview-count {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
+}
+
+.evaluation-overview-figure {
+  font-family: var(--font-family-mono);
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.evaluation-overview-bar {
+  display: block;
+  align-self: stretch;
+  height: 8px;
+  overflow: hidden;
+  background: var(--color-background);
+  border-radius: 999px;
+}
+
+.evaluation-overview-bar span,
+.evaluation-overview-average-bar span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: inherit;
+}
+
+.evaluation-overview-done {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--color-success) 70%, var(--color-text));
+}
+
+.evaluation-overview-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.evaluation-overview-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.evaluation-overview-overall {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-accent-text);
+}
+
+.evaluation-overview-averages,
+.evaluation-overview-longest {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evaluation-overview-average {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) 28px;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: 30px;
+  font-size: 13px;
+}
+
+.evaluation-overview-average-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.evaluation-overview-average-bar {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  background: var(--color-background);
+  border-radius: 999px;
+}
+
+.evaluation-overview-average[data-lowest="true"]
+  .evaluation-overview-average-bar
+  span {
+  background: var(--color-warning);
+}
+
+.evaluation-overview-average-value {
+  font-family: var(--font-family-mono);
+  font-weight: 700;
+  text-align: right;
+}
+
+.evaluation-overview-lowest {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.evaluation-overview-longest button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.evaluation-overview-longest button:hover {
+  background: var(--color-hover);
+}
+
+.evaluation-overview-longest button:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
+.evaluation-overview-longest-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evaluation-overview-longest-date {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
 @media (min-width: 1024px) {
   .app-main .evaluations-header h1 {
     font-size: 28px;
@@ -12045,12 +12296,27 @@ a.auth-brand-header:focus-visible {
     display: flex;
   }
 
-  .evaluations[data-step="list"] .evaluation-sheet-placeholder {
-    display: block;
+  .evaluation-sheet,
+  .evaluation-overview {
+    position: sticky;
+    top: var(--space-4);
+  }
+
+  .evaluation-overview {
+    display: flex;
   }
 
   .evaluation-back {
     display: none;
+  }
+
+  .evaluation-sheet-close {
+    display: inline-flex;
+  }
+
+  .evaluation-sheet-nav-button {
+    width: 32px;
+    height: 32px;
   }
 }
 
