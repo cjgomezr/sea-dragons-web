@@ -75,6 +75,8 @@ type FakeOptions = {
     ReturnType<MemberEvaluationGateways["evaluations"]["createEvaluation"]>
   >;
   readonly save?: RatingsSave;
+  /** Cómo la deja la base tras guardar. */
+  readonly savedAs?: StoredEvaluation;
   readonly refresh?: EvaluationRefresh;
 };
 
@@ -118,7 +120,10 @@ function fakeGateways(options: FakeOptions = {}): Fake {
         );
         const result = options.save ?? { kind: "saved" };
         if (result.kind === "saved") {
-          stored = { ...TWO_CATEGORIES, updatedAt: SAVED_AT };
+          stored = options.savedAs ?? {
+            ...TWO_CATEGORIES,
+            updatedAt: SAVED_AT,
+          };
         }
         return result;
       },
@@ -472,12 +477,52 @@ describe("una evaluación guardada no cambia sola", () => {
     });
   });
 
-  it("guardar valoraciones no la pone al día", async () => {
+  it("guardar la pone al día en la misma escritura, sin una aparte (D4)", async () => {
     const { gateways, writes } = fakeGateways({ stored: TWO_CATEGORIES });
 
     await saveEvaluationRatings(gateways, SAVE_REQUEST);
 
-    expect(writes.some((write) => write.startsWith("refresh"))).toBe(false);
+    expect(writes).toEqual([
+      `save ${MEMBER_ID} por ${COACH_ID} ${READ_AT} ${FITNESS_ID}=9`,
+    ]);
+  });
+});
+
+describe("guardar una evaluación que no está al día (#820, D4)", () => {
+  it("manda la nota de una categoría que la evaluación aún no tiene", async () => {
+    const { gateways, writes } = fakeGateways({
+      stored: TWO_CATEGORIES,
+      savedAs: REFRESHED,
+    });
+
+    await saveEvaluationRatings(gateways, {
+      ...SAVE_REQUEST,
+      ratings: [
+        { categoryId: FITNESS_ID, rating: 7 },
+        { categoryId: BREATH_HOLD_ID, rating: 5 },
+      ],
+    });
+
+    expect(writes).toEqual([
+      `save ${MEMBER_ID} por ${COACH_ID} ${READ_AT} ${FITNESS_ID}=7,${BREATH_HOLD_ID}=5`,
+    ]);
+  });
+
+  it("devuelve la evaluación al día con su OVR recalculado", async () => {
+    const { gateways } = fakeGateways({
+      stored: TWO_CATEGORIES,
+      savedAs: REFRESHED,
+    });
+
+    const evaluation = await saveEvaluationRatings(gateways, SAVE_REQUEST);
+
+    expect(evaluation).toMatchObject({
+      status: "evaluated",
+      updatedAt: SAVED_AT,
+      overallRating: 6,
+      ratings: REFRESHED.ratings,
+      isCurrent: true,
+    });
   });
 });
 

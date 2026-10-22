@@ -350,6 +350,7 @@ funcion reschedule_series_sessions(acting_club_id uuid, target_series_id uuid, f
 funcion reserve_directory_email_quota(target_club_id uuid, sender_user_id uuid, send_request_id uuid, recipient_count integer, quota_limit integer, window_start timestamp with time zone)
 funcion run_nightly_cleanup()
 funcion save_attendance_sheet(acting_club_id uuid, acting_user_id uuid, target_event_id uuid, records jsonb)
+funcion save_member_evaluation(acting_club_id uuid, acting_user_id uuid, target_user_id uuid, expected_updated_at timestamp with time zone, ratings jsonb)
 funcion save_member_evaluation_ratings(acting_club_id uuid, acting_user_id uuid, target_user_id uuid, expected_updated_at timestamp with time zone, ratings jsonb)
 funcion save_team_split(acting_club_id uuid, acting_user_id uuid, target_event_id uuid, split jsonb)
 funcion search_events(p_club_id uuid, p_text text, p_whole_club boolean, p_group_ids uuid[])
