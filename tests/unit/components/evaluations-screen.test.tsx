@@ -919,19 +919,6 @@ describe("ficha de evaluación", () => {
     expect(callsTo("POST")).toHaveLength(1);
   });
 
-  it("vuelve a la lista con el botón de volver", async () => {
-    clubApi();
-    await renderScreen();
-    const sheet = await openCamila();
-
-    await userEvent.click(
-      within(sheet).getByRole("button", { name: /all members/i }),
-    );
-
-    expect(screen.queryByRole("region", { name: /evaluation of/i })).toBeNull();
-    await waitFor(() => expect(memberButton(/camila ortiz/i)).toHaveFocus());
-  });
-
   it("sale entera en español", async () => {
     clubApi();
     await renderScreen({ locale: "es" });
@@ -1789,5 +1776,280 @@ describe("editar en el panel (#820)", () => {
     expect(
       await screen.findByText("Camila Ortiz guardado"),
     ).toBeInTheDocument();
+  });
+});
+
+/* Por debajo de 1024 px (#822, RF-6 del PRD de E31, D12) la pestaña Jugadores
+   es una lista y cada jugador se abre en una ficha a pantalla completa. El
+   ancho lo dice `matchMedia`, que aquí se simula; cómo se ve a 320, 375 y
+   768 px lo prueba Playwright. */
+describe("en el móvil (#822)", () => {
+  const BELOW_DESKTOP_QUERY = "(width < 1024px)";
+  const PHONE_QUERY = "(width < 768px)";
+
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === BELOW_DESKTOP_QUERY || query === PHONE_QUERY,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }));
+  });
+
+  function backButton(sheet: HTMLElement): HTMLElement {
+    return within(sheet).getByRole("button", { name: "Back to the list" });
+  }
+
+  function previousButton(sheet: HTMLElement): HTMLElement {
+    return within(sheet).getByRole("button", { name: "Previous player" });
+  }
+
+  function nextButton(sheet: HTMLElement): HTMLElement {
+    return within(sheet).getByRole("button", { name: "Next player" });
+  }
+
+  /** Los botones de la barra fija de abajo, en su orden. */
+  function bottomBarButtons(sheet: HTMLElement): readonly string[] {
+    const bar = within(sheet).getByRole("group", {
+      name: /^(actions|acciones)$/i,
+    });
+    return within(bar)
+      .getAllByRole("button")
+      .map((button) => button.textContent ?? "");
+  }
+
+  it("cada fila lleva el nombre, posición · fecha o Sin evaluar, y el OVR", async () => {
+    clubApi();
+
+    await renderScreen();
+
+    expect(memberButton(/camila ortiz/i)).toHaveTextContent(
+      /Forward · .*27 Sep.*7\.5/,
+    );
+    expect(memberButton(/mateo ruiz/i)).toHaveTextContent(
+      /Centre · Not evaluated/,
+    );
+  });
+
+  it("el selector de orden es compacto", async () => {
+    clubApi();
+
+    await renderScreen();
+
+    const sort = screen.getByRole("combobox", { name: "Sort by" });
+    expect(
+      within(sort)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["A–Z", "OVR high", "OVR low", "Oldest"]);
+  });
+
+  it("tocar una fila abre la ficha con volver, su sitio en la lista, ↑ y ↓", async () => {
+    clubApi();
+    await renderScreen();
+
+    const sheet = await openCamila();
+
+    expect(sheet).toHaveTextContent("1 of 3 in this list");
+    expect(backButton(sheet)).toBeEnabled();
+    expect(previousButton(sheet)).toBeDisabled();
+    expect(nextButton(sheet)).toBeEnabled();
+    expect(within(sheet).queryByRole("button", { name: "Close" })).toBeNull();
+  });
+
+  it("↑ y ↓ recorren la lista filtrada y se deshabilitan en los extremos", async () => {
+    clubApi();
+    await renderScreen();
+    const camila = await openCamila();
+
+    await userEvent.click(nextButton(camila));
+    const jose = await sheetRegion(/evaluation of josé peña/i);
+    expect(jose).toHaveTextContent("2 of 3 in this list");
+    await userEvent.click(nextButton(jose));
+    const mateo = await sheetRegion(/evaluation of mateo ruiz/i);
+    expect(mateo).toHaveTextContent("3 of 3 in this list");
+    expect(nextButton(mateo)).toBeDisabled();
+
+    await userEvent.click(previousButton(mateo));
+    expect(await sheetRegion(/evaluation of josé peña/i)).toBeInTheDocument();
+  });
+
+  it("una categoría que la evaluación no tiene sale como nueva sin nota, igual que en escritorio", async () => {
+    const BREATH_HOLD = {
+      id: "ca7e0000-0000-4000-8000-000000000011",
+      name: "Breath hold",
+      isActive: true,
+    } as const;
+    clubApi({
+      [`GET ${CATEGORIES_PATH}`]: () =>
+        jsonResponse(200, {
+          data: { categories: [CATEGORIES[0], BREATH_HOLD, CATEGORIES[1]] },
+        }),
+    });
+    await renderScreen();
+
+    const sheet = await openCamila();
+
+    const ratings = within(sheet).getByRole("list", { name: RATINGS_LIST });
+    await waitFor(() =>
+      expect(within(ratings).getAllByRole("listitem")[1]).toHaveTextContent(
+        "Breath holdnew · not rated—",
+      ),
+    );
+  });
+
+  it("en lectura la barra fija lleva Editar notas", async () => {
+    clubApi();
+    await renderScreen();
+
+    const sheet = await openCamila();
+
+    expect(bottomBarButtons(sheet)).toEqual(["Edit ratings"]);
+  });
+
+  it("en edición cada categoría lleva − y + que bajan y suben de uno en uno", async () => {
+    clubApi();
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+    const fitness = within(sheet).getByRole("slider", { name: "Fitness" });
+
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Lower Fitness" }),
+    );
+    expect(fitness).toHaveValue("7");
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Raise Fitness" }),
+    );
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Raise Fitness" }),
+    );
+
+    expect(fitness).toHaveValue("9");
+    expect(sheet).toHaveTextContent("8.0");
+  });
+
+  it("− y + se deshabilitan en 1 y en 10", async () => {
+    clubApi();
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+
+    setSlider(sheet, "Fitness", 10);
+    setSlider(sheet, "Speed", 1);
+
+    expect(
+      within(sheet).getByRole("button", { name: "Raise Fitness" }),
+    ).toBeDisabled();
+    expect(
+      within(sheet).getByRole("button", { name: "Lower Fitness" }),
+    ).toBeEnabled();
+    expect(
+      within(sheet).getByRole("button", { name: "Lower Speed" }),
+    ).toBeDisabled();
+    expect(
+      within(sheet).getByRole("button", { name: "Raise Speed" }),
+    ).toBeEnabled();
+  });
+
+  it("en edición la barra fija lleva Cancelar y Guardar y siguiente, que abre al siguiente ya en edición", async () => {
+    clubApi({ [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: savedWith });
+    await renderScreen();
+    const camila = await openCamila();
+    await startEditing(camila);
+    expect(bottomBarButtons(camila)).toEqual(["Cancel", "Save & next"]);
+
+    await userEvent.click(saveAndNextButton(camila));
+
+    const jose = await sheetRegion(/evaluation of josé peña/i);
+    expect(
+      await within(jose).findByRole("slider", { name: "Fitness" }),
+    ).toHaveValue("7");
+    expect(callsTo("PUT")).toHaveLength(1);
+  });
+
+  it("en el último jugador el botón dice Guardar y se queda en su ficha", async () => {
+    clubApi({
+      [`GET ${ROSTER_PATH}`]: () => rosterResponse([CAMILA, JOSE]),
+      [`PUT ${ROSTER_PATH}/${JOSE.userId}`]: () =>
+        jsonResponse(200, {
+          data: evaluated(JOSE.userId, JOSE_RATINGS, SAVED_AT),
+        }),
+    });
+    await renderScreen();
+    const jose = await openMember(/josé peña/i);
+    await within(jose).findByRole("list", { name: RATINGS_LIST });
+    await startEditing(jose);
+    expect(bottomBarButtons(jose)).toEqual(["Cancel", "Save"]);
+
+    await userEvent.click(saveButton(jose));
+
+    await waitFor(() =>
+      expect(bottomBarButtons(jose)).toEqual(["Edit ratings"]),
+    );
+    expect(callsTo("PUT")).toHaveLength(1);
+    expect(
+      screen.getByRole("region", { name: /evaluation of josé peña/i }),
+    ).toBe(jose);
+  });
+
+  it("volver deja los filtros como estaban y el foco en la fila de ese jugador", async () => {
+    clubApi();
+    await renderScreen();
+    await userEvent.click(
+      screen.getByRole("button", { name: /^not evaluated/i }),
+    );
+    const sheet = await openMember(/mateo ruiz/i);
+
+    await userEvent.click(backButton(sheet));
+
+    expect(screen.queryByRole("region", { name: /evaluation of/i })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /^not evaluated/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(rowNames()).toEqual(["Mateo Ruiz"]);
+    await waitFor(() => expect(memberButton(/mateo ruiz/i)).toHaveFocus());
+  });
+
+  it("con ?miembro= sale ya la ficha de ese jugador", async () => {
+    clubApi();
+
+    await renderScreen({ initialMemberId: CAMILA.userId });
+
+    const sheet = await sheetRegion(/evaluation of camila ortiz/i);
+    expect(backButton(sheet)).toBeInTheDocument();
+    expect(sheet).toHaveTextContent("1 of 3 in this list");
+  });
+
+  it("sale en español", async () => {
+    clubApi();
+    await renderScreen({ locale: "es" });
+    const sort = screen.getByRole("combobox", { name: "Ordenar por" });
+    expect(
+      within(sort)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["A–Z", "OVR alto", "OVR bajo", "Más antigua"]);
+
+    const sheet = await openMember(/camila ortiz/i);
+    await userEvent.click(
+      await within(sheet).findByRole("button", { name: "Editar notas" }),
+    );
+
+    expect(
+      within(sheet).getByRole("button", { name: "Volver a la lista" }),
+    ).toBeInTheDocument();
+    expect(
+      within(sheet).getByRole("button", { name: "Bajar Fitness" }),
+    ).toBeInTheDocument();
+    expect(
+      within(sheet).getByRole("button", { name: "Subir Fitness" }),
+    ).toBeInTheDocument();
+    expect(bottomBarButtons(sheet)).toEqual([
+      "Cancelar",
+      "Guardar y siguiente",
+    ]);
   });
 });

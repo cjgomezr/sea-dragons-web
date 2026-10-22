@@ -323,6 +323,7 @@ export function EvaluationSheet({
           updatedBy={updatedByOf(member)}
           editor={editor}
           hasNext={context.position.nextId !== null}
+          layout={context.layout}
           onReload={reload}
         />
       )}
