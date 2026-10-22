@@ -708,12 +708,36 @@ export const englishMessages = {
   "groups.members.removeLabel": "Remove {name} from {group}",
   "groups.members.removed": "{name} removed from {group}",
   "groups.members.openPicker": "Add members",
-  "groups.members.addLabel": "Member to add",
-  "groups.members.add": "Add to the group",
-  "groups.members.adding": "Adding…",
-  "groups.members.added": "{name} added to {group}",
-  "groups.members.noCandidates":
-    "Every member of the club is already in this group.",
+  // El selector de varios a la vez (#829, RF-4 de E32).
+  "groups.picker.label": "Add members to {group}",
+  "groups.picker.search": "Search members not in this group",
+  "groups.picker.groupCount": {
+    one: "in {count} group",
+    other: "in {count} groups",
+  },
+  "groups.picker.selected": {
+    one: "{count} selected",
+    other: "{count} selected",
+  },
+  "groups.picker.outside": {
+    one: "{count} member not in this group",
+    other: "{count} members not in this group",
+  },
+  "groups.picker.submit": {
+    one: "Add {count} member",
+    other: "Add {count} members",
+  },
+  "groups.picker.adding": "Adding…",
+  "groups.picker.added": {
+    one: "{count} member added to {group}",
+    other: "{count} members added to {group}",
+  },
+  "groups.picker.everyoneIn": "Everyone in the club is already in this group.",
+  "groups.picker.noMatch": "No one matches.",
+  "groups.picker.rejected": "Couldn't add: {members}.",
+  "groups.picker.rejectedMember": "{name} ({reason})",
+  "groups.picker.reason.inactive": "account deactivated",
+  "groups.picker.reason.not_in_club": "no longer in the club",
   "groups.error.nameTaken": "The club already has a group with that name.",
   "groups.error.invalidName":
     "The name must have between 1 and {max} characters.",

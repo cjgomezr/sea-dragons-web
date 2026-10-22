@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { GroupRosterMember } from "@/lib/groups/group-members";
+import type {
+  GroupRosterMember,
+  RejectedMember,
+} from "@/lib/groups/group-members";
 import type { GroupOverview } from "@/lib/groups/groups";
 import type { Translator } from "@/lib/i18n/translator";
 import { compareNames } from "@/lib/text/name-order";
@@ -9,11 +12,13 @@ import type { GroupActionResult } from "./GroupNameForm";
 import { GroupMemberList } from "./GroupMemberList";
 import { GroupPanelHeader } from "./GroupPanelHeader";
 import type { GroupAction } from "./group-action";
+import { type RejectedCandidate, describeRejection } from "./group-texts";
 import {
   type GroupRoster,
   type GroupRosterLoad,
   type GroupsFailure,
-  assignMember,
+  type RosterCandidate,
+  assignMembers,
   describeGroupsFailure,
   isGroupGone,
   loadGroupRoster,
@@ -50,12 +55,26 @@ function readRoster(outcome: GroupRosterLoad): RosterState {
   return isGroupGone(outcome) ? { kind: "gone" } : { kind: "failed" };
 }
 
-function byName(
-  members: readonly GroupRosterMember[],
-): readonly GroupRosterMember[] {
+function byName<Member extends GroupRosterMember>(
+  members: readonly Member[],
+): readonly Member[] {
   return [...members].sort((one, other) =>
     compareNames(one.fullName, other.fullName),
   );
+}
+
+/** Los rechazados vuelven sólo con su id; el nombre es el que enseñaba el
+ * selector. */
+function namedRejections(
+  chosen: readonly RosterCandidate[],
+  rejected: readonly RejectedMember[],
+): readonly RejectedCandidate[] {
+  return rejected.flatMap(({ userId, reason }) => {
+    const candidate = chosen.find(({ id }) => id === userId);
+    return candidate === undefined
+      ? []
+      : [{ fullName: candidate.fullName, reason }];
+  });
 }
 
 function countNotActivated(state: RosterState): number {
@@ -70,12 +89,15 @@ export function GroupMembersPanel({
   pendingAction,
   onMembersChange,
   onGroupGone,
+  isNewGroup,
   onRename,
   onDelete,
   onNotice,
 }: {
   translate: Translator;
   group: GroupOverview;
+  /** Recién creado: su selector de añadir se abre solo. */
+  isNewGroup: boolean;
   /** La única acción en vuelo de toda la pantalla. */
   pendingAction: PendingAction<GroupAction>;
   onMembersChange: (members: readonly GroupRosterMember[]) => void;
@@ -90,6 +112,9 @@ export function GroupMembersPanel({
   // Se guarda el fallo y no la frase: el aviso que ya está a la vista cambia
   // de idioma con el interruptor (E17).
   const [failure, setFailure] = useState<GroupsFailure | null>(null);
+  // Quien el último alta dejó fuera. Se queda a la vista, y no en el aviso que
+  // se va solo, porque hay que leer los nombres.
+  const [rejected, setRejected] = useState<readonly RejectedCandidate[]>([]);
   const { pending, run } = pendingAction;
 
   const [reloads, setReloads] = useState(0);
@@ -129,34 +154,44 @@ export function GroupMembersPanel({
   function applyRoster(roster: GroupRoster): void {
     setState({ kind: "ready", ...roster });
     setFailure(null);
+    setRejected([]);
     onMembersChange(roster.members);
   }
 
-  /** La respuesta trae el socio a secas; su posición y su foto son las que
-   * ya enseñaba el selector. */
-  function add(roster: GroupRoster, candidate: GroupRosterMember): void {
-    void run({ kind: "assign" }, async () => {
-      const outcome = await assignMember(group.id, candidate.id);
+  /** Un solo POST con todos los elegidos (D3). La respuesta trae las dos
+   * listas ya al día; cuántos entraron se cuenta en ella, porque los
+   * rechazados no están. */
+  async function addMany(
+    chosen: readonly RosterCandidate[],
+  ): Promise<GroupActionResult> {
+    const result = await run({ kind: "assign" }, async () => {
+      const outcome = await assignMembers(
+        group.id,
+        chosen.map(({ id }) => id),
+      );
       if (outcome.kind === "failed") {
         reportFailure(outcome);
-        return;
+        return "failed";
       }
       applyRoster({
-        members: byName([
-          ...roster.members,
-          { ...candidate, ...outcome.member },
-        ]),
-        candidates: roster.candidates.filter(
-          (other) => other.id !== candidate.id,
-        ),
+        members: outcome.members,
+        candidates: outcome.candidates,
       });
-      onNotice(
-        translate("groups.members.added", {
-          name: candidate.fullName,
-          group: group.name,
-        }),
-      );
+      setRejected(namedRejections(chosen, outcome.rejected));
+      const addedCount = chosen.filter(({ id }) =>
+        outcome.members.some((member) => member.id === id),
+      ).length;
+      if (addedCount > 0) {
+        onNotice(
+          translate("groups.picker.added", {
+            count: addedCount,
+            group: group.name,
+          }),
+        );
+      }
+      return "done";
     });
+    return result ?? "failed";
   }
 
   function remove(roster: GroupRoster, member: GroupRosterMember): void {
@@ -168,7 +203,10 @@ export function GroupMembersPanel({
       }
       applyRoster({
         members: roster.members.filter((other) => other.id !== member.id),
-        candidates: byName([...roster.candidates, member]),
+        candidates: byName([
+          ...roster.candidates,
+          { ...member, groupCount: null },
+        ]),
       });
       onNotice(
         translate("groups.members.removed", {
@@ -197,6 +235,11 @@ export function GroupMembersPanel({
           {describeGroupsFailure(translate, failure)}
         </p>
       )}
+      {rejected.length === 0 ? null : (
+        <p className="auth-error groups-panel-error" role="alert">
+          {describeRejection(translate, rejected)}
+        </p>
+      )}
       {state.kind === "loading" ? (
         <p className="groups-members-empty">
           {translate("groups.members.loading")}
@@ -219,7 +262,8 @@ export function GroupMembersPanel({
           roster={state}
           isDisabled={isDisabled}
           isAdding={pending?.kind === "assign"}
-          onAdd={(candidate) => add(state, candidate)}
+          isNewGroup={isNewGroup}
+          onAdd={addMany}
           onRemove={(member) => remove(state, member)}
         />
       ) : null}

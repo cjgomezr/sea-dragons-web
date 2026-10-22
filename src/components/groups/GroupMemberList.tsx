@@ -3,21 +3,22 @@
 import { MagnifyingGlass } from "@phosphor-icons/react/dist/ssr/MagnifyingGlass";
 import { UserPlus } from "@phosphor-icons/react/dist/ssr/UserPlus";
 import { X } from "@phosphor-icons/react/dist/ssr/X";
-import { useId, useState } from "react";
+import { useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { MemberAvatar } from "@/components/MemberAvatar";
 import type { GroupRosterMember } from "@/lib/groups/group-members";
 import type { Translator } from "@/lib/i18n/translator";
 import { matchesNameSearch } from "@/lib/text/name-search";
-import type { GroupRoster } from "./groups-client";
+import { GroupMemberPicker } from "./GroupMemberPicker";
+import type { GroupActionResult } from "./GroupNameForm";
+import type { GroupRoster, RosterCandidate } from "./groups-client";
 
 /**
  * La columna de miembros del panel de un grupo (#828, RF-3 de E32): buscar
  * dentro del grupo, la fila de cada miembro con su × y "Añadir miembros".
  *
  * Quitar no pide confirmación (D10): volver a añadir es fácil y el aviso dice
- * lo que pasó. El selector que abre "Añadir miembros" es todavía el de uno en
- * uno de E4; el de varios a la vez llega con su propio ticket (#829).
+ * lo que pasó. "Añadir miembros" abre el selector de varios a la vez (#829).
  */
 
 function MemberRow({
@@ -65,61 +66,6 @@ function MemberRow({
         <Icon glyph={X} weight="bold" />
       </button>
     </li>
-  );
-}
-
-function CandidatePicker({
-  translate,
-  candidates,
-  isDisabled,
-  isAdding,
-  onAdd,
-}: {
-  translate: Translator;
-  candidates: readonly GroupRosterMember[];
-  isDisabled: boolean;
-  isAdding: boolean;
-  onAdd: (candidate: GroupRosterMember) => void;
-}): React.JSX.Element {
-  const fieldId = useId();
-  const [chosenId, setChosenId] = useState<string | null>(null);
-  // Quien esté elegido, o el primero: una opción que acaba de salir del
-  // selector no puede seguir siendo la elegida.
-  const chosen =
-    candidates.find((candidate) => candidate.id === chosenId) ?? candidates[0];
-  if (chosen === undefined) {
-    return (
-      <p className="groups-picker-empty">
-        {translate("groups.members.noCandidates")}
-      </p>
-    );
-  }
-  return (
-    <div className="groups-picker">
-      <div className="auth-field">
-        <label htmlFor={fieldId}>{translate("groups.members.addLabel")}</label>
-        <select
-          id={fieldId}
-          value={chosen.id}
-          disabled={isDisabled}
-          onChange={(event) => setChosenId(event.target.value)}
-        >
-          {candidates.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.fullName}
-            </option>
-          ))}
-        </select>
-      </div>
-      <button
-        type="button"
-        className="auth-submit"
-        disabled={isDisabled}
-        onClick={() => onAdd(chosen)}
-      >
-        {translate(isAdding ? "groups.members.adding" : "groups.members.add")}
-      </button>
-    </div>
   );
 }
 
@@ -177,6 +123,7 @@ export function GroupMemberList({
   roster,
   isDisabled,
   isAdding,
+  isNewGroup,
   onAdd,
   onRemove,
 }: {
@@ -186,12 +133,24 @@ export function GroupMemberList({
   /** Hay una acción en vuelo en la pantalla. */
   isDisabled: boolean;
   isAdding: boolean;
-  onAdd: (candidate: GroupRosterMember) => void;
+  /** Recién creado: su selector se abre solo, porque lo siguiente es
+   * llenarlo. */
+  isNewGroup: boolean;
+  onAdd: (chosen: readonly RosterCandidate[]) => Promise<GroupActionResult>;
   onRemove: (member: GroupRosterMember) => void;
 }): React.JSX.Element {
   const [search, setSearch] = useState("");
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(isNewGroup);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const searchLabel = translate("groups.members.search");
+
+  /** El selector se va con el botón que tenía el foco: lo recoge el que lo
+   * abrió. */
+  function closePicker(): void {
+    setIsPickerOpen(false);
+    toggleRef.current?.focus();
+  }
+
   return (
     <div className="groups-members">
       <div className="groups-members-toolbar">
@@ -206,6 +165,7 @@ export function GroupMemberList({
           />
         </label>
         <button
+          ref={toggleRef}
           type="button"
           className="groups-add-toggle"
           aria-expanded={isPickerOpen}
@@ -216,12 +176,14 @@ export function GroupMemberList({
         </button>
       </div>
       {isPickerOpen ? (
-        <CandidatePicker
+        <GroupMemberPicker
           translate={translate}
+          groupName={groupName}
           candidates={roster.candidates}
           isDisabled={isDisabled}
           isAdding={isAdding}
           onAdd={onAdd}
+          onClose={closePicker}
         />
       ) : null}
       <MembersBody

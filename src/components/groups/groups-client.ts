@@ -11,7 +11,6 @@ import { ISO_WEEKDAYS } from "@/lib/events/event-occurrences";
 import type { GroupAudience } from "@/lib/groups/group-audience";
 import type {
   GroupCandidate,
-  GroupMember,
   GroupRosterMember,
   RejectedMember,
 } from "@/lib/groups/group-members";
@@ -86,8 +85,6 @@ const candidatesSchema = z.object({
   data: z.object({ candidates: z.array(candidateSchema) }),
 });
 
-const singleMemberSchema = z.object({ data: memberSchema });
-
 const bulkAssignmentSchema = z.object({
   data: z.object({
     members: z.array(rosterMemberSchema),
@@ -152,18 +149,19 @@ export type GroupSaved =
 
 export type GroupDeleted = { readonly kind: "deleted" } | GroupsFailure;
 
-/** Los candidatos se guardan sin `groupCount`: quien sale del grupo vuelve a
- * ser candidato, y en cuántos otros grupos está no lo sabe esta pantalla. */
+/** Un candidato del selector. Su `groupCount` es `null` cuando acaba de salir
+ * del grupo desde esta pantalla: en cuántos otros grupos está no lo sabe. */
+export type RosterCandidate = GroupRosterMember & {
+  readonly groupCount: number | null;
+};
+
 export type GroupRoster = {
   readonly members: readonly GroupRosterMember[];
-  readonly candidates: readonly GroupRosterMember[];
+  readonly candidates: readonly RosterCandidate[];
 };
 
 export type GroupRosterLoad =
   ({ readonly kind: "loaded" } & GroupRoster) | GroupsFailure;
-
-export type MemberAssigned =
-  { readonly kind: "assigned"; readonly member: GroupMember } | GroupsFailure;
 
 /** El alta masiva (D3 de E32): las dos listas ya actualizadas y quién no
  * entró. */
@@ -276,19 +274,6 @@ export async function loadGroupRoster(
   };
 }
 
-export async function assignMember(
-  groupId: string,
-  userId: string,
-): Promise<MemberAssigned> {
-  const read = readApiPayload(
-    await requestApi(membershipPath(groupId, userId), { method: "PUT" }),
-    singleMemberSchema,
-  );
-  return read.kind === "failed"
-    ? read
-    : { kind: "assigned", member: read.value.data };
-}
-
 export async function assignMembers(
   groupId: string,
   userIds: readonly string[],
@@ -330,10 +315,9 @@ export async function removeMember(
 
 /**
  * Un 404 de cualquiera de estos caminos deja el grupo fuera de uso desde esta
- * pantalla: lo borró otro mientras la tenía abierta. Quitar un socio sólo
- * responde 404 por el grupo, y asignar lo responde también por un socio que
- * acaba de salir del club, un caso que la lista de candidatos que se acaba de
- * leer hace remoto. Se tratan igual: el grupo sale de la lista y se vuelve a
+ * pantalla: lo borró otro mientras la tenía abierta. Quitar un socio y
+ * añadir a varios sólo lo responden por el grupo: quien ya no está en el club
+ * vuelve en `rejected` (D3 de E32). El grupo sale de la lista y se vuelve a
  * ella, que es lo que pide el PRD de E4.
  */
 export function isGroupGone(failure: GroupsFailure): boolean {
