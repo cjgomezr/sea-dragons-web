@@ -1,131 +1,213 @@
 "use client";
 
-import type { EvaluationCategory } from "@/lib/evaluations/evaluation-categories";
+import { CaretRight } from "@phosphor-icons/react/dist/ssr/CaretRight";
+import { DotsSixVertical } from "@phosphor-icons/react/dist/ssr/DotsSixVertical";
+import { EyeSlash } from "@phosphor-icons/react/dist/ssr/EyeSlash";
+import { PencilSimple } from "@phosphor-icons/react/dist/ssr/PencilSimple";
+import { useId, useState } from "react";
+import {
+  type SortableRowBinding,
+  useSortableRow,
+} from "@/components/club/SortableRows";
+import type {
+  EvaluationCategories,
+  EvaluationCategory,
+} from "@/lib/evaluations/evaluation-categories";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
- * Una categoría en la pantalla de categorías (#323), con la forma de las
- * posiciones de #300 para que las dos pantallas se parezcan: las activas se
- * mueven, renombran y desactivan; las desactivadas sólo se reactivan.
+ * Las filas de la tabla de categorías (#821, RF-5 del PRD de E31), con la
+ * forma de las posiciones del club (#723): una activa tiene su asa, su
+ * número, su nombre, Renombrar y Desactivar; las desactivadas van plegadas
+ * debajo, sólo con su nombre y Reactivar.
  *
- * Mover es con botones de subir y bajar, no arrastrando, para que se pueda
- * con el teclado.
+ * El asa reordena con ↑ y ↓, o arrastrándola con ratón o dedo, como las
+ * posiciones (#725). Ya no hay botones de subir y bajar (D9).
  */
 
 export type Direction = "up" | "down";
 
-/** Lo que marca un botón para que la pantalla le devuelva el foco después
- * de pintar la lista nueva: al esperar la respuesta estaba desactivado y lo
- * perdió. */
+/** Lo que marca un control para que la pestaña le devuelva el foco después
+ * de pintar la lista nueva: al esperar la respuesta estaba desactivado, o su
+ * fila cambió de sitio, y lo perdió. */
 export const FOCUS_KEY_ATTRIBUTE = "data-focus-key";
 
-export function moveFocusKey(categoryId: string, direction: Direction): string {
-  return `${categoryId}:${direction}`;
+const DIRECTION_OF_KEY: Readonly<Record<string, Direction>> = {
+  ArrowUp: "up",
+  ArrowDown: "down",
+};
+
+export function handleFocusKey(categoryId: string): string {
+  return `${categoryId}:handle`;
 }
 
 export function renameFocusKey(categoryId: string): string {
   return `${categoryId}:rename`;
 }
 
-function CategoryHeading({
-  name,
-  rank,
-}: {
-  name: string;
-  /** El puesto en el orden, sólo en las activas. */
-  rank?: number;
-}): React.JSX.Element {
-  return (
-    <div className="club-positions-head">
-      {rank === undefined ? null : (
-        <span className="club-positions-rank" aria-hidden="true">
-          {rank}
-        </span>
-      )}
-      <h3 className="club-positions-name">{name}</h3>
-    </div>
-  );
-}
-
-export function ActiveCategoryItem({
+function CategoryHandle({
   translate,
   category,
   rank,
   total,
-  isBusy,
-  isEditing,
+  hintId,
+  setHandleNode,
+  handleListeners,
   onMove,
-  onToggleRename,
+}: {
+  translate: Translator;
+  category: EvaluationCategory;
+  rank: number;
+  total: number;
+  hintId: string;
+  setHandleNode: SortableRowBinding["setHandleNode"];
+  handleListeners: SortableRowBinding["handleListeners"];
+  onMove: (direction: Direction) => void;
+}): React.JSX.Element {
+  function handleKey(event: React.KeyboardEvent): void {
+    const direction = DIRECTION_OF_KEY[event.key];
+    if (direction === undefined) {
+      return;
+    }
+    // Las flechas no mueven la página mientras el asa tiene el foco.
+    event.preventDefault();
+    const isAtEdge = direction === "up" ? rank === 1 : rank === total;
+    if (!isAtEdge) {
+      onMove(direction);
+    }
+  }
+
+  return (
+    <div className="club-positions-cell">
+      <button
+        ref={setHandleNode}
+        type="button"
+        className="club-positions-handle"
+        data-focus-key={handleFocusKey(category.id)}
+        aria-label={translate("evaluations.categories.handle.label", {
+          name: category.name,
+          rank,
+          total,
+        })}
+        aria-describedby={hintId}
+        title={translate("evaluations.categories.handle.title")}
+        {...handleListeners}
+        onKeyDown={handleKey}
+      >
+        <DotsSixVertical aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+function RowActions({
+  translate,
+  category,
+  isBusy,
+  onRename,
   onDeactivate,
-  children,
+}: {
+  translate: Translator;
+  category: EvaluationCategory;
+  isBusy: boolean;
+  onRename: () => void;
+  onDeactivate: () => void;
+}): React.JSX.Element {
+  const { name } = category;
+  return (
+    <div className="club-positions-cell club-positions-actions">
+      <button
+        type="button"
+        className="club-positions-icon-button"
+        data-focus-key={renameFocusKey(category.id)}
+        aria-label={translate("evaluations.categories.rename.label", { name })}
+        disabled={isBusy}
+        onClick={onRename}
+      >
+        <PencilSimple aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="club-positions-icon-button evaluation-categories-deactivate"
+        aria-label={translate("evaluations.categories.deactivate.label", {
+          name,
+        })}
+        disabled={isBusy}
+        onClick={onDeactivate}
+      >
+        <EyeSlash aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+export function ActiveCategoryRow({
+  translate,
+  category,
+  rank,
+  total,
+  handleHintId,
+  isBusy,
+  renameForm,
+  onMove,
+  onRename,
+  onDeactivate,
 }: {
   translate: Translator;
   category: EvaluationCategory;
   /** Empieza en 1. */
   rank: number;
   total: number;
+  /** El texto que explica cómo se mueve con el asa. */
+  handleHintId: string;
   isBusy: boolean;
-  isEditing: boolean;
+  /** El formulario de renombrar, que ocupa el nombre y las acciones mientras
+   * está abierto. */
+  renameForm: React.ReactNode | null;
   onMove: (direction: Direction) => void;
-  onToggleRename: () => void;
+  onRename: () => void;
   onDeactivate: () => void;
-  /** El formulario de renombrar, cuando está abierto. */
-  children?: React.ReactNode;
 }): React.JSX.Element {
-  const { name } = category;
-  const isAtEdge = (direction: Direction): boolean =>
-    direction === "up" ? rank === 1 : rank === total;
-  const moveButton = (direction: Direction): React.JSX.Element => (
-    <button
-      type="button"
-      className="admin-secondary"
-      data-focus-key={moveFocusKey(category.id, direction)}
-      aria-label={translate(`evaluations.categories.move.${direction}.label`, {
-        name,
-      })}
-      disabled={isBusy || isAtEdge(direction)}
-      onClick={() => onMove(direction)}
-    >
-      {translate(`evaluations.categories.move.${direction}`)}
-    </button>
-  );
+  const { setRowNode, rowClassName, rowStyle, setHandleNode, handleListeners } =
+    useSortableRow(category.id);
   return (
-    <li className="groups-item club-positions-item">
-      <CategoryHeading name={name} rank={rank} />
-      <div className="groups-actions">
-        {moveButton("up")}
-        {moveButton("down")}
-        <button
-          type="button"
-          className="admin-secondary"
-          data-focus-key={renameFocusKey(category.id)}
-          aria-label={translate("evaluations.categories.rename.label", {
-            name,
-          })}
-          aria-expanded={isEditing}
-          disabled={isBusy}
-          onClick={onToggleRename}
-        >
-          {translate("evaluations.categories.rename")}
-        </button>
-        <button
-          type="button"
-          className="admin-secondary"
-          aria-label={translate("evaluations.categories.deactivate.label", {
-            name,
-          })}
-          disabled={isBusy}
-          onClick={onDeactivate}
-        >
-          {translate("evaluations.categories.deactivate")}
-        </button>
-      </div>
-      {children}
+    <li
+      ref={setRowNode}
+      className={`club-positions-row ${rowClassName}`.trimEnd()}
+      style={rowStyle}
+    >
+      <CategoryHandle
+        translate={translate}
+        category={category}
+        rank={rank}
+        total={total}
+        hintId={handleHintId}
+        setHandleNode={setHandleNode}
+        handleListeners={handleListeners}
+        onMove={onMove}
+      />
+      <span className="club-positions-cell evaluation-categories-rank">
+        {rank}
+      </span>
+      {renameForm ?? (
+        <>
+          <span className="club-positions-cell evaluation-categories-name">
+            {category.name}
+          </span>
+          <RowActions
+            translate={translate}
+            category={category}
+            isBusy={isBusy}
+            onRename={onRename}
+            onDeactivate={onDeactivate}
+          />
+        </>
+      )}
     </li>
   );
 }
 
-export function InactiveCategoryItem({
+function InactiveCategoryRow({
   translate,
   category,
   isBusy,
@@ -137,21 +219,81 @@ export function InactiveCategoryItem({
   onReactivate: () => void;
 }): React.JSX.Element {
   return (
-    <li className="groups-item club-positions-item">
-      <CategoryHeading name={category.name} />
-      <div className="groups-actions">
-        <button
-          type="button"
-          className="admin-secondary"
-          aria-label={translate("evaluations.categories.reactivate.label", {
-            name: category.name,
-          })}
-          disabled={isBusy}
-          onClick={onReactivate}
-        >
-          {translate("evaluations.categories.reactivate")}
-        </button>
-      </div>
+    <li className="club-positions-archived-row">
+      <span className="evaluation-categories-name">{category.name}</span>
+      <button
+        type="button"
+        className="admin-secondary"
+        aria-label={translate("evaluations.categories.reactivate.label", {
+          name: category.name,
+        })}
+        disabled={isBusy}
+        onClick={onReactivate}
+      >
+        {translate("evaluations.categories.reactivate")}
+      </button>
     </li>
+  );
+}
+
+/** Las desactivadas, plegadas bajo la tabla: salen sólo si hay alguna. */
+export function InactiveCategories({
+  translate,
+  inactive,
+  isBusy,
+  onReactivate,
+}: {
+  translate: Translator;
+  inactive: EvaluationCategories;
+  isBusy: boolean;
+  onReactivate: (category: EvaluationCategory) => void;
+}): React.JSX.Element | null {
+  const [isOpen, setIsOpen] = useState(false);
+  const listId = useId();
+  if (inactive.length === 0) {
+    return null;
+  }
+  const total = inactive.length;
+  return (
+    <div className="club-positions-archived">
+      <button
+        type="button"
+        className="club-positions-archived-toggle"
+        aria-expanded={isOpen}
+        aria-controls={listId}
+        aria-label={translate("evaluations.categories.inactive.toggle.label", {
+          total,
+        })}
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        <CaretRight
+          className="club-positions-archived-caret"
+          aria-hidden="true"
+        />
+        <span className="club-positions-archived-count">
+          {translate("evaluations.categories.inactive.toggle", { total })}
+        </span>
+        <span className="club-positions-note">
+          {translate("evaluations.categories.inactive.note")}
+        </span>
+      </button>
+      {isOpen ? (
+        <ul
+          id={listId}
+          className="club-positions-archived-list"
+          aria-label={translate("evaluations.categories.inactive.title")}
+        >
+          {inactive.map((category) => (
+            <InactiveCategoryRow
+              key={category.id}
+              translate={translate}
+              category={category}
+              isBusy={isBusy}
+              onReactivate={() => onReactivate(category)}
+            />
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }

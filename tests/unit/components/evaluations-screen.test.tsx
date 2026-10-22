@@ -371,7 +371,7 @@ describe("pestañas", () => {
 
     const panel = screen.getByRole("tabpanel", { name: /categories/i });
     expect(
-      await within(panel).findByRole("heading", { name: "Active categories" }),
+      await within(panel).findByRole("list", { name: "Active categories" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Players" })).toBeNull();
     expect(addressParams()).toEqual({ tab: "categories" });

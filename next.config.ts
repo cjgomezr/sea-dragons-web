@@ -10,12 +10,18 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   // La pantalla de administración de E3 se mudó al directorio (#240). Quien
   // llegue con un enlace viejo aterriza donde ahora están la bandeja y el
-  // cambio de rol. Es permanente porque la ruta no va a volver.
+  // cambio de rol. Es permanente porque la ruta no va a volver. Lo mismo las
+  // categorías de evaluación, que son una pestaña de Evaluaciones (#821).
   async redirects() {
     return [
       {
         source: "/administracion",
         destination: "/directorio",
+        permanent: true,
+      },
+      {
+        source: "/evaluaciones/categorias",
+        destination: "/evaluaciones?tab=categories",
         permanent: true,
       },
     ];

@@ -11542,45 +11542,99 @@ a.auth-brand-header:focus-visible {
   border-radius: var(--radius);
 }
 
-/* Las categorías de evaluación (#323). Sin mockup: copia la forma de las
-   posiciones de #300 (sus clases `club-positions-*` en cada categoría y en el
-   formulario), porque el problema es el mismo y conviene que se parezcan. */
+/* La pestaña Categorías de Evaluaciones (#821, RF-5 del PRD de E31; docs/
+   design/design_handoff_evaluations, "04-desktop-categories"). Es la tabla de
+   las posiciones del club (#723), con sus clases `club-positions-*`, sin la
+   columna del rol y con 680px de ancho como mucho. */
 .evaluation-categories {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  max-width: 720px;
+  gap: var(--space-4);
+  max-width: 680px;
 }
 
-.evaluation-categories-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  max-width: 720px;
-}
-
-.evaluation-categories-header {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-
-.evaluation-categories-header h1,
-.evaluation-categories-header .app-lead {
+.evaluation-categories .evaluation-categories-lead {
   margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-.evaluation-categories-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+.evaluation-categories .club-positions-row {
+  grid-template-columns: 36px 28px 1fr 84px;
 }
 
-.evaluation-categories-group h2 {
+.evaluation-categories .club-positions-table {
+  min-width: 0;
+  border-radius: 12px;
+}
+
+.evaluation-categories .club-positions-table-head {
+  min-height: 34px;
+  padding-block: 0;
+}
+
+.evaluation-categories-rank {
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.evaluation-categories-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.evaluation-categories
+  .club-positions-icon-button.evaluation-categories-deactivate:hover:not(
+    :disabled
+  ) {
+  color: var(--color-danger);
+}
+
+/* En la fila de añadir, el campo ocupa el número y el nombre. */
+.evaluation-categories .club-positions-add-row .club-positions-names-cell {
+  grid-column: 2 / 4;
+}
+
+/* Con el aviso debajo del campo la fila crece: el + y Añadir se quedan a la
+   altura del campo, no en el centro de la fila. */
+.evaluation-categories .club-positions-add-row {
+  align-items: start;
+}
+
+.evaluation-categories .club-positions-add-row .club-positions-add-icon,
+.evaluation-categories .club-positions-add-row .club-positions-actions {
+  height: 34px;
+}
+
+.evaluation-categories .club-positions-names-cell {
+  gap: var(--space-1);
+}
+
+.evaluation-categories .club-positions-names-cell .auth-field-error {
   margin: 0;
-  font-size: 18px;
-  line-height: 1.3;
+  font-size: 12.5px;
+}
+
+.evaluation-categories .club-positions-names-cell .auth-error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+}
+
+.evaluation-categories-add-input.club-positions-input {
+  height: 34px;
+}
+
+.evaluation-categories-rename-input.club-positions-input {
+  border-color: var(--color-accent);
+}
+
+.evaluation-categories-rename-input.club-positions-input[aria-invalid="true"],
+.evaluation-categories-add-input.club-positions-input[aria-invalid="true"] {
+  border-color: var(--color-danger);
 }
 
 /* La oferta de poner al día (#323), bajo el OVR con las demás acciones. */

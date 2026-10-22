@@ -1,16 +1,39 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import type { DndContextProps } from "@dnd-kit/core";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EvaluationCategoriesScreen } from "@/components/evaluations/EvaluationCategoriesScreen";
+import { EvaluationCategoriesManager } from "@/components/evaluations/EvaluationCategoriesScreen";
 import type { EvaluationCategory } from "@/lib/evaluations/evaluation-categories";
 import type { Locale } from "@/lib/i18n/locale";
+import { createTranslator } from "@/lib/i18n/translator";
+import { type CapturedDndContext, dropOn } from "../helpers/dnd-kit-drag";
+
+const dndContext = vi.hoisted((): CapturedDndContext => ({ props: null }));
+
+vi.mock("@dnd-kit/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@dnd-kit/core")>();
+  return {
+    ...actual,
+    DndContext: (props: DndContextProps) => {
+      dndContext.props = props;
+      return <actual.DndContext {...props} />;
+    },
+  };
+});
 
 /**
- * La pantalla de categorías de evaluación (#323, RF-3 del PRD de E9): un
- * Coach o un Admin ve las activas en su orden y las desactivadas aparte, y
- * añade, renombra, reordena (también con el teclado), desactiva y reactiva.
- * El servidor es un doble que guarda el catálogo en memoria; las reglas
- * (nombre repetido, qué entra en las evaluaciones nuevas) son suyas.
+ * La pestaña Categorías de Evaluaciones (#821, RF-5 del PRD de E31): una
+ * tabla con las activas en su orden, que se reordena arrastrando por el asa
+ * o con ↑ y ↓ sobre ella, se renombra en la misma fila y se amplía con la
+ * fila de añadir. Las desactivadas van plegadas debajo. El servidor es un
+ * doble que guarda el catálogo en memoria; el nombre repetido lo comprueba
+ * también la pestaña antes de mandar nada.
  */
 
 const CATEGORIES_PATH = "/api/v1/evaluations/categories";
@@ -33,7 +56,7 @@ const TEAMWORK: EvaluationCategory = {
 };
 const EXPERIENCE: EvaluationCategory = {
   id: "ca7e0000-0000-4000-8000-000000000004",
-  name: "Experience",
+  name: "Experiência",
   isActive: false,
 };
 const NEW_CATEGORY_ID = "ca7e0000-0000-4000-8000-000000000005";
@@ -44,7 +67,7 @@ let catalog: EvaluationCategory[];
 let requests: Request[];
 /** La respuesta de la próxima escritura o de la próxima carga, si no es la
  * del doble. */
-let nextWriteResponse: (() => Response) | null;
+let nextWriteResponse: (() => Response | Promise<Response>) | null;
 let nextLoadResponse: (() => Response) | null;
 
 function jsonResponse(status: number, payload: unknown): Response {
@@ -68,6 +91,10 @@ function catalogResponse(status = 200): Response {
 
 function networkFailure(): Response {
   throw new TypeError("Failed to fetch");
+}
+
+function neverAnswers(): Promise<Response> {
+  return new Promise(() => undefined);
 }
 
 function applyWrite(request: Request): Response {
@@ -94,14 +121,21 @@ function applyWrite(request: Request): Response {
     return catalogResponse(201);
   }
   const categoryId = request.url.split("/").at(-1);
-  catalog = catalog.map((category) => {
-    if (category.id !== categoryId) {
-      return category;
-    }
-    return "name" in body
-      ? { ...category, name: String(body.name) }
-      : { ...category, isActive: body.isActive as boolean };
-  });
+  const target = catalog.find((category) => category.id === categoryId)!;
+  if ("name" in body) {
+    catalog = catalog.map((category) =>
+      category === target ? { ...category, name: String(body.name) } : category,
+    );
+    return catalogResponse();
+  }
+  // Reactivar la devuelve al final de las activas.
+  const changed = { ...target, isActive: body.isActive as boolean };
+  const others = catalog.filter((category) => category !== target);
+  catalog = [
+    ...others.filter(({ isActive }) => isActive),
+    changed,
+    ...others.filter(({ isActive }) => !isActive),
+  ];
   return catalogResponse();
 }
 
@@ -131,8 +165,12 @@ function stubApi(): void {
   );
 }
 
-async function renderScreen(locale: Locale = "en"): Promise<void> {
-  render(<EvaluationCategoriesScreen locale={locale} />);
+function mountTab(locale: Locale = "en"): void {
+  render(<EvaluationCategoriesManager translate={createTranslator(locale)} />);
+}
+
+async function renderTab(locale: Locale = "en"): Promise<void> {
+  mountTab(locale);
   await screen.findByRole("list", {
     name: locale === "en" ? "Active categories" : "Categorías activas",
   });
@@ -142,29 +180,35 @@ function activeList(): HTMLElement {
   return screen.getByRole("list", { name: "Active categories" });
 }
 
-function inactiveList(): HTMLElement {
-  return screen.getByRole("list", { name: "Deactivated categories" });
-}
-
-function namesIn(list: HTMLElement): string[] {
-  return within(list)
+/** Los nombres de las activas, en el orden en que salen. */
+function activeNames(): string[] {
+  return within(activeList())
     .getAllByRole("listitem")
-    .map((item) => within(item).getByRole("heading").textContent ?? "");
+    .map(
+      (row) =>
+        row.querySelector(".evaluation-categories-name")?.textContent ?? "",
+    );
 }
 
-function createForm(): HTMLElement {
-  return screen.getByRole("form", { name: "Add a category" });
+function handleOf(name: string, rank: number, total = 3): HTMLElement {
+  return screen.getByRole("button", {
+    name: `Reorder ${name}, position ${rank} of ${total}`,
+  });
 }
 
-async function addCategory(name: string): Promise<void> {
-  const field = within(createForm()).getByLabelText("Category name");
-  await userEvent.clear(field);
-  if (name !== "") {
-    await userEvent.type(field, name);
-  }
+function addField(): HTMLElement {
+  return screen.getByRole("textbox", { name: "New category" });
+}
+
+function addButton(): HTMLElement {
+  return screen.getByRole("button", { name: "Add" });
+}
+
+async function openDeactivated(): Promise<HTMLElement> {
   await userEvent.click(
-    within(createForm()).getByRole("button", { name: "Add category" }),
+    screen.getByRole("button", { name: /^Deactivated categories: / }),
   );
+  return screen.getByRole("list", { name: "Deactivated categories" });
 }
 
 beforeEach(() => {
@@ -172,6 +216,7 @@ beforeEach(() => {
   requests = [];
   nextWriteResponse = null;
   nextLoadResponse = null;
+  dndContext.props = null;
   stubApi();
 });
 
@@ -180,121 +225,82 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("pantalla de categorías", () => {
-  it("lista las activas en su orden y las desactivadas aparte", async () => {
-    await renderScreen();
+describe("la tabla de categorías", () => {
+  it("lleva la entradilla del orden y las activas en su orden, con su número", async () => {
+    await renderTab();
 
-    expect(namesIn(activeList())).toEqual(["Fitness", "Speed", "Teamwork"]);
-    expect(namesIn(inactiveList())).toEqual(["Experience"]);
+    expect(
+      screen.getByText(
+        "The order here is the order on every evaluation. Deactivating hides a category from new ratings; old scores are kept.",
+      ),
+    ).toBeInTheDocument();
+    expect(activeNames()).toEqual(["Fitness", "Speed", "Teamwork"]);
+    const ranks = within(activeList())
+      .getAllByRole("listitem")
+      .map(
+        (row) =>
+          row.querySelector(".evaluation-categories-rank")?.textContent ?? "",
+      );
+    expect(ranks).toEqual(["1", "2", "3"]);
   });
 
-  it("vuelve a Evaluaciones desde su cabecera", async () => {
-    await renderScreen();
+  it("da a cada fila su asa, Renombrar y Desactivar", async () => {
+    await renderTab();
 
-    expect(screen.getByRole("link", { name: /evaluations/i })).toHaveAttribute(
-      "href",
-      "/evaluaciones",
+    const [, row] = within(activeList()).getAllByRole("listitem");
+    if (row === undefined) {
+      throw new Error("Falta la segunda fila");
+    }
+    const handle = within(row).getByRole("button", {
+      name: "Reorder Speed, position 2 of 3",
+    });
+    expect(handle).toHaveAttribute("title", "Drag, or use ↑ ↓");
+    expect(
+      within(row).getByRole("button", { name: "Rename Speed" }),
+    ).toBeInTheDocument();
+    expect(
+      within(row).getByRole("button", { name: "Deactivate Speed" }),
+    ).toBeInTheDocument();
+  });
+
+  it("ya no tiene los botones de subir y bajar", async () => {
+    await renderTab();
+
+    expect(screen.queryByRole("button", { name: /^Move .* (up|down)$/ })).toBe(
+      null,
     );
   });
 
-  it("añade una categoría, que aparece la última de las activas", async () => {
-    await renderScreen();
+  it("deja las desactivadas plegadas, con su número y su nota", async () => {
+    await renderTab();
 
-    await addCategory("Breath hold");
+    const toggle = screen.getByRole("button", {
+      name: "Deactivated categories: 1",
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent("Deactivated · 1");
+    expect(toggle).toHaveTextContent(
+      "hidden from new ratings, kept on old ones",
+    );
+    expect(
+      screen.queryByRole("list", { name: "Deactivated categories" }),
+    ).toBeNull();
+
+    const inactive = await openDeactivated();
+
+    expect(within(inactive).getByText("Experiência")).toBeInTheDocument();
+  });
+});
+
+describe("reordenar con ↑ y ↓ en el asa", () => {
+  it("sube la fila un puesto, manda el orden entero, lo anuncia y deja el foco en el asa", async () => {
+    await renderTab();
+
+    handleOf("Teamwork", 3).focus();
+    await userEvent.keyboard("{ArrowUp}");
 
     await vi.waitFor(() =>
-      expect(namesIn(activeList())).toEqual([
-        "Fitness",
-        "Speed",
-        "Teamwork",
-        "Breath hold",
-      ]),
-    );
-    expect(requests).toEqual([
-      { method: "POST", url: CATEGORIES_PATH, body: { name: "Breath hold" } },
-    ]);
-    expect(within(createForm()).getByLabelText("Category name")).toHaveValue(
-      "",
-    );
-    expect(screen.getByText("Breath hold added.")).toHaveAttribute(
-      "aria-live",
-      "polite",
-    );
-  });
-
-  it("renombra una categoría", async () => {
-    await renderScreen();
-
-    await userEvent.click(screen.getByRole("button", { name: "Rename Speed" }));
-    const form = screen.getByRole("form", { name: "Rename Speed" });
-    const field = within(form).getByLabelText("Category name");
-    expect(field).toHaveValue("Speed");
-    await userEvent.clear(field);
-    await userEvent.type(field, "Sprint");
-    await userEvent.click(
-      within(form).getByRole("button", { name: "Save name" }),
-    );
-
-    await vi.waitFor(() =>
-      expect(namesIn(activeList())).toEqual(["Fitness", "Sprint", "Teamwork"]),
-    );
-    expect(requests).toEqual([
-      {
-        method: "PATCH",
-        url: `${CATEGORIES_PATH}/${SPEED.id}`,
-        body: { name: "Sprint" },
-      },
-    ]);
-    expect(screen.queryByRole("form", { name: "Rename Speed" })).toBeNull();
-  });
-
-  it("desactiva una categoría y la pasa a las desactivadas", async () => {
-    await renderScreen();
-
-    await userEvent.click(
-      screen.getByRole("button", { name: "Deactivate Speed" }),
-    );
-
-    await vi.waitFor(() =>
-      expect(namesIn(inactiveList())).toEqual(["Speed", "Experience"]),
-    );
-    expect(namesIn(activeList())).toEqual(["Fitness", "Teamwork"]);
-    expect(requests).toEqual([
-      {
-        method: "PATCH",
-        url: `${CATEGORIES_PATH}/${SPEED.id}`,
-        body: { isActive: false },
-      },
-    ]);
-  });
-
-  it("reactiva una categoría desactivada", async () => {
-    await renderScreen();
-
-    await userEvent.click(
-      screen.getByRole("button", { name: "Reactivate Experience" }),
-    );
-
-    await vi.waitFor(() =>
-      expect(namesIn(activeList())).toContain("Experience"),
-    );
-    expect(requests).toEqual([
-      {
-        method: "PATCH",
-        url: `${CATEGORIES_PATH}/${EXPERIENCE.id}`,
-        body: { isActive: true },
-      },
-    ]);
-  });
-
-  it("reordena con el teclado mandando la lista entera, y deja el foco en la categoría movida", async () => {
-    await renderScreen();
-
-    screen.getByRole("button", { name: "Move Teamwork up" }).focus();
-    await userEvent.keyboard("{Enter}");
-
-    await vi.waitFor(() =>
-      expect(namesIn(activeList())).toEqual(["Fitness", "Teamwork", "Speed"]),
+      expect(activeNames()).toEqual(["Fitness", "Teamwork", "Speed"]),
     );
     expect(requests).toEqual([
       {
@@ -304,92 +310,363 @@ describe("pantalla de categorías", () => {
       },
     ]);
     expect(
-      screen.getByRole("button", { name: "Move Teamwork up" }),
-    ).toHaveFocus();
-    expect(screen.getByText("Teamwork is now number 2 of 3.")).toHaveAttribute(
-      "aria-live",
-      "polite",
+      screen.getByText("Teamwork moved to 2 of 3 · saved", {
+        selector: "[aria-live]",
+      }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(handleOf("Teamwork", 2)).toHaveFocus());
+  });
+
+  it("baja la fila un puesto con ↓", async () => {
+    await renderTab();
+
+    handleOf("Fitness", 1).focus();
+    await userEvent.keyboard("{ArrowDown}");
+
+    await vi.waitFor(() =>
+      expect(activeNames()).toEqual(["Speed", "Fitness", "Teamwork"]),
+    );
+    await waitFor(() => expect(handleOf("Fitness", 2)).toHaveFocus());
+  });
+
+  it("enseña también a la vista que se guardó", async () => {
+    await renderTab();
+
+    handleOf("Teamwork", 3).focus();
+    await userEvent.keyboard("{ArrowUp}");
+
+    expect(
+      await screen.findByText("Teamwork moved to 2 of 3 · saved", {
+        selector: ".club-saved-notice *",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("no sube la primera ni baja la última", async () => {
+    await renderTab();
+
+    handleOf("Fitness", 1).focus();
+    await userEvent.keyboard("{ArrowUp}");
+    handleOf("Teamwork", 3).focus();
+    await userEvent.keyboard("{ArrowDown}");
+
+    expect(requests).toEqual([]);
+  });
+
+  it("si falla al guardar, la fila sigue en su sitio y dice el error", async () => {
+    await renderTab();
+    nextWriteResponse = networkFailure;
+
+    handleOf("Teamwork", 3).focus();
+    await userEvent.keyboard("{ArrowUp}");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /couldn't reach the server/i,
+    );
+    expect(activeNames()).toEqual(["Fitness", "Speed", "Teamwork"]);
+  });
+
+  it("si alguien cambió las categorías entretanto, ofrece cargar las últimas", async () => {
+    await renderTab();
+    nextWriteResponse = () =>
+      errorResponse(409, "conflict", "evaluation_categories_changed");
+
+    handleOf("Speed", 2).focus();
+    await userEvent.keyboard("{ArrowDown}");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /someone else changed the categories/i,
+    );
+    catalog = [TEAMWORK, FITNESS, SPEED, EXPERIENCE];
+    await userEvent.click(
+      screen.getByRole("button", { name: "Load the latest categories" }),
+    );
+
+    await vi.waitFor(() =>
+      expect(activeNames()).toEqual(["Teamwork", "Fitness", "Speed"]),
+    );
+  });
+});
+
+describe("arrastrar por el asa", () => {
+  it("soltar en otro puesto guarda el orden entero y lo anuncia", async () => {
+    await renderTab();
+
+    dropOn(dndContext, TEAMWORK.id, FITNESS.id);
+
+    expect(
+      await screen.findByText("Teamwork moved to 1 of 3 · saved", {
+        selector: "[aria-live]",
+      }),
+    ).toBeInTheDocument();
+    expect(requests).toEqual([
+      {
+        method: "PUT",
+        url: ORDER_PATH,
+        body: { categoryIds: [TEAMWORK.id, FITNESS.id, SPEED.id] },
+      },
+    ]);
+    expect(activeNames()).toEqual(["Teamwork", "Fitness", "Speed"]);
+  });
+
+  it("mientras el servidor contesta, la fila ya está donde se soltó", async () => {
+    await renderTab();
+    nextWriteResponse = neverAnswers;
+
+    dropOn(dndContext, FITNESS.id, TEAMWORK.id);
+
+    expect(activeNames()).toEqual(["Speed", "Teamwork", "Fitness"]);
+  });
+
+  it("si falla, la fila vuelve a su sitio y dice el error", async () => {
+    await renderTab();
+    nextWriteResponse = networkFailure;
+
+    dropOn(dndContext, TEAMWORK.id, FITNESS.id);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /couldn't reach the server/i,
+    );
+    expect(activeNames()).toEqual(["Fitness", "Speed", "Teamwork"]);
+  });
+
+  it("soltar en el mismo puesto no manda nada", async () => {
+    await renderTab();
+
+    dropOn(dndContext, SPEED.id, SPEED.id);
+
+    expect(requests).toEqual([]);
+  });
+});
+
+describe("renombrar en la fila", () => {
+  it("pasa el nombre a un campo con ✓ y ×, con el foco dentro", async () => {
+    await renderTab();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename Speed" }));
+
+    const field = screen.getByRole("textbox", { name: "New name for Speed" });
+    expect(field).toHaveValue("Speed");
+    expect(field).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Save name" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  });
+
+  it("guarda con Intro", async () => {
+    await renderTab();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename Speed" }));
+    const field = screen.getByRole("textbox", { name: "New name for Speed" });
+    await userEvent.clear(field);
+    await userEvent.type(field, "Sprint{Enter}");
+
+    await vi.waitFor(() =>
+      expect(activeNames()).toEqual(["Fitness", "Sprint", "Teamwork"]),
+    );
+    expect(requests).toEqual([
+      {
+        method: "PATCH",
+        url: `${CATEGORIES_PATH}/${SPEED.id}`,
+        body: { name: "Sprint" },
+      },
+    ]);
+    expect(
+      screen.queryByRole("textbox", { name: "New name for Speed" }),
+    ).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Rename Sprint" }),
+      ).toHaveFocus(),
     );
   });
 
-  it("no deja subir la primera ni bajar la última", async () => {
-    await renderScreen();
+  it("cancela con Esc sin mandar nada y devuelve el foco a Renombrar", async () => {
+    await renderTab();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename Speed" }));
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "New name for Speed" }),
+      "y{Escape}",
+    );
 
     expect(
-      screen.getByRole("button", { name: "Move Fitness up" }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "Move Teamwork down" }),
-    ).toBeDisabled();
+      screen.queryByRole("textbox", { name: "New name for Speed" }),
+    ).toBeNull();
+    expect(activeNames()).toEqual(["Fitness", "Speed", "Teamwork"]);
+    expect(requests).toEqual([]);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Rename Speed" }),
+      ).toHaveFocus(),
+    );
   });
 
-  it("enseña el nombre repetido junto al campo y no cambia la lista", async () => {
-    await renderScreen();
+  it("no deja guardar el nombre de otra categoría", async () => {
+    await renderTab();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename Speed" }));
+    const field = screen.getByRole("textbox", { name: "New name for Speed" });
+    await userEvent.clear(field);
+    await userEvent.type(field, "fitness");
+
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    expect(field).toHaveAccessibleDescription(
+      "There is already a category with that name.",
+    );
+    expect(screen.getByRole("button", { name: "Save name" })).toBeDisabled();
+  });
+});
+
+describe("la fila de añadir", () => {
+  it("lleva el campo de hasta 40 caracteres y Añadir deshabilitado mientras está vacío", async () => {
+    await renderTab();
+
+    expect(addField()).toHaveAttribute(
+      "placeholder",
+      "New category, e.g. Speed",
+    );
+    expect(addField()).toHaveAttribute("maxlength", "40");
+    expect(addButton()).toBeDisabled();
+
+    await userEvent.type(addField(), "   ");
+
+    expect(addButton()).toBeDisabled();
+  });
+
+  it("añade con Intro y dice que sale sin nota en las que ya existen", async () => {
+    await renderTab();
+
+    await userEvent.type(addField(), "Breath hold{Enter}");
+
+    await vi.waitFor(() =>
+      expect(activeNames()).toEqual([
+        "Fitness",
+        "Speed",
+        "Teamwork",
+        "Breath hold",
+      ]),
+    );
+    expect(requests).toEqual([
+      { method: "POST", url: CATEGORIES_PATH, body: { name: "Breath hold" } },
+    ]);
+    expect(addField()).toHaveValue("");
+    expect(
+      screen.getByText(
+        'Breath hold added · it shows as "not rated" on existing evaluations',
+        { selector: "[aria-live]" },
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["una activa, en minúsculas", "speed"],
+    ["una desactivada", "Experiência"],
+    ["una desactivada, sin tilde y en mayúsculas", "EXPERIENCIA"],
+  ])("avisa del nombre de %s y no deja añadirlo", async (_case, name) => {
+    await renderTab();
+
+    await userEvent.type(addField(), name);
+
+    expect(addField()).toHaveAttribute("aria-invalid", "true");
+    expect(addField()).toHaveAccessibleDescription(
+      "There is already a category with that name.",
+    );
+    expect(addButton()).toBeDisabled();
+  });
+
+  it("si el servidor dice que el nombre ya existe, lo enseña junto al campo", async () => {
+    await renderTab();
     nextWriteResponse = () =>
       errorResponse(400, "validation_error", "name_taken");
 
-    await addCategory("Speed");
+    await userEvent.type(addField(), "Breath hold");
+    await userEvent.click(addButton());
 
-    const field = within(createForm()).getByLabelText("Category name");
     await vi.waitFor(() =>
-      expect(field).toHaveAttribute("aria-invalid", "true"),
+      expect(addField()).toHaveAttribute("aria-invalid", "true"),
     );
-    expect(field).toHaveAccessibleDescription(
-      expect.stringContaining("Another category already has this name"),
+    expect(addField()).toHaveAccessibleDescription(
+      "There is already a category with that name.",
     );
-    expect(namesIn(activeList())).toEqual(["Fitness", "Speed", "Teamwork"]);
   });
 
-  it("no manda un nombre vacío, y lo dice junto al campo", async () => {
-    await renderScreen();
-
-    await addCategory("   ");
-
-    const field = within(createForm()).getByLabelText("Category name");
-    expect(field).toHaveAttribute("aria-invalid", "true");
-    expect(field).toHaveAccessibleDescription(
-      expect.stringContaining("Write a name"),
-    );
-    expect(requests).toEqual([]);
-  });
-
-  it("no manda un nombre de más de 40 caracteres, y lo dice junto al campo", async () => {
-    await renderScreen();
-
-    await addCategory("x".repeat(41));
-
-    const field = within(createForm()).getByLabelText("Category name");
-    expect(field).toHaveAttribute("aria-invalid", "true");
-    expect(field).toHaveAccessibleDescription(
-      expect.stringContaining("Up to 40 characters"),
-    );
-    expect(requests).toEqual([]);
-  });
-
-  it("tras un fallo de red al añadir lo dice y deja reintentar con lo escrito", async () => {
-    await renderScreen();
+  it("tras un fallo de red lo dice y deja reintentar con lo escrito", async () => {
+    await renderTab();
     nextWriteResponse = networkFailure;
 
-    await addCategory("Breath hold");
+    await userEvent.type(addField(), "Breath hold{Enter}");
 
-    expect(
-      await within(createForm()).findByText(/couldn't reach the server/i),
-    ).toBeInTheDocument();
-    expect(within(createForm()).getByLabelText("Category name")).toHaveValue(
-      "Breath hold",
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /couldn't reach the server/i,
     );
+    expect(addField()).toHaveValue("Breath hold");
+    await userEvent.click(addButton());
+
+    await vi.waitFor(() => expect(activeNames()).toContain("Breath hold"));
+  });
+});
+
+describe("desactivar y reactivar", () => {
+  it("desactiva una categoría, lo dice y la pasa a las desactivadas", async () => {
+    await renderTab();
+
     await userEvent.click(
-      within(createForm()).getByRole("button", { name: "Add category" }),
+      screen.getByRole("button", { name: "Deactivate Speed" }),
     );
 
+    await vi.waitFor(() =>
+      expect(activeNames()).toEqual(["Fitness", "Teamwork"]),
+    );
+    expect(requests).toEqual([
+      {
+        method: "PATCH",
+        url: `${CATEGORIES_PATH}/${SPEED.id}`,
+        body: { isActive: false },
+      },
+    ]);
     expect(
-      await within(activeList()).findByText("Breath hold"),
+      screen.getByText("Speed deactivated · old scores kept", {
+        selector: "[aria-live]",
+      }),
     ).toBeInTheDocument();
-    expect(within(createForm()).queryByRole("alert")).toBeNull();
+    const inactive = await openDeactivated();
+    expect(within(inactive).getByText("Speed")).toBeInTheDocument();
+  });
+
+  it("reactiva una desactivada al final de las activas", async () => {
+    await renderTab();
+    const inactive = await openDeactivated();
+
+    await userEvent.click(
+      within(inactive).getByRole("button", { name: "Reactivate Experiência" }),
+    );
+
+    await vi.waitFor(() =>
+      expect(activeNames()).toEqual([
+        "Fitness",
+        "Speed",
+        "Teamwork",
+        "Experiência",
+      ]),
+    );
+    expect(requests).toEqual([
+      {
+        method: "PATCH",
+        url: `${CATEGORIES_PATH}/${EXPERIENCE.id}`,
+        body: { isActive: true },
+      },
+    ]);
+    expect(
+      screen.getByText("Experiência reactivated · added at the end", {
+        selector: "[aria-live]",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("tras un fallo de red al desactivar lo dice y reintenta con un botón", async () => {
-    await renderScreen();
+    await renderTab();
     nextWriteResponse = networkFailure;
 
     await userEvent.click(
@@ -402,36 +679,16 @@ describe("pantalla de categorías", () => {
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     await vi.waitFor(() =>
-      expect(namesIn(inactiveList())).toEqual(["Speed", "Experience"]),
+      expect(activeNames()).toEqual(["Fitness", "Teamwork"]),
     );
     expect(screen.queryByRole("alert")).toBeNull();
   });
+});
 
-  it("si alguien cambió las categorías entretanto, ofrece cargar las últimas", async () => {
-    await renderScreen();
-    nextWriteResponse = () =>
-      errorResponse(409, "conflict", "evaluation_categories_changed");
-
-    await userEvent.click(
-      screen.getByRole("button", { name: "Move Speed down" }),
-    );
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      /someone else changed the categories/i,
-    );
-    catalog = [TEAMWORK, FITNESS, SPEED, EXPERIENCE];
-    await userEvent.click(
-      screen.getByRole("button", { name: "Load the latest categories" }),
-    );
-
-    await vi.waitFor(() =>
-      expect(namesIn(activeList())).toEqual(["Teamwork", "Fitness", "Speed"]),
-    );
-  });
-
+describe("la carga", () => {
   it("si no puede cargarlas, lo dice y deja reintentar", async () => {
     nextLoadResponse = networkFailure;
-    render(<EvaluationCategoriesScreen locale="en" />);
+    mountTab();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /couldn't reach the server/i,
@@ -446,57 +703,105 @@ describe("pantalla de categorías", () => {
   it("dice que no tiene acceso si la API responde 403", async () => {
     nextLoadResponse = () => errorResponse(403, "forbidden");
 
-    render(<EvaluationCategoriesScreen locale="en" />);
+    mountTab();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /only coaches and admins/i,
     );
   });
+});
 
+describe("en español", () => {
   it("sale entera en español", async () => {
-    await renderScreen("es");
+    await renderTab("es");
 
     expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: "Categorías de evaluación",
-      }),
+      screen.getByText(
+        "El orden de aquí es el de cada evaluación. Desactivar oculta una categoría de las notas nuevas; las antiguas se conservan.",
+      ),
     ).toBeInTheDocument();
-    expect(
-      namesIn(screen.getByRole("list", { name: "Categorías desactivadas" })),
-    ).toEqual(["Experience"]);
+    const handle = screen.getByRole("button", {
+      name: "Reordenar Speed, posición 2 de 3",
+    });
+    expect(handle).toHaveAttribute("title", "Arrastra, o usa ↑ ↓");
     expect(
       screen.getByRole("button", { name: "Desactivar Speed" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Nueva categoría" }),
+    ).toHaveAttribute("placeholder", "Nueva categoría, p. ej. Velocidad");
+    expect(screen.getByRole("button", { name: "Añadir" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Categorías desactivadas: 1" }),
+    ).toHaveTextContent(
+      "Desactivadas · 1ocultas en las notas nuevas, se conservan en las antiguas",
+    );
   });
-});
 
-describe("el foco en la pantalla de categorías", () => {
-  it("al subir una categoría hasta arriba pasa al botón de bajarla", async () => {
-    await renderScreen();
+  it("anuncia en español lo que guarda", async () => {
+    await renderTab("es");
+
+    screen
+      .getByRole("button", { name: "Reordenar Teamwork, posición 3 de 3" })
+      .focus();
+    await userEvent.keyboard("{ArrowUp}");
+
+    expect(
+      await screen.findByText("Teamwork movida a 2 de 3 · guardado", {
+        selector: "[aria-live]",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("avisa en español del nombre repetido", async () => {
+    await renderTab("es");
+
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Nueva categoría" }),
+      "experiencia",
+    );
+
+    expect(
+      screen.getByText("Ya hay una categoría con ese nombre."),
+    ).toBeInTheDocument();
+  });
+
+  it("dice en español lo que pasa al añadir, desactivar y reactivar", async () => {
+    await renderTab("es");
+
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Nueva categoría" }),
+      "Apnea{Enter}",
+    );
+    expect(
+      await screen.findByText(
+        'Apnea añadida · sale como "sin nota" en las evaluaciones que ya existen',
+        { selector: "[aria-live]" },
+      ),
+    ).toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Move Speed up" }),
+      screen.getByRole("button", { name: "Desactivar Speed" }),
     );
-
-    await vi.waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Move Speed down" }),
-      ).toHaveFocus(),
-    );
-  });
-
-  it("al cerrar el renombrado vuelve al botón que lo abrió", async () => {
-    await renderScreen();
-
-    await userEvent.click(screen.getByRole("button", { name: "Rename Speed" }));
     expect(
-      within(screen.getByRole("form", { name: "Rename Speed" })).getByLabelText(
-        "Category name",
+      await screen.findByText(
+        "Speed desactivada · se conservan las notas antiguas",
+        {
+          selector: "[aria-live]",
+        },
       ),
-    ).toHaveFocus();
-    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    ).toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: "Rename Speed" })).toHaveFocus();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Categorías desactivadas: 2" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Reactivar Speed" }),
+    );
+    expect(
+      await screen.findByText("Speed reactivada · añadida al final", {
+        selector: "[aria-live]",
+      }),
+    ).toBeInTheDocument();
   });
 });
