@@ -2393,7 +2393,7 @@ export const englishMessages = {
   "evaluations.overview.longest": "Longest without review",
   "evaluations.notEvaluated.title": "{name} hasn't been evaluated yet",
   "evaluations.notEvaluated.hint":
-    "Every category starts at 5. Until then, Teams counts them as 5.",
+    "Every category starts at 5. Until then, Teams counts this player as 5.",
   "evaluations.create": "Start evaluation",
   "evaluations.creating": "Starting…",
   "evaluations.edit": "Edit ratings",

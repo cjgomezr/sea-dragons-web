@@ -360,9 +360,12 @@ export function EvaluationsScreen({
     }
   }
 
-  function renderPlayers(roster: Roster): React.JSX.Element {
-    const display = displayRoster(roster.members, view, locale);
-    const side = selected ? (
+  /** El panel lateral: la ficha de quien esté elegido, o el resumen. */
+  function renderSide(
+    roster: Roster,
+    display: RosterDisplay,
+  ): React.JSX.Element {
+    return selected ? (
       <EvaluationSheet
         key={selected.userId}
         translate={translate}
@@ -389,6 +392,10 @@ export function EvaluationsScreen({
         onOpen={openMember}
       />
     );
+  }
+
+  function renderPlayers(roster: Roster): React.JSX.Element {
+    const display = displayRoster(roster.members, view, locale);
     return (
       <PlayersPanel
         translate={translate}
@@ -397,7 +404,7 @@ export function EvaluationsScreen({
         selectedId={selectedId}
         onViewChange={changeView}
         onSelect={toggleSelection}
-        side={side}
+        side={renderSide(roster, display)}
       />
     );
   }

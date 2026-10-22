@@ -1333,6 +1333,21 @@ describe("ficha en lectura (#819)", () => {
     ).toBeVisible();
   });
 
+  it("tras guardar no atribuye la edición nueva a quien hizo la anterior", async () => {
+    clubApi({ [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: savedWith });
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+
+    setSlider(sheet, "Fitness", 10);
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: /save ratings/i }),
+    );
+
+    expect(await within(sheet).findByText(/^Updated 27 Sep/)).toBeVisible();
+    expect(sheet).not.toHaveTextContent(/by Carla Coach/);
+  });
+
   it("sin quién la actualizó, el pie dice sólo la fecha", async () => {
     clubApi();
     await renderScreen();
@@ -1354,7 +1369,7 @@ describe("ficha en lectura (#819)", () => {
       await within(sheet).findByText("Mateo Ruiz hasn't been evaluated yet"),
     ).toBeVisible();
     expect(sheet).toHaveTextContent(
-      "Every category starts at 5. Until then, Teams counts them as 5.",
+      "Every category starts at 5. Until then, Teams counts this player as 5.",
     );
     expect(
       within(sheet).getByRole("button", { name: "Start evaluation" }),
