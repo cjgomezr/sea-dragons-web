@@ -148,3 +148,17 @@ export function summarizeEvaluationRoster(
     longestUnreviewed: longestUnreviewedOf(evaluated),
   };
 }
+
+/** La categoría que el panel pinta en aviso (#819); con un empate, la
+ * primera en el orden del club. `null` sin ninguna media. */
+export function lowestCategoryAverage(
+  averages: readonly CategoryAverage[],
+): CategoryAverage | null {
+  return averages.reduce<CategoryAverage | null>(
+    (lowest, candidate) =>
+      lowest === null || candidate.average < lowest.average
+        ? candidate
+        : lowest,
+    null,
+  );
+}
