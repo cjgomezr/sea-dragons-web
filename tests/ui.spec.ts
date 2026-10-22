@@ -4119,6 +4119,17 @@ test.describe("el selector de añadir miembros en escritorio", () => {
     const toggleBorder = await toggle.evaluate(
       (element) => getComputedStyle(element).borderTopColor,
     );
+    const toggleBackground = await toggle.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    const activeTint = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      probe.style.background = "var(--color-segment-selected)";
+      document.body.append(probe);
+      const rgb = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return rgb;
+    });
     const accentAsRgb = await page.evaluate((color) => {
       const probe = document.createElement("span");
       probe.style.color = color;
@@ -4131,6 +4142,7 @@ test.describe("el selector de añadir miembros en escritorio", () => {
     expect(pickerBorder.radius).toBe("10px");
     expect(pickerBorder.color).toBe(accentAsRgb);
     expect(toggleBorder).toBe(accentAsRgb);
+    expect(toggleBackground).toBe(activeTint);
   });
 
   test("cada fila mide al menos 42px, con el avatar de 28px", async ({
