@@ -16222,7 +16222,7 @@ test.describe("evaluaciones en el navegador", () => {
       "true",
     );
     await expect(
-      page.getByRole("heading", { name: "Active categories" }),
+      page.getByRole("list", { name: ACTIVE_CATEGORIES_LIST }),
     ).toBeVisible();
   });
 
