@@ -2,9 +2,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
+import { createSupabaseNotificationWriter } from "@/lib/notifications/supabase-notification-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
-import type { EventRsvpGateways, NewEventRsvp, RsvpEvent } from "./event-rsvp";
+import {
+  type EventRsvpGateways,
+  type NewEventRsvp,
+  RSVP_RESPONSES,
+  type RsvpEvent,
+  type RsvpResponse,
+} from "./event-rsvp";
+import { createSupabaseTeamSeatsGateway } from "./supabase-team-seats-gateway";
 
 /**
  * Responder a un evento contra Supabase (#308).
@@ -25,6 +33,7 @@ type Environment = Readonly<Record<string, string | undefined>>;
 const rsvpEventRowSchema = z.object({
   id: z.string(),
   club_id: z.string(),
+  title: z.string(),
   status: z.enum(["scheduled", "cancelled"]),
   starts_at: z.string(),
   audience: z.enum(["all", "groups"]),
@@ -35,6 +44,7 @@ function toRsvpEvent(row: z.infer<typeof rsvpEventRowSchema>): RsvpEvent {
   return {
     id: row.id,
     clubId: row.club_id,
+    title: row.title,
     status: row.status,
     startsAt: new Date(row.starts_at),
     audience:
@@ -53,7 +63,9 @@ async function findEvent(
 ): Promise<RsvpEvent | null> {
   const { data, error } = await serviceClient
     .from(EVENTS_TABLE)
-    .select("id, club_id, status, starts_at, audience, event_groups(group_id)")
+    .select(
+      "id, club_id, title, status, starts_at, audience, event_groups(group_id)",
+    )
     .eq("club_id", query.clubId)
     .eq("id", query.eventId)
     .maybeSingle();
@@ -63,6 +75,26 @@ async function findEvent(
     );
   }
   return data === null ? null : toRsvpEvent(rsvpEventRowSchema.parse(data));
+}
+
+const responseRowSchema = z.object({ response: z.enum(RSVP_RESPONSES) });
+
+async function findResponse(
+  serviceClient: SupabaseClient,
+  query: { readonly eventId: string; readonly userId: string },
+): Promise<RsvpResponse | null> {
+  const { data, error } = await serviceClient
+    .from(RSVPS_TABLE)
+    .select("response")
+    .eq("event_id", query.eventId)
+    .eq("user_id", query.userId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo leer la respuesta de ${query.userId} al evento ${query.eventId}: ${error.message}`,
+    );
+  }
+  return data === null ? null : responseRowSchema.parse(data).response;
 }
 
 async function saveResponse(
@@ -89,13 +121,18 @@ async function saveResponse(
 export function createEventRsvpGateways(
   serviceClient: SupabaseClient,
 ): EventRsvpGateways {
+  const roleRequests = createRoleRequestGateways(serviceClient);
   return {
-    members: createRoleRequestGateways(serviceClient).members,
+    members: roleRequests.members,
     memberGroups: createSupabaseMemberGroupsGateway(serviceClient),
     rsvps: {
       findEvent: (query) => findEvent(serviceClient, query),
+      findResponse: (query) => findResponse(serviceClient, query),
       saveResponse: (rsvp) => saveResponse(serviceClient, rsvp),
     },
+    teamSeats: createSupabaseTeamSeatsGateway(serviceClient),
+    admins: roleRequests.admins,
+    notifications: createSupabaseNotificationWriter(serviceClient),
   };
 }
 
