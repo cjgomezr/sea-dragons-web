@@ -96,7 +96,8 @@ function toAssignableMember(row: AssignableRow): AssignableMember {
   };
 }
 
-async function groupExists(
+/** Si el grupo existe y es del club. */
+export async function groupExists(
   serviceClient: SupabaseClient,
   { clubId, groupId }: GroupScope,
 ): Promise<boolean> {
@@ -154,7 +155,7 @@ async function findAssignableMembers(
 
 function toInsertFailure(
   error: { readonly code: string; readonly message: string },
-  membership: { readonly groupId: string; readonly userId: string },
+  membership: { readonly groupId: string; readonly userIds: readonly string[] },
 ): MembershipInsertResult {
   if (error.code === FOREIGN_KEY_VIOLATION_CODE) {
     if (error.message.includes(GROUP_FOREIGN_KEY)) {
@@ -165,7 +166,7 @@ function toInsertFailure(
     }
   }
   throw new Error(
-    `No se pudo asignar el socio ${membership.userId} al grupo ${membership.groupId}: ${error.message}`,
+    `No se pudo asignar a ${membership.userIds.join(", ")} al grupo ${membership.groupId}: ${error.message}`,
   );
 }
 
@@ -203,7 +204,7 @@ export function createGroupMembersGateways(
             { onConflict: "group_id,user_id", ignoreDuplicates: true },
           );
         if (error) {
-          return toInsertFailure(error, { groupId, userId });
+          return toInsertFailure(error, { groupId, userIds: [userId] });
         }
         return { kind: "assigned" };
       },
@@ -225,6 +226,38 @@ export function createGroupMembersGateways(
           );
         }
         return { kind: "removed" };
+      },
+    },
+    bulkMemberships: {
+      async findClubMembers({ clubId, userIds }) {
+        const { data, error } = await serviceClient
+          .from(MEMBERS_TABLE)
+          .select(MEMBER_COLUMNS)
+          .eq("club_id", clubId)
+          .in("user_id", userIds);
+        if (error) {
+          throw new Error(
+            `No se pudieron leer los socios pedidos del club ${clubId}: ${error.message}`,
+          );
+        }
+        return data.map(toClubMember);
+      },
+
+      // Un solo `insert ... on conflict do nothing`: una sentencia es atómica,
+      // así que si una clave foránea falla no entra nadie.
+      async insertMemberships({ clubId, groupId, userIds }) {
+        const { error } = await serviceClient.from(MEMBERSHIPS_TABLE).upsert(
+          userIds.map((userId) => ({
+            club_id: clubId,
+            group_id: groupId,
+            user_id: userId,
+          })),
+          { onConflict: "group_id,user_id", ignoreDuplicates: true },
+        );
+        if (error) {
+          return toInsertFailure(error, { groupId, userIds });
+        }
+        return { kind: "assigned" };
       },
     },
     photos: {

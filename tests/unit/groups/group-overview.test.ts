@@ -18,6 +18,12 @@ const TOMORROW = "2026-10-23";
 const SENIOR = "9a9a9a9a-0000-4000-8000-000000000009";
 const MASTERS = "8b8b8b8b-0000-4000-8000-000000000008";
 
+/** La próxima sesión programada de una serie que sigue en pie. */
+const NEXT_SESSION = {
+  id: "5e5e5e5e-0000-4000-8000-00000000005e",
+  startsOn: TOMORROW,
+};
+
 const NO_USES: GroupAudienceUses = { events: [], series: [], posts: [] };
 
 describe("uso de un grupo: eventos", () => {
@@ -56,7 +62,9 @@ describe("uso de un grupo: eventos", () => {
   it("cuenta una serie que sigue en pie una sola vez, no por sesión", () => {
     const uses: GroupAudienceUses = {
       ...NO_USES,
-      series: [{ groupIds: [SENIOR], endsOn: TOMORROW, hasSessionsLeft: true }],
+      series: [
+        { groupIds: [SENIOR], endsOn: TOMORROW, nextSession: NEXT_SESSION },
+      ],
     };
 
     expect(countGroupUsage(uses, TODAY).get(SENIOR)).toEqual({
@@ -69,7 +77,7 @@ describe("uso de un grupo: eventos", () => {
     const uses: GroupAudienceUses = {
       ...NO_USES,
       series: [
-        { groupIds: [SENIOR], endsOn: YESTERDAY, hasSessionsLeft: true },
+        { groupIds: [SENIOR], endsOn: YESTERDAY, nextSession: NEXT_SESSION },
       ],
     };
 
@@ -79,9 +87,7 @@ describe("uso de un grupo: eventos", () => {
   it("no cuenta una serie cancelada, sin sesiones en pie de hoy en adelante", () => {
     const uses: GroupAudienceUses = {
       ...NO_USES,
-      series: [
-        { groupIds: [SENIOR], endsOn: TOMORROW, hasSessionsLeft: false },
-      ],
+      series: [{ groupIds: [SENIOR], endsOn: TOMORROW, nextSession: null }],
     };
 
     expect(countGroupUsage(uses, TODAY).get(SENIOR)).toBeUndefined();
