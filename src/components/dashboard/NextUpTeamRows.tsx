@@ -67,9 +67,15 @@ export function MyTeamStrip({
   readonly eventId: string;
   readonly team: NextUpTeam;
 }): React.JSX.Element {
+  // Quien ya no viene sigue en el equipo, pero no "juega en" él: la franja
+  // pierde el tinte y la etiqueta lo dice sin contradecir la línea.
   return (
     <div
-      className="dashboard-next-up-team"
+      className={
+        team.isOutsideSquad
+          ? "dashboard-next-up-team dashboard-next-up-team-not-coming"
+          : "dashboard-next-up-team"
+      }
       style={{ "--team-color": team.color } as React.CSSProperties}
     >
       <span className="dashboard-next-up-team-swatch" aria-hidden="true">
@@ -77,7 +83,11 @@ export function MyTeamStrip({
       </span>
       <div className="dashboard-next-up-team-text">
         <p className="dashboard-next-up-eyebrow">
-          {translate("calendar.teams.playingInEyebrow")}
+          {translate(
+            team.isOutsideSquad
+              ? "calendar.teams.heading"
+              : "calendar.teams.playingInEyebrow",
+          )}
         </p>
         <TeamLine translate={translate} team={team} />
       </div>

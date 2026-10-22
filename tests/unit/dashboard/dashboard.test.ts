@@ -1166,7 +1166,7 @@ describe("mi equipo en el próximo evento (#745)", () => {
     });
   });
 
-  it("dice al Player del reparto publicado que ya no viene si respondió que no", async () => {
+  it("dice al Player del reparto publicado que ya no viene si no está entre quienes respondieron Sí o Quizás", async () => {
     const row = scrimmage();
     club.players = [playerWith(GOALKEEPER.id)];
     club.splits.set(row.id, splitWith([{ userId: CALLER_ID, team: "b" }]));

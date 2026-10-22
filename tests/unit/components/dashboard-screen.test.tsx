@@ -822,6 +822,16 @@ describe("el equipo en la tarjeta Próximo (#747)", () => {
       expect(within(card).queryByText(/Full back/)).toBeNull();
     });
 
+    it("no le dice que está jugando: la etiqueta pasa a Equipos", async () => {
+      stubDashboard(withNextUp({ ...NEXT_UP, myTeam: NOT_COMING_TEAM }));
+
+      await renderScreen();
+
+      const card = nextUpCard();
+      expect(within(card).queryByText("You're playing in")).toBeNull();
+      expect(within(card).getByText("Teams")).toBeInTheDocument();
+    });
+
     it("le deja el enlace Ver equipos", async () => {
       stubDashboard(withNextUp({ ...NEXT_UP, myTeam: NOT_COMING_TEAM }));
 

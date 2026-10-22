@@ -20312,6 +20312,18 @@ p.dashboard-next-up-line {
   border: 1px solid color-mix(in srgb, var(--team-color) 60%, transparent);
 }
 
+/* Quien ya no viene (#839): la franja neutra, como la del candado, y la
+   camiseta en gris. */
+.dashboard-next-up-team-not-coming {
+  background: var(--color-background);
+  border-color: var(--color-border);
+}
+
+.dashboard-next-up-team-not-coming .dashboard-next-up-team-swatch {
+  color: var(--color-text-secondary);
+  background: var(--color-panel);
+}
+
 .dashboard-next-up-team-swatch {
   display: inline-flex;
   flex: none;

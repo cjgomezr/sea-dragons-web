@@ -461,7 +461,7 @@ describe("EventTeams", () => {
     ).not.toBeNull();
   });
 
-  it("no marca a nadie cuando vuelve a responder Voy", async () => {
+  it("no marca a nadie si todos siguen en la escuadra", async () => {
     stubEvent(SCRIMMAGE, PLAYING_IN_KELP);
 
     const panel = await openPanel(SCRIMMAGE);
