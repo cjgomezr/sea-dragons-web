@@ -17894,6 +17894,10 @@ async function openFirstPanelWithTeams(page: Page): Promise<void> {
  * baja hasta el segundo para que se vea a quien ya no viene (#839). */
 async function showNotComingTeammates(page: Page): Promise<void> {
   await openFirstPanelWithTeams(page);
+  // Lo mismo que al elegir qué editar (ver showEditScopeChoice): sin alargar
+  // la ventana, la de 1×1 de la captura pasa la agenda al móvil un instante
+  // y el panel vuelve arriba, sin el desplazamiento.
+  await fitViewportToPage(page);
   await eventPanel(page, STUBBED_AGENDA_EVENTS[0].title)
     .getByRole("list", { name: PUBLISHED_TEAMS.teams.b.name })
     .scrollIntoViewIfNeeded();
