@@ -81,7 +81,11 @@ const ASSIGNABLE = [ZOE_RECORD, NEREA_RECORD, PAULA_RECORD, BEA_RECORD];
 const INES_ID = "f5f5f5f5-0000-4000-8000-00000000000f";
 const CLUB_MEMBERS = [
   ...ASSIGNABLE,
-  { id: INES_ID, fullName: "Inés Inactiva", accountStatus: "inactive" as const },
+  {
+    id: INES_ID,
+    fullName: "Inés Inactiva",
+    accountStatus: "inactive" as const,
+  },
 ];
 
 type GatewayOptions = {
