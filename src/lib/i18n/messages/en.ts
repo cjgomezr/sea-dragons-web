@@ -714,6 +714,19 @@ export const englishMessages = {
   "groups.members.added": "{name} added to {group}",
   "groups.members.noCandidates":
     "Every member of the club is already in this group.",
+  "groups.writeAll": "Email everyone in {name}",
+  "groups.writeAll.nobody": "Nobody to write to",
+  "groups.openDirectory": "Open {name} in the directory",
+  "groups.audience.title": "AUDIENCE OF",
+  "groups.audience.events": "Events",
+  "groups.audience.posts": "News posts",
+  "groups.audience.loading": "Loading where this group is used…",
+  "groups.audience.loadFailed": "We couldn't load where this group is used.",
+  "groups.audience.empty":
+    "Not used yet. Pick it as the audience when you create an event or a news post.",
+  "groups.audience.more": "+ {count} more",
+  "groups.audience.weekly": "Weekly · {days} {time}",
+  "groups.audience.posted": "Posted {date}",
   "groups.error.nameTaken": "The club already has a group with that name.",
   "groups.error.invalidName":
     "The name must have between 1 and {max} characters.",

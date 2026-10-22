@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  DirectoryEmailComposer,
+  type EmailRecipient,
+} from "@/components/directory/DirectoryEmailComposer";
 import type { GroupRosterMember } from "@/lib/groups/group-members";
 import { GROUP_PREVIEW_SIZE } from "@/lib/groups/group-overview";
 import type { Group, GroupOverview } from "@/lib/groups/groups";
@@ -37,6 +41,10 @@ import { usePendingAction } from "./use-pending-action";
  * escribe por la API v1, nunca contra la base, porque la aplicación nativa de
  * Release 2 usará esos mismos endpoints (CON-002). El idioma llega como prop
  * porque el traductor no puede cruzar del servidor al navegador.
+ *
+ * Escribir a todos (#830) abre aquí el redactor del Directorio, con los
+ * activos del grupo. Si quien mira puede usarlo lo decide la página con su
+ * rol; el servidor lo vuelve a comprobar al enviar (D6).
  */
 
 type ScreenState =
@@ -132,8 +140,11 @@ function LoadFailure({
 
 export function GroupsScreen({
   locale,
+  canWriteEmails,
 }: {
   locale: Locale;
+  /** Admin y Committee: los que escriben desde el Directorio (D6). */
+  canWriteEmails: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
@@ -144,6 +155,9 @@ export function GroupsScreen({
   const pendingAction = usePendingAction<GroupAction>();
   const { pending, run } = pendingAction;
   const { notice, announce } = useChangeNotice();
+  const [emailRecipients, setEmailRecipients] = useState<
+    readonly EmailRecipient[] | null
+  >(null);
   // Tras borrar, el botón que tenía el foco desaparece con su panel: el foco
   // pasa a "Elige un grupo" en cuanto se pinta, y no cae al principio.
   const placeholderRef = useRef<HTMLParagraphElement>(null);
@@ -276,6 +290,13 @@ export function GroupsScreen({
           {describeGroupsFailure(translate, failure)}
         </p>
       )}
+      {emailRecipients === null ? null : (
+        <DirectoryEmailComposer
+          locale={locale}
+          recipients={emailRecipients}
+          onClose={() => setEmailRecipients(null)}
+        />
+      )}
       {state.kind === "ready" ? (
         <div className="groups-layout">
           <section className="groups-column" aria-labelledby="grupos-del-club">
@@ -326,6 +347,7 @@ export function GroupsScreen({
               onRename={(name) => rename(selectedGroup, name)}
               onDelete={() => remove(selectedGroup)}
               onNotice={announce}
+              onWriteToAll={canWriteEmails ? setEmailRecipients : null}
             />
           )}
         </div>

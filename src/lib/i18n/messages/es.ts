@@ -701,6 +701,19 @@ export const spanishMessages: MessageCatalog = {
   "groups.members.added": "{name} ya está en {group}",
   "groups.members.noCandidates":
     "Todos los miembros del club ya están en este grupo.",
+  "groups.writeAll": "Escribir a todos en {name}",
+  "groups.writeAll.nobody": "Nadie a quien escribir",
+  "groups.openDirectory": "Abrir {name} en el directorio",
+  "groups.audience.title": "AUDIENCIA DE",
+  "groups.audience.events": "Eventos",
+  "groups.audience.posts": "Noticias",
+  "groups.audience.loading": "Cargando dónde se usa este grupo…",
+  "groups.audience.loadFailed": "No pudimos cargar dónde se usa este grupo.",
+  "groups.audience.empty":
+    "Sin usar todavía. Elígelo como audiencia al crear un evento o una noticia.",
+  "groups.audience.more": "+ {count} más",
+  "groups.audience.weekly": "Semanal · {days} {time}",
+  "groups.audience.posted": "Publicada el {date}",
   "groups.error.nameTaken": "El club ya tiene un grupo con ese nombre.",
   "groups.error.invalidName":
     "El nombre tiene que tener entre 1 y {max} caracteres.",
