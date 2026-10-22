@@ -11553,8 +11553,10 @@ a.auth-brand-header:focus-visible {
   max-width: 680px;
 }
 
-.evaluation-categories-lead {
+.evaluation-categories .evaluation-categories-lead {
   margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .evaluation-categories .club-positions-row {

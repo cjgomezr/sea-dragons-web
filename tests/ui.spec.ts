@@ -16349,17 +16349,23 @@ test.describe("evaluaciones en el navegador", () => {
 });
 
 /* ---------------------------------------------------------------------------
-   Categorías de evaluación (#323): la lista con una desactivada y el alta
-   con un nombre repetido. Sin mockup: copia la forma de las posiciones de
-   #300. Los datos son fijos, servidos por `page.route`; lo que los endpoints
-   hacen se prueba contra la base (#320).
+   La pestaña Categorías de Evaluaciones (#821, RF-5 del PRD de E31): la
+   tabla con una desactivada, el nombre repetido en la fila de añadir,
+   renombrando en la fila y las desactivadas abiertas. Se revisa contra
+   docs/design/design_handoff_evaluations/screenshots/04-desktop-categories.png
+   a 768 y 1440; el móvil llega en #823. Los datos son fijos, servidos por
+   `page.route`; lo que los endpoints hacen se prueba contra la base (#320).
    --------------------------------------------------------------------------- */
 
-const EVALUATION_CATEGORIES_SCREEN_PATH = "/evaluaciones/categorias";
+const EVALUATION_CATEGORIES_TAB_PATH = `${EVALUATIONS_SCREEN_PATH}?tab=categories`;
+const EVALUATION_CATEGORIES_OLD_PATH = "/evaluaciones/categorias";
 const EVALUATION_CATEGORIES_ENDPOINT = "/api/v1/evaluations/categories";
-const EVALUATION_CATEGORIES_HEADING =
-  /^(Evaluation categories|Categorías de evaluación)$/;
 const ACTIVE_CATEGORIES_LIST = /^(Active categories|Categorías activas)$/;
+const NEW_CATEGORY_FIELD = /^(New category|Nueva categoría)$/;
+const TAKEN_CATEGORY_NAME =
+  /^(There is already a category with that name\.|Ya hay una categoría con ese nombre\.)$/;
+const DEACTIVATED_TOGGLE =
+  /^(Deactivated categories|Categorías desactivadas): /;
 
 type StubbedCategory = {
   readonly id: string;
@@ -16393,22 +16399,12 @@ const STUBBED_CATEGORIES: readonly StubbedCategory[] = [
   },
 ];
 
-const REJECTED_CATEGORY_NAME = {
-  code: "validation_error",
-  message: "Ya hay otra categoría con ese nombre.",
-  reason: "name_taken",
-};
-
-/** GET sirve el catálogo; POST rechaza el nombre como repetido; PUT del
- * orden responde con las activas en el orden que llegó. */
+/** GET sirve el catálogo; PUT del orden responde con las activas en el
+ * orden que llegó. Lo demás no se escribe en estas pruebas. */
 async function stubEvaluationCategories(page: Page): Promise<void> {
   await page.route(
     (url) => url.pathname.startsWith(EVALUATION_CATEGORIES_ENDPOINT),
     async (route, request) => {
-      if (request.method() === "GET") {
-        await route.fulfill(jsonBody({ categories: STUBBED_CATEGORIES }));
-        return;
-      }
       if (request.method() === "PUT") {
         const { categoryIds } = request.postDataJSON() as {
           categoryIds: string[];
@@ -16422,30 +16418,37 @@ async function stubEvaluationCategories(page: Page): Promise<void> {
         await route.fulfill(jsonBody({ categories: reordered }));
         return;
       }
-      await route.fulfill({
-        status: 400,
-        contentType: "application/json",
-        body: JSON.stringify({ error: REJECTED_CATEGORY_NAME }),
-      });
+      await route.fulfill(jsonBody({ categories: STUBBED_CATEGORIES }));
     },
   );
 }
 
-/** Añade "Speed", que ya existe: el servidor fingido la rechaza y el aviso
- * sale junto al campo. */
-function addCategoryWithTakenName(labels: {
-  readonly field: string;
-  readonly submit: string;
-  readonly issue: RegExp;
-}) {
-  return async (page: Page): Promise<void> => {
-    await page.getByLabel(labels.field).fill("Speed");
-    await page.getByRole("button", { name: labels.submit }).click();
-    await expect(page.getByText(labels.issue)).toBeVisible();
-    // El puntero se queda sobre el botón pulsado: la captura saldría con su
-    // hover.
-    await page.mouse.move(0, 0);
-  };
+/** Escribe "speed", que ya existe: el aviso sale mientras se escribe, sin
+ * mandar nada. */
+async function typeTakenCategoryName(page: Page): Promise<void> {
+  await page.getByRole("textbox", { name: NEW_CATEGORY_FIELD }).fill("speed");
+  await expect(page.getByText(TAKEN_CATEGORY_NAME)).toBeVisible();
+}
+
+async function renameSpeed(page: Page): Promise<void> {
+  await page
+    .getByRole("button", { name: /^(Rename|Renombrar) Speed$/ })
+    .click();
+  await expect(
+    page.getByRole("textbox", {
+      name: /^(New name for|Nuevo nombre de) Speed$/,
+    }),
+  ).toBeFocused();
+}
+
+async function openDeactivatedCategories(page: Page): Promise<void> {
+  await page.getByRole("button", { name: DEACTIVATED_TOGGLE }).click();
+  await expect(
+    page.getByRole("button", { name: /^(Reactivate|Reactivar) Experience$/ }),
+  ).toBeVisible();
+  // El puntero se queda sobre el botón pulsado: la captura saldría con su
+  // hover.
+  await page.mouse.move(0, 0);
 }
 
 type EvaluationCategoriesState = {
@@ -16459,46 +16462,51 @@ const EVALUATION_CATEGORIES_STATES: readonly EvaluationCategoriesState[] = [
   { name: "evaluaciones-categorias-es", isSpanish: true },
   {
     name: "evaluaciones-categorias-nombre-repetido",
-    prepare: addCategoryWithTakenName({
-      field: "Category name",
-      submit: "Add category",
-      issue: /Another category already has this name/,
-    }),
+    prepare: typeTakenCategoryName,
   },
   {
     name: "evaluaciones-categorias-nombre-repetido-es",
     isSpanish: true,
-    prepare: addCategoryWithTakenName({
-      field: "Nombre de la categoría",
-      submit: "Añadir categoría",
-      issue: /Ya hay otra categoría con este nombre/,
-    }),
+    prepare: typeTakenCategoryName,
+  },
+  { name: "evaluaciones-categorias-renombrando", prepare: renameSpeed },
+  {
+    name: "evaluaciones-categorias-desactivadas-abiertas",
+    prepare: openDeactivatedCategories,
   },
 ];
+
+/** Las tabletas y el escritorio: el móvil de las categorías llega en #823. */
+const EVALUATION_CATEGORIES_VIEWPORTS = viewports.filter(
+  (vp) => vp.name !== "mobile",
+);
 
 async function goToEvaluationCategories(
   page: Page,
   state: EvaluationCategoriesState,
   theme?: (typeof themes)[number],
 ): Promise<void> {
+  await stubEvaluationReads(page, STUBBED_ROSTER);
   await stubEvaluationCategories(page);
   if (state.isSpanish === true) {
     await chooseSpanish(page);
   }
   if (theme === undefined) {
-    await page.goto(`${APP_URL}${EVALUATION_CATEGORIES_SCREEN_PATH}`);
+    await page.goto(`${APP_URL}${EVALUATION_CATEGORIES_TAB_PATH}`);
   } else {
-    await goToWithTheme(page, EVALUATION_CATEGORIES_SCREEN_PATH, theme);
+    await goToWithTheme(page, EVALUATION_CATEGORIES_TAB_PATH, theme);
   }
   await expect(
-    page.getByRole("heading", {
-      level: 1,
-      name: EVALUATION_CATEGORIES_HEADING,
-    }),
+    page.getByRole("heading", { level: 1, name: EVALUATIONS_HEADING }),
   ).toBeVisible();
   await expect(
     page.getByRole("list", { name: ACTIVE_CATEGORIES_LIST }),
   ).toBeVisible();
+  // El número de Jugadores llega en su propia lectura: sin él, la captura
+  // sale a veces con la pestaña sin número.
+  await expect(
+    page.getByRole("tab", { name: /^(Players|Jugadores)/ }),
+  ).toContainText(String(STUBBED_ROSTER.length));
   await state.prepare?.(page);
 }
 
@@ -16508,7 +16516,7 @@ for (const state of EVALUATION_CATEGORIES_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of EVALUATION_CATEGORIES_VIEWPORTS) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -16531,18 +16539,21 @@ for (const state of EVALUATION_CATEGORIES_STATES) {
       });
     }
 
-    for (const width of EVALUATIONS_NARROW_WIDTHS) {
-      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
-        await page.setViewportSize({ width, height: 812 });
-        await goToEvaluationCategories(page, state);
-        expect(await hasHorizontalScroll(page)).toBe(false);
+    test("has no horizontal scroll at 768px", async ({ page }) => {
+      await page.setViewportSize({ width: 768, height: 1024 });
+      await goToEvaluationCategories(page, state);
+      expect(await hasHorizontalScroll(page)).toBe(false);
+    });
+
+    for (const theme of themes) {
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await goToEvaluationCategories(page, state, theme);
+        await expectNoAxeViolations(page);
       });
     }
-
-    test("has no accessibility violations (axe-core)", async ({ page }) => {
-      await goToEvaluationCategories(page, state);
-      await expectNoAxeViolations(page);
-    });
   });
 }
 
@@ -16551,8 +16562,6 @@ test.describe("categorías de evaluación en el navegador", () => {
   quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
-  // Desde #818 las categorías son una pestaña de Evaluaciones, no un enlace a
-  // su propia pantalla: la pestaña abierta va en la URL.
   test("se llega desde la pestaña de Evaluaciones", async ({ page }) => {
     await goToEvaluations(page, EVALUATIONS_LIST);
     const categoriesTab = page.getByRole("tab", { name: /^Categories/ });
@@ -16566,21 +16575,61 @@ test.describe("categorías de evaluación en el navegador", () => {
     ).toBeVisible();
   });
 
-  test("se reordena sólo con el teclado", async ({ page }) => {
-    await goToEvaluationCategories(page, { name: "teclado" });
-    const moveSpeedUp = page.getByRole("button", { name: "Move Speed up" });
+  // D1 del PRD de E31: la pantalla propia ya no existe, y un enlace guardado
+  // lleva a la pestaña.
+  test("la dirección vieja lleva a la pestaña", async ({ page }) => {
+    await stubEvaluationReads(page, STUBBED_ROSTER);
+    await stubEvaluationCategories(page);
 
-    await moveSpeedUp.focus();
-    await page.keyboard.press("Enter");
+    await page.goto(`${APP_URL}${EVALUATION_CATEGORIES_OLD_PATH}`);
 
-    const names = page
-      .getByRole("list", { name: ACTIVE_CATEGORIES_LIST })
-      .getByRole("heading");
-    await expect(names.nth(0)).toHaveText("Speed");
-    await expect(names.nth(1)).toHaveText("Fitness");
+    await expect(page).toHaveURL(/\/evaluaciones\?tab=categories$/);
     await expect(
-      page.getByRole("button", { name: "Move Speed down" }),
+      page.getByRole("list", { name: ACTIVE_CATEGORIES_LIST }),
+    ).toBeVisible();
+  });
+
+  test("se reordena sólo con el teclado, y el foco se queda en el asa", async ({
+    page,
+  }) => {
+    await goToEvaluationCategories(page, { name: "teclado" });
+
+    await page
+      .getByRole("button", { name: "Reorder Speed, position 2 of 10" })
+      .focus();
+    await page.keyboard.press("ArrowUp");
+
+    await expect(
+      page.getByRole("button", { name: "Reorder Speed, position 1 of 10" }),
     ).toBeFocused();
+    await expect(
+      page.getByText("Speed moved to 1 of 10 · saved").first(),
+    ).toBeAttached();
+  });
+
+  test("se reordena arrastrando por el asa", async ({ page }) => {
+    await goToEvaluationCategories(page, { name: "arrastre" });
+    const handle = page.getByRole("button", {
+      name: "Reorder Endurance, position 3 of 10",
+    });
+    const target = page
+      .getByRole("list", { name: ACTIVE_CATEGORIES_LIST })
+      .getByRole("listitem")
+      .first();
+
+    await handle.hover();
+    await page.mouse.down();
+    const box = await target.boundingBox();
+    if (box === null) {
+      throw new Error("La primera fila no tiene caja");
+    }
+    // Por pasos: dnd-kit necesita ver que el puntero se mueve para empezar.
+    await page.mouse.move(box.x + box.width / 2, box.y + 4, { steps: 12 });
+    await page.mouse.up();
+
+    await expect(
+      page.getByRole("button", { name: "Reorder Endurance, position 1 of 10" }),
+    ).toBeVisible();
   });
 });
 
