@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EvaluationCategories } from "@/lib/evaluations/evaluation-categories";
 import {
   type EvaluationsTab,
@@ -44,7 +44,8 @@ import {
  * del PRD de E31) lleva las pestañas Jugadores y Categorías, y la lista es
  * una tabla con búsqueda, filtros y orden. Al lado va un panel (#819): sin
  * nadie elegido, el resumen de la plantilla; con alguien, su ficha, con la
- * edición de sus valoraciones.
+ * edición de sus valoraciones (#820). Cada guardado lo dice unos segundos
+ * bajo las pestañas y vuelve a pedir el resumen.
  *
  * Quién llega lo decide la frontera: `EVALUATIONS_PATH` está en
  * `RESTRICTED_ROUTES` para Admin y Coach, y los endpoints lo vuelven a
@@ -150,9 +151,13 @@ function useEvaluationRoster(): {
   readonly state: RosterState;
   readonly retry: () => void;
   readonly applyEvaluation: (evaluation: MemberEvaluation) => void;
+  readonly refreshSummary: () => void;
 } {
   const [state, setState] = useState<RosterState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
+  // Con Guardar y siguiente se encadenan guardados: sólo vale la respuesta
+  // del último, no la de uno anterior que llegue tarde.
+  const latestSummaryRequest = useRef(0);
 
   useEffect(() => {
     let isCurrent = true;
@@ -183,7 +188,89 @@ function useEvaluationRoster(): {
     );
   }
 
-  return { state, retry, applyEvaluation };
+  /** El resumen lo calcula el servidor (D5): tras guardar se vuelve a pedir
+   * la plantilla y se toma su resumen. Las filas no se tocan, porque ya las
+   * puso al día lo que confirmó el guardado. Si falla, se queda el resumen
+   * que había: lo dice la próxima lectura. */
+  function refreshSummary(): void {
+    latestSummaryRequest.current += 1;
+    const request = latestSummaryRequest.current;
+    void loadEvaluationRoster().then((outcome) => {
+      if (
+        outcome.kind !== "loaded" ||
+        request !== latestSummaryRequest.current
+      ) {
+        return;
+      }
+      setState((current) =>
+        current.kind === "ready"
+          ? {
+              kind: "ready",
+              roster: { ...current.roster, summary: outcome.roster.summary },
+            }
+          : current,
+      );
+    });
+  }
+
+  return { state, retry, applyEvaluation, refreshSummary };
+}
+
+/** Lo que dura a la vista "{nombre} guardado" (handoff: unos 3 segundos). */
+const SAVED_NOTICE_MS = 3000;
+
+type SavedNotice = {
+  readonly name: string;
+  /** Otro guardado del mismo jugador vuelve a contar los 3 segundos. */
+  readonly sequence: number;
+};
+
+/** "{nombre} guardado" tras cada guardado, que se va solo. */
+function useSavedNotice(): {
+  readonly notice: SavedNotice | null;
+  readonly show: (name: string) => void;
+} {
+  const [notice, setNotice] = useState<SavedNotice | null>(null);
+
+  useEffect(() => {
+    if (notice === null) {
+      return;
+    }
+    const timer = window.setTimeout(() => setNotice(null), SAVED_NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  return {
+    notice,
+    show: (name) =>
+      setNotice((current) => ({
+        name,
+        sequence: (current?.sequence ?? 0) + 1,
+      })),
+  };
+}
+
+/** Siempre en la página, para que el lector de pantalla tenga ya la región
+ * cuando llegue el texto; vacía no ocupa sitio. */
+function SavedNoticeRegion({
+  translate,
+  notice,
+}: {
+  translate: Translator;
+  notice: SavedNotice | null;
+}): React.JSX.Element {
+  return (
+    <p
+      className={
+        notice === null ? "evaluations-saved" : "admin-notice evaluations-saved"
+      }
+      role="status"
+    >
+      {notice === null
+        ? null
+        : translate("evaluations.saved", { name: notice.name })}
+    </p>
+  );
 }
 
 /** Las categorías del club: su número va en la pestaña y su orden en las
@@ -306,11 +393,15 @@ export function EvaluationsScreen({
   canOpenMemberRecords: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
-  const { state, retry, applyEvaluation } = useEvaluationRoster();
+  const { state, retry, applyEvaluation, refreshSummary } =
+    useEvaluationRoster();
+  const savedNotice = useSavedNotice();
   const clubCategories = useClubCategories();
   const [tab, setTab] = useState<EvaluationsTab>(initialTab);
   const [view, setView] = useState<RosterView>(initialView);
   const [selectedId, setSelectedId] = useState<string | null>(initialMemberId);
+  // Si la ficha que se abre empieza ya en edición (#820).
+  const [isEditingOnOpen, setIsEditingOnOpen] = useState(false);
   // A quién devolver el foco al volver de la ficha a la lista.
   const [returnFocusTo, setReturnFocusTo] = useState<string | null>(null);
 
@@ -332,15 +423,17 @@ export function EvaluationsScreen({
     replaceAddressSearch(searchWithRosterView(currentAddressParams(), next));
   }
 
-  function openMember(userId: string): void {
+  function openMember(userId: string, isEditing = false): void {
     setReturnFocusTo(null);
     setSelectedId(userId);
+    setIsEditingOnOpen(isEditing);
   }
 
   /** Pulsar la fila abierta la suelta. */
   function toggleSelection(userId: string): void {
     setReturnFocusTo(null);
     setSelectedId((current) => (current === userId ? null : userId));
+    setIsEditingOnOpen(false);
   }
 
   function goBack(): void {
@@ -351,12 +444,22 @@ export function EvaluationsScreen({
   const members = state.kind === "ready" ? state.roster.members : null;
   const selected = members?.find((member) => member.userId === selectedId);
 
-  /** Hasta #820 el primero se abre en lectura. */
+  /** El primero se abre ya en edición (#820). */
   function evaluatePending(players: readonly ScreenRosterEntry[]): void {
     changeView(PENDING_VIEW);
     const [first] = applyRosterView(players, PENDING_VIEW);
     if (first !== undefined) {
-      openMember(first.userId);
+      openMember(first.userId, true);
+    }
+  }
+
+  /** La fila ya la puso al día la ficha; aquí, el aviso, el resumen y, con
+   * Guardar y siguiente, el siguiente en edición. */
+  function confirmSaved(name: string, nextId: string | null): void {
+    savedNotice.show(name);
+    refreshSummary();
+    if (nextId !== null) {
+      openMember(nextId, true);
     }
   }
 
@@ -368,17 +471,21 @@ export function EvaluationsScreen({
     return selected ? (
       <EvaluationSheet
         key={selected.userId}
-        translate={translate}
-        member={selected}
+        context={{
+          translate,
+          member: selected,
+          canOpenMemberRecords,
+          position: locateInList(
+            display.listed.map((member) => member.userId),
+            selected.userId,
+          ),
+          onClose: goBack,
+          onNavigate: (userId) => openMember(userId),
+        }}
         categories={clubCategories.categories}
-        canOpenMemberRecords={canOpenMemberRecords}
-        position={locateInList(
-          display.listed.map((member) => member.userId),
-          selected.userId,
-        )}
-        onClose={goBack}
-        onNavigate={openMember}
+        isEditingOnOpen={isEditingOnOpen}
         onEvaluationChange={applyEvaluation}
+        onSaved={(nextId) => confirmSaved(selected.fullName, nextId)}
       />
     ) : (
       <EvaluationOverview
@@ -389,7 +496,7 @@ export function EvaluationsScreen({
         }}
         summary={roster.summary}
         onEvaluatePending={() => evaluatePending(roster.members)}
-        onOpen={openMember}
+        onOpen={(userId) => openMember(userId)}
       />
     );
   }
@@ -426,6 +533,7 @@ export function EvaluationsScreen({
           }}
           onSelect={selectTab}
         />
+        <SavedNoticeRegion translate={translate} notice={savedNotice.notice} />
       </header>
       <div
         role="tabpanel"

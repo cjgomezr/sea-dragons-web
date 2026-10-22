@@ -2408,10 +2408,11 @@ export const englishMessages = {
   "evaluations.create": "Start evaluation",
   "evaluations.creating": "Starting…",
   "evaluations.edit": "Edit ratings",
-  "evaluations.save": "Save ratings",
+  "evaluations.save": "Save",
+  "evaluations.saveAndNext": "Save & next",
   "evaluations.saving": "Saving…",
   "evaluations.cancel": "Cancel",
-  "evaluations.saved": "Ratings saved.",
+  "evaluations.saved": "{name} saved",
   "evaluations.reload": "Reload evaluation",
   "evaluations.error.changed":
     "Someone else changed this evaluation while you were editing. Reload it to see their changes.",
@@ -2426,12 +2427,6 @@ export const englishMessages = {
     "Your session ended. Sign in again to see evaluations.",
   "evaluations.error.forbidden": "Only coaches and admins can see evaluations.",
   "evaluations.error.unexpected": "Something went wrong. Try again.",
-  "evaluations.refresh.hint":
-    "The club's categories have changed since this evaluation was made.",
-  "evaluations.refresh.action": "Update to the current categories",
-  "evaluations.refresh.running": "Updating…",
-  "evaluations.refresh.done":
-    "This evaluation now uses the current categories.",
   "evaluations.categories.lead":
     "The order here is the order on every evaluation. Deactivating hides a category from new ratings; old scores are kept.",
   "evaluations.categories.loading": "Loading the categories…",

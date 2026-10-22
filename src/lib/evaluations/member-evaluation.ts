@@ -26,6 +26,9 @@ import { calculateOverallRating } from "./overall-rating";
 
 export const RATING_MIN = 1;
 export const RATING_MAX = 10;
+/** Con la que nace cada categoría de una evaluación (FR-051), y la que lleva
+ * en la edición una que la evaluación aún no tiene (D4 del PRD de E31). */
+export const INITIAL_RATING = 5;
 
 /** Los `reason` con los que la API distingue los casos que comparten código. */
 export const EVALUATION_EXISTS_REASON = "evaluation_exists";

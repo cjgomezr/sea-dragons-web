@@ -2420,10 +2420,11 @@ export const spanishMessages: MessageCatalog = {
   "evaluations.create": "Empezar evaluación",
   "evaluations.creating": "Empezando…",
   "evaluations.edit": "Editar notas",
-  "evaluations.save": "Guardar valoraciones",
+  "evaluations.save": "Guardar",
+  "evaluations.saveAndNext": "Guardar y siguiente",
   "evaluations.saving": "Guardando…",
   "evaluations.cancel": "Cancelar",
-  "evaluations.saved": "Valoraciones guardadas.",
+  "evaluations.saved": "{name} guardado",
   "evaluations.reload": "Recargar la evaluación",
   "evaluations.error.changed":
     "Alguien más cambió esta evaluación mientras la editabas. Recárgala para ver sus cambios.",
@@ -2439,11 +2440,6 @@ export const spanishMessages: MessageCatalog = {
   "evaluations.error.forbidden":
     "Solo el personal de entrenamiento y la administración ven las evaluaciones.",
   "evaluations.error.unexpected": "Algo salió mal. Vuelve a intentarlo.",
-  "evaluations.refresh.hint":
-    "Las categorías del club cambiaron desde que se hizo esta evaluación.",
-  "evaluations.refresh.action": "Poner al día con las categorías actuales",
-  "evaluations.refresh.running": "Poniendo al día…",
-  "evaluations.refresh.done": "Esta evaluación ya usa las categorías actuales.",
   "evaluations.categories.lead":
     "El orden de aquí es el de cada evaluación. Desactivar oculta una categoría de las notas nuevas; las antiguas se conservan.",
   "evaluations.categories.loading": "Cargando las categorías…",

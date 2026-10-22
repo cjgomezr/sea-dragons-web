@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -325,6 +326,14 @@ async function startEditing(sheet: HTMLElement): Promise<void> {
   await userEvent.click(
     within(sheet).getByRole("button", { name: /edit ratings/i }),
   );
+}
+
+function saveButton(sheet: HTMLElement): HTMLElement {
+  return within(sheet).getByRole("button", { name: "Save" });
+}
+
+function saveAndNextButton(sheet: HTMLElement): HTMLElement {
+  return within(sheet).getByRole("button", { name: "Save & next" });
 }
 
 function setSlider(sheet: HTMLElement, category: string, value: number): void {
@@ -786,9 +795,7 @@ describe("ficha de evaluación", () => {
     await startEditing(sheet);
 
     setSlider(sheet, "Fitness", 10);
-    await userEvent.click(
-      within(sheet).getByRole("button", { name: /save ratings/i }),
-    );
+    await userEvent.click(saveButton(sheet));
 
     expect(await within(sheet).findByText("8.5")).toBeInTheDocument();
     expect(callsTo("PUT")[0]?.body).toEqual({
@@ -799,7 +806,8 @@ describe("ficha de evaluación", () => {
       ],
     });
     expect(memberButton(/camila ortiz/i)).toHaveTextContent("8.5");
-    expect(evaluationReads()).toHaveLength(2);
+    // La plantilla, la ficha y la plantilla otra vez, por el resumen (#820).
+    await waitFor(() => expect(evaluationReads()).toHaveLength(3));
   });
 
   it("no manda una segunda petición al pulsar guardar dos veces seguidas", async () => {
@@ -807,7 +815,7 @@ describe("ficha de evaluación", () => {
     await renderScreen();
     const sheet = await openCamila();
     await startEditing(sheet);
-    const save = within(sheet).getByRole("button", { name: /save ratings/i });
+    const save = saveButton(sheet);
 
     fireEvent.click(save);
     fireEvent.click(save);
@@ -832,9 +840,7 @@ describe("ficha de evaluación", () => {
     await startEditing(sheet);
     setSlider(sheet, "Fitness", 10);
 
-    await userEvent.click(
-      within(sheet).getByRole("button", { name: /save ratings/i }),
-    );
+    await userEvent.click(saveButton(sheet));
 
     expect(await within(sheet).findByRole("alert")).toHaveTextContent(
       /couldn't reach the server/i,
@@ -842,9 +848,7 @@ describe("ficha de evaluación", () => {
     expect(within(sheet).getByRole("slider", { name: "Fitness" })).toHaveValue(
       "10",
     );
-    await userEvent.click(
-      within(sheet).getByRole("button", { name: /save ratings/i }),
-    );
+    await userEvent.click(saveButton(sheet));
     expect(await within(sheet).findByText("8.5")).toBeInTheDocument();
   });
 
@@ -869,9 +873,7 @@ describe("ficha de evaluación", () => {
     await startEditing(sheet);
     setSlider(sheet, "Fitness", 10);
 
-    await userEvent.click(
-      within(sheet).getByRole("button", { name: /save ratings/i }),
-    );
+    await userEvent.click(saveButton(sheet));
     expect(await within(sheet).findByRole("alert")).toHaveTextContent(
       /someone else changed/i,
     );
@@ -951,14 +953,13 @@ describe("ficha de evaluación", () => {
   });
 });
 
-describe("poner al día una evaluación", () => {
+describe("editar una evaluación que no está al día (#820, D4)", () => {
   const BREATH_HOLD_ID = "ca7e0000-0000-4000-8000-000000000011";
-  const REFRESH_PATH = `POST ${ROSTER_PATH}/${CAMILA.userId}/refresh`;
   const OUTDATED_RATINGS: readonly EvaluationRating[] = [
     CAMILA_RATINGS[0]!,
     { ...CAMILA_RATINGS[1]!, isRetired: true },
   ];
-  const REFRESHED_RATINGS: readonly EvaluationRating[] = [
+  const CURRENT_RATINGS: readonly EvaluationRating[] = [
     CAMILA_RATINGS[0]!,
     {
       categoryId: BREATH_HOLD_ID,
@@ -968,15 +969,6 @@ describe("poner al día una evaluación", () => {
     },
   ];
 
-  function refreshedResponse(): Response {
-    return jsonResponse(200, {
-      data: {
-        outcome: { kind: "refreshed", addedCount: 1, removedCount: 1 },
-        evaluation: evaluated(CAMILA.userId, REFRESHED_RATINGS, SAVED_AT),
-      },
-    });
-  }
-
   /** El club desactivó Speed y añadió Breath hold después de evaluarla. */
   const CHANGED_CATEGORIES = [
     CATEGORIES[0],
@@ -985,7 +977,7 @@ describe("poner al día una evaluación", () => {
     CATEGORIES[2],
   ];
 
-  function outdatedApi(refresh: Responder): void {
+  function outdatedApi(save: Responder): void {
     clubApi({
       [`GET ${CATEGORIES_PATH}`]: () =>
         jsonResponse(200, { data: { categories: CHANGED_CATEGORIES } }),
@@ -993,44 +985,69 @@ describe("poner al día una evaluación", () => {
         jsonResponse(200, {
           data: evaluated(CAMILA.userId, OUTDATED_RATINGS, READ_AT, false),
         }),
-      [REFRESH_PATH]: refresh,
+      [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: save,
     });
   }
 
-  function refreshButton(sheet: HTMLElement): HTMLElement {
-    return within(sheet).getByRole("button", {
-      name: /update to the current categories/i,
+  function savedCurrent(): Response {
+    return jsonResponse(200, {
+      data: evaluated(CAMILA.userId, CURRENT_RATINGS, SAVED_AT),
     });
   }
 
-  it("la ofrece cuando el conjunto cambió y, al usarla, enseña el conjunto nuevo y el OVR recalculado", async () => {
-    outdatedApi(refreshedResponse);
+  it("enseña las categorías activas en su orden, con las nuevas en 5 y sin las desactivadas", async () => {
+    outdatedApi(savedCurrent);
     await renderScreen();
     const sheet = await openCamila();
 
-    await userEvent.click(refreshButton(sheet));
+    await startEditing(sheet);
+
+    const sliders = within(sheet).getAllByRole("slider");
+    expect(sliders.map((slider) => slider.getAttribute("id"))).toEqual([
+      `evaluation-rating-${FITNESS_ID}`,
+      `evaluation-rating-${BREATH_HOLD_ID}`,
+    ]);
+    expect(within(sheet).getByRole("slider", { name: "Fitness" })).toHaveValue(
+      "8",
+    );
+    expect(
+      within(sheet).getByRole("slider", { name: "Breath hold" }),
+    ).toHaveValue("5");
+    expect(within(sheet).queryByRole("slider", { name: "Speed" })).toBeNull();
+  });
+
+  it("guardar la pone al día y guarda las notas en una sola petición", async () => {
+    outdatedApi(savedCurrent);
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+
+    await userEvent.click(saveButton(sheet));
 
     expect(await within(sheet).findByText("6.5")).toBeInTheDocument();
+    expect(calls.filter((call) => call.method !== "GET")).toEqual([
+      {
+        method: "PUT",
+        url: `${ROSTER_PATH}/${CAMILA.userId}`,
+        body: {
+          expectedUpdatedAt: READ_AT,
+          ratings: [
+            { categoryId: FITNESS_ID, rating: 8 },
+            { categoryId: BREATH_HOLD_ID, rating: 5 },
+          ],
+        },
+      },
+    ]);
     const ratings = within(sheet).getByRole("list", { name: RATINGS_LIST });
     expect(
       within(ratings)
         .getAllByRole("listitem")
         .map((item) => item.textContent),
     ).toEqual(["Fitness8 out of 10", "Breath hold5 out of 10"]);
-    expect(within(sheet).getByRole("status")).toHaveTextContent(
-      /now uses the current categories/i,
-    );
-    expect(
-      within(sheet).queryByRole("button", {
-        name: /update to the current categories/i,
-      }),
-    ).toBeNull();
-    expect(memberButton(/camila ortiz/i)).toHaveTextContent("6.5");
-    expect(callsTo("POST")).toHaveLength(1);
   });
 
-  it("no la ofrece a una evaluación ya al día", async () => {
-    clubApi();
+  it("ya no ofrece poner al día como una acción aparte", async () => {
+    outdatedApi(savedCurrent);
     await renderScreen();
 
     const sheet = await openCamila();
@@ -1040,54 +1057,6 @@ describe("poner al día una evaluación", () => {
         name: /update to the current categories/i,
       }),
     ).toBeNull();
-  });
-
-  it("no la ofrece mientras se editan las valoraciones", async () => {
-    outdatedApi(refreshedResponse);
-    await renderScreen();
-    const sheet = await openCamila();
-
-    await startEditing(sheet);
-
-    expect(
-      within(sheet).queryByRole("button", {
-        name: /update to the current categories/i,
-      }),
-    ).toBeNull();
-  });
-
-  it("avisa de un fallo de red y deja reintentar", async () => {
-    let attempts = 0;
-    outdatedApi(() => {
-      attempts += 1;
-      if (attempts === 1) {
-        throw new TypeError("Failed to fetch");
-      }
-      return refreshedResponse();
-    });
-    await renderScreen();
-    const sheet = await openCamila();
-
-    await userEvent.click(refreshButton(sheet));
-    expect(await within(sheet).findByRole("alert")).toHaveTextContent(
-      /couldn't reach the server/i,
-    );
-    await userEvent.click(refreshButton(sheet));
-
-    expect(await within(sheet).findByText("6.5")).toBeInTheDocument();
-  });
-
-  it("sale en español", async () => {
-    outdatedApi(refreshedResponse);
-    await renderScreen({ locale: "es" });
-
-    const sheet = await openMember(/camila ortiz/i);
-
-    expect(
-      await within(sheet).findByRole("button", {
-        name: /poner al día con las categorías actuales/i,
-      }),
-    ).toBeInTheDocument();
   });
 });
 
@@ -1187,8 +1156,22 @@ describe("resumen de la plantilla (#819)", () => {
     );
   });
 
-  it("Evaluar a los pendientes deja el filtro en Sin evaluar, ordena por nombre y abre al primero", async () => {
-    clubApi();
+  it("Evaluar a los pendientes deja el filtro en Sin evaluar, ordena por nombre y abre al primero ya en edición", async () => {
+    let releaseCreation: () => void = () => undefined;
+    const created = new Promise<void>((resolve) => {
+      releaseCreation = resolve;
+    });
+    clubApi({
+      [`POST ${ROSTER_PATH}/${MATEO.userId}`]: async () => {
+        await created;
+        return jsonResponse(201, {
+          data: evaluated(MATEO.userId, [
+            { ...CAMILA_RATINGS[0]!, rating: 5 },
+            { ...CAMILA_RATINGS[1]!, rating: 5 },
+          ]),
+        });
+      },
+    });
     window.history.replaceState(
       null,
       "",
@@ -1212,7 +1195,15 @@ describe("resumen de la plantilla (#819)", () => {
       "name",
     );
     expect(addressParams()).toEqual({ filtro: "sin-evaluar" });
-    expect(await sheetRegion(/evaluation of mateo ruiz/i)).toBeInTheDocument();
+    const sheet = await sheetRegion(/evaluation of mateo ruiz/i);
+    releaseCreation();
+    expect(
+      await within(sheet).findByRole("slider", { name: "Fitness" }),
+    ).toHaveValue("5");
+    expect(within(sheet).getByRole("slider", { name: "Speed" })).toHaveValue(
+      "5",
+    );
+    expect(callsTo("POST")).toHaveLength(1);
   });
 
   it("Más tiempo sin revisar lista a los más antiguos con su fecha y los abre", async () => {
@@ -1340,9 +1331,7 @@ describe("ficha en lectura (#819)", () => {
     await startEditing(sheet);
 
     setSlider(sheet, "Fitness", 10);
-    await userEvent.click(
-      within(sheet).getByRole("button", { name: /save ratings/i }),
-    );
+    await userEvent.click(saveButton(sheet));
 
     expect(await within(sheet).findByText(/^Updated 27 Sep/)).toBeVisible();
     expect(sheet).not.toHaveTextContent(/by Carla Coach/);
@@ -1501,5 +1490,226 @@ describe("?miembro= en la dirección (#819, D8)", () => {
     });
 
     expect(overviewPanel()).toBeInTheDocument();
+  });
+});
+
+describe("editar en el panel (#820)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("Editar notas pone el borde de acento y un deslizador de 1 a 10 por categoría con su valor al lado", async () => {
+    clubApi();
+    await renderScreen();
+    const sheet = await openCamila();
+    expect(sheet).not.toHaveAttribute("data-editing");
+
+    await startEditing(sheet);
+
+    expect(sheet).toHaveAttribute("data-editing", "true");
+    const fitness = within(sheet).getByRole("slider", { name: "Fitness" });
+    expect(fitness).toHaveAttribute("min", "1");
+    expect(fitness).toHaveAttribute("max", "10");
+    expect(fitness).toHaveAttribute("step", "1");
+    expect(sheet.querySelector(`label[for="${fitness.id}"]`)).toHaveTextContent(
+      "Fitness",
+    );
+    setSlider(sheet, "Fitness", 10);
+    expect(within(fitness.closest("li")!).getByText("10")).toBeVisible();
+  });
+
+  it("recalcula el OVR de la cabecera mientras se mueve un deslizador", async () => {
+    clubApi();
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+
+    setSlider(sheet, "Fitness", 10);
+
+    const header = within(sheet).getByRole("heading", { name: "Camila Ortiz" })
+      .parentElement!.parentElement!;
+    expect(header).toHaveTextContent("8.5");
+    expect(callsTo("PUT")).toHaveLength(0);
+  });
+
+  it("el pie en edición lleva Cancelar, Guardar y Guardar y siguiente", async () => {
+    clubApi();
+    await renderScreen();
+    const sheet = await openCamila();
+
+    await startEditing(sheet);
+
+    const footer = within(sheet).getByRole("button", {
+      name: "Cancel",
+    }).parentElement!;
+    expect(
+      within(footer)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Cancel", "Save", "Save & next›"]);
+  });
+
+  it("Cancelar vuelve a la lectura sin guardar nada", async () => {
+    clubApi();
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+    setSlider(sheet, "Fitness", 10);
+
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Cancel" }),
+    );
+
+    expect(within(sheet).queryByRole("slider")).toBeNull();
+    expect(sheet).not.toHaveAttribute("data-editing");
+    const ratings = within(sheet).getByRole("list", { name: RATINGS_LIST });
+    expect(within(ratings).getAllByRole("listitem")[0]).toHaveTextContent(
+      "Fitness8 out of 10",
+    );
+    expect(within(sheet).getByText("7.5")).toBeInTheDocument();
+    expect(callsTo("PUT")).toHaveLength(0);
+  });
+
+  it("Guardar y siguiente guarda y abre al siguiente de la lista ya en edición", async () => {
+    clubApi({ [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: savedWith });
+    await renderScreen();
+    const camila = await openCamila();
+    await startEditing(camila);
+    setSlider(camila, "Fitness", 10);
+
+    await userEvent.click(saveAndNextButton(camila));
+
+    const jose = await sheetRegion(/evaluation of josé peña/i);
+    expect(
+      await within(jose).findByRole("slider", { name: "Fitness" }),
+    ).toHaveValue("7");
+    expect(jose).toHaveAttribute("data-editing", "true");
+    expect(jose).toHaveTextContent("2 of 3 in this list");
+    expect(memberButton(/camila ortiz/i)).toHaveTextContent("8.5");
+    expect(callsTo("PUT")).toHaveLength(1);
+  });
+
+  it("Guardar y siguiente está deshabilitado en el último jugador de la lista", async () => {
+    rosterApi([CAMILA, JOSE]);
+    await renderScreen();
+    const jose = await openMember(/josé peña/i);
+    await within(jose).findByRole("list", { name: RATINGS_LIST });
+
+    await startEditing(jose);
+
+    expect(saveAndNextButton(jose)).toBeDisabled();
+    expect(saveButton(jose)).toBeEnabled();
+  });
+
+  it("con un conflicto avisa, no pisa nada y Guardar y siguiente no avanza", async () => {
+    clubApi({
+      [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: () =>
+        errorResponse(409, "conflict", "evaluation_changed"),
+    });
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+    setSlider(sheet, "Fitness", 10);
+
+    await userEvent.click(saveAndNextButton(sheet));
+
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+      /someone else changed/i,
+    );
+    expect(
+      screen.getByRole("region", { name: /evaluation of camila ortiz/i }),
+    ).toBe(sheet);
+    expect(within(sheet).getByRole("slider", { name: "Fitness" })).toHaveValue(
+      "10",
+    );
+    expect(memberButton(/camila ortiz/i)).toHaveTextContent("7.5");
+    expect(
+      calls.filter((call) => call.url === `${ROSTER_PATH}/${JOSE.userId}`),
+    ).toHaveLength(0);
+  });
+
+  it("con un fallo de red avisa, no avanza y deja abierta la edición con lo movido", async () => {
+    clubApi({
+      [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: () => {
+        throw new TypeError("Failed to fetch");
+      },
+    });
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+    setSlider(sheet, "Fitness", 10);
+
+    await userEvent.click(saveAndNextButton(sheet));
+
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+      /couldn't reach the server/i,
+    );
+    expect(within(sheet).getByRole("slider", { name: "Fitness" })).toHaveValue(
+      "10",
+    );
+    expect(sheet).toHaveTextContent("1 of 3 in this list");
+  });
+
+  it('al guardar dice "{nombre} guardado" con role=status unos 3 segundos', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    clubApi({ [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: savedWith });
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+
+    await userEvent.click(saveButton(sheet));
+
+    const notice = await screen.findByText("Camila Ortiz saved");
+    expect(notice).toHaveAttribute("role", "status");
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(screen.queryByText("Camila Ortiz saved")).toBeNull();
+  });
+
+  it("tras guardar pone al día el resumen de la plantilla", async () => {
+    let rosterReads = 0;
+    clubApi({
+      [`GET ${ROSTER_PATH}`]: () => {
+        rosterReads += 1;
+        return rosterResponse(
+          ROSTER,
+          rosterReads === 1 ? SUMMARY : { ...SUMMARY, averageOverall: 7.4 },
+        );
+      },
+      [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: savedWith,
+    });
+    await renderScreen();
+    const sheet = await openCamila();
+    await startEditing(sheet);
+    setSlider(sheet, "Fitness", 10);
+
+    await userEvent.click(saveButton(sheet));
+    await waitFor(() => expect(rosterReads).toBe(2));
+    await userEvent.click(within(sheet).getByRole("button", { name: "Close" }));
+
+    expect(await screen.findByText("7.4")).toBeInTheDocument();
+  });
+
+  it("sale en español", async () => {
+    clubApi({ [`PUT ${ROSTER_PATH}/${CAMILA.userId}`]: savedWith });
+    await renderScreen({ locale: "es" });
+    const sheet = await openMember(/camila ortiz/i);
+    await userEvent.click(
+      await within(sheet).findByRole("button", { name: "Editar notas" }),
+    );
+
+    expect(
+      within(sheet).getByRole("button", { name: "Cancelar" }),
+    ).toBeVisible();
+    expect(
+      within(sheet).getByRole("button", { name: "Guardar y siguiente" }),
+    ).toBeVisible();
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Guardar" }),
+    );
+    expect(
+      await screen.findByText("Camila Ortiz guardado"),
+    ).toBeInTheDocument();
   });
 });

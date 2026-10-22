@@ -5,6 +5,7 @@ import {
 } from "@/lib/evaluations/member-evaluation";
 import type { EvaluationCategories } from "@/lib/evaluations/evaluation-categories";
 import {
+  type EditingRating,
   type SheetRating,
   sheetRatings,
 } from "@/lib/evaluations/sheet-ratings";
@@ -14,21 +15,13 @@ import type { Translator } from "@/lib/i18n/translator";
  * Las categorías de una evaluación con su barra y su número, como el mockup
  * (#322), desde #819 con la rejilla del panel de E31. La barra es sólo
  * dibujo: lo que se lee, y lo que anuncia un lector de pantalla, es la
- * categoría y su número (PRD, accesibilidad). Al editar, cada barra pasa a
- * ser un deslizador con el mismo nombre y el número al lado.
+ * categoría y su número (PRD, accesibilidad). Al editar (#820), cada
+ * categoría activa lleva un deslizador nativo con su etiqueta y el número al
+ * lado, que cambia mientras se mueve.
  */
 
 const RATINGS_HEADING_ID = "evaluation-ratings";
 const PERCENT = 100;
-
-/** Lo ajustado y sin guardar, por categoría. */
-export type RatingsDraft = Readonly<Record<string, number>>;
-
-export function draftOf(ratings: readonly EvaluationRating[]): RatingsDraft {
-  return Object.fromEntries(
-    ratings.map((entry) => [entry.categoryId, entry.rating]),
-  );
-}
 
 function sliderId(categoryId: string): string {
   return `evaluation-rating-${categoryId}`;
@@ -84,22 +77,17 @@ function ReadOnlyRating({
 }
 
 function EditableRating({
-  translate,
-  entry,
-  value,
+  row,
   onChange,
 }: {
-  translate: Translator;
-  entry: EvaluationRating;
-  value: number;
+  row: EditingRating;
   onChange: (value: number) => void;
 }): React.JSX.Element {
-  const id = sliderId(entry.categoryId);
+  const id = sliderId(row.categoryId);
   return (
     <li className="evaluation-rating">
       <span className="evaluation-rating-name">
-        <label htmlFor={id}>{entry.name}</label>
-        <RetiredTag translate={translate} entry={entry} />
+        <label htmlFor={id}>{row.name}</label>
       </span>
       <input
         id={id}
@@ -108,11 +96,11 @@ function EditableRating({
         min={RATING_MIN}
         max={RATING_MAX}
         step={1}
-        value={value}
+        value={row.rating}
         onChange={(event) => onChange(Number(event.target.value))}
       />
       <output htmlFor={id} className="evaluation-rating-value">
-        {value}
+        {row.rating}
       </output>
     </li>
   );
@@ -194,19 +182,19 @@ export function EvaluationRatings({
   translate,
   ratings,
   categories,
-  draft,
-  onDraftChange,
+  editingRows,
+  onRatingChange,
 }: {
   translate: Translator;
   ratings: readonly EvaluationRating[];
   /** Las del club, para las que la evaluación no tiene; `null` si no se
    * pudieron leer. */
   categories: EvaluationCategories | null;
-  /** `null` mientras no se edita. */
-  draft: RatingsDraft | null;
-  onDraftChange: (draft: RatingsDraft) => void;
+  /** Las de la edición con su valor de ahora; `null` mientras no se edita. */
+  editingRows: readonly EditingRating[] | null;
+  onRatingChange: (categoryId: string, rating: number) => void;
 }): React.JSX.Element {
-  if (draft === null) {
+  if (editingRows === null) {
     return (
       <ReadOnlyRatings
         translate={translate}
@@ -216,15 +204,11 @@ export function EvaluationRatings({
   }
   return (
     <RatingsCard translate={translate}>
-      {ratings.map((entry) => (
+      {editingRows.map((row) => (
         <EditableRating
-          key={entry.categoryId}
-          translate={translate}
-          entry={entry}
-          value={draft[entry.categoryId] ?? entry.rating}
-          onChange={(value) =>
-            onDraftChange({ ...draft, [entry.categoryId]: value })
-          }
+          key={row.categoryId}
+          row={row}
+          onChange={(value) => onRatingChange(row.categoryId, value)}
         />
       ))}
     </RatingsCard>
