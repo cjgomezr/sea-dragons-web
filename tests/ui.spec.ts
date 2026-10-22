@@ -3746,6 +3746,30 @@ const STUBBED_GROUP_CANDIDATES = [
     photoUrl: null,
     groupCount: 1,
   },
+  {
+    id: "eeeeeeee-0000-4000-8000-00000000000e",
+    fullName: "Iker Salazar",
+    isPendingActivation: false,
+    positionName: "Back",
+    photoUrl: null,
+    groupCount: 0,
+  },
+  {
+    id: "ffffffff-0000-4000-8000-00000000000f",
+    fullName: "Lucía Ferrer",
+    isPendingActivation: false,
+    positionName: null,
+    photoUrl: null,
+    groupCount: 2,
+  },
+  {
+    id: "abababab-0000-4000-8000-0000000000ab",
+    fullName: "Marta Quintana Olabarrieta",
+    isPendingActivation: false,
+    positionName: "Forward",
+    photoUrl: null,
+    groupCount: 3,
+  },
 ];
 
 /** La vista previa: los activos del grupo en orden de nombre, sin foto. */
@@ -3965,6 +3989,27 @@ type GroupsViewport = {
   readonly height: number;
 };
 
+const OPEN_PICKER_BUTTON = /^(Add members|Añadir miembros)$/;
+const PICKER_LABEL = `Add members to ${OPENED_GROUP_NAME}`;
+
+/** Los tres que marca la captura del selector: el mockup enseña tres. */
+const CHOSEN_CANDIDATES = STUBBED_GROUP_CANDIDATES.slice(0, 3);
+
+async function openMemberPicker(page: Page): Promise<void> {
+  await selectGroup(page);
+  await page.getByRole("button", { name: OPEN_PICKER_BUTTON }).click();
+  await expect(page.getByRole("group", { name: PICKER_LABEL })).toBeVisible();
+}
+
+async function chooseThreeCandidates(page: Page): Promise<void> {
+  await openMemberPicker(page);
+  for (const candidate of CHOSEN_CANDIDATES) {
+    await page.getByRole("checkbox", { name: candidate.fullName }).check();
+  }
+  await expect(page.getByText("3 selected")).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
 type GroupsState = {
   readonly name: string;
   readonly withGroups: boolean;
@@ -4043,6 +4088,7 @@ const GROUPS_STATES: readonly GroupsState[] = [
     viewports: GROUPS_AUDIENCE_VIEWPORTS,
     prepare: selectGroup,
   },
+  { name: "grupos-anadir", withGroups: true, prepare: chooseThreeCandidates },
 ];
 
 async function goToGroups(
@@ -4253,6 +4299,88 @@ test.describe("el cuerpo del panel de un grupo", () => {
     const { audience, members } = await measureBody(page);
 
     expect(audience.y + audience.height).toBeLessThanOrEqual(members.y);
+  });
+});
+
+test.describe("el selector de añadir miembros en escritorio", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 1440, height: 900 },
+  });
+
+  test("va en línea, con el borde de acento y radio 10, como el botón que lo abre", async ({
+    page,
+  }) => {
+    await goToGroups(page, { name: "grupos-anadir", withGroups: true });
+    await openMemberPicker(page);
+
+    const picker = page.getByRole("group", { name: PICKER_LABEL });
+    const toggle = page.getByRole("button", { name: OPEN_PICKER_BUTTON });
+    const accent = await page.evaluate(() =>
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--color-accent")
+        .trim(),
+    );
+    const pickerBorder = await picker.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { color: style.borderTopColor, radius: style.borderTopLeftRadius };
+    });
+    const toggleBorder = await toggle.evaluate(
+      (element) => getComputedStyle(element).borderTopColor,
+    );
+    const toggleBackground = await toggle.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    const activeTint = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      probe.style.background = "var(--color-segment-selected)";
+      document.body.append(probe);
+      const rgb = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return rgb;
+    });
+    const accentAsRgb = await page.evaluate((color) => {
+      const probe = document.createElement("span");
+      probe.style.color = color;
+      document.body.append(probe);
+      const rgb = getComputedStyle(probe).color;
+      probe.remove();
+      return rgb;
+    }, accent);
+
+    expect(pickerBorder.radius).toBe("10px");
+    expect(pickerBorder.color).toBe(accentAsRgb);
+    expect(toggleBorder).toBe(accentAsRgb);
+    expect(toggleBackground).toBe(activeTint);
+  });
+
+  test("cada fila mide al menos 42px, con el avatar de 28px", async ({
+    page,
+  }) => {
+    await goToGroups(page, { name: "grupos-anadir", withGroups: true });
+    await openMemberPicker(page);
+
+    const picker = page.getByRole("group", { name: PICKER_LABEL });
+    const row = picker.getByRole("listitem").first();
+    const avatar = row.locator(".groups-picker-avatar");
+    expect((await row.boundingBox())?.height).toBeGreaterThanOrEqual(42);
+    expect((await avatar.boundingBox())?.width).toBe(28);
+    expect((await avatar.boundingBox())?.height).toBe(28);
+  });
+
+  test("la lista no pasa de 220px y se desplaza dentro", async ({ page }) => {
+    await goToGroups(page, { name: "grupos-anadir", withGroups: true });
+    await openMemberPicker(page);
+
+    const list = page
+      .getByRole("group", { name: PICKER_LABEL })
+      .getByRole("list");
+    expect((await list.boundingBox())?.height).toBeLessThanOrEqual(220);
+    expect(
+      await list.evaluate((element) => getComputedStyle(element).overflowY),
+    ).toBe("auto");
   });
 });
 
@@ -16433,8 +16561,10 @@ type EvaluationsState = {
   /** Lo que sirve la ficha de Camila, si no es la evaluación al día. */
   readonly camilaEvaluation?: unknown;
   readonly isSpanish?: boolean;
-  /** Sólo se fotografía a 1440: el móvil de la tabla llega en #822. */
-  readonly isDesktopOnly?: boolean;
+  /** Si sólo se fotografía a un ancho: los estados del panel lateral sólo
+   * existen en escritorio, y los `evaluaciones-movil-*` (#822) son los de la
+   * ficha a pantalla completa. Sin él, a los tres anchos. */
+  readonly photographedAt?: "desktop" | "mobile";
   readonly ready: (page: Page) => Promise<void>;
 };
 
@@ -16494,7 +16624,7 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
     // cuándo se tome.
     name: "evaluaciones-guardar-y-siguiente",
     roster: STUBBED_ROSTER,
-    isDesktopOnly: true,
+    photographedAt: "desktop",
     ready: async (page) => {
       await openCamilaFromRoster(page);
       await page.getByRole("button", { name: EDIT_RATINGS }).click();
@@ -16521,19 +16651,19 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
   {
     name: "evaluaciones-resumen",
     roster: STUBBED_ROSTER,
-    isDesktopOnly: true,
+    photographedAt: "desktop",
     ready: (page) => waitForOverview(page, "Lowest: Defense"),
   },
   {
     name: "evaluaciones-resumen-todos-evaluados",
     roster: STUBBED_ROSTER.filter((member) => member.status === "evaluated"),
-    isDesktopOnly: true,
+    photographedAt: "desktop",
     ready: (page) => waitForOverview(page, "✓ Everyone has an evaluation."),
   },
   {
     name: "evaluaciones-filtrando",
     roster: STUBBED_ROSTER,
-    isDesktopOnly: true,
+    photographedAt: "desktop",
     ready: async (page) => {
       await waitForRoster(page);
       await page.getByRole("button", { name: NOT_EVALUATED_CHIP }).click();
@@ -16544,11 +16674,43 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
   {
     name: "evaluaciones-sin-resultados",
     roster: STUBBED_ROSTER,
-    isDesktopOnly: true,
+    photographedAt: "desktop",
     ready: async (page) => {
       await waitForRoster(page);
       await page.getByRole("searchbox", { name: SEARCH_BY_NAME }).fill("zzz");
       await expect(page.getByText("No player matches.")).toBeVisible();
+    },
+  },
+  {
+    name: "evaluaciones-movil-lista",
+    roster: STUBBED_ROSTER,
+    photographedAt: "mobile",
+    ready: waitForRoster,
+  },
+  {
+    name: "evaluaciones-movil-ficha",
+    roster: STUBBED_ROSTER,
+    photographedAt: "mobile",
+    ready: openCamilaFromRoster,
+  },
+  {
+    // El último de la lista (Valentina, con el nombre largo) en edición, con
+    // Fitness subido con +: la barra fija dice Guardar y no Guardar y
+    // siguiente.
+    name: "evaluaciones-movil-editando",
+    roster: STUBBED_ROSTER,
+    photographedAt: "mobile",
+    ready: async (page) => {
+      await waitForRoster(page);
+      await rosterButton(page, /Valentina Maximiliana/).click();
+      await page.getByRole("button", { name: EDIT_RATINGS }).click();
+      await page.getByRole("button", { name: "Raise Fitness" }).click();
+      await expect(page.getByRole("slider", { name: "Fitness" })).toHaveValue(
+        "9",
+      );
+      await expect(
+        page.getByRole("button", { name: "Save", exact: true }),
+      ).toBeVisible();
     },
   },
   {
@@ -16598,11 +16760,16 @@ for (const state of EVALUATIONS_STATES) {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
         const isPhotographedHere =
-          state.isDesktopOnly !== true || vp.name === "desktop";
+          state.photographedAt === undefined ||
+          state.photographedAt === vp.name;
         if (isStatePhotographed(state.name) && isPhotographedHere) {
           for (const theme of themes) {
             test(`matches approved baseline (${theme})`, async ({ page }) => {
               await goToEvaluations(page, state, theme);
+              // Evaluaciones elige su diseño con `useIsBelowDesktop` (#822):
+              // si la página no cabe, la captura entera lo ve un instante
+              // como móvil y la ficha cambia de forma a mitad de captura.
+              await fitViewportToPage(page);
               const snapshot = `${state.name}-${vp.name}-${theme}.png`;
               await createMissingLocalBaseline(snapshot, () =>
                 page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
@@ -16630,7 +16797,11 @@ for (const state of EVALUATIONS_STATES) {
       test(`has no accessibility violations (axe-core, ${theme})`, async ({
         page,
       }) => {
-        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.setViewportSize(
+          state.photographedAt === "mobile"
+            ? { width: 375, height: 812 }
+            : { width: 1440, height: 900 },
+        );
         await goToEvaluations(page, state, theme);
         await expectNoAxeViolations(page);
       });
@@ -16638,23 +16809,114 @@ for (const state of EVALUATIONS_STATES) {
   });
 }
 
+const BACK_TO_THE_LIST = /^(Back to the list|Volver a la lista)$/;
+
 test.describe("evaluaciones en el navegador", () => {
   skipWithoutSession();
   quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
-  test("a 375px la lista y la ficha son dos pasos, con forma de volver", async ({
+  // Por debajo de 1024 px, también en la tableta (#822, D12).
+  for (const width of [375, 768] as const) {
+    test(`a ${width}px la lista y la ficha a pantalla completa son dos pasos, con forma de volver`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 812 });
+      await goToEvaluations(page, EVALUATIONS_LIST);
+
+      await openCamila(page);
+      await expect(page.getByRole("searchbox")).toBeHidden();
+      await expect(
+        page.getByRole("heading", { level: 1, name: EVALUATIONS_HEADING }),
+      ).toBeHidden();
+      await expect(
+        page.getByRole("group", { name: /^(Actions|Acciones)$/ }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: BACK_TO_THE_LIST }).click();
+
+      await expect(page.getByRole("searchbox")).toBeVisible();
+      await expect(rosterButton(page, CAMILA_BUTTON)).toBeFocused();
+      await expect(page.getByRole("list", { name: RATINGS_LIST })).toHaveCount(
+        0,
+      );
+    });
+  }
+
+  test("en el móvil los toques miden al menos 44 px y los campos llevan letra de 16 px (#822)", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await goToEvaluations(page, EVALUATIONS_LIST);
+    const row = await rosterButton(page, CAMILA_BUTTON).boundingBox();
+    expect(row?.height).toBeGreaterThanOrEqual(64);
+    for (const field of [
+      page.getByRole("searchbox", { name: SEARCH_BY_NAME }),
+      page.getByRole("combobox", { name: SORT_BY }),
+    ]) {
+      expect(
+        await field.evaluate((element) => getComputedStyle(element).fontSize),
+      ).toBe("16px");
+    }
 
     await openCamila(page);
-    await expect(page.getByRole("searchbox")).toBeHidden();
-    await page.getByRole("button", { name: "All members" }).click();
+    await page.getByRole("button", { name: EDIT_RATINGS }).click();
 
-    await expect(page.getByRole("searchbox")).toBeVisible();
-    await expect(page.getByRole("list", { name: RATINGS_LIST })).toHaveCount(0);
+    for (const name of [
+      BACK_TO_THE_LIST,
+      /^Previous player$/,
+      /^Next player$/,
+      /^Lower Fitness$/,
+      /^Raise Fitness$/,
+      /^Cancel$/,
+      SAVE_AND_NEXT,
+    ]) {
+      const box = await page.getByRole("button", { name }).boundingBox();
+      expect(box?.height, String(name)).toBeGreaterThanOrEqual(44);
+      expect(box?.width, String(name)).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test("en el móvil la lista y la ficha llevan las medidas del handoff (#822)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToEvaluations(page, EVALUATIONS_LIST);
+    const heightOf = async (locator: Locator): Promise<number | undefined> =>
+      (await locator.boundingBox())?.height;
+    const fontSizeOf = (locator: Locator): Promise<string> =>
+      locator.evaluate((element) => getComputedStyle(element).fontSize);
+    const camilaRow = rosterButton(page, CAMILA_BUTTON);
+
+    expect(await fontSizeOf(page.getByRole("heading", { level: 1 }))).toBe(
+      "24px",
+    );
+    expect(
+      await heightOf(page.getByRole("searchbox", { name: SEARCH_BY_NAME })),
+    ).toBe(46);
+    expect(
+      await heightOf(page.getByRole("button", { name: NOT_EVALUATED_CHIP })),
+    ).toBe(36);
+    expect(await heightOf(camilaRow.locator(".evaluation-row-avatar"))).toBe(
+      40,
+    );
+    expect(await fontSizeOf(camilaRow.locator(".evaluation-row-overall"))).toBe(
+      "16px",
+    );
+
+    await openCamila(page);
+    expect(
+      await heightOf(page.locator(".evaluation-sheet .evaluation-avatar")),
+    ).toBe(60);
+    expect(
+      await heightOf(page.getByRole("button", { name: EDIT_RATINGS })),
+    ).toBe(48);
+    await page.getByRole("button", { name: EDIT_RATINGS }).click();
+    for (const name of [/^Cancel$/, SAVE_AND_NEXT]) {
+      expect(
+        await heightOf(page.getByRole("button", { name })),
+        String(name),
+      ).toBe(48);
+    }
   });
 
   test("la búsqueda, la ficha y el orden sobreviven a recargar (#818)", async ({
@@ -16750,8 +17012,8 @@ test.describe("evaluaciones en el navegador", () => {
 
     await expect(page.getByRole("searchbox")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "All members" }),
-    ).toBeHidden();
+      page.getByRole("button", { name: BACK_TO_THE_LIST }),
+    ).toHaveCount(0);
   });
 
   test("guardar una evaluación que no está al día la pone al día en la misma petición (#820, D4)", async ({

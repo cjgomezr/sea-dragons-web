@@ -14,22 +14,44 @@ import { useSyncExternalStore } from "react";
  */
 const PHONE_QUERY = "(width < 768px)";
 
-function subscribe(onChange: () => void): () => void {
-  const query = window.matchMedia(PHONE_QUERY);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
+/** Evaluaciones usa el diseño del móvil también en la tableta (D12 de E31):
+ * la lista con la ficha al lado sólo cabe desde 1024 px. */
+const BELOW_DESKTOP_QUERY = "(width < 1024px)";
+
+function subscribeTo(mediaQuery: string): (onChange: () => void) => () => void {
+  return (onChange) => {
+    const query = window.matchMedia(mediaQuery);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  };
 }
+
+const subscribe = subscribeTo(PHONE_QUERY);
+const subscribeBelowDesktop = subscribeTo(BELOW_DESKTOP_QUERY);
 
 function isPhoneNow(): boolean {
   return window.matchMedia(PHONE_QUERY).matches;
 }
 
-function isPhoneOnServer(): boolean {
+function isBelowDesktopNow(): boolean {
+  return window.matchMedia(BELOW_DESKTOP_QUERY).matches;
+}
+
+function isNarrowOnServer(): boolean {
   return false;
 }
 
 export function useIsPhone(): boolean {
-  return useSyncExternalStore(subscribe, isPhoneNow, isPhoneOnServer);
+  return useSyncExternalStore(subscribe, isPhoneNow, isNarrowOnServer);
+}
+
+/** Como `useIsPhone`, con el corte de 1024 px. */
+export function useIsBelowDesktop(): boolean {
+  return useSyncExternalStore(
+    subscribeBelowDesktop,
+    isBelowDesktopNow,
+    isNarrowOnServer,
+  );
 }
 
 function isUnknownOnServer(): null {

@@ -1,4 +1,5 @@
 import type { AudienceEvent, AudiencePost } from "@/lib/groups/group-audience";
+import type { RejectionReason } from "@/lib/groups/group-members";
 import type { GroupUsage } from "@/lib/groups/group-overview";
 import type { GroupOverview } from "@/lib/groups/groups";
 import {
@@ -8,12 +9,14 @@ import {
   formatWeekdayName,
 } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
+import type { RosterCandidate } from "./groups-client";
 
 /**
  * Las frases de la pantalla Grupos que se arman a trozos (#828, E32): el uso
- * de un grupo, el resumen de su panel, el aviso de borrarlo (D11) y la fecha
- * de lo que lo tiene de audiencia (#830). Cada trozo
- * sale del catálogo; aquí sólo se decide cuáles van y en qué orden.
+ * de un grupo, el resumen de su panel, el aviso de borrarlo (D11), las del
+ * selector de añadir a varios (#829) y la fecha de lo que lo tiene de
+ * audiencia (#830). Cada trozo sale del catálogo; aquí sólo se decide
+ * cuáles van y en qué orden.
  */
 
 const PART_SEPARATOR = " · ";
@@ -124,4 +127,42 @@ export function describeAudiencePostDate(
   return translate("groups.audience.posted", {
     date: formatClubCompactDay(translate.locale, new Date(post.publishedAt)),
   });
+}
+
+/** "Forward · in 2 groups" en la fila del selector, sin la parte que no se
+ * sepa. Puede quedar vacía. */
+export function describeCandidate(
+  translate: Translator,
+  candidate: RosterCandidate,
+): string {
+  return [
+    candidate.positionName,
+    candidate.groupCount === null
+      ? null
+      : translate("groups.picker.groupCount", { count: candidate.groupCount }),
+  ]
+    .filter((part): part is string => part !== null)
+    .join(PART_SEPARATOR);
+}
+
+/** Quien el alta masiva dejó fuera, con el nombre que enseñaba el selector. */
+export type RejectedCandidate = {
+  readonly fullName: string;
+  readonly reason: RejectionReason;
+};
+
+/** "Couldn't add: Bea (no longer in the club), Tomás (account deactivated)." */
+export function describeRejection(
+  translate: Translator,
+  rejected: readonly RejectedCandidate[],
+): string {
+  const members = rejected
+    .map(({ fullName, reason }) =>
+      translate("groups.picker.rejectedMember", {
+        name: fullName,
+        reason: translate(`groups.picker.reason.${reason}`),
+      }),
+    )
+    .join(", ");
+  return translate("groups.picker.rejected", { members });
 }

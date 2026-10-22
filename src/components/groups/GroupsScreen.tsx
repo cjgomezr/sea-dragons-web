@@ -154,6 +154,9 @@ export function GroupsScreen({
   const translate = createTranslator(locale);
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  // El grupo que se acaba de crear abre su selector al pintarse (#829); en
+  // cuanto se elige otro, deja de ser nuevo.
+  const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
   // Se guarda el fallo y no la frase, para que el aviso que ya está a la vista
   // cambie de idioma con el interruptor en vez de quedarse en el de antes.
   const [failure, setFailure] = useState<GroupsFailure | null>(null);
@@ -220,6 +223,7 @@ export function GroupsScreen({
       }
       setState((current) => withSavedGroup(current, outcome.group));
       setSelectedGroupId(outcome.group.id);
+      setCreatedGroupId(outcome.group.id);
       setFailure(null);
       announce(translate("groups.create.done", { name: outcome.group.name }));
       return "done";
@@ -321,11 +325,12 @@ export function GroupsScreen({
               groups={groups}
               selectedGroupId={selectedGroupId}
               isDisabled={isDisabled}
-              onSelect={(group) =>
+              onSelect={(group) => {
+                setCreatedGroupId(null);
                 setSelectedGroupId((selected) =>
                   selected === group.id ? null : group.id,
-                )
-              }
+                );
+              }}
             />
           </section>
           {selectedGroup === undefined ? (
@@ -344,6 +349,7 @@ export function GroupsScreen({
               translate={translate}
               group={selectedGroup}
               pendingAction={pendingAction}
+              isNewGroup={selectedGroup.id === createdGroupId}
               onMembersChange={(members) =>
                 setState((current) =>
                   withMembers(current, selectedGroup.id, members),

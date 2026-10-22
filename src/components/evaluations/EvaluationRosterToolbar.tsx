@@ -8,11 +8,13 @@ import {
   type RosterView,
 } from "@/lib/evaluations/roster-view";
 import type { Translator } from "@/lib/i18n/translator";
+import type { EvaluationsLayout } from "./evaluations-layout";
 
 /**
  * La barra de encima de la tabla de jugadores (#818, RF-2 del PRD de E31): el
  * buscador, las fichas Todos y Sin evaluar con su número, la posición y el
- * orden. No guarda nada: cada cambio sale como una vista nueva.
+ * orden. No guarda nada: cada cambio sale como una vista nueva. En el móvil
+ * (#822) el orden lleva nombres cortos para caber junto a las fichas.
  */
 
 const SEARCH_FIELD_ID = "evaluaciones-buscar";
@@ -24,7 +26,16 @@ const ANY_POSITION_VALUE = "";
 
 function sortLabels(
   translate: Translator,
+  layout: EvaluationsLayout,
 ): Readonly<Record<RosterSort, string>> {
+  if (layout === "compact") {
+    return {
+      name: translate("evaluations.sort.short.name"),
+      overall_desc: translate("evaluations.sort.short.overallDesc"),
+      overall_asc: translate("evaluations.sort.short.overallAsc"),
+      oldest: translate("evaluations.sort.short.oldest"),
+    };
+  }
   return {
     name: translate("evaluations.sort.name"),
     overall_desc: translate("evaluations.sort.overallDesc"),
@@ -76,15 +87,17 @@ export function EvaluationRosterToolbar({
   view,
   counts,
   positions,
+  layout,
   onViewChange,
 }: {
   readonly translate: Translator;
   readonly view: RosterView;
   readonly counts: RosterCounts;
   readonly positions: readonly NamedPosition[];
+  readonly layout: EvaluationsLayout;
   readonly onViewChange: (view: RosterView) => void;
 }): React.JSX.Element {
-  const labels = sortLabels(translate);
+  const labels = sortLabels(translate, layout);
 
   function setFilter(filter: RosterFilter): void {
     onViewChange({ ...view, filter });

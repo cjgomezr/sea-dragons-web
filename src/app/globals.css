@@ -4715,24 +4715,126 @@ a.groups-icon-button {
   background: var(--color-hover);
 }
 
+/* Como el segmento elegido: el tinte con --color-text encima. El texto de
+   acento del tema claro se queda ahí en 4.3:1. */
 .groups-add-toggle[aria-expanded="true"] {
+  color: var(--color-text);
   background: var(--color-segment-selected);
   border-color: var(--color-accent);
 }
 
-/* El selector de uno en uno de E4, hasta que llegue el de varios (#829). */
+/* El selector de varios a la vez (#829, RF-4 de E32): en línea, debajo de la
+   barra, con el borde de acento que lo une al botón que lo abrió. */
 .groups-picker {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border);
+  flex-direction: column;
+  margin: var(--space-3) var(--space-4);
+  overflow: hidden;
+  background: var(--color-background);
+  border: 1px solid var(--color-accent);
+  border-radius: 10px;
 }
 
-.groups-picker .auth-field {
-  flex: 1 1 220px;
-  min-width: 0;
+.groups-picker-search {
+  flex: none;
+}
+
+/* La búsqueda es la primera franja del selector, no una caja dentro de él. */
+.groups-picker-search input,
+.groups-picker-search input:hover {
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+}
+
+.groups-picker-search input:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Unas cinco filas a la vista; el resto, desplazándose dentro. */
+.groups-picker-list {
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.groups-picker-list li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.groups-picker-row {
+  display: grid;
+  grid-template-columns: 18px 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 42px;
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+
+.groups-picker-row:hover {
+  background: var(--color-hover);
+}
+
+.groups-picker-row input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.groups-picker-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-hover);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.groups-picker-name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.groups-picker-detail {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: right;
+}
+
+.groups-picker-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-editor-bar);
+  border-top: 1px solid var(--color-border);
+}
+
+.groups-picker-count {
+  margin: 0 auto 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.groups-picker-submit {
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  font-size: 14px;
 }
 
 .groups-picker-empty,
@@ -4740,10 +4842,6 @@ a.groups-icon-button {
   margin: 0;
   padding: var(--space-4);
   color: var(--color-text-secondary);
-}
-
-.groups-picker-empty {
-  border-bottom: 1px solid var(--color-border);
 }
 
 /* La lista se desplaza sola: un grupo de todo el club no estira la página. */
@@ -12487,7 +12585,7 @@ a.groups-icon-button {
 /* El panel lateral (#819, RF-3 del PRD de E31): sin nadie elegido, el
    resumen de la plantilla; con alguien, su ficha. Los dos son la misma caja,
    pegada arriba en escritorio. En el móvil el resumen no sale (D7) y la
-   ficha es el segundo paso, que rehace #822. */
+   ficha es el segundo paso, a pantalla completa (#822). */
 .evaluation-sheet,
 .evaluation-overview {
   display: flex;
@@ -12502,27 +12600,6 @@ a.groups-icon-button {
 
 .evaluation-overview {
   display: none;
-}
-
-.evaluation-back {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--touch-target-min);
-  padding: 0 var(--space-4);
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--color-text);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.evaluation-back:hover {
-  border-color: var(--color-accent);
 }
 
 .evaluation-sheet-nav {
@@ -12571,11 +12648,6 @@ a.groups-icon-button {
   color: var(--color-text-secondary);
   cursor: not-allowed;
   opacity: 0.5;
-}
-
-/* En el móvil ya cierra el botón de volver. */
-.evaluation-sheet-close {
-  display: none;
 }
 
 .evaluation-sheet-header {
@@ -13047,17 +13119,254 @@ a.groups-icon-button {
     display: flex;
   }
 
-  .evaluation-back {
-    display: none;
-  }
-
-  .evaluation-sheet-close {
-    display: inline-flex;
-  }
-
   .evaluation-sheet-nav-button {
     width: 32px;
     height: 32px;
+  }
+}
+
+/* − y + de cada nota en el móvil (#822): 44 px, a los lados del
+   deslizador. */
+.evaluation-rating-stepper {
+  display: grid;
+  grid-template-columns: var(--touch-target-min) minmax(0, 1fr) var(
+      --touch-target-min
+    );
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.evaluation-rating-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  font-size: 18px;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.evaluation-rating-step:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.evaluation-rating-step:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.evaluation-rating-step:disabled {
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Evaluaciones por debajo de 1024 px (#822, RF-6 y D12 del PRD de E31;
+   05-mobile-list y 06-mobile-player-editing del handoff): la lista sin
+   columnas, con filas de 64 px, y la ficha a pantalla completa con sus
+   botones en una barra fija abajo. La entradilla no sale, como en el
+   mockup; la regla del OVR sigue al pie de la lista. */
+@media (width < 1024px) {
+  .app-main .evaluations-header h1 {
+    margin-bottom: var(--space-3);
+    font-size: 24px;
+  }
+
+  .evaluations-header .app-lead {
+    display: none;
+  }
+
+  /* La ficha ocupa la pantalla: su barra de arriba ya dice dónde está. */
+  .evaluations[data-step="sheet"] {
+    gap: 0;
+  }
+
+  .evaluations[data-step="sheet"] .evaluations-header h1,
+  .evaluations[data-step="sheet"] .evaluations-tabs {
+    display: none;
+  }
+
+  /* El aviso de guardado, encima de la barra fija y no sobre ↑ ↓. */
+  .evaluations[data-step="sheet"] .evaluations-saved {
+    position: fixed;
+    inset-block: auto
+      calc(var(--space-12) + 2 * var(--space-3) + var(--space-2));
+    inset-inline: var(--space-4);
+    z-index: 10;
+  }
+
+  .evaluations-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .evaluations-search,
+  .evaluations-chips {
+    grid-column: 1 / -1;
+  }
+
+  .evaluations-search input {
+    height: 46px;
+  }
+
+  /* Las fichas se desplazan de lado sin empujar la página. */
+  .evaluations-chips {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .evaluations-chip {
+    flex: none;
+    height: 36px;
+  }
+
+  .evaluations-select {
+    width: 100%;
+    height: var(--touch-target-min);
+    font-size: 16px;
+  }
+
+  .evaluation-table-head {
+    display: none;
+  }
+
+  .evaluation-row {
+    grid-template-columns: 40px minmax(0, 1fr) auto 16px;
+    min-height: 64px;
+  }
+
+  .evaluation-row-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 13px;
+  }
+
+  .evaluation-row-name {
+    display: -webkit-box;
+    font-size: 15px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .evaluation-row-detail {
+    overflow: hidden;
+    font-size: 12.5px;
+    color: var(--color-text-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .evaluation-row-overall {
+    font-size: 16px;
+  }
+
+  .evaluation-row-caret {
+    display: inline-flex;
+    font-size: 16px;
+    color: var(--color-text-secondary);
+  }
+
+  .evaluation-sheet[data-layout="compact"] {
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+  }
+
+  .evaluation-sheet[data-layout="compact"] .evaluation-avatar {
+    width: 60px;
+    height: 60px;
+  }
+
+  .evaluation-sheet[data-layout="compact"] .evaluation-sheet-header h2 {
+    font-size: 20px;
+  }
+
+  .evaluation-sheet[data-layout="compact"] .evaluation-ratings {
+    padding: var(--space-3) var(--space-4) var(--space-1);
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+  }
+
+  /* Cada nota es un bloque: el nombre y el número arriba, y debajo la
+     barra, la marca de nueva o − [deslizador] +. */
+  .evaluation-sheet[data-layout="compact"] .evaluation-rating {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name value"
+      "bar bar";
+    row-gap: var(--space-2);
+    padding-block: var(--space-3);
+    font-size: 15px;
+  }
+
+  .evaluation-sheet[data-layout="compact"] .evaluation-rating-name {
+    grid-area: name;
+  }
+
+  .evaluation-sheet[data-layout="compact"] .evaluation-rating-value {
+    grid-area: value;
+  }
+
+  .evaluation-sheet[data-layout="compact"] .evaluation-rating-bar,
+  .evaluation-sheet[data-layout="compact"] .evaluation-rating-unrated,
+  .evaluation-sheet[data-layout="compact"] .evaluation-rating-stepper {
+    grid-area: bar;
+  }
+
+  /* La página deja debajo un hueco del alto de la barra fija para que no
+     tape lo último. */
+  .evaluations:has(.evaluation-bottom-bar) {
+    padding-bottom: calc(var(--space-12) + var(--space-8));
+  }
+
+  .evaluation-bottom-bar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: var(--sidebar-width);
+    z-index: 9;
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4)
+      calc(var(--space-3) + env(safe-area-inset-bottom));
+    background: var(--color-panel);
+    border-top: 1px solid var(--color-border);
+    box-shadow: var(--shadow);
+  }
+
+  .evaluation-bottom-bar button {
+    display: inline-flex;
+    flex: 1;
+    gap: var(--space-2);
+    align-items: center;
+    justify-content: center;
+    min-height: var(--space-12);
+    font-size: 16px;
+  }
+}
+
+/* En el móvil no hay barra lateral, y la de pestañas va debajo. */
+@media (width < 768px) {
+  .evaluation-bottom-bar {
+    bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+    left: 0;
+    padding-bottom: var(--space-3);
+  }
+
+  .evaluations[data-step="sheet"] .evaluations-saved {
+    inset-block-end: calc(
+      var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-12) + 2 *
+        var(--space-3) + var(--space-2)
+    );
   }
 }
 

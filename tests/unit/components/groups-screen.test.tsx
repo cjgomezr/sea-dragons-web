@@ -91,7 +91,10 @@ type ApiStub = {
   readonly deleteGroup?: Respond;
   /** Devuelve `null` para dejar que responda la lista de arriba. */
   readonly loadDetail?: (url: string) => Response | Promise<Response> | null;
-  readonly assignMember?: Respond;
+  /** Recibe los ids que pidió el POST masivo (D3 de E32). */
+  readonly assignMembers?: (
+    userIds: readonly string[],
+  ) => Response | Promise<Response>;
   readonly removeMember?: Respond;
   readonly audience?: GroupAudience;
   readonly loadAudience?: Respond;
@@ -151,14 +154,25 @@ function detailResponse(stub: ApiStub, url: string): Response {
     : jsonResponse(200, { data: { candidates: stub.candidates ?? [TOMAS] } });
 }
 
-/** Asignar responde el socio a secas, sin posición ni foto. */
-function membershipResponse(stub: ApiStub, url: string): Response {
-  const userId = MEMBERSHIP_PATH.exec(url)?.[2] ?? "";
-  const member = (stub.candidates ?? [TOMAS]).find(
-    (candidate) => candidate.id === userId,
-  );
-  const { id, fullName, isPendingActivation } = member ?? TOMAS;
-  return jsonResponse(200, { data: { id, fullName, isPendingActivation } });
+function idsIn(body: unknown): readonly string[] {
+  return (body as { userIds?: readonly string[] }).userIds ?? [];
+}
+
+/** El alta masiva responde las dos listas ya al día y a nadie rechazado. */
+function bulkAssignmentResponse(
+  stub: ApiStub,
+  userIds: readonly string[],
+): Response {
+  const candidates = stub.candidates ?? [TOMAS];
+  const isChosen = (candidate: GroupCandidate): boolean =>
+    userIds.includes(candidate.id);
+  return jsonResponse(200, {
+    data: {
+      members: [...(stub.members ?? [NEREA]), ...candidates.filter(isChosen)],
+      candidates: candidates.filter((candidate) => !isChosen(candidate)),
+      rejected: [],
+    },
+  });
 }
 
 function stubApi(stub: ApiStub = {}): void {
@@ -184,8 +198,11 @@ function stubApi(stub: ApiStub = {}): void {
       if (GROUP_PATH.test(url) && method === "DELETE") {
         return stub.deleteGroup?.() ?? NO_CONTENT();
       }
-      if (MEMBERSHIP_PATH.test(url) && method === "PUT") {
-        return stub.assignMember?.() ?? membershipResponse(stub, url);
+      if (MEMBERS_PATH.test(url) && method === "POST") {
+        return (
+          stub.assignMembers?.(idsIn(body)) ??
+          bulkAssignmentResponse(stub, idsIn(body))
+        );
       }
       if (MEMBERSHIP_PATH.test(url) && method === "DELETE") {
         return stub.removeMember?.() ?? NO_CONTENT();
@@ -273,9 +290,27 @@ async function openGroup(name: string): Promise<HTMLElement> {
   return groupPanel(name);
 }
 
-async function openPicker(panel: HTMLElement): Promise<void> {
+function addMembersButton(panel: HTMLElement): HTMLElement {
+  return within(panel).getByRole("button", { name: "Add members" });
+}
+
+/** El selector de varios a la vez (#829), con el nombre de su grupo. */
+function pickerOf(panel: HTMLElement, groupName: string): HTMLElement {
+  return within(panel).getByRole("group", {
+    name: `Add members to ${groupName}`,
+  });
+}
+
+async function openPicker(panel: HTMLElement): Promise<HTMLElement> {
   const user = userEvent.setup();
-  await user.click(within(panel).getByRole("button", { name: "Add members" }));
+  await user.click(addMembersButton(panel));
+  return pickerOf(panel, panel.getAttribute("aria-label") ?? "");
+}
+
+function bulkPosts(): readonly ApiCall[] {
+  return calls.filter(
+    (call) => call.method === "POST" && MEMBERS_PATH.test(call.url),
+  );
 }
 
 beforeEach(() => {
@@ -1111,11 +1146,12 @@ describe("los miembros del grupo", () => {
     await waitFor(() =>
       expect(within(panel).queryByText("Nerea Ruiz")).toBeNull(),
     );
-    await openPicker(panel);
+    const picker = await openPicker(panel);
 
+    // En cuántos otros grupos está no lo sabe esta pantalla: sólo su posición.
     expect(
-      within(panel).getByRole("combobox", { name: "Member to add" }),
-    ).toHaveTextContent("Nerea Ruiz");
+      within(picker).getByRole("checkbox", { name: "Nerea Ruiz" }),
+    ).toHaveAccessibleDescription("Forward");
   });
 
   it("en español, quitar a un socio lo avisa en español", async () => {
@@ -1236,7 +1272,99 @@ describe("los miembros del grupo", () => {
 /** El selector de uno en uno de E4 sigue hasta que llegue el de varios a la
  * vez (#829): se abre con "Add members". */
 describe("añadir socios", () => {
-  it("agregar un socio lo mete en la lista, lo saca del selector, sube el conteo y lo avisa", async () => {
+  it("el selector lleva la búsqueda y una casilla por socio con su posición y sus grupos", async () => {
+    stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA, TOMAS] });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+
+    const picker = await openPicker(panel);
+
+    expect(
+      within(picker).getByRole("searchbox", {
+        name: "Search members not in this group",
+      }),
+    ).toBeVisible();
+    expect(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    ).toHaveAccessibleDescription("in 2 groups");
+    expect(
+      within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
+    ).toHaveAccessibleDescription("Goalkeeper · in 0 groups");
+    expect(addMembersButton(panel)).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("sin nada marcado, dice cuántos no están en el grupo y no deja añadir", async () => {
+    stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA, TOMAS] });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+
+    const picker = await openPicker(panel);
+
+    expect(
+      within(picker).getByText("2 members not in this group"),
+    ).toBeVisible();
+    expect(
+      within(picker).getByRole("button", { name: "Add 0 members" }),
+    ).toBeDisabled();
+  });
+
+  it("marcar y desmarcar cambia el contador y el botón", async () => {
+    const user = userEvent.setup();
+    stubApi({
+      groups: [SENIOR],
+      members: [NEREA],
+      candidates: [ANA, BEA, TOMAS],
+    });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+    const picker = await openPicker(panel);
+
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Bea Nadal" }),
+    );
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
+    );
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Bea Nadal" }),
+    );
+
+    expect(within(picker).getByText("2 selected")).toBeVisible();
+    expect(
+      within(picker).getByRole("button", { name: "Add 2 members" }),
+    ).toBeEnabled();
+  });
+
+  it("lo marcado sigue marcado aunque la búsqueda lo esconda", async () => {
+    const user = userEvent.setup();
+    stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA, BEA] });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+    const picker = await openPicker(panel);
+
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
+    await user.type(
+      within(picker).getByRole("searchbox", {
+        name: "Search members not in this group",
+      }),
+      "bea",
+    );
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Bea Nadal" }),
+    );
+
+    expect(
+      within(picker).queryByRole("checkbox", { name: "Ana Admin" }),
+    ).toBeNull();
+    expect(within(picker).getByText("2 selected")).toBeVisible();
+  });
+
+  it("añadir manda un solo POST con todos los elegidos, cierra el selector, pone la lista al día y lo avisa", async () => {
     const user = userEvent.setup();
     stubApi({
       groups: [SENIOR],
@@ -1245,47 +1373,74 @@ describe("añadir socios", () => {
     });
     await renderScreen();
     const panel = await openGroup("Senior Squad");
-    await openPicker(panel);
+    const picker = await openPicker(panel);
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Bea Nadal" }),
+    );
 
     await user.click(
-      within(panel).getByRole("button", { name: "Add to the group" }),
+      within(picker).getByRole("button", { name: "Add 2 members" }),
     );
 
     await waitFor(() =>
-      expect(
-        within(panel).getByRole("button", {
-          name: "Remove Ana Admin from Senior Squad",
-        }),
-      ).toBeVisible(),
+      expect(statusNotice()).toHaveTextContent(
+        "2 members added to Senior Squad",
+      ),
     );
-    expect(
-      within(panel).getByRole("combobox", { name: "Member to add" }),
-    ).not.toHaveTextContent("Ana Admin");
-    expect(groupRow("Senior Squad")).toHaveAccessibleDescription(
-      "2 events · 1 post · 3 members",
-    );
-    expect(statusNotice()).toHaveTextContent("Ana Admin added to Senior Squad");
-    expect(calls.filter((call) => call.method === "PUT")).toEqual([
+    expect(bulkPosts()).toEqual([
       {
-        url: `${GROUPS_PATH}/${SENIOR.id}/members/${ANA.id}`,
-        method: "PUT",
-        body: null,
+        url: `${GROUPS_PATH}/${SENIOR.id}/members`,
+        method: "POST",
+        body: { userIds: [ANA.id, BEA.id] },
       },
     ]);
+    expect(
+      within(panel).queryByRole("group", {
+        name: "Add members to Senior Squad",
+      }),
+    ).toBeNull();
+    expect(
+      within(panel).getByRole("button", {
+        name: "Remove Bea Nadal from Senior Squad",
+      }),
+    ).toBeVisible();
+    expect(groupRow("Senior Squad")).toHaveAccessibleDescription(
+      "2 events · 1 post · 4 members",
+    );
+    expect(addMembersButton(panel)).toHaveFocus();
   });
 
-  it("el socio añadido conserva su posición, que la respuesta no trae", async () => {
+  it("los añadidos salen del selector la próxima vez que se abre", async () => {
     const user = userEvent.setup();
-    stubApi({ groups: [SENIOR], members: [], candidates: [TOMAS] });
+    stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA, BEA] });
     await renderScreen();
     const panel = await openGroup("Senior Squad");
-    await openPicker(panel);
-
+    const picker = await openPicker(panel);
     await user.click(
-      within(panel).getByRole("button", { name: "Add to the group" }),
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
+    await user.click(
+      within(picker).getByRole("button", { name: "Add 1 member" }),
+    );
+    await waitFor(() =>
+      expect(
+        within(panel).queryByRole("group", {
+          name: "Add members to Senior Squad",
+        }),
+      ).toBeNull(),
     );
 
-    expect(await within(panel).findByText("Goalkeeper")).toBeVisible();
+    const reopened = await openPicker(panel);
+
+    expect(
+      within(reopened).queryByRole("checkbox", { name: "Ana Admin" }),
+    ).toBeNull();
+    expect(
+      within(reopened).getByRole("checkbox", { name: "Bea Nadal" }),
+    ).not.toBeChecked();
   });
 
   it("marca a quien no activó su cuenta y no lo suma al conteo", async () => {
@@ -1298,10 +1453,13 @@ describe("añadir socios", () => {
     });
     await renderScreen();
     const panel = await openGroup("Senior Squad");
-    await openPicker(panel);
+    const picker = await openPicker(panel);
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
 
     await user.click(
-      within(panel).getByRole("button", { name: "Add to the group" }),
+      within(picker).getByRole("button", { name: "Add 1 member" }),
     );
 
     await waitFor(() =>
@@ -1312,37 +1470,278 @@ describe("añadir socios", () => {
     );
   });
 
-  it("dice que ya están todos cuando no queda a quién agregar", async () => {
+  it("los rechazados no entran, los demás sí, y el aviso dice quién no y por qué", async () => {
+    const user = userEvent.setup();
+    stubApi({
+      groups: [SENIOR],
+      members: [NEREA],
+      candidates: [ANA, BEA, TOMAS],
+      assignMembers: () =>
+        jsonResponse(200, {
+          data: {
+            members: [ANA, NEREA],
+            candidates: [],
+            rejected: [
+              { userId: BEA.id, reason: "not_in_club" },
+              { userId: TOMAS.id, reason: "inactive" },
+            ],
+          },
+        }),
+    });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+    const picker = await openPicker(panel);
+    for (const name of ["Ana Admin", "Bea Nadal", "Tomás Errekondo"]) {
+      await user.click(within(picker).getByRole("checkbox", { name }));
+    }
+
+    await user.click(
+      within(picker).getByRole("button", { name: "Add 3 members" }),
+    );
+
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
+      "Couldn't add: Bea Nadal (no longer in the club), Tomás Errekondo (account deactivated).",
+    );
+    expect(statusNotice()).toHaveTextContent("1 member added to Senior Squad");
+    expect(
+      within(panel).getByRole("button", {
+        name: "Remove Ana Admin from Senior Squad",
+      }),
+    ).toBeVisible();
+    expect(
+      within(panel).queryByRole("button", {
+        name: "Remove Tomás Errekondo from Senior Squad",
+      }),
+    ).toBeNull();
+  });
+
+  it("en español, el selector, el contador y los rechazados salen en español", async () => {
+    const user = userEvent.setup();
+    stubApi({
+      groups: [SENIOR],
+      members: [NEREA],
+      candidates: [ANA, TOMAS],
+      assignMembers: () =>
+        jsonResponse(200, {
+          data: {
+            members: [ANA, NEREA],
+            candidates: [],
+            rejected: [{ userId: TOMAS.id, reason: "inactive" }],
+          },
+        }),
+    });
+    await renderScreen("es");
+    await user.click(groupRow("Senior Squad"));
+    const panel = groupPanel("Senior Squad");
+    await user.click(
+      await within(panel).findByRole("button", { name: "Añadir miembros" }),
+    );
+    const picker = within(panel).getByRole("group", {
+      name: "Añadir miembros a Senior Squad",
+    });
+
+    expect(
+      within(picker).getByRole("searchbox", {
+        name: "Buscar miembros que no están en este grupo",
+      }),
+    ).toBeVisible();
+    expect(
+      within(picker).getByText("2 miembros no están en este grupo"),
+    ).toBeVisible();
+    expect(
+      within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
+    ).toHaveAccessibleDescription("Goalkeeper · en 0 grupos");
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
+    );
+    expect(within(picker).getByText("2 elegidos")).toBeVisible();
+    await user.click(
+      within(picker).getByRole("button", { name: "Añadir 2 miembros" }),
+    );
+
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
+      "No se pudo añadir a: Tomás Errekondo (tiene la cuenta desactivada).",
+    );
+    expect(statusNotice()).toHaveTextContent("1 añadido a Senior Squad");
+  });
+
+  it("dice que todo el club está ya en el grupo cuando no queda a quién añadir", async () => {
     stubApi({ groups: [SENIOR], members: [NEREA], candidates: [] });
     await renderScreen();
     const panel = await openGroup("Senior Squad");
 
-    await openPicker(panel);
+    const picker = await openPicker(panel);
 
     expect(
-      within(panel).getByText(
-        "Every member of the club is already in this group.",
+      within(picker).getByText(
+        "Everyone in the club is already in this group.",
       ),
     ).toBeVisible();
-    expect(
-      within(panel).queryByRole("button", { name: "Add to the group" }),
-    ).toBeNull();
+    expect(within(picker).queryByRole("checkbox")).toBeNull();
   });
 
-  it("un grupo que otro borró mientras se agregaba vuelve a elegir y lo explica", async () => {
+  it("una búsqueda sin resultados dice que nadie se llama así", async () => {
+    const user = userEvent.setup();
+    stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA, TOMAS] });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+    const picker = await openPicker(panel);
+
+    await user.type(
+      within(picker).getByRole("searchbox", {
+        name: "Search members not in this group",
+      }),
+      "zzz",
+    );
+
+    expect(within(picker).getByText("No one matches.")).toBeVisible();
+    expect(within(picker).queryByRole("checkbox")).toBeNull();
+  });
+
+  it("la búsqueda del selector no mira mayúsculas ni tildes", async () => {
+    const user = userEvent.setup();
+    stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA, TOMAS] });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+    const picker = await openPicker(panel);
+
+    await user.type(
+      within(picker).getByRole("searchbox", {
+        name: "Search members not in this group",
+      }),
+      "TOMAS",
+    );
+
+    expect(
+      within(picker)
+        .getAllByRole("checkbox")
+        .map((box) => box.getAttribute("aria-labelledby") ?? "")
+        .map((id) => document.getElementById(id)?.textContent),
+    ).toEqual(["Tomás Errekondo"]);
+  });
+
+  it("en español, sin nadie fuera y sin resultados lo dice en español", async () => {
+    const user = userEvent.setup();
+    stubApi({ groups: [SENIOR, MASTERS], members: [NEREA], candidates: [] });
+    await renderScreen("es");
+    await user.click(groupRow("Senior Squad"));
+    const panel = groupPanel("Senior Squad");
+    await user.click(
+      await within(panel).findByRole("button", { name: "Añadir miembros" }),
+    );
+
+    expect(
+      within(panel).getByText("Todo el club está ya en este grupo."),
+    ).toBeVisible();
+  });
+
+  it("en español, una búsqueda sin resultados dice que nadie se llama así", async () => {
+    const user = userEvent.setup();
+    stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA] });
+    await renderScreen("es");
+    await user.click(groupRow("Senior Squad"));
+    const panel = groupPanel("Senior Squad");
+    await user.click(
+      await within(panel).findByRole("button", { name: "Añadir miembros" }),
+    );
+
+    await user.type(
+      within(panel).getByRole("searchbox", {
+        name: "Buscar miembros que no están en este grupo",
+      }),
+      "zzz",
+    );
+
+    expect(within(panel).getByText("Nadie se llama así.")).toBeVisible();
+  });
+
+  it("al crear un grupo, su selector se abre solo", async () => {
+    stubApi({ groups: [SENIOR], candidates: [ANA, TOMAS] });
+    await renderScreen();
+
+    await createGroup("Alevines");
+
+    const panel = await screen.findByRole("region", { name: "Alevines" });
+    expect(
+      await within(panel).findByRole("group", {
+        name: "Add members to Alevines",
+      }),
+    ).toBeVisible();
+    expect(addMembersButton(panel)).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("elegir un grupo que ya existía no abre su selector", async () => {
+    stubApi({ groups: [SENIOR], candidates: [ANA] });
+    await renderScreen();
+
+    const panel = await openGroup("Senior Squad");
+
+    expect(within(panel).queryByRole("group")).toBeNull();
+  });
+
+  it("Cancelar cierra el selector sin añadir a nadie y devuelve el foco a Añadir miembros", async () => {
+    const user = userEvent.setup();
+    stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA, BEA] });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+    const picker = await openPicker(panel);
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
+
+    await user.click(within(picker).getByRole("button", { name: "Cancel" }));
+
+    expect(
+      within(panel).queryByRole("group", {
+        name: "Add members to Senior Squad",
+      }),
+    ).toBeNull();
+    expect(addMembersButton(panel)).toHaveFocus();
+    expect(addMembersButton(panel)).toHaveAttribute("aria-expanded", "false");
+    expect(bulkPosts()).toEqual([]);
+    expect(groupRow("Senior Squad")).toHaveAccessibleDescription(
+      "2 events · 1 post · 2 members",
+    );
+  });
+
+  it("tras Cancelar, el selector vuelve a abrirse sin nadie marcado", async () => {
+    const user = userEvent.setup();
+    stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA] });
+    await renderScreen();
+    const panel = await openGroup("Senior Squad");
+    const picker = await openPicker(panel);
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
+    await user.click(within(picker).getByRole("button", { name: "Cancel" }));
+
+    const reopened = await openPicker(panel);
+
+    expect(
+      within(reopened).getByRole("checkbox", { name: "Ana Admin" }),
+    ).not.toBeChecked();
+  });
+
+  it("un grupo que otro borró mientras se añadía vuelve a elegir y lo explica", async () => {
     const user = userEvent.setup();
     stubApi({
       groups: [SENIOR, MASTERS],
       members: [NEREA],
       candidates: [TOMAS],
-      assignMember: () => errorResponse(404, "not_found"),
+      assignMembers: () => errorResponse(404, "not_found"),
     });
     await renderScreen();
     const panel = await openGroup("Senior Squad");
-    await openPicker(panel);
+    const picker = await openPicker(panel);
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
+    );
 
     await user.click(
-      within(panel).getByRole("button", { name: "Add to the group" }),
+      within(picker).getByRole("button", { name: "Add 1 member" }),
     );
 
     expect(
@@ -1350,37 +1749,35 @@ describe("añadir socios", () => {
     ).toBeVisible();
     await waitFor(() => expect(rowNames()).toEqual(["Masters Squad"]));
     expect(screen.queryByRole("region", { name: "Senior Squad" })).toBeNull();
-    expect(
-      screen.getByText("Pick a group to see and manage its members."),
-    ).toBeVisible();
   });
 
-  it("un socio dado de baja no se agrega, y la pantalla dice por qué", async () => {
+  it("un error al añadir no da a nadie por añadido y deja el selector como estaba", async () => {
     const user = userEvent.setup();
     stubApi({
       groups: [SENIOR],
       members: [NEREA],
       candidates: [TOMAS],
-      assignMember: () => errorResponse(422, "business_rule"),
+      assignMembers: () => errorResponse(500, "internal_error"),
     });
     await renderScreen();
     const panel = await openGroup("Senior Squad");
-    await openPicker(panel);
+    const picker = await openPicker(panel);
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
+    );
 
     await user.click(
-      within(panel).getByRole("button", { name: "Add to the group" }),
+      within(picker).getByRole("button", { name: "Add 1 member" }),
     );
 
     expect(
-      await screen.findByText(
-        "That member's account is deactivated, so they can't be added.",
+      await within(panel).findByText(
+        "We couldn't finish that. Try again in a moment.",
       ),
     ).toBeVisible();
     expect(
-      within(panel).queryByRole("button", {
-        name: "Remove Tomás Errekondo from Senior Squad",
-      }),
-    ).toBeNull();
+      within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
+    ).toBeChecked();
     expect(groupRow("Senior Squad")).toHaveAccessibleDescription(
       "2 events · 1 post · 2 members",
     );
@@ -1388,18 +1785,14 @@ describe("añadir socios", () => {
 });
 
 describe("una sola acción en vuelo", () => {
-  it("desactiva el botón de agregar hasta la respuesta, y un doble clic no manda dos", async () => {
+  it("desactiva el botón de añadir hasta la respuesta, y un doble clic no manda dos", async () => {
     const user = userEvent.setup();
     let release = (): void => {};
     const pending = new Promise<Response>((resolve) => {
       release = () =>
         resolve(
           jsonResponse(200, {
-            data: {
-              id: TOMAS.id,
-              fullName: TOMAS.fullName,
-              isPendingActivation: false,
-            },
+            data: { members: [NEREA, TOMAS], candidates: [], rejected: [] },
           }),
         );
     });
@@ -1407,22 +1800,26 @@ describe("una sola acción en vuelo", () => {
       groups: [SENIOR],
       members: [NEREA],
       candidates: [TOMAS],
-      assignMember: () => pending,
+      assignMembers: () => pending,
     });
     await renderScreen();
     const panel = await openGroup("Senior Squad");
-    await openPicker(panel);
+    const picker = await openPicker(panel);
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
+    );
 
-    const add = within(panel).getByRole("button", { name: "Add to the group" });
+    const add = within(picker).getByRole("button", { name: "Add 1 member" });
     await user.click(add);
     await waitFor(() => expect(add).toBeDisabled());
+    expect(add).toHaveTextContent("Adding…");
     await user.click(add);
     release();
 
     await waitFor(() =>
       expect(within(panel).getByText("Tomás Errekondo")).toBeVisible(),
     );
-    expect(calls.filter((call) => call.method === "PUT")).toHaveLength(1);
+    expect(bulkPosts()).toHaveLength(1);
   });
 
   it("mientras se quita un socio, ni crear ni borrar ni otra fila se pueden pulsar", async () => {
