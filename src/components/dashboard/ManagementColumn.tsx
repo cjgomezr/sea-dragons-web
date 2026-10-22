@@ -2,6 +2,7 @@ import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types
 import { CaretRight } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import { ChatCircleDots } from "@phosphor-icons/react/dist/ssr/ChatCircleDots";
 import { ClipboardText } from "@phosphor-icons/react/dist/ssr/ClipboardText";
+import { UserMinus } from "@phosphor-icons/react/dist/ssr/UserMinus";
 import { UserSwitch } from "@phosphor-icons/react/dist/ssr/UserSwitch";
 import { UsersThree } from "@phosphor-icons/react/dist/ssr/UsersThree";
 import Link from "next/link";
@@ -114,6 +115,15 @@ function describeTodo(
         detail: translate("dashboard.todos.teams.detail", {
           event: todo.title,
         }),
+        action: translate("dashboard.todos.teams.action"),
+        href: teamBuilderHref(todo.eventId),
+      };
+    case "teams_dropped":
+      return {
+        tone: "warning",
+        glyph: UserMinus,
+        title: translate("dashboard.todos.teamsDropped", { count: todo.count }),
+        detail: todo.title,
         action: translate("dashboard.todos.teams.action"),
         href: teamBuilderHref(todo.eventId),
       };

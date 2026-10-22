@@ -2,6 +2,10 @@ import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { RoleRequestGateways } from "@/lib/auth/role-request";
 import type { MemberGroupsGateway } from "@/lib/groups/member-groups";
 import type { EventAudience } from "./event-creation";
+import {
+  type TeamPlayerNoticeGateways,
+  noticeTeamPlayerChange,
+} from "./team-player-notices";
 
 /**
  * Responder a un evento (#308, RF-5 del PRD de E7, FR-034 y FR-035), contado
@@ -24,6 +28,8 @@ export type RsvpResponse = (typeof RSVP_RESPONSES)[number];
 export type RsvpEvent = {
   readonly id: string;
   readonly clubId: string;
+  /** Para el aviso a quien publicó el reparto (#838). */
+  readonly title: string;
   readonly status: "scheduled" | "cancelled";
   readonly startsAt: Date;
   readonly audience: EventAudience;
@@ -51,12 +57,17 @@ export type EventRsvpsGateway = {
     readonly clubId: string;
     readonly eventId: string;
   }): Promise<RsvpEvent | null>;
+  /** La respuesta guardada del miembro, o null si no respondió. */
+  findResponse(query: {
+    readonly eventId: string;
+    readonly userId: string;
+  }): Promise<RsvpResponse | null>;
   /** Reescribe la respuesta anterior del miembro, si la había: dos llamadas
    * iguales a la vez dejan una sola fila. */
   saveResponse(rsvp: NewEventRsvp): Promise<void>;
 };
 
-export type EventRsvpGateways = {
+export type EventRsvpGateways = TeamPlayerNoticeGateways & {
   readonly members: RoleRequestGateways["members"];
   readonly memberGroups: MemberGroupsGateway;
   readonly rsvps: EventRsvpsGateway;
@@ -129,7 +140,9 @@ async function findOpenEvent(
 }
 
 /** Guarda la respuesta de quien llama a una ocurrencia, o dice por qué no. El
- * club sale de su fila de miembro, nunca de la petición (NFR-009). */
+ * club sale de su fila de miembro, nunca de la petición (NFR-009). Si deja de
+ * ir o vuelve a ir estando en un reparto publicado, avisa a quien lo publicó
+ * (#838). */
 export async function respondToEvent(
   gateways: EventRsvpGateways,
   request: {
@@ -147,12 +160,23 @@ export async function respondToEvent(
     ...request,
     clubId: caller.clubId,
   });
+  const previous = await gateways.rsvps.findResponse({
+    eventId: event.id,
+    userId: request.callerId,
+  });
   await gateways.rsvps.saveResponse({
     clubId: caller.clubId,
     eventId: event.id,
     userId: request.callerId,
     response: request.response,
     respondedAt: request.now,
+  });
+  await noticeTeamPlayerChange(gateways, {
+    clubId: caller.clubId,
+    event: { id: event.id, title: event.title },
+    player: { id: request.callerId, fullName: caller.fullName },
+    previous,
+    current: request.response,
   });
   return {
     eventId: event.id,

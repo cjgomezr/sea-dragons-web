@@ -367,10 +367,15 @@ async function saveSplit(
 
 async function publishSplit(
   serviceClient: SupabaseClient,
-  query: { readonly clubId: string; readonly eventId: string },
+  query: {
+    readonly clubId: string;
+    readonly eventId: string;
+    readonly publisherId: string;
+  },
 ): Promise<TeamSplitPublication> {
   const { data, error } = await serviceClient.rpc(PUBLISH_SPLIT_FUNCTION, {
     acting_club_id: query.clubId,
+    acting_user_id: query.publisherId,
     target_event_id: query.eventId,
   });
   if (error) {

@@ -39,6 +39,8 @@ export const NOTIFICATION_TYPES = [
   "team_assigned",
   "team_unassigned",
   "membership_renewal_upcoming",
+  "team_player_dropped",
+  "team_player_returned",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -147,7 +149,21 @@ type NotificationDataByType = DataForEveryType<{
   };
   /** #470. Siete días antes de cada renovación, con lo que se va a cobrar. */
   readonly membership_renewal_upcoming: RenewalCharge;
+  /** #838. A quien publicó el reparto, cuando uno de sus jugadores responde
+   * que no viene. El equipo es el del reparto publicado. */
+  readonly team_player_dropped: TeamPlayerChange;
+  /** #838. Al mismo, cuando ese jugador vuelve a ir. */
+  readonly team_player_returned: TeamPlayerChange;
 }>;
+
+/** El jugador de un reparto publicado que cambió su respuesta. */
+type TeamPlayerChange = {
+  readonly eventId: string;
+  readonly title: string;
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly teamName: string;
+};
 
 /** Un tipo con sus datos. Al ser una unión discriminada, quien avisa no puede
  * mandar unos datos que la pantalla no sepa leer. */

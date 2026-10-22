@@ -331,6 +331,11 @@ export const spanishMessages: MessageCatalog = {
   "dashboard.todos.teams": "Publicar equipos",
   "dashboard.todos.teams.detail": "{event} · guardado, sin publicar",
   "dashboard.todos.teams.action": "Abrir",
+  // #838: asignados de un reparto publicado que respondieron que no.
+  "dashboard.todos.teamsDropped": {
+    one: "{count} ya no viene en un reparto publicado",
+    other: "{count} ya no vienen en un reparto publicado",
+  },
   "dashboard.todos.noReply": {
     one: "{count} no ha respondido",
     other: "{count} no han respondido",
@@ -1267,6 +1272,11 @@ export const spanishMessages: MessageCatalog = {
   "notifications.team_assigned.body": "{title}: {moment}",
   "notifications.team_unassigned.title": "Ya no estás en ningún equipo",
   "notifications.team_unassigned.body": "{title}: {moment}",
+  // #838: a quien publicó el reparto.
+  "notifications.team_player_dropped.title": "{name} ya no viene a {title}",
+  "notifications.team_player_dropped.body": "Estaba en {team}",
+  "notifications.team_player_returned.title": "{name} vuelve a ir a {title}",
+  "notifications.team_player_returned.body": "Sigue en {team}",
   // #470: siete días antes de cada renovación.
   "notifications.membership_renewal_upcoming.title":
     "Tu membresía se renueva pronto",

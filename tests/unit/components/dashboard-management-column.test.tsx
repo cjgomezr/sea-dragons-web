@@ -33,6 +33,13 @@ const TEAMS_UNPUBLISHED = {
   title: "Saturday scrimmage",
 } as const;
 
+const TEAMS_DROPPED = {
+  kind: "teams_dropped",
+  eventId: "bbbbbbbb-0000-4000-8000-000000000002",
+  title: "Saturday scrimmage",
+  count: 2,
+} as const;
+
 const NO_REPLY = {
   kind: "no_reply",
   eventId: "bbbbbbbb-0000-4000-8000-000000000002",
@@ -190,6 +197,41 @@ describe("ManagementColumn: Pendientes", () => {
       "href",
       `/equipos?evento=${TEAMS_UNPUBLISHED.eventId}`,
     );
+  });
+
+  it("sends the players who dropped out to that event's team builder with Open (#838)", () => {
+    renderColumn({ todos: [TEAMS_DROPPED] });
+
+    const row = todoRow("2 players dropped out of published teams");
+
+    expect(within(row).getByText("Saturday scrimmage")).toBeVisible();
+    expect(within(row).getByRole("link", { name: "Open" })).toHaveAttribute(
+      "href",
+      `/equipos?evento=${TEAMS_DROPPED.eventId}`,
+    );
+  });
+
+  it("writes the players who dropped out in Spanish, in the singular", () => {
+    renderColumn({
+      todos: [{ ...TEAMS_DROPPED, count: 1 }],
+      locale: "es",
+    });
+
+    expect(
+      within(todoCard("Pendientes")).getByText(
+        "1 ya no viene en un reparto publicado",
+      ),
+    ).toBeVisible();
+  });
+
+  it("writes them in Spanish, in the plural", () => {
+    renderColumn({ todos: [TEAMS_DROPPED], locale: "es" });
+
+    expect(
+      within(todoCard("Pendientes")).getByText(
+        "2 ya no vienen en un reparto publicado",
+      ),
+    ).toBeVisible();
   });
 
   it("sends the missing replies to the event with See who", () => {

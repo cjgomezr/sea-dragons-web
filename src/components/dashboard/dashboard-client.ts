@@ -165,6 +165,12 @@ const todoSchema = z.discriminatedUnion("kind", [
     title: z.string(),
   }),
   z.object({
+    kind: z.literal("teams_dropped"),
+    eventId: z.string(),
+    title: z.string(),
+    count: countSchema,
+  }),
+  z.object({
     kind: z.literal("no_reply"),
     eventId: z.string(),
     title: z.string(),

@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
 import type { Role } from "@/lib/auth/roles";
+import { respondToEvent } from "@/lib/events/event-rsvp";
+import { createEventRsvpGateways } from "@/lib/events/supabase-event-rsvp-gateways";
 import { PROFILE_PHOTO_BUCKET } from "@/lib/members/supabase-profile-photo-gateways";
 import { listBuildableEvents } from "@/lib/teams/buildable-events";
 import {
@@ -392,6 +394,74 @@ describeRls("el team builder en Supabase", () => {
             entity_type: "event",
             entity_id: squad.eventId,
             metadata: { assignedCount: 2 },
+          },
+        ]);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "guarda quién publicó y le avisa cuando un asignado deja de ir y vuelve, a nadie más (#838)",
+    async () => {
+      await withSquad(async (squad) => {
+        const gateways = createTeamBuilderGateways(squad.serviceClient.client);
+        const request = {
+          callerId: squad.coach.id,
+          eventId: squad.eventId,
+          now: new Date(),
+        };
+        await saveTeamSplit(gateways, {
+          ...request,
+          teams: DEFAULT_TEAM_LABELS,
+          assignments: [
+            { userId: squad.pia.id, team: "a" },
+            { userId: squad.beto.id, team: "b" },
+          ],
+        });
+        await publishTeamSplit(gateways, request);
+        const { client } = squad.serviceClient;
+        const { data: split } = await client
+          .from("team_splits")
+          .select("published_by")
+          .eq("event_id", squad.eventId)
+          .single();
+        expect(split).toEqual({ published_by: squad.coach.id });
+
+        const rsvpGateways = createEventRsvpGateways(client);
+        for (const response of ["no", "yes"] as const) {
+          await respondToEvent(rsvpGateways, {
+            callerId: squad.pia.id,
+            eventId: squad.eventId,
+            response,
+            now: new Date(),
+          });
+        }
+
+        const { data: notices, error } = await client
+          .from("notifications")
+          .select("user_id, type, data")
+          .eq("club_id", squad.clubId)
+          .in("type", ["team_player_dropped", "team_player_returned"])
+          .order("created_at");
+        expect(error).toBeNull();
+        const change = {
+          eventId: squad.eventId,
+          title: "Scrimmage para armar",
+          playerId: squad.pia.id,
+          playerName: "Pía Portera",
+          teamName: DEFAULT_TEAM_LABELS.a.name,
+        };
+        expect(notices).toEqual([
+          {
+            user_id: squad.coach.id,
+            type: "team_player_dropped",
+            data: change,
+          },
+          {
+            user_id: squad.coach.id,
+            type: "team_player_returned",
+            data: change,
           },
         ]);
       });

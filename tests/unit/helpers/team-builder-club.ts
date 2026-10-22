@@ -99,6 +99,8 @@ export type FakeTeamsClub = {
   readonly myTeamGateways: MyTeamGateways;
   readonly split: () => StoredTeamSplit | null;
   readonly saves: NewTeamSplit[];
+  /** Quién publicó, en cada publicación (#838). */
+  readonly publisherIds: string[];
   readonly clubTeamChanges: ClubTeamChange[];
   readonly notices: SentNotice[];
   readonly auditRows: AuditLogInsertRow[];
@@ -158,6 +160,7 @@ export function fakeTeamsClub(
   let split = options.split ?? null;
   let published = options.publishedAssignments ?? [];
   const saves: NewTeamSplit[] = [];
+  const publisherIds: string[] = [];
   let clubTeams = options.clubTeams ?? DEFAULT_TEAM_LABELS;
   const clubTeamChanges: ClubTeamChange[] = [];
   const notices: SentNotice[] = [];
@@ -235,10 +238,11 @@ export function fakeTeamsClub(
       split = { ...split, teams };
       return true;
     },
-    publishSplit: async () => {
+    publishSplit: async ({ publisherId }) => {
       if (split === null || split.assignments.length === 0) {
         return { kind: "empty" };
       }
+      publisherIds.push(publisherId);
       const previous = published;
       published = split.assignments;
       split = { ...split, publishedAt: PUBLISHED_AT };
@@ -306,6 +310,7 @@ export function fakeTeamsClub(
     myTeamGateways,
     split: () => split,
     saves,
+    publisherIds,
     clubTeamChanges,
     notices,
     auditRows,

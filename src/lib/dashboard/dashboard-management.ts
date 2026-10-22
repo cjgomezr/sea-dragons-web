@@ -43,6 +43,13 @@ export type DashboardTodo =
       readonly title: string;
     }
   | {
+      /** #838: asignados del reparto publicado que respondieron que no. */
+      readonly kind: "teams_dropped";
+      readonly eventId: string;
+      readonly title: string;
+      readonly count: number;
+    }
+  | {
       readonly kind: "no_reply";
       readonly eventId: string;
       readonly title: string;
@@ -57,10 +64,27 @@ export type UnansweredGateway = {
   }): Promise<number>;
 };
 
+/** Quién publicó el reparto de un evento y cuáles de sus asignados
+ * respondieron que no (#838). */
+export type PublishedSplitDrops = {
+  /** Null si se publicó antes de `0079` o quien publicó ya no está. */
+  readonly publishedBy: string | null;
+  readonly droppedUserIds: readonly string[];
+};
+
+export type DroppedPlayersGateway = {
+  /** Null sin reparto publicado. */
+  findDroppedPlayers(query: {
+    readonly clubId: string;
+    readonly eventId: string;
+  }): Promise<PublishedSplitDrops | null>;
+};
+
 export type TodoGateways = {
   readonly administration: ClubAdministrationGateways;
   readonly attendanceSessions: AttendanceSessionsGateways;
   readonly unanswered: UnansweredGateway;
+  readonly droppedPlayers: DroppedPlayersGateway;
 };
 
 /** Quien puede resolver alguno de los pendientes ve la columna (D3): el
@@ -144,6 +168,45 @@ function listTeamsTodos(request: TodosRequest): readonly DashboardTodo[] {
   return [{ kind: "teams_unpublished", eventId: event.id, title: event.title }];
 }
 
+/** El mismo destinatario que el aviso de la campana: quien publicó o, si no
+ * se sabe quién fue, los Admin. */
+function isDropsRecipient(
+  request: TodosRequest,
+  publishedBy: string | null,
+): boolean {
+  return publishedBy === null
+    ? request.role === "Admin"
+    : publishedBy === request.callerId;
+}
+
+/** #838: el reparto publicado del próximo evento, a quien lo publicó. */
+async function listDroppedTodos(
+  gateways: TodoGateways,
+  request: TodosRequest,
+): Promise<readonly DashboardTodo[]> {
+  const event = request.nextEvent;
+  if (
+    event === null ||
+    !("teamsStatus" in event) ||
+    event.teamsStatus !== "published"
+  ) {
+    return NOTHING;
+  }
+  const drops = await gateways.droppedPlayers.findDroppedPlayers({
+    clubId: request.clubId,
+    eventId: event.id,
+  });
+  if (drops === null || !isDropsRecipient(request, drops.publishedBy)) {
+    return NOTHING;
+  }
+  const count = drops.droppedUserIds.filter(
+    (userId) => userId !== request.callerId,
+  ).length;
+  return count === 0
+    ? NOTHING
+    : [{ kind: "teams_dropped", eventId: event.id, title: event.title, count }];
+}
+
 /** A todo el que ve la columna: sólo abre el evento (D9). */
 async function listNoReplyTodos(
   gateways: TodoGateways,
@@ -171,6 +234,7 @@ export async function listTodos(
     listRoleRequestTodos(gateways, request),
     listAttendanceTodos(gateways, request),
     listTeamsTodos(request),
+    listDroppedTodos(gateways, request),
     listNoReplyTodos(gateways, request),
   ]);
   return groups.flat();

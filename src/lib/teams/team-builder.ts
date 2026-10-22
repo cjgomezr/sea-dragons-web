@@ -172,9 +172,11 @@ export type TeamSplitsGateway = {
   findSplit(eventId: string): Promise<StoredTeamSplit | null>;
   /** Sustituye el reparto entero y lo deja en borrador, todo o nada. */
   saveSplit(split: NewTeamSplit): Promise<TeamSplitSaveOutcome>;
+  /** Publica en nombre de `publisherId`, que queda como quien publicó. */
   publishSplit(query: {
     readonly clubId: string;
     readonly eventId: string;
+    readonly publisherId: string;
   }): Promise<TeamSplitPublication>;
   /** Cambia sólo el nombre y el color del reparto de ese evento del club, y
    * sólo si está guardado y sin publicar (D4). Dice si cambió alguno. */
