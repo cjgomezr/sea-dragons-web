@@ -144,7 +144,7 @@ function comparableName(name: string): string {
     .trim()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .toLocaleLowerCase();
+    .toLowerCase();
 }
 
 /** Si otra categoría del catálogo, activa o desactivada, ya se llama así

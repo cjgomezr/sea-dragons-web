@@ -11598,6 +11598,17 @@ a.auth-brand-header:focus-visible {
   grid-column: 2 / 4;
 }
 
+/* Con el aviso debajo del campo la fila crece: el + y Añadir se quedan a la
+   altura del campo, no en el centro de la fila. */
+.evaluation-categories .club-positions-add-row {
+  align-items: start;
+}
+
+.evaluation-categories .club-positions-add-row .club-positions-add-icon,
+.evaluation-categories .club-positions-add-row .club-positions-actions {
+  height: 34px;
+}
+
 .evaluation-categories .club-positions-names-cell {
   gap: var(--space-1);
 }
