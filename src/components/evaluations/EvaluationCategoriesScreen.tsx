@@ -506,12 +506,10 @@ export function EvaluationCategoriesManager({
 
   function renderActive(categories: EvaluationCategories): React.JSX.Element {
     const saved = activeOf(categories);
-    const listClassName = isPhone
-      ? "club-positions-rows club-positions-phone-card"
-      : "club-positions-rows";
+    const cardClassName = isPhone ? " club-positions-phone-card" : "";
     if (saved.length === 0) {
       return (
-        <p className={`club-positions-empty ${listClassName}`}>
+        <p className={`club-positions-empty${cardClassName}`}>
           {translate("evaluations.categories.active.empty")}
         </p>
       );
@@ -528,7 +526,7 @@ export function EvaluationCategoriesManager({
         onDrop={(order, moved) => void drop(moved, order)}
       >
         <ol
-          className={listClassName}
+          className={`club-positions-rows${cardClassName}`}
           aria-label={translate("evaluations.categories.active.title")}
         >
           {active.map((category, index) =>
