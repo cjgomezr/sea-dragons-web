@@ -126,11 +126,11 @@ export class InactiveMemberError extends Error {
 }
 
 /** Los socios del club que no están de baja, repartidos según estén o no en
- * el grupo, en orden alfabético: `isAssigned` elige qué mitad. */
+ * el grupo, en orden alfabético: `side` elige qué mitad. */
 async function findMembersBy(
   gateways: GroupMembersGateways,
   request: GroupRequest,
-  isAssigned: boolean,
+  side: "in_group" | "outside_group",
 ): Promise<readonly AssignableMember[]> {
   const caller = await findGroupManager(gateways, request.callerId);
   const result = await gateways.groupMembers.findAssignableMembers({
@@ -142,7 +142,8 @@ async function findMembersBy(
   }
   return result.members
     .filter(
-      (member) => member.groupIds.includes(request.groupId) === isAssigned,
+      (member) =>
+        member.groupIds.includes(request.groupId) === (side === "in_group"),
     )
     .sort((first, second) => compareNames(first.fullName, second.fullName));
 }
@@ -181,7 +182,7 @@ export async function listGroupMembers(
   gateways: GroupMembersGateways,
   request: GroupListRequest,
 ): Promise<readonly GroupRosterMember[]> {
-  const members = await findMembersBy(gateways, request, true);
+  const members = await findMembersBy(gateways, request, "in_group");
   const photoUrls = await signMemberPhotos(gateways, members);
   return members.map((member) =>
     toRosterMember(member, { photoUrls, locale: request.locale }),
@@ -194,7 +195,7 @@ export async function listGroupCandidates(
   gateways: GroupMembersGateways,
   request: GroupListRequest,
 ): Promise<readonly GroupCandidate[]> {
-  const candidates = await findMembersBy(gateways, request, false);
+  const candidates = await findMembersBy(gateways, request, "outside_group");
   const photoUrls = await signMemberPhotos(gateways, candidates);
   return candidates.map((candidate) => ({
     ...toRosterMember(candidate, { photoUrls, locale: request.locale }),

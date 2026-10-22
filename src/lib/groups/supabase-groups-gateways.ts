@@ -92,7 +92,9 @@ async function readActiveMemberIds(
  * esa relación va por una clave foránea compuesta contra una restricción única,
  * y una lectura que depende de cómo PostgREST la deduzca se rompe sin que nadie
  * toque este archivo (lo mismo que evita `supabase-club-administration-
- * gateways.ts`). El club tiene decenas de socios, no miles.
+ * gateways.ts`). Lo que se evita es ese sentido; el contrario, las
+ * pertenencias incrustadas bajo `members`, es el que usan el directorio y
+ * `findMemberships`. El club tiene decenas de socios, no miles.
  */
 async function readActiveMemberCounts(
   serviceClient: SupabaseClient,
