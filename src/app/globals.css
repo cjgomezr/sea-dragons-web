@@ -4593,7 +4593,10 @@ a.auth-brand-header:focus-visible {
   background: var(--color-hover);
 }
 
+/* Como el segmento elegido: el tinte con --color-text encima. El texto de
+   acento del tema claro se queda ahí en 4.3:1. */
 .groups-add-toggle[aria-expanded="true"] {
+  color: var(--color-text);
   background: var(--color-segment-selected);
   border-color: var(--color-accent);
 }
