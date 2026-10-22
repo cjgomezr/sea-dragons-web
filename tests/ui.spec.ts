@@ -16222,8 +16222,10 @@ type EvaluationsState = {
   /** Lo que sirve la ficha de Camila, si no es la evaluación al día. */
   readonly camilaEvaluation?: unknown;
   readonly isSpanish?: boolean;
-  /** Sólo se fotografía a 1440: el móvil de la tabla llega en #822. */
-  readonly isDesktopOnly?: boolean;
+  /** Si sólo se fotografía a un ancho: los estados del panel lateral sólo
+   * existen en escritorio, y los `evaluaciones-movil-*` (#822) son los de la
+   * ficha a pantalla completa. Sin él, a los tres anchos. */
+  readonly photographedAt?: "desktop" | "mobile";
   readonly ready: (page: Page) => Promise<void>;
 };
 
@@ -16283,7 +16285,7 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
     // cuándo se tome.
     name: "evaluaciones-guardar-y-siguiente",
     roster: STUBBED_ROSTER,
-    isDesktopOnly: true,
+    photographedAt: "desktop",
     ready: async (page) => {
       await openCamilaFromRoster(page);
       await page.getByRole("button", { name: EDIT_RATINGS }).click();
@@ -16310,19 +16312,19 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
   {
     name: "evaluaciones-resumen",
     roster: STUBBED_ROSTER,
-    isDesktopOnly: true,
+    photographedAt: "desktop",
     ready: (page) => waitForOverview(page, "Lowest: Defense"),
   },
   {
     name: "evaluaciones-resumen-todos-evaluados",
     roster: STUBBED_ROSTER.filter((member) => member.status === "evaluated"),
-    isDesktopOnly: true,
+    photographedAt: "desktop",
     ready: (page) => waitForOverview(page, "✓ Everyone has an evaluation."),
   },
   {
     name: "evaluaciones-filtrando",
     roster: STUBBED_ROSTER,
-    isDesktopOnly: true,
+    photographedAt: "desktop",
     ready: async (page) => {
       await waitForRoster(page);
       await page.getByRole("button", { name: NOT_EVALUATED_CHIP }).click();
@@ -16333,11 +16335,43 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
   {
     name: "evaluaciones-sin-resultados",
     roster: STUBBED_ROSTER,
-    isDesktopOnly: true,
+    photographedAt: "desktop",
     ready: async (page) => {
       await waitForRoster(page);
       await page.getByRole("searchbox", { name: SEARCH_BY_NAME }).fill("zzz");
       await expect(page.getByText("No player matches.")).toBeVisible();
+    },
+  },
+  {
+    name: "evaluaciones-movil-lista",
+    roster: STUBBED_ROSTER,
+    photographedAt: "mobile",
+    ready: waitForRoster,
+  },
+  {
+    name: "evaluaciones-movil-ficha",
+    roster: STUBBED_ROSTER,
+    photographedAt: "mobile",
+    ready: openCamilaFromRoster,
+  },
+  {
+    // El último de la lista (Valentina, con el nombre largo) en edición, con
+    // Fitness subido con +: la barra fija dice Guardar y no Guardar y
+    // siguiente.
+    name: "evaluaciones-movil-editando",
+    roster: STUBBED_ROSTER,
+    photographedAt: "mobile",
+    ready: async (page) => {
+      await waitForRoster(page);
+      await rosterButton(page, /Valentina Maximiliana/).click();
+      await page.getByRole("button", { name: EDIT_RATINGS }).click();
+      await page.getByRole("button", { name: "Raise Fitness" }).click();
+      await expect(page.getByRole("slider", { name: "Fitness" })).toHaveValue(
+        "9",
+      );
+      await expect(
+        page.getByRole("button", { name: "Save", exact: true }),
+      ).toBeVisible();
     },
   },
   {
@@ -16387,11 +16421,16 @@ for (const state of EVALUATIONS_STATES) {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
         const isPhotographedHere =
-          state.isDesktopOnly !== true || vp.name === "desktop";
+          state.photographedAt === undefined ||
+          state.photographedAt === vp.name;
         if (isStatePhotographed(state.name) && isPhotographedHere) {
           for (const theme of themes) {
             test(`matches approved baseline (${theme})`, async ({ page }) => {
               await goToEvaluations(page, state, theme);
+              // Evaluaciones elige su diseño con `useIsBelowDesktop` (#822):
+              // si la página no cabe, la captura entera lo ve un instante
+              // como móvil y la ficha cambia de forma a mitad de captura.
+              await fitViewportToPage(page);
               const snapshot = `${state.name}-${vp.name}-${theme}.png`;
               await createMissingLocalBaseline(snapshot, () =>
                 page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
@@ -16419,7 +16458,11 @@ for (const state of EVALUATIONS_STATES) {
       test(`has no accessibility violations (axe-core, ${theme})`, async ({
         page,
       }) => {
-        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.setViewportSize(
+          state.photographedAt === "mobile"
+            ? { width: 375, height: 812 }
+            : { width: 1440, height: 900 },
+        );
         await goToEvaluations(page, state, theme);
         await expectNoAxeViolations(page);
       });
@@ -16427,23 +16470,71 @@ for (const state of EVALUATIONS_STATES) {
   });
 }
 
+const BACK_TO_THE_LIST = /^(Back to the list|Volver a la lista)$/;
+
 test.describe("evaluaciones en el navegador", () => {
   skipWithoutSession();
   quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
-  test("a 375px la lista y la ficha son dos pasos, con forma de volver", async ({
+  // Por debajo de 1024 px, también en la tableta (#822, D12).
+  for (const width of [375, 768] as const) {
+    test(`a ${width}px la lista y la ficha a pantalla completa son dos pasos, con forma de volver`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 812 });
+      await goToEvaluations(page, EVALUATIONS_LIST);
+
+      await openCamila(page);
+      await expect(page.getByRole("searchbox")).toBeHidden();
+      await expect(
+        page.getByRole("heading", { level: 1, name: EVALUATIONS_HEADING }),
+      ).toBeHidden();
+      await expect(
+        page.getByRole("group", { name: /^(Actions|Acciones)$/ }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: BACK_TO_THE_LIST }).click();
+
+      await expect(page.getByRole("searchbox")).toBeVisible();
+      await expect(rosterButton(page, CAMILA_BUTTON)).toBeFocused();
+      await expect(page.getByRole("list", { name: RATINGS_LIST })).toHaveCount(
+        0,
+      );
+    });
+  }
+
+  test("en el móvil los toques miden al menos 44 px y los campos llevan letra de 16 px (#822)", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await goToEvaluations(page, EVALUATIONS_LIST);
+    const row = await rosterButton(page, CAMILA_BUTTON).boundingBox();
+    expect(row?.height).toBeGreaterThanOrEqual(64);
+    for (const field of [
+      page.getByRole("searchbox", { name: SEARCH_BY_NAME }),
+      page.getByRole("combobox", { name: SORT_BY }),
+    ]) {
+      expect(
+        await field.evaluate((element) => getComputedStyle(element).fontSize),
+      ).toBe("16px");
+    }
 
     await openCamila(page);
-    await expect(page.getByRole("searchbox")).toBeHidden();
-    await page.getByRole("button", { name: "All members" }).click();
+    await page.getByRole("button", { name: EDIT_RATINGS }).click();
 
-    await expect(page.getByRole("searchbox")).toBeVisible();
-    await expect(page.getByRole("list", { name: RATINGS_LIST })).toHaveCount(0);
+    for (const name of [
+      BACK_TO_THE_LIST,
+      /^Previous player$/,
+      /^Next player$/,
+      /^Lower Fitness$/,
+      /^Raise Fitness$/,
+      /^Cancel$/,
+      SAVE_AND_NEXT,
+    ]) {
+      const box = await page.getByRole("button", { name }).boundingBox();
+      expect(box?.height, String(name)).toBeGreaterThanOrEqual(44);
+      expect(box?.width, String(name)).toBeGreaterThanOrEqual(44);
+    }
   });
 
   test("la búsqueda, la ficha y el orden sobreviven a recargar (#818)", async ({
@@ -16539,8 +16630,8 @@ test.describe("evaluaciones en el navegador", () => {
 
     await expect(page.getByRole("searchbox")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "All members" }),
-    ).toBeHidden();
+      page.getByRole("button", { name: BACK_TO_THE_LIST }),
+    ).toHaveCount(0);
   });
 
   test("guardar una evaluación que no está al día la pone al día en la misma petición (#820, D4)", async ({

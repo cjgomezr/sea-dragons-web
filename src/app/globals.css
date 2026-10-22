@@ -12935,6 +12935,10 @@ a.auth-brand-header:focus-visible {
   }
 
   /* La ficha ocupa la pantalla: su barra de arriba ya dice dónde está. */
+  .evaluations[data-step="sheet"] {
+    gap: 0;
+  }
+
   .evaluations[data-step="sheet"] .evaluations-header h1,
   .evaluations[data-step="sheet"] .evaluations-tabs {
     display: none;

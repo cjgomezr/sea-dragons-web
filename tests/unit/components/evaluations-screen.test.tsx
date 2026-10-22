@@ -1876,6 +1876,30 @@ describe("en el móvil (#822)", () => {
     expect(await sheetRegion(/evaluation of josé peña/i)).toBeInTheDocument();
   });
 
+  it("una categoría que la evaluación no tiene sale como nueva sin nota, igual que en escritorio", async () => {
+    const BREATH_HOLD = {
+      id: "ca7e0000-0000-4000-8000-000000000011",
+      name: "Breath hold",
+      isActive: true,
+    } as const;
+    clubApi({
+      [`GET ${CATEGORIES_PATH}`]: () =>
+        jsonResponse(200, {
+          data: { categories: [CATEGORIES[0], BREATH_HOLD, CATEGORIES[1]] },
+        }),
+    });
+    await renderScreen();
+
+    const sheet = await openCamila();
+
+    const ratings = within(sheet).getByRole("list", { name: RATINGS_LIST });
+    await waitFor(() =>
+      expect(within(ratings).getAllByRole("listitem")[1]).toHaveTextContent(
+        "Breath holdnew · not rated—",
+      ),
+    );
+  });
+
   it("en lectura la barra fija lleva Editar notas", async () => {
     clubApi();
     await renderScreen();
