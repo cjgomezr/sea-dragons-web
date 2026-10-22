@@ -1127,15 +1127,34 @@ export const englishMessages = {
     "There are no members in the list to write to.",
   "directory.email.title": "Email members",
   "directory.email.lead":
-    "Each member gets their own email from the club address, and replies come to your email.",
+    "Each member gets their own email from the club's address. Replies come to you.",
   "directory.email.recipients": {
     one: "{count} recipient",
     other: "{count} recipients",
   },
-  "directory.email.removeShort": "Remove",
+  "directory.email.to": {
+    one: "To · {count} member",
+    other: "To · {count} members",
+  },
+  "directory.email.clearAll": "Clear all",
+  "directory.email.showAll": {
+    one: "Show {count} recipient",
+    other: "Show all {count} recipients",
+  },
+  "directory.email.hiddenCount": "+{count} more",
+  "directory.email.showLess": "Show less",
+  "directory.email.search.label": "Add a member by name",
+  "directory.email.search.add": "Add",
+  "directory.email.search.keys":
+    "↑↓ to move · Enter to add · Backspace on empty removes the last",
+  "directory.email.search.loading": "Loading members…",
+  "directory.email.search.noMatch": 'No members match "{query}".',
+  "directory.email.search.allAdded":
+    'Everyone matching "{query}" is already on the list.',
+  "directory.email.search.failed": "We couldn't load the club's members.",
+  "directory.email.search.retry": "Try again",
   "directory.email.remove": "Remove {name}",
-  "directory.email.noRecipients":
-    "The list is empty: there's nobody to send it to.",
+  "directory.email.noRecipients": "No one to email yet. Add members by name.",
   "directory.email.subject": "Subject",
   "directory.email.message": "Message",
   "directory.email.messageHint": "Plain text, sent exactly as you write it.",

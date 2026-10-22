@@ -1,5 +1,7 @@
 "use client";
 
+import { EnvelopeSimple } from "@phosphor-icons/react/dist/ssr/EnvelopeSimple";
+import { X } from "@phosphor-icons/react/dist/ssr/X";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   type ApiRequestFailure,
@@ -15,7 +17,9 @@ import {
 } from "@/lib/directory/directory-email-rules";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import { Icon } from "@/components/Icon";
 import { DirectoryEmailConfirmDialog } from "./DirectoryEmailConfirmDialog";
+import { DirectoryEmailRecipients } from "./DirectoryEmailRecipients";
 import {
   describeDirectoryEmailFailure,
   describeQuotaExceeded,
@@ -80,46 +84,6 @@ function describeNotice(translate: Translator, notice: Notice): string {
   return notice.kind === "quotaExceeded"
     ? describeQuotaExceeded(translate, notice.remaining)
     : describeDirectoryEmailFailure(translate, notice.failure);
-}
-
-function RecipientList({
-  translate,
-  recipients,
-  onRemove,
-}: {
-  readonly translate: Translator;
-  readonly recipients: readonly EmailRecipient[];
-  readonly onRemove: (userId: string) => void;
-}): React.JSX.Element {
-  const countId = useId();
-  return (
-    <div className="directory-email-recipients">
-      <p id={countId} className="directory-email-count">
-        {translate("directory.email.recipients", { count: recipients.length })}
-      </p>
-      {recipients.length === 0 ? (
-        <p className="auth-note">{translate("directory.email.noRecipients")}</p>
-      ) : (
-        <ul aria-labelledby={countId}>
-          {recipients.map((recipient) => (
-            <li key={recipient.userId}>
-              <span>{recipient.fullName}</span>
-              <button
-                type="button"
-                className="admin-secondary"
-                aria-label={translate("directory.email.remove", {
-                  name: recipient.fullName,
-                })}
-                onClick={() => onRemove(recipient.userId)}
-              >
-                {translate("directory.email.removeShort")}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
 }
 
 function DraftFields({
@@ -324,26 +288,32 @@ export function DirectoryEmailComposer({
       aria-labelledby={titleId}
     >
       <div className="directory-email-header">
-        <h2 id={titleId} ref={titleRef} tabIndex={-1}>
-          {translate("directory.email.title")}
-        </h2>
-        <button type="button" className="admin-secondary" onClick={onClose}>
-          {translate("directory.email.close")}
+        <span className="directory-email-header-icon" aria-hidden="true">
+          <Icon glyph={EnvelopeSimple} />
+        </span>
+        <div className="directory-email-heading">
+          <h2 id={titleId} ref={titleRef} tabIndex={-1}>
+            {translate("directory.email.title")}
+          </h2>
+          <p>{translate("directory.email.lead")}</p>
+        </div>
+        <button
+          type="button"
+          className="directory-email-close"
+          aria-label={translate("directory.email.close")}
+          onClick={onClose}
+        >
+          <Icon glyph={X} />
         </button>
       </div>
       {phase.kind === "sent" ? (
         <SendResult translate={translate} result={phase.result} />
       ) : (
         <form className="directory-email-form" onSubmit={submit} noValidate>
-          <p className="app-lead">{translate("directory.email.lead")}</p>
-          <RecipientList
+          <DirectoryEmailRecipients
             translate={translate}
             recipients={recipients}
-            onRemove={(userId) =>
-              setRecipients((current) =>
-                current.filter((recipient) => recipient.userId !== userId),
-              )
-            }
+            onChange={setRecipients}
           />
           <DraftFields
             translate={translate}

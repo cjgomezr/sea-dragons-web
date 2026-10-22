@@ -1119,15 +1119,35 @@ export const spanishMessages: MessageCatalog = {
     "No hay miembros en la lista a quien escribir.",
   "directory.email.title": "Escribir a los miembros",
   "directory.email.lead":
-    "Cada miembro recibe su propio correo desde la dirección del club, y las respuestas te llegan a tu correo.",
+    "Cada socio recibe su propio correo desde la dirección del club. Las respuestas te llegan a ti.",
   "directory.email.recipients": {
     one: "{count} destinatario",
     other: "{count} destinatarios",
   },
-  "directory.email.removeShort": "Quitar",
+  "directory.email.to": {
+    one: "Para · {count} socio",
+    other: "Para · {count} socios",
+  },
+  "directory.email.clearAll": "Quitar todos",
+  "directory.email.showAll": {
+    one: "Ver el {count} destinatario",
+    other: "Ver los {count} destinatarios",
+  },
+  "directory.email.hiddenCount": "+{count} más",
+  "directory.email.showLess": "Ver menos",
+  "directory.email.search.label": "Añadir un socio por su nombre",
+  "directory.email.search.add": "Añadir",
+  "directory.email.search.keys":
+    "↑↓ para moverte · Enter para añadir · Retroceso con el campo vacío quita el último",
+  "directory.email.search.loading": "Buscando socios…",
+  "directory.email.search.noMatch": 'Ningún socio coincide con "{query}".',
+  "directory.email.search.allAdded":
+    'Todos los que coinciden con "{query}" ya están en la lista.',
+  "directory.email.search.failed": "No pudimos cargar a los socios del club.",
+  "directory.email.search.retry": "Reintentar",
   "directory.email.remove": "Quitar a {name}",
   "directory.email.noRecipients":
-    "La lista está vacía: no hay a quién mandarlo.",
+    "Todavía no hay a quién escribir. Añade socios por su nombre.",
   "directory.email.subject": "Asunto",
   "directory.email.message": "Mensaje",
   "directory.email.messageHint": "Texto plano. Sale tal como lo escribes.",
