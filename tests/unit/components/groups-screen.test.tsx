@@ -748,6 +748,21 @@ describe("renombrar un grupo", () => {
     expect(calls.filter((call) => call.method === "PATCH")).toEqual([]);
   });
 
+  it("mientras se renombra no se puede borrar ni volver a renombrar", async () => {
+    stubApi({ groups: [SENIOR] });
+    await renderScreen();
+
+    await startRenaming();
+
+    const panel = groupPanel("Senior Squad");
+    expect(
+      within(panel).queryByRole("button", { name: "Delete Senior Squad" }),
+    ).toBeNull();
+    expect(
+      within(panel).queryByRole("button", { name: "Rename Senior Squad" }),
+    ).toBeNull();
+  });
+
   it("× cancela igual que Esc", async () => {
     const user = userEvent.setup();
     stubApi({ groups: [SENIOR] });

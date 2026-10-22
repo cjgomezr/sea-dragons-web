@@ -166,12 +166,14 @@ export function GroupPanelHeader({
   const [mode, setMode] = useState<HeaderMode>("viewing");
   const renameRef = useRef<HTMLButtonElement>(null);
   const deleteRef = useRef<HTMLButtonElement>(null);
-  const focusAfterCloseRef = useRef<HTMLButtonElement | null>(null);
+  const focusAfterCloseRef =
+    useRef<React.RefObject<HTMLButtonElement | null> | null>(null);
 
-  // El foco vuelve en cuanto el botón se puede enfocar: tras guardar, sigue
-  // desactivado hasta que la acción en vuelo termina de soltarse.
+  // El foco vuelve en cuanto el botón está y se puede enfocar: mientras se
+  // renombra no se pinta, y tras guardar sigue desactivado hasta que la acción
+  // en vuelo termina de soltarse.
   useEffect(() => {
-    const target = focusAfterCloseRef.current;
+    const target = focusAfterCloseRef.current?.current ?? null;
     if (target !== null && !isDisabled) {
       target.focus();
       focusAfterCloseRef.current = null;
@@ -180,7 +182,7 @@ export function GroupPanelHeader({
 
   function closeInto(button: React.RefObject<HTMLButtonElement | null>): void {
     setMode("viewing");
-    focusAfterCloseRef.current = button.current;
+    focusAfterCloseRef.current = button;
   }
 
   /** El campo se cierra sólo cuando el servidor confirmó: si dijo que no, el
@@ -209,30 +211,33 @@ export function GroupPanelHeader({
           {describeSummary(translate, group, notActivatedCount)}
         </p>
       </div>
-      <div className="groups-panel-actions">
-        <button
-          ref={renameRef}
-          type="button"
-          className="groups-icon-button"
-          aria-label={translate("groups.renameLabel", { name: group.name })}
-          aria-expanded={mode === "renaming"}
-          disabled={isDisabled}
-          onClick={() => setMode("renaming")}
-        >
-          <Icon glyph={PencilSimple} />
-        </button>
-        <button
-          ref={deleteRef}
-          type="button"
-          className="groups-icon-button groups-icon-button-danger"
-          aria-label={translate("groups.deleteLabel", { name: group.name })}
-          aria-expanded={mode === "confirmingDelete"}
-          disabled={isDisabled}
-          onClick={() => setMode("confirmingDelete")}
-        >
-          <Icon glyph={Trash} />
-        </button>
-      </div>
+      {/* Mientras se renombra sólo quedan ✓ y ×: la papelera al lado del
+          campo tiraba el nombre escrito con un mal toque. */}
+      {mode === "renaming" ? null : (
+        <div className="groups-panel-actions">
+          <button
+            ref={renameRef}
+            type="button"
+            className="groups-icon-button"
+            aria-label={translate("groups.renameLabel", { name: group.name })}
+            disabled={isDisabled}
+            onClick={() => setMode("renaming")}
+          >
+            <Icon glyph={PencilSimple} />
+          </button>
+          <button
+            ref={deleteRef}
+            type="button"
+            className="groups-icon-button groups-icon-button-danger"
+            aria-label={translate("groups.deleteLabel", { name: group.name })}
+            aria-expanded={mode === "confirmingDelete"}
+            disabled={isDisabled}
+            onClick={() => setMode("confirmingDelete")}
+          >
+            <Icon glyph={Trash} />
+          </button>
+        </div>
+      )}
       {mode === "confirmingDelete" ? (
         <DeleteWarning
           translate={translate}
