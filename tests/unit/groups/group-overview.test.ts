@@ -62,7 +62,9 @@ describe("uso de un grupo: eventos", () => {
   it("cuenta una serie que sigue en pie una sola vez, no por sesión", () => {
     const uses: GroupAudienceUses = {
       ...NO_USES,
-      series: [{ groupIds: [SENIOR], endsOn: TOMORROW, nextSession: NEXT_SESSION }],
+      series: [
+        { groupIds: [SENIOR], endsOn: TOMORROW, nextSession: NEXT_SESSION },
+      ],
     };
 
     expect(countGroupUsage(uses, TODAY).get(SENIOR)).toEqual({
@@ -85,9 +87,7 @@ describe("uso de un grupo: eventos", () => {
   it("no cuenta una serie cancelada, sin sesiones en pie de hoy en adelante", () => {
     const uses: GroupAudienceUses = {
       ...NO_USES,
-      series: [
-        { groupIds: [SENIOR], endsOn: TOMORROW, nextSession: null },
-      ],
+      series: [{ groupIds: [SENIOR], endsOn: TOMORROW, nextSession: null }],
     };
 
     expect(countGroupUsage(uses, TODAY).get(SENIOR)).toBeUndefined();
