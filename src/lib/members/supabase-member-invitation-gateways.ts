@@ -122,6 +122,9 @@ export function createInvitedMemberStore(serviceClient: SupabaseClient): Pick<
           .select("user_id, full_name")
           .eq("club_id", clubId)
           .eq("email", email)
+          // `email` es una copia del de Auth, sin índice único: una copia
+          // vieja repetida no puede convertir el 409 en un 500.
+          .limit(1)
           .maybeSingle();
         if (error) {
           throw new Error(

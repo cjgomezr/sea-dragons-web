@@ -341,12 +341,10 @@ describe("alta de un miembro", () => {
       clubMemberWithEmail: existingMember,
     });
 
-    const error = await create(gateways).catch((thrown: unknown) => thrown);
-
-    expect(error).toBeInstanceOf(MemberEmailTakenError);
-    expect((error as MemberEmailTakenError).existingMember).toEqual(
+    await expect(create(gateways)).rejects.toMatchObject({
+      name: "MemberEmailTakenError",
       existingMember,
-    );
+    });
     expect(emailsLookedUp).toEqual([
       { clubId: CLUB_ID, email: "nerea.silva@example.com" },
     ]);
@@ -355,9 +353,10 @@ describe("alta de un miembro", () => {
   it("names nobody when the address has an account but no member in the club", async () => {
     const { gateways } = fake({ emailTaken: true });
 
-    const error = await create(gateways).catch((thrown: unknown) => thrown);
-
-    expect((error as MemberEmailTakenError).existingMember).toBeNull();
+    await expect(create(gateways)).rejects.toMatchObject({
+      name: "MemberEmailTakenError",
+      existingMember: null,
+    });
   });
 
   it("names every invalid field at once", async () => {
