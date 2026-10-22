@@ -1206,6 +1206,34 @@ describe("resumen de la plantilla (#819)", () => {
     expect(callsTo("POST")).toHaveLength(1);
   });
 
+  it("si otro la creó entretanto, abre en edición la que ya existe", async () => {
+    let reads = 0;
+    clubApi({
+      [`POST ${ROSTER_PATH}/${MATEO.userId}`]: () =>
+        errorResponse(409, "conflict", "evaluation_exists"),
+      [`GET ${ROSTER_PATH}/${MATEO.userId}`]: () => {
+        reads += 1;
+        return jsonResponse(200, {
+          data:
+            reads === 1
+              ? { status: "not_evaluated", memberId: MATEO.userId }
+              : evaluated(MATEO.userId, CAMILA_RATINGS),
+        });
+      },
+    });
+    await renderScreen();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Evaluate the 1 pending" }),
+    );
+
+    const sheet = await sheetRegion(/evaluation of mateo ruiz/i);
+    expect(
+      await within(sheet).findByRole("slider", { name: "Fitness" }),
+    ).toHaveValue("8");
+    expect(within(sheet).queryByRole("alert")).toBeNull();
+  });
+
   it("Más tiempo sin revisar lista a los más antiguos con su fecha y los abre", async () => {
     clubApi();
     await renderScreen();

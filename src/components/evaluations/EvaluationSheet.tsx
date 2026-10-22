@@ -53,7 +53,9 @@ type SheetOpening =
     };
 
 /** Abrir en edición a quien no tiene evaluación es lo mismo que pulsar
- * Empezar evaluación: se crea con todo en 5 y se abre para ajustar. */
+ * Empezar evaluación: se crea con todo en 5 y se abre para ajustar. Si otro
+ * la creó entretanto (u otra apertura de la misma ficha, como el doble
+ * efecto de desarrollo), se edita la que ya existe. */
 async function openEvaluation(
   memberId: string,
   isEditingOnOpen: boolean,
@@ -67,6 +69,9 @@ async function openEvaluation(
     return { kind: "read", load };
   }
   const created = await createMemberEvaluation(memberId);
+  if (created.kind === "failed" && isStaleEvaluation(created)) {
+    return { kind: "read", load: await loadMemberEvaluation(memberId) };
+  }
   return created.kind === "failed"
     ? { kind: "creation_failed", memberId, failure: created }
     : { kind: "read", load: created };
