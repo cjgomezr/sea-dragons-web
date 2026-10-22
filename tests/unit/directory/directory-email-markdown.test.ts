@@ -135,6 +135,13 @@ describe("enlaces", () => {
     expect(textOf("<https://club.org>")).toBe("https://club.org");
   });
 
+  it("pone la dirección como texto de un enlace sin texto", () => {
+    expect(htmlOf("[](https://club.org)")).toContain(
+      '<a href="https://club.org" style="color: #0B5F86; text-decoration: underline;">https://club.org</a>',
+    );
+    expect(textOf("[](https://club.org)")).toBe("https://club.org");
+  });
+
   it("lleva el color de acento del club en línea", () => {
     expect(htmlOf("[web](https://club.org)")).toMatch(
       new RegExp(`<a href="https://club.org" style="[^"]*color: ${LINK_COLOR}`),

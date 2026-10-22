@@ -1,4 +1,10 @@
-import type { Nodes, PhrasingContent, RootContent } from "mdast";
+import type {
+  Link,
+  ListItem,
+  Nodes,
+  PhrasingContent,
+  RootContent,
+} from "mdast";
 import remarkBreaks from "remark-breaks";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
@@ -96,6 +102,13 @@ function toInlines(
   return nodes.flatMap((node) => toInline(node, source));
 }
 
+/** Un enlace sin texto (`[](https://club.org)`) se vería vacío: lleva su
+ * dirección. */
+function linkLabel(node: Link, source: string): DirectoryEmailInline[] {
+  const label = toInlines(node.children, source);
+  return label.length === 0 ? [{ type: "text", value: node.url }] : label;
+}
+
 function toInline(
   node: PhrasingContent,
   source: string,
@@ -110,23 +123,14 @@ function toInline(
       return [{ type: node.type, children: toInlines(node.children, source) }];
     case "link":
       return isAllowedLinkUrl(node.url)
-        ? [
-            {
-              type: "link",
-              url: node.url,
-              children: toInlines(node.children, source),
-            },
-          ]
+        ? [{ type: "link", url: node.url, children: linkLabel(node, source) }]
         : writtenInlines(node, source);
     default:
       return writtenInlines(node, source);
   }
 }
 
-function toListItem(
-  node: Extract<RootContent, { type: "listItem" }>,
-  source: string,
-): DirectoryEmailListItem {
+function toListItem(node: ListItem, source: string): DirectoryEmailListItem {
   return {
     type: "listItem",
     children: node.children.map((child) => toBlock(child, source)),
