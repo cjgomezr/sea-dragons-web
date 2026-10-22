@@ -15,7 +15,11 @@ import type {
   GroupRosterMember,
   RejectedMember,
 } from "@/lib/groups/group-members";
-import { GROUP_NAME_MAX_LENGTH, type Group } from "@/lib/groups/groups";
+import {
+  GROUP_NAME_MAX_LENGTH,
+  type Group,
+  type GroupOverview,
+} from "@/lib/groups/groups";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
@@ -36,8 +40,24 @@ const groupSchema = z.object({
   memberCount: z.number(),
 });
 
+/** La vista previa y el uso de cada grupo de la lista (D4 de E32). */
+const groupOverviewSchema = groupSchema.extend({
+  usage: z.object({ events: z.number(), posts: z.number() }),
+  previewMembers: z.array(
+    z.object({
+      id: z.uuid(),
+      fullName: z.string(),
+      photoUrl: z.string().nullable(),
+    }),
+  ),
+});
+
 const groupsSchema = z.object({
   data: z.object({ groups: z.array(groupSchema) }),
+});
+
+const groupOverviewsSchema = z.object({
+  data: z.object({ groups: z.array(groupOverviewSchema) }),
 });
 
 const singleGroupSchema = z.object({ data: groupSchema });
@@ -48,25 +68,30 @@ const memberSchema = z.object({
   isPendingActivation: z.boolean(),
 });
 
-const membersSchema = z.object({
-  data: z.object({ members: z.array(memberSchema) }),
-});
-
-const candidatesSchema = z.object({
-  data: z.object({ candidates: z.array(memberSchema) }),
-});
-
-const singleMemberSchema = z.object({ data: memberSchema });
-
+/** La posición y la foto de cada socio de la lista (#826). */
 const rosterMemberSchema = memberSchema.extend({
   positionName: z.string().nullable(),
   photoUrl: z.string().nullable(),
 });
 
+const candidateSchema = rosterMemberSchema.extend({
+  groupCount: z.number(),
+});
+
+const membersSchema = z.object({
+  data: z.object({ members: z.array(rosterMemberSchema) }),
+});
+
+const candidatesSchema = z.object({
+  data: z.object({ candidates: z.array(candidateSchema) }),
+});
+
+const singleMemberSchema = z.object({ data: memberSchema });
+
 const bulkAssignmentSchema = z.object({
   data: z.object({
     members: z.array(rosterMemberSchema),
-    candidates: z.array(rosterMemberSchema.extend({ groupCount: z.number() })),
+    candidates: z.array(candidateSchema),
     rejected: z.array(
       z.object({
         userId: z.string(),
@@ -118,14 +143,20 @@ export type GroupsLoad =
   | { readonly kind: "loaded"; readonly groups: readonly Group[] }
   | GroupsFailure;
 
+export type GroupOverviewsLoad =
+  | { readonly kind: "loaded"; readonly groups: readonly GroupOverview[] }
+  | GroupsFailure;
+
 export type GroupSaved =
   { readonly kind: "saved"; readonly group: Group } | GroupsFailure;
 
 export type GroupDeleted = { readonly kind: "deleted" } | GroupsFailure;
 
+/** Los candidatos se guardan sin `groupCount`: quien sale del grupo vuelve a
+ * ser candidato, y en cuántos otros grupos está no lo sabe esta pantalla. */
 export type GroupRoster = {
-  readonly members: readonly GroupMember[];
-  readonly candidates: readonly GroupMember[];
+  readonly members: readonly GroupRosterMember[];
+  readonly candidates: readonly GroupRosterMember[];
 };
 
 export type GroupRosterLoad =
@@ -184,8 +215,22 @@ async function saveGroup(
     : { kind: "saved", group: read.value.data };
 }
 
+/** Los grupos con nombre y conteo: lo que piden las pantallas que los
+ * ofrecen como audiencia o los asignan a un socio. */
 export async function loadGroups(): Promise<GroupsLoad> {
   const read = readApiPayload(await requestApi(GROUPS_API_PATH), groupsSchema);
+  return read.kind === "failed"
+    ? read
+    : { kind: "loaded", groups: read.value.data.groups };
+}
+
+/** La misma lista con el uso y la vista previa de cada grupo, que sólo pinta
+ * la pantalla Grupos (D4 de E32). */
+export async function loadGroupOverviews(): Promise<GroupOverviewsLoad> {
+  const read = readApiPayload(
+    await requestApi(GROUPS_API_PATH),
+    groupOverviewsSchema,
+  );
   return read.kind === "failed"
     ? read
     : { kind: "loaded", groups: read.value.data.groups };

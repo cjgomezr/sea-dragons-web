@@ -4112,29 +4112,612 @@ a.auth-brand-header:focus-visible {
   }
 }
 
-/* La sección Grupos (#228). Sin mockup propio: se revisa contra
-   design-system.md, y la fila de socio del panel reutiliza la de la pantalla
-   de administración (docs/mockups/directory-light.png) sin el correo, que a
-   quien gestiona grupos no se le enseña. */
+/* La sección Grupos (#228), rehecha en escritorio por #828 (E32) según
+   docs/design/design_handoff_groups/: la lista compacta a la izquierda y el
+   panel del grupo a la derecha. Los colores sueltos del handoff son tokens que
+   ya había (D14): la cabecera de la tabla es --color-editor-bar, la fila
+   elegida --color-segment-selected y el hover --color-hover. */
 .groups {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
-  max-width: 720px;
+  gap: var(--space-4);
+  max-width: 1120px;
 }
 
-.groups > .app-lead {
+.groups-head .app-lead {
   margin-bottom: 0;
 }
 
-/* El formulario de un nombre: el de crear y el de renombrar son el mismo. El
-   campo y el botón se apilan en móvil y comparten línea en cuanto cabe. */
-.groups-name-form {
+/* El aviso de cada cambio (RF-8). Vacío no ocupa sitio, pero sigue en la
+   página: un `role="status"` que aparece con su texto ya puesto no lo
+   anuncian todos los lectores. */
+.groups-notice {
+  align-self: flex-start;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-success) 18%, var(--color-panel));
+  border: 1px solid color-mix(in srgb, var(--color-success) 45%, transparent);
+  border-radius: var(--radius);
+}
+
+.groups-notice:empty {
+  display: none;
+}
+
+/* Por debajo de 1024px va una columna encima de la otra: el flujo del móvil
+   es otro ticket (D13). */
+.groups-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .groups-layout {
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+}
+
+.groups-column {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  min-width: 0;
 }
 
+/* La fila de crear: el campo y "+ Crear" en la misma línea. */
+.groups-create {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.groups-create-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.groups-create-field,
+.groups-rename-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.groups-create-field:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.groups-create-field[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.groups-create-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-danger);
+}
+
+.groups-create-submit {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.groups-create-submit:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.groups-create-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.groups-list {
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.groups-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 0 var(--space-4);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  background: var(--color-editor-bar);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.groups-list-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.groups-list-items li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.groups-list-empty {
+  margin: 0;
+  padding: var(--space-6) var(--space-4);
+  color: var(--color-text-secondary);
+  text-align: center;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+/* Cada fila es un botón entero: el nombre con su uso debajo, los avatares y
+   el conteo. La elegida lleva el tinte del acento y una barra de 3px por
+   dentro, que se ve también sin color. */
+.groups-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 54px;
+  padding: var(--space-2) var(--space-4);
+  font-family: inherit;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.groups-row:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.groups-row[aria-current="true"] {
+  background: var(--color-segment-selected);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+/* Sobre el tinte de la elegida, el secundario no llega a 4.5:1. */
+.groups-row[aria-current="true"] .groups-row-usage {
+  color: var(--color-text-soft);
+}
+
+.groups-row:disabled {
+  cursor: not-allowed;
+}
+
+.groups-row:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
+.groups-row-identity {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.groups-row-name {
+  overflow: hidden;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groups-row-usage {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.groups-row-avatars {
+  display: flex;
+  flex: none;
+}
+
+.groups-row-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-hover);
+  border: 2px solid var(--color-panel);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.groups-row-avatar + .groups-row-avatar {
+  margin-left: -4px;
+}
+
+.groups-row-count {
+  flex: none;
+  min-width: 3ch;
+  font-family: var(--font-family-mono);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.groups-panel-placeholder {
+  display: none;
+  margin: 0;
+  padding: var(--space-12) var(--space-6);
+  color: var(--color-text-secondary);
+  text-align: center;
+  border: 1px dashed var(--color-border-dashed);
+  border-radius: 12px;
+}
+
+/* La caja de "Elige un grupo" sólo tiene sentido al lado de la lista. */
+@media (min-width: 1024px) {
+  .groups-panel-placeholder {
+    display: block;
+  }
+}
+
+.groups-panel {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.groups-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.groups-panel-title {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.app-main .groups-panel-title h2 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.groups-panel-summary {
+  margin: var(--space-1) 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.groups-panel-actions {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+}
+
+.groups-icon-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 18px;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.groups-icon-button:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.groups-icon-button[aria-expanded="true"] {
+  border-color: var(--color-accent);
+}
+
+.groups-icon-button-danger {
+  color: var(--color-danger);
+}
+
+.groups-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.groups-rename {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.groups-rename-field {
+  height: 38px;
+  font-size: 18px;
+  font-weight: 700;
+  border-color: var(--color-accent);
+}
+
+/* El aviso de borrar (D11), en línea y con el tinte de peligro. */
+.groups-delete-warning {
+  flex: 1 1 100%;
+  padding: var(--space-3) var(--space-4);
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-panel));
+  border: 1px solid color-mix(in srgb, var(--color-danger) 55%, transparent);
+  border-radius: 10px;
+}
+
+.groups-delete-title {
+  margin: 0 0 var(--space-1);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.groups-delete-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-soft);
+}
+
+.groups-delete-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.groups-text-button {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.groups-text-button:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.groups-panel-error {
+  margin: var(--space-3) var(--space-4) 0;
+}
+
+.groups-members {
+  display: flex;
+  flex-direction: column;
+}
+
+.groups-members-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.groups-search {
+  position: relative;
+  display: flex;
+  flex: 1 1 200px;
+  align-items: center;
+  min-width: 0;
+}
+
+.groups-search svg {
+  position: absolute;
+  left: var(--space-3);
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+.groups-search input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 var(--space-3) 0 36px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.groups-search input:hover {
+  border-color: var(--color-accent);
+}
+
+.groups-add-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  height: 38px;
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-accent-text);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.groups-add-toggle:hover {
+  background: var(--color-hover);
+}
+
+.groups-add-toggle[aria-expanded="true"] {
+  background: var(--color-segment-selected);
+  border-color: var(--color-accent);
+}
+
+/* El selector de uno en uno de E4, hasta que llegue el de varios (#829). */
+.groups-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.groups-picker .auth-field {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.groups-picker-empty,
+.groups-members-empty {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.groups-picker-empty {
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* La lista se desplaza sola: un grupo de todo el club no estira la página. */
+.groups-members-list {
+  max-height: 440px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.groups-member {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto 34px;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-2) var(--space-4);
+}
+
+.groups-member + .groups-member {
+  border-top: 1px solid var(--color-border);
+}
+
+.groups-member-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-hover);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.groups-member-identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.groups-member-name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.groups-member-position {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* La ficha "Sin activar" ocupa la tercera columna; sin ficha queda vacía. */
+.groups-member-pill {
+  grid-column: 3;
+  padding: 2px var(--space-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--color-warning) 22%, var(--color-panel));
+  border-radius: 999px;
+}
+
+.groups-member-remove {
+  display: inline-flex;
+  grid-column: 4;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.groups-member-remove:hover:not(:disabled) {
+  color: var(--color-danger);
+  background: var(--color-hover);
+}
+
+.groups-member-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Lo que sigue lo comparten otras pantallas que nacieron copiando la de E4:
+   las acciones de un evento, de una noticia, del reparto y de las categorías
+   de Evaluaciones. */
 .groups-actions {
   display: flex;
   flex-wrap: wrap;
@@ -4160,48 +4743,6 @@ a.auth-brand-header:focus-visible {
   border-radius: var(--radius);
 }
 
-.groups-item-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-/* El nombre es el control que abre el grupo, así que se lee como texto y se
-   comporta como botón: un nombre de 60 caracteres parte por donde haga falta
-   antes que sacar una barra horizontal a 375px. */
-.groups-open {
-  flex: 1 1 160px;
-  min-width: 0;
-  min-height: var(--touch-target-min);
-  padding: 0;
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: 700;
-  text-align: left;
-  color: var(--color-text);
-  background: none;
-  border: none;
-  cursor: pointer;
-  overflow-wrap: anywhere;
-}
-
-.groups-open:hover:not(:disabled) {
-  color: var(--color-accent-text);
-}
-
-.groups-open:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.groups-count {
-  flex: none;
-  font-family: var(--font-family-mono);
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
 .groups-confirm {
   display: flex;
   flex-direction: column;
@@ -4213,8 +4754,8 @@ a.auth-brand-header:focus-visible {
   overflow-wrap: anywhere;
 }
 
-/* La única acción destructiva de la pantalla. Lleva el color de peligro para
-   no parecer la principal, y el borde la distingue también sin color. */
+/* Una acción destructiva. Lleva el color de peligro para no parecer la
+   principal, y el borde la distingue también sin color. */
 .groups-danger {
   min-height: var(--touch-target-min);
   padding: 0 var(--space-6);
@@ -4235,50 +4776,6 @@ a.auth-brand-header:focus-visible {
 .groups-danger:disabled {
   cursor: not-allowed;
   opacity: 0.6;
-}
-
-.groups-detail-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.groups-detail-head h2 {
-  margin: 0;
-  font-size: 18px;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
-
-.groups-add {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-/* El campo y el botón comparten línea en cuanto caben. `flex-basis` sólo se
-   declara aquí a propósito: en la columna del móvil el eje principal es el
-   vertical, así que esos 220px serían un ALTO mínimo del campo y abrirían un
-   hueco enorme entre el campo y su botón. */
-@media (min-width: 768px) {
-  .groups-name-form,
-  .groups-add {
-    flex-direction: row;
-    align-items: flex-end;
-  }
-
-  .groups-name-form .auth-field,
-  .groups-add .auth-field {
-    flex: 1 1 220px;
-    min-width: 0;
-  }
-
-  .groups-name-form .groups-actions,
-  .groups-add > button {
-    flex: none;
-  }
 }
 
 /* El directorio del club (#239). Sigue docs/mockups/directory-light.png: la

@@ -3708,39 +3708,76 @@ test.describe("la evaluación en el perfil de un Admin", () => {
 const GROUPS_SCREEN_PATH = "/grupos";
 const GROUPS_ENDPOINT = "/api/v1/groups";
 
-/** Justo el tope de `GROUP_NAME_MAX_LENGTH`, para el criterio de los 60
- * caracteres a 375px y el caso de contenido largo de design-system.md. */
+/** Justo el tope de `GROUP_NAME_MAX_LENGTH`, para el caso de contenido largo
+ * de design-system.md: en la lista se corta con puntos suspensivos. */
 const LONG_GROUP_NAME =
   "Juveniles que entrenan los jueves por la tarde en la piscina";
+
+const STUBBED_GROUP_MEMBERS = [
+  {
+    id: "aaaaaaaa-0000-4000-8000-00000000000a",
+    fullName: "Ana Admin",
+    isPendingActivation: false,
+    positionName: "Forward",
+    photoUrl: null,
+  },
+  {
+    id: "bbbbbbbb-0000-4000-8000-00000000000b",
+    fullName: "Nerea Ruiz",
+    isPendingActivation: true,
+    positionName: "Goalkeeper",
+    photoUrl: null,
+  },
+  {
+    id: "cccccccc-0000-4000-8000-00000000000c",
+    fullName: "Tomás Errekondo Aranburu",
+    isPendingActivation: false,
+    positionName: null,
+    photoUrl: null,
+  },
+];
+
+const STUBBED_GROUP_CANDIDATES = [
+  {
+    id: "dddddddd-0000-4000-8000-00000000000d",
+    fullName: "Bea Nadal",
+    isPendingActivation: false,
+    positionName: "Centre",
+    photoUrl: null,
+    groupCount: 1,
+  },
+];
+
+/** La vista previa: los activos del grupo en orden de nombre, sin foto. */
+const STUBBED_PREVIEW = STUBBED_GROUP_MEMBERS.filter(
+  (member) => !member.isPendingActivation,
+).map(({ id, fullName }) => ({ id, fullName, photoUrl: null }));
 
 const STUBBED_GROUPS = [
   {
     id: "11111111-0000-4000-8000-000000000001",
     name: "Senior Squad",
-    memberCount: 3,
+    memberCount: 2,
+    usage: { events: 2, posts: 1 },
+    previewMembers: STUBBED_PREVIEW,
   },
   {
     id: "22222222-0000-4000-8000-000000000002",
     name: LONG_GROUP_NAME,
     memberCount: 0,
+    usage: { events: 0, posts: 0 },
+    previewMembers: [],
   },
-];
-
-const STUBBED_GROUP_MEMBERS = [
-  { id: "aaaaaaaa-0000-4000-8000-00000000000a", fullName: "Ana Admin" },
-  { id: "bbbbbbbb-0000-4000-8000-00000000000b", fullName: "Nerea Ruiz" },
   {
-    id: "cccccccc-0000-4000-8000-00000000000c",
-    fullName: "Tomás Errekondo Aranburu",
+    id: "33333333-0000-4000-8000-000000000003",
+    name: "Sunday social",
+    memberCount: 18,
+    usage: { events: 1, posts: 0 },
+    previewMembers: STUBBED_PREVIEW,
   },
 ];
 
-const STUBBED_GROUP_CANDIDATES = [
-  { id: "dddddddd-0000-4000-8000-00000000000d", fullName: "Bea Nadal" },
-  { id: "eeeeeeee-0000-4000-8000-00000000000e", fullName: "Iker Lasa" },
-];
-
-const OPENED_GROUP = STUBBED_GROUPS[0];
+const OPENED_GROUP_NAME = "Senior Squad";
 
 /** Las tres lecturas de la sección, con datos fijos. Registradas antes de
  * navegar, para que la pantalla no llegue a ver las de verdad. */
@@ -3781,38 +3818,56 @@ async function stubGroupsReads(
   );
 }
 
+const NEW_GROUP_FIELD = /^(New group name|Nombre del grupo nuevo)$/;
+const GROUP_SEARCH = /^(Search in this group|Buscar en este grupo)$/;
+
 /** La pantalla pide su lista al montarse, así que hasta que llega sólo enseña
  * que está cargando. Sin esperarla, una captura sale del estado de carga y la
  * comparación de un instante después, de la pantalla ya llena. */
-async function waitForGroups(page: Page, heading: string): Promise<void> {
-  await expect(page.getByRole("heading", { name: heading })).toBeVisible();
-}
-
-/** Abre la confirmación de borrado del grupo con socios, que es la que dice
- * cuántos tiene. */
-async function askToDeleteGroup(page: Page): Promise<void> {
-  await page
-    .getByRole("button", { name: `Delete ${OPENED_GROUP?.name ?? ""}` })
-    .click();
-  await expect(page.getByText(/They stay in the club/)).toBeVisible();
-}
-
-function openGroupIn(memberHeading: string) {
-  return async (page: Page): Promise<void> => {
-    await page
-      .getByRole("button", { name: OPENED_GROUP?.name ?? "", exact: true })
-      .click();
+async function waitForGroups(page: Page, withGroups: boolean): Promise<void> {
+  await expect(
+    page.getByRole("textbox", { name: NEW_GROUP_FIELD }),
+  ).toBeVisible();
+  if (withGroups) {
     await expect(
-      page.getByRole("heading", { name: memberHeading }),
+      page.getByRole("button", { name: OPENED_GROUP_NAME, exact: true }),
     ).toBeVisible();
-  };
+  }
+}
+
+/** Elige el grupo con miembros y espera a que su lista haya llegado. */
+async function selectGroup(page: Page): Promise<void> {
+  await page
+    .getByRole("button", { name: OPENED_GROUP_NAME, exact: true })
+    .click();
+  await expect(
+    page.getByRole("searchbox", { name: GROUP_SEARCH }),
+  ).toBeVisible();
+  // El puntero se queda encima de la fila y su hover taparía el elegido.
+  await page.mouse.move(0, 0);
+}
+
+async function askToDeleteGroup(page: Page): Promise<void> {
+  await selectGroup(page);
+  await page
+    .getByRole("button", { name: `Delete ${OPENED_GROUP_NAME}` })
+    .click();
+  await expect(page.getByText(/will lose this audience/)).toBeVisible();
+}
+
+async function startRenamingGroup(page: Page): Promise<void> {
+  await selectGroup(page);
+  await page
+    .getByRole("button", { name: `Rename ${OPENED_GROUP_NAME}` })
+    .click();
+  await expect(
+    page.getByRole("textbox", { name: `New name for ${OPENED_GROUP_NAME}` }),
+  ).toBeFocused();
 }
 
 type GroupsState = {
   readonly name: string;
   readonly withGroups: boolean;
-  /** El encabezado por el que se sabe que la lista llegó. */
-  readonly listHeading: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
 };
@@ -3820,47 +3875,37 @@ type GroupsState = {
 const ENGLISH_GROUPS_HEADING = "Club groups";
 const SPANISH_GROUPS_HEADING = "Grupos del club";
 
+/** El escritorio de #828 (RF-2 de E32). Por debajo de 1024px va el flujo del
+ * móvil, que es otro ticket (D13): ahí sólo se comprueba que no hay scroll
+ * horizontal. */
+const GROUPS_VIEWPORTS = [
+  { name: "desktop-1024", width: 1024, height: 900 },
+  { name: "desktop", width: 1440, height: 900 },
+] as const;
+
+const GROUPS_NARROW_WIDTHS = [375, 768] as const;
+
 const GROUPS_STATES: readonly GroupsState[] = [
-  {
-    name: "grupos-con-grupos",
-    withGroups: true,
-    listHeading: ENGLISH_GROUPS_HEADING,
-  },
-  {
-    name: "grupos-con-grupos-es",
-    withGroups: true,
-    listHeading: SPANISH_GROUPS_HEADING,
-    beforeVisit: chooseSpanish,
-  },
-  {
-    name: "grupos-sin-grupos",
-    withGroups: false,
-    listHeading: ENGLISH_GROUPS_HEADING,
-  },
+  { name: "grupos-lista", withGroups: true },
+  { name: "grupos-lista-es", withGroups: true, beforeVisit: chooseSpanish },
+  { name: "grupos-sin-grupos", withGroups: false },
   {
     name: "grupos-sin-grupos-es",
     withGroups: false,
-    listHeading: SPANISH_GROUPS_HEADING,
     beforeVisit: chooseSpanish,
   },
+  { name: "grupos-panel", withGroups: true, prepare: selectGroup },
   {
-    name: "grupos-borrar",
+    name: "grupos-panel-es",
     withGroups: true,
-    listHeading: ENGLISH_GROUPS_HEADING,
-    prepare: askToDeleteGroup,
-  },
-  {
-    name: "grupos-abierto",
-    withGroups: true,
-    listHeading: ENGLISH_GROUPS_HEADING,
-    prepare: openGroupIn(`Members of ${OPENED_GROUP?.name ?? ""}`),
-  },
-  {
-    name: "grupos-abierto-es",
-    withGroups: true,
-    listHeading: SPANISH_GROUPS_HEADING,
     beforeVisit: chooseSpanish,
-    prepare: openGroupIn(`Miembros de ${OPENED_GROUP?.name ?? ""}`),
+    prepare: selectGroup,
+  },
+  { name: "grupos-borrar-aviso", withGroups: true, prepare: askToDeleteGroup },
+  {
+    name: "grupos-renombrando",
+    withGroups: true,
+    prepare: startRenamingGroup,
   },
 ];
 
@@ -3876,7 +3921,7 @@ async function goToGroups(
   } else {
     await goToWithTheme(page, GROUPS_SCREEN_PATH, theme);
   }
-  await waitForGroups(page, state.listHeading);
+  await waitForGroups(page, state.withGroups);
   await state.prepare?.(page);
 }
 
@@ -3886,7 +3931,7 @@ for (const state of GROUPS_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of GROUPS_VIEWPORTS) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -3909,22 +3954,96 @@ for (const state of GROUPS_STATES) {
 
         test("has no horizontal scroll", async ({ page }) => {
           await goToGroups(page, state);
-          const overflow = await page.evaluate(
-            () =>
-              document.documentElement.scrollWidth >
-              document.documentElement.clientWidth,
-          );
-          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+          expect(
+            await hasHorizontalScroll(page),
+            `horizontal overflow at ${vp.width}px`,
+          ).toBe(false);
         });
       });
     }
 
-    test("has no accessibility violations (axe-core)", async ({ page }) => {
-      await goToGroups(page, state);
-      await expectNoAxeViolations(page);
-    });
+    for (const width of GROUPS_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToGroups(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    for (const theme of themes) {
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await goToGroups(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
   });
 }
+
+test.describe("la sección Grupos en escritorio", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 1440, height: 900 },
+  });
+
+  test("la lista y el panel van lado a lado, con la lista de 340px", async ({
+    page,
+  }) => {
+    await goToGroups(page, { name: "grupos-panel", withGroups: true });
+    await selectGroup(page);
+
+    const list = page.getByRole("region", { name: ENGLISH_GROUPS_HEADING });
+    const panel = page.getByRole("region", { name: OPENED_GROUP_NAME });
+    const listBox = await list.boundingBox();
+    const panelBox = await panel.boundingBox();
+
+    expect(listBox?.width).toBe(340);
+    expect(panelBox?.x).toBeGreaterThan((listBox?.x ?? 0) + 340);
+    expect(Math.round(panelBox?.y ?? 0)).toBe(Math.round(listBox?.y ?? 0));
+  });
+
+  test("cada fila de grupo mide al menos 54px y cada miembro 48px", async ({
+    page,
+  }) => {
+    await goToGroups(page, { name: "grupos-panel", withGroups: true });
+    await selectGroup(page);
+
+    const row = page.getByRole("button", {
+      name: OPENED_GROUP_NAME,
+      exact: true,
+    });
+    const member = page
+      .getByRole("region", { name: OPENED_GROUP_NAME })
+      .getByRole("listitem")
+      .first();
+    expect((await row.boundingBox())?.height).toBeGreaterThanOrEqual(54);
+    expect((await member.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+  });
+
+  test("los botones de icono de la cabecera miden 38px y el × 32px", async ({
+    page,
+  }) => {
+    await goToGroups(page, { name: "grupos-panel", withGroups: true });
+    await selectGroup(page);
+
+    const rename = await page
+      .getByRole("button", { name: `Rename ${OPENED_GROUP_NAME}` })
+      .boundingBox();
+    const remove = await page
+      .getByRole("button", {
+        name: `Remove Ana Admin from ${OPENED_GROUP_NAME}`,
+      })
+      .boundingBox();
+    expect(rename?.width).toBe(38);
+    expect(rename?.height).toBe(38);
+    expect(remove?.width).toBe(32);
+    expect(remove?.height).toBe(32);
+  });
+});
 
 /* ---------------------------------------------------------------------------
    La exportación a CSV del directorio (#500): el Admin sembrado descarga la
@@ -3983,7 +4102,7 @@ test.describe("la sección Grupos con los datos de verdad", () => {
       page.getByRole("heading", { level: 1, name: "Groups" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: ENGLISH_GROUPS_HEADING }),
+      page.getByRole("region", { name: ENGLISH_GROUPS_HEADING }),
     ).toBeVisible();
   });
 
@@ -3995,7 +4114,7 @@ test.describe("la sección Grupos con los datos de verdad", () => {
       page.getByRole("heading", { level: 1, name: "Grupos" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: SPANISH_GROUPS_HEADING }),
+      page.getByRole("region", { name: SPANISH_GROUPS_HEADING }),
     ).toBeVisible();
   });
 
