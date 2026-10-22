@@ -45,7 +45,7 @@ export function renameFocusKey(categoryId: string): string {
   return `${categoryId}:rename`;
 }
 
-function CategoryHandle({
+export function CategoryHandle({
   translate,
   category,
   rank,

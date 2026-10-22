@@ -805,3 +805,359 @@ describe("en español", () => {
     ).toBeInTheDocument();
   });
 });
+
+/* El móvil (#823, RF-7 del PRD de E31): por debajo de 768 px la tabla no
+   cabe. Cada activa es una fila de una tarjeta con su asa, su número, su
+   nombre y una flecha; al tocarla sube una hoja con el nombre, Desactivar y
+   Guardar. El ancho lo dice `matchMedia`, que aquí se simula; cómo se ve lo
+   prueba Playwright. */
+
+const PHONE_QUERY = "(width < 768px)";
+
+function stubPhoneScreen(): void {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === PHONE_QUERY,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }));
+}
+
+function phoneRow(name: string): HTMLElement {
+  return within(activeList()).getByRole("button", { name });
+}
+
+function sheet(name: string): HTMLElement {
+  return screen.getByRole("dialog", { name });
+}
+
+async function openSheet(name: string): Promise<HTMLElement> {
+  await userEvent.click(phoneRow(name));
+  return sheet(name);
+}
+
+function sheetField(dialog: HTMLElement): HTMLElement {
+  return within(dialog).getByRole("textbox", { name: "Name" });
+}
+
+async function renameInSheet(dialog: HTMLElement, name: string): Promise<void> {
+  await userEvent.clear(sheetField(dialog));
+  await userEvent.type(sheetField(dialog), name);
+}
+
+function saveButton(dialog: HTMLElement): HTMLElement {
+  return within(dialog).getByRole("button", { name: "Save" });
+}
+
+describe("en el móvil", () => {
+  beforeEach(() => {
+    stubPhoneScreen();
+  });
+
+  describe("la tarjeta", () => {
+    it("indica cómo se ordena y se renombra", async () => {
+      await renderTab();
+
+      expect(
+        screen.getByText("Hold ⋮⋮ and drag to reorder. Tap to rename."),
+      ).toBeInTheDocument();
+    });
+
+    it("en español indica cómo se ordena y se renombra", async () => {
+      await renderTab("es");
+
+      expect(
+        screen.getByText(
+          "Mantén ⋮⋮ y arrastra para ordenar. Toca para renombrar.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("pinta una fila por activa, en su orden, con su asa, su número y su nombre", async () => {
+      await renderTab();
+
+      expect(activeNames()).toEqual(["Fitness", "Speed", "Teamwork"]);
+      const [, row] = within(activeList()).getAllByRole("listitem");
+      if (row === undefined) {
+        throw new Error("Falta la segunda fila");
+      }
+      expect(
+        within(row).getByRole("button", {
+          name: "Reorder Speed, position 2 of 3",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        row.querySelector(".evaluation-categories-rank"),
+      ).toHaveTextContent("2");
+      expect(
+        within(row).getByRole("button", { name: "Speed" }),
+      ).toHaveAttribute("aria-haspopup", "dialog");
+    });
+
+    it("no pinta los controles de la tabla de escritorio", async () => {
+      await renderTab();
+
+      expect(screen.queryByRole("button", { name: /^Rename / })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Deactivate / })).toBeNull();
+    });
+
+    it("el asa reordena con ↑ como en escritorio", async () => {
+      await renderTab();
+
+      handleOf("Teamwork", 3).focus();
+      await userEvent.keyboard("{ArrowUp}");
+
+      await vi.waitFor(() =>
+        expect(activeNames()).toEqual(["Fitness", "Teamwork", "Speed"]),
+      );
+      expect(requests[0]?.body).toEqual({
+        categoryIds: [FITNESS.id, TEAMWORK.id, SPEED.id],
+      });
+      await waitFor(() => expect(handleOf("Teamwork", 2)).toHaveFocus());
+    });
+
+    it("el asa reordena con ↓ como en escritorio", async () => {
+      await renderTab();
+
+      handleOf("Fitness", 1).focus();
+      await userEvent.keyboard("{ArrowDown}");
+
+      await vi.waitFor(() =>
+        expect(activeNames()).toEqual(["Speed", "Fitness", "Teamwork"]),
+      );
+    });
+
+    it("soltar una fila arrastrada guarda el orden con el aviso del escritorio", async () => {
+      await renderTab();
+
+      dropOn(dndContext, TEAMWORK.id, FITNESS.id);
+
+      expect(
+        await screen.findByText("Teamwork moved to 1 of 3 · saved", {
+          selector: ".club-saved-notice *",
+        }),
+      ).toBeInTheDocument();
+      expect(requests[0]?.body).toEqual({
+        categoryIds: [TEAMWORK.id, FITNESS.id, SPEED.id],
+      });
+    });
+
+    it("tocar el asa no abre la hoja", async () => {
+      await renderTab();
+
+      await userEvent.click(handleOf("Speed", 2));
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+  });
+
+  describe("debajo de la tarjeta", () => {
+    it("el campo Nueva categoría añade con Añadir", async () => {
+      await renderTab();
+
+      expect(addField()).toHaveAttribute("placeholder", "New category");
+      await userEvent.type(addField(), "Breath hold");
+      await userEvent.click(addButton());
+
+      await vi.waitFor(() => expect(activeNames()).toContain("Breath hold"));
+      expect(requests).toEqual([
+        { method: "POST", url: CATEGORIES_PATH, body: { name: "Breath hold" } },
+      ]);
+    });
+
+    it("avisa del nombre repetido al añadir y no deja mandarlo", async () => {
+      await renderTab();
+
+      await userEvent.type(addField(), "EXPERIENCIA");
+
+      expect(addField()).toHaveAccessibleDescription(
+        "There is already a category with that name.",
+      );
+      expect(addButton()).toBeDisabled();
+    });
+
+    it("las desactivadas van plegadas y se reactivan", async () => {
+      await renderTab();
+
+      const inactive = await openDeactivated();
+      await userEvent.click(
+        within(inactive).getByRole("button", {
+          name: "Reactivate Experiência",
+        }),
+      );
+
+      await vi.waitFor(() => expect(activeNames()).toContain("Experiência"));
+      expect(requests[0]?.body).toEqual({ isActive: true });
+    });
+  });
+
+  describe("la hoja de una categoría", () => {
+    it("tocar la fila abre la hoja con el nombre, Desactivar y Guardar", async () => {
+      await renderTab();
+
+      const dialog = await openSheet("Speed");
+
+      expect(
+        within(dialog).getByRole("heading", { name: "Speed" }),
+      ).toBeInTheDocument();
+      expect(sheetField(dialog)).toHaveValue("Speed");
+      expect(
+        within(dialog).getByRole("button", { name: "Deactivate" }),
+      ).toBeInTheDocument();
+      expect(saveButton(dialog)).toBeInTheDocument();
+    });
+
+    it("en español lleva Nombre, Desactivar y Guardar", async () => {
+      await renderTab("es");
+
+      await userEvent.click(
+        within(
+          screen.getByRole("list", { name: "Categorías activas" }),
+        ).getByRole("button", { name: "Speed" }),
+      );
+      const dialog = sheet("Speed");
+
+      expect(
+        within(dialog).getByRole("textbox", { name: "Nombre" }),
+      ).toHaveValue("Speed");
+      expect(
+        within(dialog).getByRole("button", { name: "Desactivar" }),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByRole("button", { name: "Guardar" }),
+      ).toBeInTheDocument();
+    });
+
+    it("al abrirse deja el foco dentro de la hoja", async () => {
+      await renderTab();
+
+      const dialog = await openSheet("Speed");
+
+      expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    });
+
+    it("guarda el nombre nuevo, cierra, lo avisa y devuelve el foco a la fila", async () => {
+      await renderTab();
+
+      const dialog = await openSheet("Speed");
+      await renameInSheet(dialog, "Sprint");
+      await userEvent.click(saveButton(dialog));
+
+      await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(requests).toEqual([
+        {
+          method: "PATCH",
+          url: `${CATEGORIES_PATH}/${SPEED.id}`,
+          body: { name: "Sprint" },
+        },
+      ]);
+      expect(activeNames()).toEqual(["Fitness", "Sprint", "Teamwork"]);
+      expect(
+        screen.getByText("Name saved.", { selector: ".club-saved-notice *" }),
+      ).toBeInTheDocument();
+      await waitFor(() => expect(phoneRow("Sprint")).toHaveFocus());
+    });
+
+    it("sin cambios, Guardar cierra la hoja sin mandar nada", async () => {
+      await renderTab();
+
+      const dialog = await openSheet("Speed");
+      await userEvent.click(saveButton(dialog));
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(requests).toEqual([]);
+    });
+
+    it("no deja guardar el nombre de otra categoría", async () => {
+      await renderTab();
+
+      const dialog = await openSheet("Speed");
+      await renameInSheet(dialog, "fitness");
+
+      expect(sheetField(dialog)).toHaveAttribute("aria-invalid", "true");
+      expect(sheetField(dialog)).toHaveAccessibleDescription(
+        "There is already a category with that name.",
+      );
+      expect(saveButton(dialog)).toBeDisabled();
+    });
+
+    it("enseña en la hoja el nombre repetido que rechaza el servidor y la deja abierta", async () => {
+      await renderTab();
+      nextWriteResponse = () =>
+        errorResponse(400, "validation_error", "name_taken");
+
+      const dialog = await openSheet("Speed");
+      await renameInSheet(dialog, "Sprint");
+      await userEvent.click(saveButton(dialog));
+
+      await vi.waitFor(() =>
+        expect(sheetField(dialog)).toHaveAccessibleDescription(
+          "There is already a category with that name.",
+        ),
+      );
+      expect(sheet("Speed")).toBe(dialog);
+    });
+
+    it("Desactivar la pasa a las desactivadas y cierra la hoja", async () => {
+      await renderTab();
+
+      const dialog = await openSheet("Speed");
+      await userEvent.click(
+        within(dialog).getByRole("button", { name: "Deactivate" }),
+      );
+
+      await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(requests).toEqual([
+        {
+          method: "PATCH",
+          url: `${CATEGORIES_PATH}/${SPEED.id}`,
+          body: { isActive: false },
+        },
+      ]);
+      expect(activeNames()).toEqual(["Fitness", "Teamwork"]);
+      const inactive = await openDeactivated();
+      expect(within(inactive).getByText("Speed")).toBeInTheDocument();
+    });
+
+    it("un fallo de red al desactivar sale en la hoja y la deja abierta", async () => {
+      await renderTab();
+      nextWriteResponse = networkFailure;
+
+      const dialog = await openSheet("Speed");
+      await userEvent.click(
+        within(dialog).getByRole("button", { name: "Deactivate" }),
+      );
+
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+        /couldn't reach the server/i,
+      );
+      expect(sheet("Speed")).toBe(dialog);
+      expect(activeNames()).toEqual(["Fitness", "Speed", "Teamwork"]);
+    });
+
+    it("Escape la cierra sin cambiar nada y devuelve el foco a la fila", async () => {
+      await renderTab();
+
+      const dialog = await openSheet("Speed");
+      await userEvent.type(sheetField(dialog), "y");
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(requests).toEqual([]);
+      await waitFor(() => expect(phoneRow("Speed")).toHaveFocus());
+    });
+
+    it("al reabrirla tras cerrarla sin guardar, empieza por lo guardado", async () => {
+      await renderTab();
+
+      const first = await openSheet("Speed");
+      await userEvent.type(sheetField(first), "y");
+      await userEvent.keyboard("{Escape}");
+      const dialog = await openSheet("Speed");
+
+      expect(sheetField(dialog)).toHaveValue("Speed");
+    });
+  });
+});
