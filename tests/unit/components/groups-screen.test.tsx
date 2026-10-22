@@ -1286,12 +1286,18 @@ describe("añadir socios", () => {
     const panel = await openGroup("Senior Squad");
     const picker = await openPicker(panel);
 
-    await user.click(within(picker).getByRole("checkbox", { name: "Ana Admin" }));
-    await user.click(within(picker).getByRole("checkbox", { name: "Bea Nadal" }));
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Bea Nadal" }),
+    );
     await user.click(
       within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
     );
-    await user.click(within(picker).getByRole("checkbox", { name: "Bea Nadal" }));
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Bea Nadal" }),
+    );
 
     expect(within(picker).getByText("2 selected")).toBeVisible();
     expect(
@@ -1306,16 +1312,22 @@ describe("añadir socios", () => {
     const panel = await openGroup("Senior Squad");
     const picker = await openPicker(panel);
 
-    await user.click(within(picker).getByRole("checkbox", { name: "Ana Admin" }));
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
     await user.type(
       within(picker).getByRole("searchbox", {
         name: "Search members not in this group",
       }),
       "bea",
     );
-    await user.click(within(picker).getByRole("checkbox", { name: "Bea Nadal" }));
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Bea Nadal" }),
+    );
 
-    expect(within(picker).queryByRole("checkbox", { name: "Ana Admin" })).toBeNull();
+    expect(
+      within(picker).queryByRole("checkbox", { name: "Ana Admin" }),
+    ).toBeNull();
     expect(within(picker).getByText("2 selected")).toBeVisible();
   });
 
@@ -1329,8 +1341,12 @@ describe("añadir socios", () => {
     await renderScreen();
     const panel = await openGroup("Senior Squad");
     const picker = await openPicker(panel);
-    await user.click(within(picker).getByRole("checkbox", { name: "Ana Admin" }));
-    await user.click(within(picker).getByRole("checkbox", { name: "Bea Nadal" }));
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Bea Nadal" }),
+    );
 
     await user.click(
       within(picker).getByRole("button", { name: "Add 2 members" }),
@@ -1349,7 +1365,9 @@ describe("añadir socios", () => {
       },
     ]);
     expect(
-      within(panel).queryByRole("group", { name: "Add members to Senior Squad" }),
+      within(panel).queryByRole("group", {
+        name: "Add members to Senior Squad",
+      }),
     ).toBeNull();
     expect(
       within(panel).getByRole("button", {
@@ -1368,8 +1386,12 @@ describe("añadir socios", () => {
     await renderScreen();
     const panel = await openGroup("Senior Squad");
     const picker = await openPicker(panel);
-    await user.click(within(picker).getByRole("checkbox", { name: "Ana Admin" }));
-    await user.click(within(picker).getByRole("button", { name: "Add 1 member" }));
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
+    await user.click(
+      within(picker).getByRole("button", { name: "Add 1 member" }),
+    );
     await waitFor(() =>
       expect(
         within(panel).queryByRole("group", {
@@ -1399,9 +1421,13 @@ describe("añadir socios", () => {
     await renderScreen();
     const panel = await openGroup("Senior Squad");
     const picker = await openPicker(panel);
-    await user.click(within(picker).getByRole("checkbox", { name: "Ana Admin" }));
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
 
-    await user.click(within(picker).getByRole("button", { name: "Add 1 member" }));
+    await user.click(
+      within(picker).getByRole("button", { name: "Add 1 member" }),
+    );
 
     await waitFor(() =>
       expect(within(panel).getByText("Not activated")).toBeVisible(),
@@ -1440,9 +1466,7 @@ describe("añadir socios", () => {
       within(picker).getByRole("button", { name: "Add 3 members" }),
     );
 
-    expect(
-      await within(panel).findByRole("alert"),
-    ).toHaveTextContent(
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
       "Couldn't add: Bea Nadal (no longer in the club), Tomás Errekondo (account deactivated).",
     );
     expect(statusNotice()).toHaveTextContent("1 member added to Senior Squad");
@@ -1485,16 +1509,18 @@ describe("añadir socios", () => {
 
     expect(
       within(picker).getByRole("searchbox", {
-        name: "Buscar socios que no están en este grupo",
+        name: "Buscar miembros que no están en este grupo",
       }),
     ).toBeVisible();
     expect(
-      within(picker).getByText("2 socios no están en este grupo"),
+      within(picker).getByText("2 miembros no están en este grupo"),
     ).toBeVisible();
     expect(
       within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
     ).toHaveAccessibleDescription("Goalkeeper · en 0 grupos");
-    await user.click(within(picker).getByRole("checkbox", { name: "Ana Admin" }));
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
     await user.click(
       within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
     );
@@ -1517,7 +1543,9 @@ describe("añadir socios", () => {
     const picker = await openPicker(panel);
 
     expect(
-      within(picker).getByText("Everyone in the club is already in this group."),
+      within(picker).getByText(
+        "Everyone in the club is already in this group.",
+      ),
     ).toBeVisible();
     expect(within(picker).queryByRole("checkbox")).toBeNull();
   });
@@ -1589,7 +1617,7 @@ describe("añadir socios", () => {
 
     await user.type(
       within(panel).getByRole("searchbox", {
-        name: "Buscar socios que no están en este grupo",
+        name: "Buscar miembros que no están en este grupo",
       }),
       "zzz",
     );
@@ -1627,12 +1655,16 @@ describe("añadir socios", () => {
     await renderScreen();
     const panel = await openGroup("Senior Squad");
     const picker = await openPicker(panel);
-    await user.click(within(picker).getByRole("checkbox", { name: "Ana Admin" }));
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
 
     await user.click(within(picker).getByRole("button", { name: "Cancel" }));
 
     expect(
-      within(panel).queryByRole("group", { name: "Add members to Senior Squad" }),
+      within(panel).queryByRole("group", {
+        name: "Add members to Senior Squad",
+      }),
     ).toBeNull();
     expect(addMembersButton(panel)).toHaveFocus();
     expect(addMembersButton(panel)).toHaveAttribute("aria-expanded", "false");
@@ -1648,7 +1680,9 @@ describe("añadir socios", () => {
     await renderScreen();
     const panel = await openGroup("Senior Squad");
     const picker = await openPicker(panel);
-    await user.click(within(picker).getByRole("checkbox", { name: "Ana Admin" }));
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+    );
     await user.click(within(picker).getByRole("button", { name: "Cancel" }));
 
     const reopened = await openPicker(panel);
@@ -1673,7 +1707,9 @@ describe("añadir socios", () => {
       within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
     );
 
-    await user.click(within(picker).getByRole("button", { name: "Add 1 member" }));
+    await user.click(
+      within(picker).getByRole("button", { name: "Add 1 member" }),
+    );
 
     expect(
       await screen.findByText("That group is no longer in the club."),
@@ -1697,7 +1733,9 @@ describe("añadir socios", () => {
       within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
     );
 
-    await user.click(within(picker).getByRole("button", { name: "Add 1 member" }));
+    await user.click(
+      within(picker).getByRole("button", { name: "Add 1 member" }),
+    );
 
     expect(
       await within(panel).findByText(

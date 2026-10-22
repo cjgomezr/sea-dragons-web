@@ -697,7 +697,7 @@ export const spanishMessages: MessageCatalog = {
   "groups.members.openPicker": "Añadir miembros",
   // El selector de varios a la vez (#829, RF-4 de E32).
   "groups.picker.label": "Añadir miembros a {group}",
-  "groups.picker.search": "Buscar socios que no están en este grupo",
+  "groups.picker.search": "Buscar miembros que no están en este grupo",
   "groups.picker.groupCount": {
     one: "en {count} grupo",
     other: "en {count} grupos",
@@ -707,8 +707,8 @@ export const spanishMessages: MessageCatalog = {
     other: "{count} elegidos",
   },
   "groups.picker.outside": {
-    one: "{count} socio no está en este grupo",
-    other: "{count} socios no están en este grupo",
+    one: "{count} miembro no está en este grupo",
+    other: "{count} miembros no están en este grupo",
   },
   "groups.picker.submit": {
     one: "Añadir {count} miembro",
