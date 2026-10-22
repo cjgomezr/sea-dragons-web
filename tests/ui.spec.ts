@@ -16623,7 +16623,7 @@ test.describe("evaluaciones en el navegador", () => {
    tabla con una desactivada, el nombre repetido en la fila de añadir,
    renombrando en la fila y las desactivadas abiertas. Se revisa contra
    docs/design/design_handoff_evaluations/screenshots/04-desktop-categories.png
-   a 768 y 1440; el móvil llega en #823. Los datos son fijos, servidos por
+   a 768 y 1440; el móvil (#823) va más abajo. Los datos son fijos, servidos por
    `page.route`; lo que los endpoints hacen se prueba contra la base (#320).
    --------------------------------------------------------------------------- */
 
@@ -16714,7 +16714,8 @@ const EVALUATION_CATEGORIES_STATES: readonly EvaluationCategoriesState[] = [
   },
 ];
 
-/** Las tabletas y el escritorio: el móvil de las categorías llega en #823. */
+/** Las tabletas y el escritorio: el móvil de las categorías tiene sus propios
+ * estados (#823). */
 const EVALUATION_CATEGORIES_VIEWPORTS = viewports.filter(
   (vp) => vp.name !== "mobile",
 );
@@ -16794,6 +16795,150 @@ for (const state of EVALUATION_CATEGORIES_STATES) {
     }
   });
 }
+
+/* Las categorías en el móvil (#823, RF-7 del PRD de E31): la tarjeta con la
+   indicación de arrastrar, la hoja de una categoría y el nombre repetido en
+   la hoja. Se revisa contra docs/design/design_handoff_evaluations/
+   screenshots/07-mobile-categories.png a 375; a 320 no se sale por el lado. */
+
+const PHONE_CATEGORIES_VIEWPORT = viewports[0];
+const NARROWEST_CATEGORIES_PHONE = { width: 320, height: 640 } as const;
+
+async function openSpeedSheet(page: Page): Promise<void> {
+  await page
+    .getByRole("list", { name: ACTIVE_CATEGORIES_LIST })
+    .getByRole("button", { name: "Speed", exact: true })
+    .click();
+  await expect(page.getByRole("dialog", { name: "Speed" })).toBeVisible();
+}
+
+/** "endurance" ya existe: el aviso sale en la hoja mientras se escribe. */
+async function typeTakenNameInSheet(page: Page): Promise<void> {
+  await openSpeedSheet(page);
+  await page
+    .getByRole("dialog", { name: "Speed" })
+    .getByRole("textbox", { name: /^(Name|Nombre)$/ })
+    .fill("endurance");
+  await expect(page.getByText(TAKEN_CATEGORY_NAME)).toBeVisible();
+}
+
+type PhoneCategoriesState = EvaluationCategoriesState & {
+  /** La hoja va fija abajo: se fotografía la ventana, no la página entera. */
+  readonly isSheet: boolean;
+};
+
+const PHONE_CATEGORIES_STATES: readonly PhoneCategoriesState[] = [
+  { name: "evaluaciones-movil-categorias", isSheet: false },
+  {
+    name: "evaluaciones-movil-categorias-es",
+    isSpanish: true,
+    isSheet: false,
+  },
+  {
+    name: "evaluaciones-movil-categoria-hoja",
+    prepare: openSpeedSheet,
+    isSheet: true,
+  },
+  {
+    name: "evaluaciones-movil-categoria-hoja-nombre-repetido",
+    prepare: typeTakenNameInSheet,
+    isSheet: true,
+  },
+];
+
+for (const state of PHONE_CATEGORIES_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    test.describe(`@ ${PHONE_CATEGORIES_VIEWPORT.name}`, () => {
+      test.use({
+        viewport: {
+          width: PHONE_CATEGORIES_VIEWPORT.width,
+          height: PHONE_CATEGORIES_VIEWPORT.height,
+        },
+      });
+
+      if (isStatePhotographed(state.name)) {
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToEvaluationCategories(page, state, theme);
+            if (!state.isSheet) {
+              // En la página entera, la barra fija de abajo taparía filas.
+              await page.addStyleTag({ content: HIDDEN_TAB_BAR_STYLE });
+            }
+            const options = { ...SCREENSHOT_OPTIONS, fullPage: !state.isSheet };
+            const snapshot = `${state.name}-${PHONE_CATEGORIES_VIEWPORT.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot(options),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...options,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+      }
+
+      for (const theme of themes) {
+        test(`has no accessibility violations (axe-core, ${theme})`, async ({
+          page,
+        }) => {
+          await goToEvaluationCategories(page, state, theme);
+          await expectNoAxeViolations(page);
+        });
+      }
+    });
+
+    test("has no horizontal scroll at 320px", async ({ page }) => {
+      await page.setViewportSize(NARROWEST_CATEGORIES_PHONE);
+      await goToEvaluationCategories(page, state);
+      expect(await hasHorizontalScroll(page)).toBe(false);
+    });
+  });
+}
+
+test.describe("categorías de evaluación en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: {
+      width: PHONE_CATEGORIES_VIEWPORT.width,
+      height: PHONE_CATEGORIES_VIEWPORT.height,
+    },
+  });
+
+  test("las filas miden al menos 58 px y el asa 44, sin gesto del navegador", async ({
+    page,
+  }) => {
+    await goToEvaluationCategories(page, { name: "medidas" });
+    const row = page
+      .getByRole("list", { name: ACTIVE_CATEGORIES_LIST })
+      .getByRole("listitem")
+      .first();
+    const handle = row.getByRole("button", { name: /^Reorder / });
+
+    expect((await row.boundingBox())?.height).toBeGreaterThanOrEqual(58);
+    expect((await handle.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    await expect(handle).toHaveCSS("touch-action", "none");
+  });
+
+  test("la hoja lleva el campo y los botones de 48 px", async ({ page }) => {
+    await goToEvaluationCategories(page, { name: "hoja" });
+    await openSpeedSheet(page);
+    const dialog = page.getByRole("dialog", { name: "Speed" });
+
+    for (const control of [
+      dialog.getByRole("textbox", { name: "Name" }),
+      dialog.getByRole("button", { name: "Deactivate" }),
+      dialog.getByRole("button", { name: "Save" }),
+    ]) {
+      expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+    }
+  });
+});
 
 test.describe("categorías de evaluación en el navegador", () => {
   skipWithoutSession();

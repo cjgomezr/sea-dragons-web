@@ -12168,6 +12168,13 @@ a.auth-brand-header:focus-visible {
   text-align: center;
 }
 
+/* El nombre ocupa lo que sobra: la flecha va a la derecha del todo. */
+.evaluation-categories-phone-row .evaluation-categories-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+}
+
 /* La hoja: Desactivar con el borde de peligro, al lado de Guardar. */
 .club-positions-sheet-archive.auth-secondary.evaluation-categories-sheet-deactivate {
   color: var(--color-danger);
