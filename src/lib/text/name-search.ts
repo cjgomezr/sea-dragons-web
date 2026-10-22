@@ -1,6 +1,6 @@
 /** Sin mayúsculas ni acentos, para que "maria" encuentre a "María" (FR-017).
  * `NFD` separa cada letra de su tilde y el reemplazo se queda con la letra. */
-function normalizeForSearch(text: string): string {
+export function normalizeForSearch(text: string): string {
   return text
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
