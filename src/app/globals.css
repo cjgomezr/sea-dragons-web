@@ -7254,10 +7254,15 @@ a.groups-icon-button {
 
 .invite-screen .invite-footer {
   flex: none;
-  flex-wrap: nowrap;
   padding: var(--space-3) var(--space-4)
     calc(var(--space-3) + env(safe-area-inset-bottom));
   border-radius: 0;
+}
+
+/* A 320 px la nota, Cancelar y Enviar no caben en una fila: la nota va en
+   la suya y los dos botones debajo, a la derecha. */
+.invite-screen .invite-footer p {
+  flex: 1 1 100%;
 }
 
 .invite-screen .invite-result {
