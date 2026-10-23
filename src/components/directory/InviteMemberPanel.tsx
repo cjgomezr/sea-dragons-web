@@ -2,16 +2,20 @@
 
 import { UserPlus } from "@phosphor-icons/react/dist/ssr/UserPlus";
 import { X } from "@phosphor-icons/react/dist/ssr/X";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Icon } from "@/components/Icon";
 import { loadPositionChoices } from "@/components/club/positions-client";
+import { cycleFocus } from "@/components/focus-cycle";
 import { loadGroups } from "@/components/groups/groups-client";
+import { useIsPhone } from "@/components/use-is-phone";
 import type { NamedPosition } from "@/lib/club/club-positions";
 import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
-import { InvitationResend } from "./InvitationResend";
+import { InvitationResult } from "./InvitationResult";
 import type { CreatedMemberView } from "./new-member-client";
+import { FIELD_IDS } from "./new-member-issues";
 import { NewMemberForm } from "./NewMemberForm";
 
 /**
@@ -22,8 +26,9 @@ import { NewMemberForm } from "./NewMemberForm";
  * comprobar.
  *
  * Es de cliente porque lee y escribe por la API v1, la misma que usará la
- * aplicación nativa de Release 2 (CON-002). Lo que se enseña al terminar
- * sigue siendo el aviso de #243 hasta que #863 traiga los estados nuevos.
+ * aplicación nativa de Release 2 (CON-002). Al terminar enseña si la
+ * invitación salió (#863). En el móvil es una ventana modal que ocupa la
+ * pantalla: lo de detrás queda inerte, también para el lector de pantalla.
  */
 
 /** Los grupos y las posiciones del club (#299): el formulario necesita las
@@ -76,49 +81,6 @@ function useCatalogs(): {
   return { catalogs, retry };
 }
 
-function CreatedNotice({
-  translate,
-  created,
-  onAddAnother,
-}: {
-  translate: Translator;
-  created: CreatedMemberView;
-  onAddAnother: () => void;
-}): React.JSX.Element {
-  const { fullName: name, email, userId } = created.member;
-  const wasSent = created.invitation === "sent";
-  return (
-    <div className="invite-created">
-      <p
-        className={wasSent ? "auth-note" : "auth-error"}
-        role={wasSent ? "status" : "alert"}
-      >
-        {translate(
-          wasSent ? "newMember.created.sent" : "newMember.created.notSent",
-          { name, email },
-        )}
-      </p>
-      <div className="new-member-actions">
-        {wasSent ? null : (
-          <InvitationResend
-            translate={translate}
-            userId={userId}
-            isPrimary
-            sentText={translate("newMember.resent", { email })}
-          />
-        )}
-        <button
-          type="button"
-          className="admin-secondary"
-          onClick={onAddAnother}
-        >
-          {translate("newMember.addAnother")}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function PanelHeader({
   translate,
   titleId,
@@ -153,26 +115,54 @@ function PanelHeader({
   );
 }
 
-export function InviteMemberPanel({
+/** Lo que enseña el panel: el formulario, o el resultado del alta con los
+ * grupos que se conservan para la siguiente. */
+type PanelStep =
+  | { readonly kind: "form"; readonly groupIds: readonly string[] }
+  | {
+      readonly kind: "result";
+      readonly created: CreatedMemberView;
+      readonly groupIds: readonly string[];
+    };
+
+const FIRST_FORM: PanelStep = { kind: "form", groupIds: [] };
+
+function InvitePanel({
   locale,
   clubName,
+  titleId,
   onClose,
+  onMemberCreated,
 }: {
   readonly locale: Locale;
-  /** El que firma la invitación, para la vista previa. */
   readonly clubName: string;
+  readonly titleId: string;
   readonly onClose: () => void;
+  readonly onMemberCreated: () => void;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
-  const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const { catalogs, retry } = useCatalogs();
-  const [created, setCreated] = useState<CreatedMemberView | null>(null);
+  const [step, setStep] = useState<PanelStep>(FIRST_FORM);
 
   // Quien lo abre desde la cabecera llega al formulario, no se queda arriba.
   useEffect(() => {
     titleRef.current?.focus();
   }, []);
+
+  function showResult(
+    created: CreatedMemberView,
+    groupIds: readonly string[],
+  ): void {
+    setStep({ kind: "result", created, groupIds });
+    onMemberCreated();
+  }
+
+  /** El formulario vuelve vacío y el foco, a su primer campo. */
+  function inviteAnother(groupIds: readonly string[]): void {
+    flushSync(() => setStep({ kind: "form", groupIds }));
+    document.getElementById(FIELD_IDS.fullName)?.focus();
+  }
 
   return (
     <section className="invite-panel" aria-labelledby={titleId}>
@@ -197,23 +187,98 @@ export function InviteMemberPanel({
           </button>
         </div>
       ) : null}
-      {catalogs.kind === "ready" && created !== null ? (
-        <CreatedNotice
+      {catalogs.kind === "ready" && step.kind === "result" ? (
+        <InvitationResult
           translate={translate}
-          created={created}
-          onAddAnother={() => setCreated(null)}
+          created={step.created}
+          onInviteAnother={() => inviteAnother(step.groupIds)}
         />
       ) : null}
-      {catalogs.kind === "ready" && created === null ? (
+      {catalogs.kind === "ready" && step.kind === "form" ? (
         <NewMemberForm
           locale={locale}
           clubName={clubName}
           clubGroups={catalogs.groups}
           positions={catalogs.positions}
-          onCreated={setCreated}
+          initialGroupIds={step.groupIds}
+          onCreated={showResult}
           onCancel={onClose}
         />
       ) : null}
     </section>
+  );
+}
+
+/** El panel en el móvil (#863). Se cierra con `close`, y no desmontándolo,
+ * para que el foco pueda volver al botón de la cabecera cuando lo de detrás
+ * ya no está inerte; Escape también lo cierra. */
+function PhoneScreen({
+  titleId,
+  dialogRef,
+  onClosed,
+  children,
+}: {
+  readonly titleId: string;
+  readonly dialogRef: React.RefObject<HTMLDialogElement | null>;
+  readonly onClosed: () => void;
+  readonly children: React.ReactNode;
+}): React.JSX.Element {
+  // Antes que el efecto que enfoca el título: `showModal` movería el foco
+  // al primer control si fuera después.
+  useLayoutEffect(() => {
+    dialogRef.current?.showModal();
+  }, [dialogRef]);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="invite-screen"
+      aria-labelledby={titleId}
+      onClose={onClosed}
+      onKeyDown={(event) => cycleFocus(event, dialogRef.current)}
+    >
+      {children}
+    </dialog>
+  );
+}
+
+export function InviteMemberPanel({
+  locale,
+  clubName,
+  onClose,
+  onMemberCreated,
+}: {
+  readonly locale: Locale;
+  /** El que firma la invitación, para la vista previa. */
+  readonly clubName: string;
+  readonly onClose: () => void;
+  /** Hay un socio nuevo, con o sin correo: el Directorio vuelve a pedir su
+   * lista para enseñarlo como Invitado. */
+  readonly onMemberCreated: () => void;
+}): React.JSX.Element {
+  const titleId = useId();
+  const isPhone = useIsPhone();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  function closeScreen(): void {
+    dialogRef.current?.close();
+  }
+
+  const panel = (
+    <InvitePanel
+      locale={locale}
+      clubName={clubName}
+      titleId={titleId}
+      onClose={isPhone ? closeScreen : onClose}
+      onMemberCreated={onMemberCreated}
+    />
+  );
+
+  return isPhone ? (
+    <PhoneScreen titleId={titleId} dialogRef={dialogRef} onClosed={onClose}>
+      {panel}
+    </PhoneScreen>
+  ) : (
+    panel
   );
 }

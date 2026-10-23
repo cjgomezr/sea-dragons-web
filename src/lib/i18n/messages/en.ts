@@ -1333,14 +1333,21 @@ export const englishMessages = {
   "newMember.cancel": "Cancel",
   "newMember.submit": "Send invitation",
   "newMember.sending": "Sending…",
-  "newMember.created.sent":
-    "{name} was invited. We sent the invitation to {email}.",
-  "newMember.created.notSent":
-    "We created {name}'s account, but the invitation could not be sent.",
+  "newMember.result.sentTitle": "Invitation sent to {email}",
+  "newMember.result.resentTitle": "Invitation sent again to {email}",
+  "newMember.result.sentText": {
+    one: "{name} shows as Invited in the directory until they sign in. The link works for {count} minute and you can resend it from their profile.",
+    other:
+      "{name} shows as Invited in the directory until they sign in. The link works for {count} minutes and you can resend it from their profile.",
+  },
+  "newMember.result.notSentTitle":
+    "{name} was added, but the email didn't go out",
+  "newMember.result.notSentText":
+    "{name} is in the directory as Invited. Try sending the invitation again; if it keeps failing, check the address.",
+  "newMember.result.inviteAnother": "Invite another",
+  "newMember.result.openProfile": "Open {name}'s profile",
   "newMember.resend": "Resend invitation",
   "newMember.resending": "Resending…",
-  "newMember.resent": "We sent a new invitation to {email}.",
-  "newMember.addAnother": "Invite another member",
   "newMember.issue.fullNameMissing": "Write the member's name.",
   "newMember.issue.emailMalformed": "Write a valid email address.",
   "newMember.issue.countryUnknown": "Choose a country.",

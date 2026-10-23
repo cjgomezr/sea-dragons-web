@@ -6586,15 +6586,8 @@ a.groups-icon-button {
   height: var(--touch-target-min);
 }
 
-.invite-status,
-.invite-created {
+.invite-status {
   padding: var(--space-4) var(--space-6);
-}
-
-.invite-created {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
 }
 
 .invite-form {
@@ -7125,10 +7118,160 @@ a.groups-icon-button {
   }
 }
 
-.new-member-actions {
+/* Después del alta (#863, "Result states" del handoff): el círculo de 48 px
+   con el check o el sobre, el título, la frase y las acciones; debajo, el
+   enlace a la ficha del socio nuevo. */
+.invite-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: flex-start;
+  padding: var(--space-6);
+}
+
+.invite-result-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+  max-width: 34rem;
+}
+
+.invite-result-message h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.invite-result-message h3:focus {
+  outline: none;
+}
+
+.invite-result-message p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.invite-result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  font-size: 22px;
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 18%, var(--color-panel));
+  border-radius: 999px;
+}
+
+.invite-result-icon-warning {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 18%, var(--color-panel));
+}
+
+.invite-result-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.invite-result-actions .invitation-resend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.invite-another,
+.invite-result-profile {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.invite-another {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.invite-result-profile {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.invite-result-profile:hover {
+  text-decoration: underline;
+}
+
+/* En el móvil (#863, "Mobile" del handoff) el panel es una ventana modal que
+   ocupa la pantalla, sin radio. El cuerpo se desplaza dentro de su div, y
+   el pie con Cancelar y Enviar queda fijo abajo. Sólo se pinta abierta: el
+   `display` de aquí taparía el `none` del `<dialog>` cerrado. */
+.invite-screen[open] {
+  display: flex;
+  flex-direction: column;
+  inset: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: none;
+}
+
+.invite-screen .invite-panel {
+  flex: 1 1 auto;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.invite-screen .invite-header {
+  flex: none;
+  padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-4)
+    var(--space-4);
+}
+
+.invite-screen .invite-form {
+  flex: 1 1 auto;
+}
+
+.invite-screen .invite-body {
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  overscroll-behavior: contain;
+}
+
+.invite-screen .invite-footer {
+  flex: none;
+  flex-wrap: nowrap;
+  padding: var(--space-3) var(--space-4)
+    calc(var(--space-3) + env(safe-area-inset-bottom));
+  border-radius: 0;
+}
+
+.invite-screen .invite-result {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+/* En el móvil ningún control baja de 44 px: ni las fichas de los grupos ni
+   la experiencia, que en el escritorio miden 36 y 38. */
+.invite-screen .invite-chip,
+.invite-screen .invite-segment {
+  min-height: var(--touch-target-min);
 }
 
 /* La barra del rediseño (#548, "2a", puntos 2 y 3): la búsqueda, el control

@@ -51,7 +51,7 @@ describe("textos de invitar y desactivar", () => {
     ["directory.addMember", "Invitar miembro", "Invite member"],
     ["newMember.title", "Invitar a un miembro", "Invite a member"],
     ["newMember.submit", "Enviar invitación", "Send invitation"],
-    ["newMember.addAnother", "Invitar a otro miembro", "Invite another member"],
+    ["newMember.result.inviteAnother", "Invitar a otro", "Invite another"],
     ["memberRecord.menu.deactivate", "Desactivar miembro", "Deactivate member"],
     ["memberRecord.menu.reactivate", "Reactivar miembro", "Reactivate member"],
     ["directory.mark.inactive", "Desactivada", "Deactivated"],
