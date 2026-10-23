@@ -5179,19 +5179,72 @@ a.groups-icon-button {
   padding: var(--space-4);
   background: var(--color-panel);
   border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+/* La cabecera (#858): el sobre en su baldosa, el título con la frase debajo
+   y una × de icono, como las acciones del directorio. */
+.directory-email-header {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+}
+
+.directory-email-header-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  color: var(--color-accent-text);
+  background: var(--color-segment-selected);
   border-radius: var(--radius);
 }
 
-.directory-email-header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  align-items: center;
-  justify-content: space-between;
+.directory-email-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.directory-email-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.directory-email-heading p {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
 }
 
 .directory-email-header h2:focus {
   outline: none;
+}
+
+.directory-email-close {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 18px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.directory-email-close:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
 }
 
 .directory-email-form {
@@ -5200,60 +5253,301 @@ a.groups-icon-button {
   gap: var(--space-4);
 }
 
-.directory-email-form .app-lead {
-  margin: 0;
-}
-
 .directory-email-form textarea {
   resize: vertical;
 }
 
+/* El "Para" (#858): la etiqueta en mono como las del editor de Noticias, y
+   "Quitar todos" a su derecha. */
 .directory-email-recipients {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
 
-.directory-email-count {
-  margin: 0;
-  font-weight: 600;
+.directory-email-label-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
 }
 
-.directory-email-recipients ul {
+.directory-email-label {
+  font-family: var(--font-family-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.directory-email-text-button {
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.directory-email-text-button:hover {
+  text-decoration: underline;
+}
+
+/* Una sola caja con las fichas y el buscador, que saltan de línea juntos:
+   la lista no dibuja caja propia, así que sus fichas y el campo comparten
+   las mismas líneas. El borde toma el acento mientras se escribe. */
+.directory-email-to-box {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  max-height: 240px;
+  gap: var(--space-1);
+  align-items: center;
+  min-height: 40px;
+  padding: 5px var(--space-2);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: text;
+}
+
+.directory-email-to-box:has(.directory-email-search input:focus) {
+  border-color: var(--color-accent);
+}
+
+.directory-email-to-box > ul {
+  display: contents;
+}
+
+.directory-email-chip {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  height: 24px;
+  max-width: 100%;
+  padding: 0 2px 0 3px;
+  font-size: 12.5px;
+  font-weight: 600;
+  list-style: none;
+  background: var(--color-segment-selected);
+  border-radius: 999px;
+  cursor: default;
+}
+
+.directory-email-avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-family: var(--font-family-mono);
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-radius: 50%;
+}
+
+.directory-email-chip-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directory-email-chip-remove {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.directory-email-chip-remove:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.directory-email-more {
+  height: 24px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px dashed var(--color-border-dashed);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.directory-email-more:hover {
+  background: var(--color-hover);
+}
+
+/* El buscador ocupa lo que quede de la línea, 200 px como mínimo. */
+.directory-email-search {
+  display: flex;
+  flex: 1 1 200px;
+  gap: 6px;
+  align-items: center;
+  min-width: min(200px, 100%);
+}
+
+.directory-email-search-icon {
+  display: inline-flex;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+}
+
+.directory-email-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.directory-email-search input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+/* El desplegable cuelga de la caja entera, no del campo. */
+.directory-email-search-popover {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  left: 0;
+  z-index: 20;
+  padding: var(--space-1);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  cursor: default;
+}
+
+.directory-email-search-popover ul {
   margin: 0;
   padding: 0;
-  overflow-y: auto;
   list-style: none;
 }
 
-.directory-email-recipients li {
-  display: inline-flex;
-  gap: var(--space-2);
+.directory-email-option {
+  display: flex;
+  gap: var(--space-3);
   align-items: center;
-  max-width: 100%;
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
+  min-height: 44px;
+  padding: var(--space-1) var(--space-3);
   border-radius: var(--radius);
-  overflow-wrap: anywhere;
+  cursor: pointer;
 }
 
-/* Con un nombre largo salta de línea el nombre, nunca el botón. */
-.directory-email-recipients li span {
+.directory-email-option:hover {
+  background: var(--color-hover);
+}
+
+.directory-email-option[aria-selected="true"] {
+  background: var(--color-segment-selected);
+}
+
+.directory-email-option .directory-email-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 10px;
+}
+
+.directory-email-option-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   min-width: 0;
 }
 
-/* El chip ya tiene su borde: el botón de dentro no pinta otra caja, y sólo
-   se marca al pasar por encima. */
-.directory-email-recipients li button {
-  flex-shrink: 0;
+.directory-email-option-name {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  background: transparent;
-  border-color: transparent;
+}
+
+.directory-email-option-name strong {
+  font-weight: 700;
+}
+
+.directory-email-option-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.directory-email-option-hint {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* Sobre el fondo de la resaltada, el gris secundario y el acento no llegan
+   a 4.5:1: se oscurecen a sus versiones suaves. */
+.directory-email-option[aria-selected="true"] .directory-email-option-meta {
+  color: var(--color-text-soft);
+}
+
+.directory-email-option[aria-selected="true"] .directory-email-option-hint {
+  color: var(--color-accent-soft-text);
+}
+
+.directory-email-search-empty,
+.directory-email-search-keys {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.directory-email-search-keys {
+  margin-top: var(--space-1);
+  font-size: 11.5px;
+  border-top: 1px solid var(--color-border);
+}
+
+.directory-email-empty {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.directory-email-search-failure {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--color-danger);
+}
+
+.directory-email-search-failure p {
+  margin: 0;
 }
 
 .directory-email-actions {

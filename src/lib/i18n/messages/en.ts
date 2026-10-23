@@ -1145,6 +1145,7 @@ export const englishMessages = {
   "directory.email.showLess": "Show less",
   "directory.email.search.label": "Add a member by name",
   "directory.email.search.add": "Add",
+  "directory.email.search.enterHint": "Enter ↵",
   "directory.email.search.keys":
     "↑↓ to move · Enter to add · Backspace on empty removes the last",
   "directory.email.search.loading": "Loading members…",

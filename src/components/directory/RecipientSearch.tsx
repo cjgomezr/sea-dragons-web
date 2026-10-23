@@ -59,7 +59,7 @@ function SuggestionOption({
   return (
     // El teclado lo maneja el combobox (aria-activedescendant): la opción
     // sólo atiende al ratón, y sin robarle el foco al campo.
-     
+
     <li
       id={id}
       role="option"
@@ -86,7 +86,11 @@ function SuggestionOption({
         </span>
       </span>
       <span className="directory-email-option-hint" aria-hidden="true">
-        {isHighlighted ? "Enter ↵" : translate("directory.email.search.add")}
+        {translate(
+          isHighlighted
+            ? "directory.email.search.enterHint"
+            : "directory.email.search.add",
+        )}
       </span>
     </li>
   );

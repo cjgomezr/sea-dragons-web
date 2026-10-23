@@ -223,7 +223,7 @@ describe("el formulario", () => {
     ).toBe(true);
     expect(
       screen.getByText(
-        "Todavía no hay a quién escribir. Añade socios por su nombre.",
+        "Todavía no hay a quién escribir. Añade miembros por su nombre.",
       ),
     ).toBeTruthy();
   });
@@ -319,7 +319,7 @@ function recipientNames(): readonly string[] {
 
 function searchBox(): HTMLInputElement {
   return screen.getByRole("combobox", {
-    name: "Añadir un socio por su nombre",
+    name: "Añadir un miembro por su nombre",
   }) as HTMLInputElement;
 }
 
@@ -336,7 +336,7 @@ describe("la cabecera", () => {
     ).toBeTruthy();
     expect(
       screen.getByText(
-        "Cada socio recibe su propio correo desde la dirección del club. Las respuestas te llegan a ti.",
+        "Cada miembro recibe su propio correo desde la dirección del club. Las respuestas te llegan a ti.",
       ),
     ).toBeTruthy();
     const close = screen.getByRole("button", { name: "Cerrar" });
@@ -352,7 +352,7 @@ describe("las fichas de los destinatarios", () => {
   it("con 3, pone PARA con la cuenta y una ficha por socio con iniciales, nombre y ×", () => {
     renderWithRecipients([NEREA, TOMAS, memberNumbered(1)]);
 
-    expect(screen.getByText("Para · 3 socios")).toBeTruthy();
+    expect(screen.getByText("Para · 3 miembros")).toBeTruthy();
     const list = screen.getByRole("list", { name: "3 destinatarios" });
     const chips = within(list).getAllByRole("listitem");
     expect(chips).toHaveLength(3);
@@ -400,7 +400,7 @@ describe("las fichas de los destinatarios", () => {
     expect(recipientNames()).toEqual([]);
     expect(
       screen.getByText(
-        "Todavía no hay a quién escribir. Añade socios por su nombre.",
+        "Todavía no hay a quién escribir. Añade miembros por su nombre.",
       ),
     ).toBeTruthy();
   });
@@ -583,7 +583,7 @@ describe("añadir socios por su nombre", () => {
     await userEvent.setup().type(searchBox(), "zz");
 
     expect(
-      await screen.findByText('Ningún socio coincide con "zz".'),
+      await screen.findByText('Ningún miembro coincide con "zz".'),
     ).toBeTruthy();
   });
 
@@ -609,7 +609,7 @@ describe("añadir socios por su nombre", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain(
-      "No pudimos cargar a los socios del club.",
+      "No pudimos cargar a los miembros del club.",
     );
     await user.type(screen.getByRole("textbox", { name: "Asunto" }), "Hola");
     expect(

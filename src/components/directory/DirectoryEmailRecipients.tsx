@@ -156,7 +156,7 @@ export function DirectoryEmailRecipients({
       </div>
       {/* El clic sólo acerca el foco al campo, que ya se alcanza con el
           teclado: no hace falta un equivalente de teclado. */}
-      { }
+      {}
       <div className="directory-email-to-box" onClick={focusSearch}>
         <ul
           aria-label={translate("directory.email.recipients", {
