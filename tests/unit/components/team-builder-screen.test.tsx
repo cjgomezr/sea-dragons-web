@@ -1847,6 +1847,159 @@ describe("editar un equipo (#760)", () => {
     );
   });
 
+  describe("aplicar al reparto publicado (#871)", () => {
+    const APPLY_TO_PUBLISHED = "Also apply to this event's published teams";
+
+    const PUBLISHED_SPLIT = builderFor(SCRIMMAGE, {
+      split: {
+        mode: "manual",
+        publishedAt: "2027-06-15T10:05:00.000Z",
+        assignments: [assigned(DANIELA, "a"), assigned(ETHAN, "b")],
+      },
+    });
+
+    function relabelledPublished(body: unknown): Response {
+      const { a, b } = body as { a: unknown; b: unknown };
+      return jsonResponse(200, {
+        data: { a, b, eventSplit: "relabelledPublished", notifiedCount: 2 },
+      });
+    }
+
+    function applyToPublishedBox(): HTMLElement {
+      return within(editor()).getByRole("checkbox", {
+        name: APPLY_TO_PUBLISHED,
+      });
+    }
+
+    it("con el reparto publicado ofrece la casilla sin marcar y dice a cuántos se avisará", async () => {
+      stubClub({ builders: [PUBLISHED_SPLIT, builderFor(COMPETITION)] });
+
+      await openEditor();
+
+      expect(applyToPublishedBox()).not.toBeChecked();
+      expect(applyToPublishedBox()).toHaveAccessibleDescription(
+        "The 2 assigned players will be notified.",
+      );
+    });
+
+    it("sin reparto guardado no la ofrece", async () => {
+      stubClub();
+
+      await openEditor();
+
+      expect(within(editor()).queryByRole("checkbox")).toBeNull();
+    });
+
+    it("con el reparto guardado sin publicar no la ofrece", async () => {
+      stubClub({ builders: [DRAFTED, builderFor(COMPETITION)] });
+
+      await openEditor();
+
+      expect(within(editor()).queryByRole("checkbox")).toBeNull();
+    });
+
+    it("tras volver a guardarlo, que lo deja en borrador, no la ofrece", async () => {
+      stubClub({ builders: [PUBLISHED_SPLIT, builderFor(COMPETITION)] });
+      await openScreen();
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: "Move Ethan Brown to Team Kelp",
+        }),
+      );
+      await userEvent.click(saveButton());
+      await waitFor(() =>
+        expect(screen.getByRole("status")).toHaveTextContent("Saved"),
+      );
+
+      await userEvent.click(editButton());
+      await within(editor()).findByRole("textbox", { name: "Name" });
+
+      expect(within(editor()).queryByRole("checkbox")).toBeNull();
+    });
+
+    it("sin marcarla no pide aplicarlo al publicado", async () => {
+      stubClub({
+        builders: [PUBLISHED_SPLIT, builderFor(COMPETITION)],
+        onWrite: ({ body }) => teamsChanged(body, "published"),
+      });
+      await openEditor();
+      await renameKelp("Team Reef");
+
+      await userEvent.click(applyButton());
+
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+      expect(writes()[0]?.body).not.toHaveProperty("applyToPublished");
+    });
+
+    it("marcada, lo pide, pinta los equipos nuevos y dice a cuántos avisó", async () => {
+      stubClub({
+        builders: [PUBLISHED_SPLIT, builderFor(COMPETITION)],
+        onWrite: ({ body }) => relabelledPublished(body),
+      });
+      await openEditor();
+      await renameKelp("Team Reef");
+      await userEvent.click(applyToPublishedBox());
+
+      await userEvent.click(applyButton());
+
+      expect(writes()).toEqual([
+        {
+          method: "PATCH",
+          path: TEAM_LABELS_PATH,
+          body: {
+            a: { name: "Team Reef", color: "#1C6EA4" },
+            b: { name: "Team Tide", color: "#C99A3E" },
+            eventId: SCRIMMAGE.id,
+            applyToPublished: true,
+          },
+        },
+      ]);
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+      expect(region("Team Reef")).toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Teams changed. 2 players were notified.",
+      );
+      expect(publishButton()).toBeInTheDocument();
+      expect(saveButton()).not.toHaveAccessibleName("Save · Unsaved");
+    });
+
+    it("lo dice también en español", async () => {
+      stubClub({
+        builders: [PUBLISHED_SPLIT, builderFor(COMPETITION)],
+        onWrite: ({ body }) => relabelledPublished(body),
+      });
+      render(<TeamBuilderScreen locale="es" />);
+      await userEvent.click(
+        await screen.findByRole("button", {
+          name: "Editar nombre y color de Team Kelp",
+        }),
+      );
+      const dialog = screen.getByRole("dialog", { name: "Editar equipo" });
+      const box = await within(dialog).findByRole("checkbox", {
+        name: "Aplicar también a los equipos publicados de este evento",
+      });
+      expect(box).toHaveAccessibleDescription(
+        "Se avisará a los 2 jugadores asignados.",
+      );
+
+      await userEvent.click(box);
+      await userEvent.click(
+        within(dialog).getByRole("button", { name: "Aplicar" }),
+      );
+
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Equipos cambiados. Se avisó a 2 jugadores.",
+      );
+    });
+  });
+
   it("con el reparto guardado sin publicar conserva lo movido sin guardar y sólo manda los equipos", async () => {
     stubClub({
       builders: [DRAFTED, builderFor(COMPETITION)],

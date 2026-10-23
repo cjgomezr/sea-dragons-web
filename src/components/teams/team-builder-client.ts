@@ -16,7 +16,7 @@ import { EVENT_TYPES } from "@/lib/events/event-creation";
 import type { Translator } from "@/lib/i18n/translator";
 import {
   EVENT_SPLIT_LABELS,
-  type EventSplitLabels,
+  type EventSplitChange,
   TEAM_IDS,
   TEAM_SPLIT_MODES,
   type TeamAssignment,
@@ -95,7 +95,13 @@ const balancedResponseSchema = z.object({
 const clubTeamsResponseSchema = z.object({ data: teamLabelsSchema });
 
 const clubTeamsChangeResponseSchema = z.object({
-  data: teamLabelsSchema.extend({ eventSplit: z.enum(EVENT_SPLIT_LABELS) }),
+  data: z.union([
+    teamLabelsSchema.extend({ eventSplit: z.enum(EVENT_SPLIT_LABELS) }),
+    teamLabelsSchema.extend({
+      eventSplit: z.literal("relabelledPublished"),
+      notifiedCount: z.number().int().nonnegative(),
+    }),
+  ]),
 });
 
 const savedResponseSchema = z.object({
@@ -149,11 +155,10 @@ export type ClubTeamsLoad =
   { readonly kind: "loaded"; readonly teams: TeamLabels } | TeamsFailure;
 
 export type TeamsChangeOutcome =
-  | {
+  | ({
       readonly kind: "changed";
       readonly teams: TeamLabels;
-      readonly eventSplit: EventSplitLabels;
-    }
+    } & EventSplitChange)
   | TeamsFailure;
 
 /** Lo que ve la ventana de editar: `busy` si guardar, publicar o balancear
@@ -245,25 +250,30 @@ export async function loadClubTeams(): Promise<ClubTeamsLoad> {
 
 /** Cambia el nombre y el color de los equipos del club (#755, RF-1 del PRD
  * de E28) desde el builder de un evento, que los estrena si su reparto está
- * guardado y sin publicar (D4). Responde los que quedaron guardados, ya
- * recortados, y qué pasó con ese reparto. */
+ * guardado y sin publicar (D4), o publicado si se pide (#871). Responde los
+ * que quedaron guardados, ya recortados, y qué pasó con ese reparto. */
 export async function changeClubTeams(
   teams: TeamLabels,
   eventId: string,
+  applyToPublished: boolean,
 ): Promise<TeamsChangeOutcome> {
   const read = readApiPayload(
     await requestApi(CLUB_TEAM_LABELS_API_PATH, {
       method: "PATCH",
       headers: JSON_REQUEST_HEADERS,
-      body: JSON.stringify({ ...teams, eventId }),
+      body: JSON.stringify(
+        applyToPublished
+          ? { ...teams, eventId, applyToPublished }
+          : { ...teams, eventId },
+      ),
     }),
     clubTeamsChangeResponseSchema,
   );
   if (read.kind === "failed") {
     return read;
   }
-  const { eventSplit, ...saved } = read.value.data;
-  return { kind: "changed", teams: saved, eventSplit };
+  const { a, b, ...eventSplit } = read.value.data;
+  return { kind: "changed", teams: { a, b }, ...eventSplit };
 }
 
 /** Los `reason` del 422 del builder (#401, D2). */

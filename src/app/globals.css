@@ -21830,6 +21830,23 @@ a.agenda-take-attendance {
   margin-top: 2px;
 }
 
+/* La casilla de aplicar al reparto publicado (#871): la de los formularios,
+   a la medida de la ventana de 320 px, como la del popover del Directorio. */
+.team-edit-published input {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+.team-edit-published label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.team-edit-published .team-edit-hint {
+  margin-top: var(--space-1);
+}
+
 .team-edit-actions {
   display: flex;
   justify-content: flex-end;

@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { TeamLabels } from "@/lib/teams/team-ids";
+import type { EventSplitChange } from "@/lib/teams/team-ids";
+import type { ChangeTeams } from "./TeamEditor";
 import {
-  type TeamsEditOutcome,
   type TeamsFailure,
   autoBalance,
   changeClubTeams,
@@ -43,6 +43,8 @@ export type BuilderAction =
   | { readonly kind: "published"; readonly notifiedCount: number }
   /** `keptByPublished`: el reparto ya publicado conserva los suyos (D4). */
   | { readonly kind: "teamsChanged"; readonly keptByPublished: boolean }
+  /** El publicado estrenó los nuevos y se avisó a sus jugadores (#871). */
+  | { readonly kind: "teamsChangedPublished"; readonly notifiedCount: number }
   | { readonly kind: "failed"; readonly failure: TeamsFailure };
 
 /** El último movimiento, para anunciarlo: un jugador, o los dos de un
@@ -77,7 +79,7 @@ export type TeamBuilderControls = {
   readonly cancelPublish: () => void;
   readonly publish: () => Promise<void>;
   readonly retry: () => void;
-  readonly changeTeams: (teams: TeamLabels) => Promise<TeamsEditOutcome>;
+  readonly changeTeams: ChangeTeams;
 };
 
 const IN_FLIGHT: ReadonlySet<BuilderAction["kind"]> = new Set([
@@ -92,6 +94,15 @@ function actionAfterEdit(action: BuilderAction): BuilderAction {
   return IN_FLIGHT.has(action.kind) || action.kind === "confirmingPublish"
     ? action
     : { kind: "idle" };
+}
+
+function actionAfterTeamsChange(change: EventSplitChange): BuilderAction {
+  return change.eventSplit === "relabelledPublished"
+    ? { kind: "teamsChangedPublished", notifiedCount: change.notifiedCount }
+    : {
+        kind: "teamsChanged",
+        keptByPublished: change.eventSplit === "published",
+      };
 }
 
 function useOpenedDraft(eventId: string): {
@@ -238,24 +249,29 @@ export function useTeamBuilder(eventId: string): TeamBuilderControls {
       }
       update((ready) => ({
         ...ready,
-        draft: { ...ready.draft, publishedAt: outcome.publishedAt },
+        draft: {
+          ...ready.draft,
+          publishedAt: outcome.publishedAt,
+          isPublished: true,
+        },
         action: { kind: "published", notifiedCount: outcome.notifiedCount },
       }));
     });
 
   /** Cambia los equipos del club y los del reparto de este evento, que el
    * servidor ya guardó si estaba guardado sin publicar (D4 del PRD de E28).
-   * Uno publicado conserva los suyos, y la pantalla también. Un fallo no toca
-   * el aviso de la pantalla: lo enseña la ventana de editar, que sigue
-   * abierta. Toma el mismo cerrojo que guardar, publicar y balancear: un
-   * guardado en vuelo con los equipos de antes los pisaría en el reparto. */
-  async function changeTeams(teams: TeamLabels): Promise<TeamsEditOutcome> {
+   * Uno publicado conserva los suyos, y la pantalla también, salvo con
+   * `applyToPublished` (#871). Un fallo no toca el aviso de la pantalla: lo
+   * enseña la ventana de editar, que sigue abierta. Toma el mismo cerrojo
+   * que guardar, publicar y balancear: un guardado en vuelo con los equipos
+   * de antes los pisaría en el reparto. */
+  const changeTeams: ChangeTeams = async (teams, { applyToPublished }) => {
     if (isBusyRef.current) {
       return { kind: "busy" };
     }
     isBusyRef.current = true;
     try {
-      const outcome = await changeClubTeams(teams, eventId);
+      const outcome = await changeClubTeams(teams, eventId, applyToPublished);
       if (outcome.kind === "changed") {
         const keptByPublished = outcome.eventSplit === "published";
         update((ready) => ({
@@ -263,14 +279,14 @@ export function useTeamBuilder(eventId: string): TeamBuilderControls {
           draft: keptByPublished
             ? ready.draft
             : { ...ready.draft, teams: outcome.teams },
-          action: { kind: "teamsChanged", keptByPublished },
+          action: actionAfterTeamsChange(outcome),
         }));
       }
       return outcome;
     } finally {
       isBusyRef.current = false;
     }
-  }
+  };
 
   function askToPublish(): void {
     if (!isBusyRef.current) {
