@@ -129,7 +129,7 @@ function ConfirmActions({
   readonly onCancel: () => void;
 }): React.JSX.Element {
   return (
-    <div className="event-form-actions">
+    <div className="directory-email-dialog-actions">
       <button
         type="button"
         className="admin-secondary"
