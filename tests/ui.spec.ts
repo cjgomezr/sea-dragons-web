@@ -5687,6 +5687,70 @@ function emailStates(spanish: boolean): readonly DirectoryState[] {
   ];
 }
 
+/* Veinticinco socios, como llegan al correo desde un grupo grande (#858):
+   el redactor enseña 10 fichas y "+15 more". */
+const TWENTY_FIVE_NAMES = [
+  "Amara Okafor",
+  "Ava Martinez",
+  "Chloe Davis",
+  "Daniel Novak",
+  "Elena Petrova",
+  "Ethan Brown",
+  "Grace Kim",
+  "Hugo Laurent",
+  "Isla Patterson-Whitfield",
+  "Jack Wilson",
+  "Liam Carter",
+  "Lucas Kim",
+  "Marta Gil",
+  "Mateo Ruiz",
+  "Max Fischer",
+  "Mia Thompson",
+  "Noah Williams",
+  "Olivia Chen",
+  "Oscar Lindqvist",
+  "Priya Sharma",
+  "Ruby Nguyen",
+  "Sofia Reyes",
+  "Tomás Herrera",
+  "Willow Evans",
+  "Zoe Walker",
+] as const;
+
+const TWENTY_FIVE_MEMBERS: readonly StubbedMember[] = TWENTY_FIVE_NAMES.map(
+  (fullName, index) => ({
+    ...STUBBED_DIRECTORY_MEMBERS[index % STUBBED_DIRECTORY_MEMBERS.length]!,
+    userId: `5a5a5a5a-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    fullName,
+    status: "active",
+    invitedOn: null,
+  }),
+);
+
+/** Quita a dos que tienen "ma" en el nombre y los busca: el desplegable
+ * los ofrece con la coincidencia en negrita. */
+async function searchEmailRecipients(page: Page): Promise<void> {
+  await openFoldedEmail(page);
+  for (const name of ["Amara Okafor", "Ava Martinez"]) {
+    await page.getByRole("button", { name: `Remove ${name}` }).click();
+  }
+  // El ratón se queda sobre la ficha que sigue: sin moverlo, su × sale
+  // pintada como si se fuera a pulsar.
+  await page.mouse.move(0, 0);
+  await page.getByRole("combobox", { name: "Add a member by name" }).fill("ma");
+  await expect(
+    page.getByRole("option", { name: /Amara Okafor/ }),
+  ).toBeVisible();
+}
+
+/** Abre el correo con los 25 y espera a que la lista se pliegue. */
+async function openFoldedEmail(page: Page): Promise<void> {
+  await openEmailForm(page, ENGLISH_EMAIL_LABELS);
+  await expect(
+    page.getByRole("button", { name: "Show all 25 recipients" }),
+  ).toBeVisible();
+}
+
 const DIRECTORY_STATES: readonly DirectoryState[] = [
   {
     name: "directorio-con-miembros",
@@ -5949,6 +6013,22 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
   },
   ...emailStates(false),
   ...emailStates(true),
+  {
+    name: "correo-25-destinatarios",
+    asAdmin: true,
+    members: TWENTY_FIVE_MEMBERS,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    beforeVisit: stubDirectoryEmails(EMAIL_SENT_TO_ALL),
+    prepare: openFoldedEmail,
+  },
+  {
+    name: "correo-buscando",
+    asAdmin: true,
+    members: TWENTY_FIVE_MEMBERS,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    beforeVisit: stubDirectoryEmails(EMAIL_SENT_TO_ALL),
+    prepare: searchEmailRecipients,
+  },
 ];
 
 async function goToDirectory(

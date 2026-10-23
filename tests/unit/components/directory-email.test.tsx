@@ -21,6 +21,7 @@ import { QUIET_CLUB_SUMMARY } from "../helpers/club-summary";
  */
 
 const EMAILS_PATH = "/api/v1/directory/emails";
+const DIRECTORY_LIST_PATH = "/api/v1/directory?";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -44,6 +45,8 @@ type Respond = () => Promise<Response>;
 type ApiStub = {
   readonly quota?: readonly Respond[];
   readonly send?: Respond;
+  /** Lo que responde `GET /api/v1/directory`, que pide el buscador. */
+  readonly directory?: Respond;
 };
 
 const calls: ApiCall[] = [];
@@ -71,6 +74,35 @@ function sentResponse(
     jsonResponse(200, { data: { sentCount, failed, remaining: 10 } });
 }
 
+type ListedMember = {
+  readonly userId: string;
+  readonly fullName: string;
+  readonly role?: "Admin" | "Committee" | "Coach" | "Player";
+  readonly status?: "incomplete" | "active" | "inactive";
+};
+
+function directoryResponse(members: readonly ListedMember[]): Respond {
+  return async () =>
+    jsonResponse(200, {
+      data: {
+        kind: "member",
+        availableFilters: [],
+        total: members.length,
+        members: members.map((member) => ({
+          country: null,
+          experienceLevel: null,
+          role: "Player",
+          position: null,
+          status: "active",
+          invitedOn: null,
+          photoUrl: null,
+          attendance: { kind: "no_data" },
+          ...member,
+        })),
+      },
+    });
+}
+
 function stubApi(stub: ApiStub = {}): void {
   const quotaAnswers = [...(stub.quota ?? [quotaResponse(38)])];
   vi.stubGlobal(
@@ -80,6 +112,9 @@ function stubApi(stub: ApiStub = {}): void {
       const body =
         init?.body === undefined ? null : JSON.parse(String(init.body));
       calls.push({ url, method, body });
+      if (url.startsWith(DIRECTORY_LIST_PATH)) {
+        return (stub.directory ?? directoryResponse([]))();
+      }
       if (url !== EMAILS_PATH) {
         throw new Error(`Petición inesperada: ${url}`);
       }
@@ -187,7 +222,9 @@ describe("el formulario", () => {
         .disabled,
     ).toBe(true);
     expect(
-      screen.getByText("La lista está vacía: no hay a quién mandarlo."),
+      screen.getByText(
+        "Todavía no hay a quién escribir. Añade miembros por su nombre.",
+      ),
     ).toBeTruthy();
   });
 
@@ -237,6 +274,355 @@ describe("el formulario", () => {
 
     expect(
       screen.getByText("El asunto puede tener como mucho 150 caracteres."),
+    ).toBeTruthy();
+  });
+});
+
+function memberNumbered(index: number): {
+  readonly userId: string;
+  readonly fullName: string;
+} {
+  const suffix = String(index).padStart(12, "0");
+  return {
+    userId: `c0c0c0c0-0000-4000-8000-${suffix}`,
+    fullName: `Socio ${index}`,
+  };
+}
+
+function membersNumbered(count: number): readonly {
+  readonly userId: string;
+  readonly fullName: string;
+}[] {
+  return Array.from({ length: count }, (_, index) => memberNumbered(index + 1));
+}
+
+function renderWithRecipients(
+  recipients: readonly { readonly userId: string; readonly fullName: string }[],
+): void {
+  render(
+    <DirectoryEmailComposer
+      locale="es"
+      recipients={recipients}
+      onClose={vi.fn()}
+    />,
+  );
+}
+
+function recipientNames(): readonly string[] {
+  const list = screen.getByRole("list", { name: /destinatario/ });
+  return within(list)
+    .queryAllByRole("button", { name: /^Quitar a / })
+    .map((button) =>
+      (button.getAttribute("aria-label") ?? "").replace("Quitar a ", ""),
+    );
+}
+
+function searchBox(): HTMLInputElement {
+  return screen.getByRole("combobox", {
+    name: "Añadir un miembro por su nombre",
+  }) as HTMLInputElement;
+}
+
+function directoryRequests(): readonly ApiCall[] {
+  return calls.filter((call) => call.url.startsWith(DIRECTORY_LIST_PATH));
+}
+
+describe("la cabecera", () => {
+  it("lleva el título, la frase nueva y una × que cierra", async () => {
+    const { onClose } = renderComposer();
+
+    expect(
+      screen.getByRole("heading", { name: "Escribir a los miembros" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Cada miembro recibe su propio correo desde la dirección del club. Las respuestas te llegan a ti.",
+      ),
+    ).toBeTruthy();
+    const close = screen.getByRole("button", { name: "Cerrar" });
+    expect(close.textContent).toBe("");
+
+    await userEvent.setup().click(close);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("las fichas de los destinatarios", () => {
+  it("con 3, pone PARA con la cuenta y una ficha por socio con iniciales, nombre y ×", () => {
+    renderWithRecipients([NEREA, TOMAS, memberNumbered(1)]);
+
+    expect(screen.getByText("Para · 3 miembros")).toBeTruthy();
+    const list = screen.getByRole("list", { name: "3 destinatarios" });
+    const chips = within(list).getAllByRole("listitem");
+    expect(chips).toHaveLength(3);
+    const nerea = chips[0]!;
+    expect(within(nerea).getByText("NR")).toBeTruthy();
+    expect(within(nerea).getByText("Nerea Ruiz").getAttribute("title")).toBe(
+      "Nerea Ruiz",
+    );
+    expect(
+      within(nerea).getByRole("button", { name: "Quitar a Nerea Ruiz" }),
+    ).toBeTruthy();
+  });
+
+  it("con 25, enseña 10 y una ficha +15 más que despliega todas y Ver menos", async () => {
+    renderWithRecipients(membersNumbered(25));
+    const user = userEvent.setup();
+
+    expect(recipientNames()).toHaveLength(10);
+    const more = screen.getByRole("button", {
+      name: "Ver los 25 destinatarios",
+    });
+    expect(more.textContent).toBe("+15 más");
+
+    await user.click(more);
+
+    expect(recipientNames()).toHaveLength(25);
+    await user.click(screen.getByRole("button", { name: "Ver menos" }));
+    expect(recipientNames()).toHaveLength(10);
+  });
+
+  it("con 11, las enseña todas sin +N más", () => {
+    renderWithRecipients(membersNumbered(11));
+
+    expect(recipientNames()).toHaveLength(11);
+    expect(screen.queryByRole("button", { name: /^Ver los / })).toBeNull();
+  });
+
+  it("Quitar todos vacía la lista y dice cómo añadir socios", async () => {
+    renderComposer();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Quitar todos" }));
+
+    expect(recipientNames()).toEqual([]);
+    expect(
+      screen.getByText(
+        "Todavía no hay a quién escribir. Añade miembros por su nombre.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("con un solo destinatario no ofrece Quitar todos", () => {
+    renderWithRecipients([NEREA]);
+
+    expect(screen.queryByRole("button", { name: "Quitar todos" })).toBeNull();
+  });
+
+  it("Retroceso en el buscador vacío quita la última ficha", async () => {
+    renderComposer();
+    const user = userEvent.setup();
+
+    await user.click(searchBox());
+    await user.keyboard("{Backspace}");
+
+    expect(recipientNames()).toEqual(["Nerea Ruiz"]);
+  });
+
+  it("Retroceso con texto en el buscador borra texto, no fichas", async () => {
+    renderComposer();
+    const user = userEvent.setup();
+
+    await user.type(searchBox(), "ne");
+    await user.keyboard("{Backspace}");
+
+    expect(searchBox().value).toBe("n");
+    expect(recipientNames()).toEqual(["Nerea Ruiz", "Tomás Gil"]);
+  });
+
+  it("un clic en la caja fuera de una ficha lleva el foco al buscador", async () => {
+    renderComposer();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("list", { name: "2 destinatarios" }));
+
+    expect(document.activeElement).toBe(searchBox());
+  });
+});
+
+describe("añadir socios por su nombre", () => {
+  const MARTA = {
+    userId: "d1d1d1d1-0000-4000-8000-000000000001",
+    fullName: "Marta Gil",
+  };
+  const MARIA = {
+    userId: "d2d2d2d2-0000-4000-8000-000000000002",
+    fullName: "María López",
+    role: "Coach" as const,
+  };
+  const OMAR = {
+    userId: "d3d3d3d3-0000-4000-8000-000000000003",
+    fullName: "Omar Haddad",
+  };
+  const MARIO_DE_BAJA = {
+    userId: "d4d4d4d4-0000-4000-8000-000000000004",
+    fullName: "Mario Baja",
+    status: "inactive" as const,
+  };
+
+  function stubClub(members: readonly ListedMember[]): void {
+    stubApi({ directory: directoryResponse(members) });
+  }
+
+  it("el buscador es un combobox que apunta a su listbox", async () => {
+    stubClub([MARTA]);
+    renderComposer();
+    const box = searchBox();
+
+    expect(box.getAttribute("aria-autocomplete")).toBe("list");
+    expect(box.getAttribute("aria-expanded")).toBe("false");
+
+    await userEvent.setup().type(box, "mar");
+
+    const listbox = await screen.findByRole("listbox");
+    expect(box.getAttribute("aria-expanded")).toBe("true");
+    expect(box.getAttribute("aria-controls")).toBe(listbox.id);
+  });
+
+  it("pide la lista del club la primera vez que recibe el foco, y sólo esa", async () => {
+    stubClub([MARTA]);
+    renderComposer();
+    const user = userEvent.setup();
+
+    await user.click(searchBox());
+    await waitFor(() => expect(directoryRequests()).toHaveLength(1));
+    await user.click(screen.getByRole("textbox", { name: "Asunto" }));
+    await user.type(searchBox(), "mar");
+    await screen.findByRole("option", { name: /Marta Gil/ });
+
+    expect(directoryRequests()).toHaveLength(1);
+  });
+
+  it("enseña a los activos que no están, con la parte que coincide en negrita", async () => {
+    stubClub([MARTA, MARIA, OMAR, MARIO_DE_BAJA, { ...NEREA }]);
+    renderComposer();
+
+    await userEvent.setup().type(searchBox(), "MAR");
+
+    const options = await screen.findAllByRole("option");
+    expect(
+      options.map((option) => option.querySelector("strong")?.textContent),
+    ).toEqual(["Mar", "Mar", "mar"]);
+    expect(within(options[1]!).getByText("Coach")).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /Mario Baja/ })).toBeNull();
+  });
+
+  it("con ↓ y Enter añade el resaltado, vacía el campo y deja el foco en él", async () => {
+    stubClub([MARTA, MARIA]);
+    renderComposer();
+    const user = userEvent.setup();
+
+    await user.type(searchBox(), "mar");
+    await screen.findAllByRole("option");
+    await user.keyboard("{ArrowDown}");
+    expect(
+      screen
+        .getByRole("option", { name: /María López/ })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    await user.keyboard("{Enter}");
+
+    expect(recipientNames()).toEqual([
+      "Nerea Ruiz",
+      "Tomás Gil",
+      "María López",
+    ]);
+    expect(searchBox().value).toBe("");
+    expect(document.activeElement).toBe(searchBox());
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("↑ desde el primero va al último", async () => {
+    stubClub([MARTA, MARIA]);
+    renderComposer();
+    const user = userEvent.setup();
+
+    await user.type(searchBox(), "mar");
+    await screen.findAllByRole("option");
+    await user.keyboard("{ArrowUp}{Enter}");
+
+    expect(recipientNames()).toEqual([
+      "Nerea Ruiz",
+      "Tomás Gil",
+      "María López",
+    ]);
+  });
+
+  it("un clic en una opción la añade y deja el foco en el buscador", async () => {
+    stubClub([MARTA]);
+    renderComposer();
+    const user = userEvent.setup();
+
+    await user.type(searchBox(), "mar");
+    await user.click(await screen.findByRole("option", { name: /Marta Gil/ }));
+
+    expect(recipientNames()).toEqual(["Nerea Ruiz", "Tomás Gil", "Marta Gil"]);
+    expect(document.activeElement).toBe(searchBox());
+  });
+
+  it("Esc vacía la búsqueda", async () => {
+    stubClub([MARTA]);
+    renderComposer();
+    const user = userEvent.setup();
+
+    await user.type(searchBox(), "mar");
+    await screen.findAllByRole("option");
+    await user.keyboard("{Escape}");
+
+    expect(searchBox().value).toBe("");
+    expect(screen.queryByRole("option")).toBeNull();
+  });
+
+  it("sin coincidencias lo dice con lo buscado", async () => {
+    stubClub([MARTA]);
+    renderComposer();
+
+    await userEvent.setup().type(searchBox(), "zz");
+
+    expect(
+      await screen.findByText('Ningún miembro coincide con "zz".'),
+    ).toBeTruthy();
+  });
+
+  it("si todos los que coinciden ya están, lo dice", async () => {
+    stubClub([{ ...NEREA }]);
+    renderComposer();
+
+    await userEvent.setup().type(searchBox(), "nerea");
+
+    expect(
+      await screen.findByText(
+        'Todos los que coinciden con "nerea" ya están en la lista.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it("si la lista no llega, avisa con Reintentar y el resto sigue funcionando", async () => {
+    stubApi({ directory: async () => errorResponse(500, "internal", "x") });
+    renderComposer();
+    const user = userEvent.setup();
+
+    await user.type(searchBox(), "mar");
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(
+      "No pudimos cargar a los miembros del club.",
+    );
+    await user.type(screen.getByRole("textbox", { name: "Asunto" }), "Hola");
+    expect(
+      (screen.getByRole("textbox", { name: "Asunto" }) as HTMLInputElement)
+        .value,
+    ).toBe("Hola");
+
+    stubApi({ directory: directoryResponse([MARTA]) });
+    await user.click(within(alert).getByRole("button", { name: "Reintentar" }));
+    await user.click(searchBox());
+
+    expect(
+      await screen.findByRole("option", { name: /Marta Gil/ }),
     ).toBeTruthy();
   });
 });
