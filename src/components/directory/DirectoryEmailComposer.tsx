@@ -274,10 +274,9 @@ function useEmailDraft(): {
     if (!hasDraftProblems(checked)) {
       return true;
     }
-    if (checked.message !== null) {
-      // El área escondida no recibe el foco: se vuelve a Escribir ya.
-      flushSync(() => setActiveTab("write"));
-    }
+    // Los avisos se ven en Escribir, y el área escondida no recibe el foco:
+    // se vuelve ya, antes de llevarlo.
+    flushSync(() => setActiveTab("write"));
     const firstInvalid =
       checked.subject === null ? messageRef.current : subjectRef.current;
     firstInvalid?.focus();
@@ -366,9 +365,14 @@ export function DirectoryEmailComposer({
     setPhase({ kind: "confirming", requestId: crypto.randomUUID() });
   }
 
+  /** El botón que tenía el foco desaparece con el estado Enviado: el foco
+   * pasa al asunto del formulario nuevo en cuanto existe. */
   function writeAnother(): void {
-    editor.reset();
-    setPhase({ kind: "editing", notice: null });
+    flushSync(() => {
+      editor.reset();
+      setPhase({ kind: "editing", notice: null });
+    });
+    editor.subjectRef.current?.focus();
   }
 
   return (

@@ -6305,6 +6305,10 @@ a.groups-icon-button {
   color: var(--color-text);
 }
 
+.directory-email-sent-title:focus {
+  outline: none;
+}
+
 .directory-email-sent-status ul {
   margin: 0;
   padding: 0;

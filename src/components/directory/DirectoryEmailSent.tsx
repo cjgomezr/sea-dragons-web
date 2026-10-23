@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { Icon } from "@/components/Icon";
 import {
   DIRECTORY_EMAIL_QUOTA,
@@ -26,13 +26,21 @@ export function DirectoryEmailSent({
   readonly onClose: () => void;
 }): React.JSX.Element {
   const failedId = useId();
+  const titleRef = useRef<HTMLParagraphElement>(null);
+
+  // El diálogo y su botón ya no existen: sin esto el foco caería al
+  // principio de la página.
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+
   return (
     <div className="directory-email-sent">
       <div className="directory-email-sent-status" role="status">
         <span className="directory-email-sent-icon" aria-hidden="true">
           <Icon glyph={CheckCircle} />
         </span>
-        <p className="directory-email-sent-title">
+        <p className="directory-email-sent-title" ref={titleRef} tabIndex={-1}>
           {translate("directory.email.result.sent", {
             count: result.sentCount,
           })}

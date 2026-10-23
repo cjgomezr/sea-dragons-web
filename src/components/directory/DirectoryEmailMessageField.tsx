@@ -168,6 +168,13 @@ function useMessageEdits(
       text: area.value,
       selection: { start: area.selectionStart, end: area.selectionEnd },
     });
+    // Sin cambio de texto React no vuelve a pintar: una selección pendiente
+    // se quedaría viva y saltaría en la tecla siguiente.
+    if (edit.text === area.value) {
+      area.focus();
+      area.setSelectionRange(edit.selection.start, edit.selection.end);
+      return;
+    }
     pendingSelection.current = edit.selection;
     onChange(edit.text);
   };

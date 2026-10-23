@@ -5757,13 +5757,15 @@ const SPANISH_EMAIL_LABELS: EmailLabels = {
 };
 
 type EmailAnswer = {
-  /** Lo que responde cada lectura del cupo, en orden; la última se repite. */
-  readonly quota: readonly number[];
+  /** Lo que responde cada lectura del cupo antes de enviar y, si cambia,
+   * después. Va por el envío y no por el orden: en desarrollo React monta dos
+   * veces el efecto que lo pide al abrir el redactor (#859). */
+  readonly quota: { readonly beforeSend: number; readonly afterSend?: number };
   readonly send: { readonly status: number; readonly body: unknown };
 };
 
 const EMAIL_SENT_TO_ALL: EmailAnswer = {
-  quota: [38],
+  quota: { beforeSend: 38 },
   send: {
     status: 200,
     body: { data: { sentCount: 3, failed: [], remaining: 35 } },
@@ -5771,7 +5773,7 @@ const EMAIL_SENT_TO_ALL: EmailAnswer = {
 };
 
 const EMAIL_DOES_NOT_FIT: EmailAnswer = {
-  quota: [38, 1],
+  quota: { beforeSend: 38, afterSend: 1 },
   send: {
     status: 409,
     body: {
@@ -5785,7 +5787,7 @@ const EMAIL_DOES_NOT_FIT: EmailAnswer = {
 };
 
 const EMAIL_PARTLY_SENT: EmailAnswer = {
-  quota: [38],
+  quota: { beforeSend: 38 },
   send: {
     status: 200,
     body: {
@@ -5809,18 +5811,20 @@ const EMAIL_PARTLY_SENT: EmailAnswer = {
 
 function stubDirectoryEmails(answer: EmailAnswer) {
   return async (page: Page): Promise<void> => {
-    const quotas = [...answer.quota];
+    let hasSent = false;
     await page.route(
       (url) => url.pathname === DIRECTORY_EMAILS_ENDPOINT,
       (route, request) => {
         if (request.method() === "POST") {
+          hasSent = true;
           return route.fulfill({
             status: answer.send.status,
             contentType: "application/json",
             body: JSON.stringify(answer.send.body),
           });
         }
-        const remaining = quotas.length > 1 ? quotas.shift() : quotas[0];
+        const { beforeSend, afterSend = beforeSend } = answer.quota;
+        const remaining = hasSent ? afterSend : beforeSend;
         return route.fulfill({
           status: 200,
           contentType: "application/json",

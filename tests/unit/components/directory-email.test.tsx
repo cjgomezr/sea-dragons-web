@@ -725,6 +725,20 @@ describe("la barra de formato", () => {
     expect(messageBox().value).toBe("1. Aletas\n2. Gorro\n3. Tubo");
   });
 
+  it("un formato que no cambia el texto no mueve el cursor en la tecla siguiente", async () => {
+    renderComposer();
+    const user = userEvent.setup();
+    const text = "- a\n- b";
+    fireEvent.change(messageBox(), { target: { value: text } });
+    selectInMessage(0, text.length);
+
+    await user.click(screen.getByRole("button", { name: "Lista de viñetas" }));
+    selectInMessage(text.length, text.length);
+    await user.keyboard("cd");
+
+    expect(messageBox().value).toBe("- a\n- bcd");
+  });
+
   it("los botones no le quitan el foco al área", () => {
     renderComposer();
     const toolbar = screen.getByRole("toolbar", {
@@ -984,6 +998,21 @@ describe("los errores", () => {
     expect(screen.getByText("1 cosa por arreglar")).toBeTruthy();
   });
 
+  it("si la vista previa estaba abierta y sólo falla el asunto, también vuelve a Escribir", async () => {
+    renderComposer();
+    await userEvent.setup().type(messageBox(), "Hola");
+    await showPreview();
+
+    await userEvent.setup().click(sendButton());
+
+    expect(
+      screen
+        .getByRole("tab", { name: "Escribir" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(document.activeElement).toBe(subjectBox());
+  });
+
   it("los errores no salen hasta intentar enviar", () => {
     renderComposer();
 
@@ -1163,6 +1192,18 @@ describe("el envío hecho", () => {
     expect(recipientNames()).toEqual(["Nerea Ruiz", "Tomás Gil"]);
     expect(screen.getByText("10 de 50 correos libres hoy")).toBeTruthy();
     expect(screen.queryByText(/por arreglar/)).toBeNull();
+    expect(document.activeElement).toBe(subjectBox());
+  });
+
+  it("al enviar, el foco pasa al estado Enviado y no se pierde", async () => {
+    renderComposer();
+
+    await sendDraft();
+
+    const status = await screen.findByRole("status");
+    await waitFor(() =>
+      expect(status.contains(document.activeElement)).toBe(true),
+    );
   });
 
   it("Cerrar cierra el redactor", async () => {
