@@ -264,6 +264,19 @@ function SubmitLabel({
   );
 }
 
+type NewMemberFormState = {
+  readonly draft: Draft;
+  readonly status: Status;
+  readonly issues: readonly FormIssue[];
+  readonly isDetailsOpen: boolean;
+  readonly summaryRef: React.RefObject<HTMLDivElement | null>;
+  readonly update: (change: Partial<Draft>) => void;
+  readonly toggleGroup: (groupId: string) => void;
+  readonly toggleDetails: () => void;
+  readonly goTo: (field: NewMemberField) => void;
+  readonly submit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
+};
+
 /** El estado del formulario y lo que se hace con él: editar, enviar y
  * llevar a quien lo rellena al campo de cada error. */
 function useNewMemberForm({
@@ -272,7 +285,7 @@ function useNewMemberForm({
 }: {
   readonly positions: readonly NamedPosition[];
   readonly onCreated: (created: CreatedMemberView) => void;
-}) {
+}): NewMemberFormState {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [status, setStatus] = useState<Status>({ kind: "editing" });
   const [localIssues, setLocalIssues] = useState<readonly FormIssue[]>([]);

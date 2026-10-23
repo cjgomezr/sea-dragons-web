@@ -5842,7 +5842,7 @@ a.groups-icon-button {
 
 .invite-details-badge-danger {
   color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-panel));
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-panel));
 }
 
 .invite-details-body {
