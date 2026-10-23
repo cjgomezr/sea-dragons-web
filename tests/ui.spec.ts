@@ -17890,17 +17890,30 @@ async function openFirstPanelWithTeams(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
-/** En escritorio el panel corta en la cabecera de los equipos: la captura
- * baja hasta el segundo para que se vea a quien ya no viene (#839). */
+/** En escritorio el panel del evento mide como mucho la ventana y corta en
+ * la cabecera de los equipos (#839). La captura alarga la ventana hasta que
+ * el panel entero cabe sin su scroll, y se ve a quien ya no viene. Bajar el
+ * scroll del panel no servía: la ventana de 1×1 de la captura de página
+ * entera lo devolvía arriba, y alargar la ventana poco a poco no acababa
+ * nunca, porque el panel crece con ella. */
 async function showNotComingTeammates(page: Page): Promise<void> {
   await openFirstPanelWithTeams(page);
-  // Lo mismo que al elegir qué editar (ver showEditScopeChoice): sin alargar
-  // la ventana, la de 1×1 de la captura pasa la agenda al móvil un instante
-  // y el panel vuelve arriba, sin el desplazamiento.
+  const viewport = page.viewportSize();
+  if (viewport === null) {
+    throw new Error("La página no tiene un tamaño de ventana fijo.");
+  }
+  const panelBottom = await eventPanel(
+    page,
+    STUBBED_AGENDA_EVENTS[0].title,
+  ).evaluate(
+    (panel) =>
+      panel.getBoundingClientRect().top + window.scrollY + panel.scrollHeight,
+  );
+  await page.setViewportSize({
+    width: viewport.width,
+    height: Math.max(viewport.height, Math.ceil(panelBottom)),
+  });
   await fitViewportToPage(page);
-  await eventPanel(page, STUBBED_AGENDA_EVENTS[0].title)
-    .getByRole("list", { name: PUBLISHED_TEAMS.teams.b.name })
-    .scrollIntoViewIfNeeded();
   await page.mouse.move(0, 0);
 }
 
