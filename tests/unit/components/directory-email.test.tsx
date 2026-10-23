@@ -169,10 +169,31 @@ async function fillDraft(
   await user.type(screen.getByRole("textbox", { name: "Mensaje" }), message);
 }
 
+function sendButton(count = 2): HTMLButtonElement {
+  return screen.getByRole("button", {
+    name: `Enviar a ${count}`,
+  }) as HTMLButtonElement;
+}
+
+function subjectBox(): HTMLInputElement {
+  return screen.getByRole("textbox", { name: "Asunto" }) as HTMLInputElement;
+}
+
+function messageBox(): HTMLTextAreaElement {
+  return screen.getByRole("textbox", {
+    name: "Mensaje",
+  }) as HTMLTextAreaElement;
+}
+
+/** Espera a que el pie diga cuántos correos quedan hoy. */
+async function waitForQuota(remaining: number): Promise<void> {
+  await screen.findByText(`${remaining} de 50 correos libres hoy`);
+}
+
 async function openConfirmation(): Promise<HTMLElement> {
   await fillDraft();
-  await userEvent.setup().click(screen.getByRole("button", { name: "Enviar" }));
-  return screen.findByRole("dialog", { name: "¿Mandar el correo?" });
+  await userEvent.setup().click(sendButton());
+  return screen.findByRole("dialog", { name: "¿Enviar a 2 miembros?" });
 }
 
 beforeEach(() => {
@@ -217,10 +238,7 @@ describe("el formulario", () => {
       screen.getByRole("button", { name: "Quitar a Tomás Gil" }),
     );
 
-    expect(
-      (screen.getByRole("button", { name: "Enviar" }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
+    expect(sendButton(0).disabled).toBe(true);
     expect(
       screen.getByText(
         "Todavía no hay a quién escribir. Añade miembros por su nombre.",
@@ -231,49 +249,36 @@ describe("el formulario", () => {
   it("con el asunto y el mensaje vacíos, avisa junto a cada campo y no abre el diálogo", async () => {
     renderComposer();
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Enviar" }));
+    await userEvent.setup().click(sendButton());
 
-    const subject = screen.getByRole("textbox", { name: "Asunto" });
-    expect(subject.getAttribute("aria-invalid")).toBe("true");
-    expect(screen.getByText("Escribe el asunto.")).toBeTruthy();
-    expect(screen.getByText("Escribe el mensaje.")).toBeTruthy();
+    expect(subjectBox().getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByText("Añade un asunto.")).toBeTruthy();
+    expect(screen.getByText("Escribe un mensaje.")).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(calls).toEqual([]);
+    expect(posts()).toEqual([]);
   });
 
-  it("con un mensaje de más de 5.000 caracteres avisa del límite", async () => {
+  it("con un mensaje de 5.001 caracteres dice cuánto sobra", async () => {
     renderComposer();
-    await userEvent
-      .setup()
-      .type(screen.getByRole("textbox", { name: "Asunto" }), "Entreno");
-    fireEvent.change(screen.getByRole("textbox", { name: "Mensaje" }), {
-      target: { value: "a".repeat(5_001) },
-    });
+    await userEvent.setup().type(subjectBox(), "Entreno");
+    fireEvent.change(messageBox(), { target: { value: "a".repeat(5_001) } });
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Enviar" }));
+    await userEvent.setup().click(sendButton());
 
     expect(
-      screen.getByText("El mensaje puede tener como mucho 5000 caracteres."),
+      screen.getByText("Al mensaje le sobra 1 carácter. Acórtalo a 5.000."),
     ).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("con un asunto de más de 150 caracteres avisa del límite", async () => {
+  it("con un asunto de más de 150 caracteres dice cuántos lleva", async () => {
     renderComposer();
-    fireEvent.change(screen.getByRole("textbox", { name: "Asunto" }), {
-      target: { value: "a".repeat(151) },
-    });
+    fireEvent.change(subjectBox(), { target: { value: "a".repeat(151) } });
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Enviar" }));
+    await userEvent.setup().click(sendButton());
 
     expect(
-      screen.getByText("El asunto puede tener como mucho 150 caracteres."),
+      screen.getByText("Deja el asunto en 150 caracteres (ahora tiene 151)."),
     ).toBeTruthy();
   });
 });
@@ -627,17 +632,448 @@ describe("añadir socios por su nombre", () => {
   });
 });
 
-describe("el diálogo de confirmación", () => {
-  it("dice a cuántos va y cuántos quedan hoy, y no manda nada todavía", async () => {
+/** Selecciona en el área desde `from` (incluido) hasta `to` (excluido). */
+function selectInMessage(from: number, to: number): void {
+  const area = messageBox();
+  area.focus();
+  area.setSelectionRange(from, to);
+}
+
+function selectedInMessage(): string {
+  const area = messageBox();
+  return area.value.slice(area.selectionStart, area.selectionEnd);
+}
+
+describe("la barra de formato", () => {
+  it("es una barra de herramientas con los cinco formatos", () => {
     renderComposer();
+
+    const toolbar = screen.getByRole("toolbar", {
+      name: "Formato del mensaje",
+    });
+    expect(
+      within(toolbar)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual([
+      "Negrita",
+      "Cursiva",
+      "Añadir enlace",
+      "Lista de viñetas",
+      "Lista numerada",
+    ]);
+  });
+
+  it("Negrita envuelve la selección en ** y la deja seleccionada", async () => {
+    renderComposer();
+    fireEvent.change(messageBox(), { target: { value: "El sábado a las 8" } });
+    selectInMessage(3, 9);
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Negrita" }));
+
+    expect(messageBox().value).toBe("El **sábado** a las 8");
+    expect(selectedInMessage()).toBe("sábado");
+  });
+
+  it("sin selección, Negrita inserta el texto de ejemplo seleccionado", async () => {
+    renderComposer();
+    selectInMessage(0, 0);
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Negrita" }));
+
+    expect(messageBox().value).toBe("**texto en negrita**");
+    expect(selectedInMessage()).toBe("texto en negrita");
+  });
+
+  it("Ctrl+B pone negrita y Ctrl+I cursiva", async () => {
+    renderComposer();
+    const user = userEvent.setup();
+    fireEvent.change(messageBox(), { target: { value: "Trae aletas" } });
+    selectInMessage(5, 11);
+
+    await user.keyboard("{Control>}b{/Control}");
+    await user.keyboard("{Control>}i{/Control}");
+
+    expect(messageBox().value).toBe("Trae **_aletas_**");
+  });
+
+  it("⌘+K convierte la selección en enlace con https:// seleccionado", async () => {
+    renderComposer();
+    fireEvent.change(messageBox(), { target: { value: "Mira la hoja" } });
+    selectInMessage(5, 12);
+
+    await userEvent.setup().keyboard("{Meta>}k{/Meta}");
+
+    expect(messageBox().value).toBe("Mira [la hoja](https://)");
+    expect(selectedInMessage()).toBe("https://");
+  });
+
+  it("Lista numerada numera las líneas y cambia las viñetas que ya tenían", async () => {
+    renderComposer();
+    const text = "- Aletas\n- Gorro\n- Tubo";
+    fireEvent.change(messageBox(), { target: { value: text } });
+    selectInMessage(0, text.length);
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Lista numerada" }));
+
+    expect(messageBox().value).toBe("1. Aletas\n2. Gorro\n3. Tubo");
+  });
+
+  it("un formato que no cambia el texto no mueve el cursor en la tecla siguiente", async () => {
+    renderComposer();
+    const user = userEvent.setup();
+    const text = "- a\n- b";
+    fireEvent.change(messageBox(), { target: { value: text } });
+    selectInMessage(0, text.length);
+
+    await user.click(screen.getByRole("button", { name: "Lista de viñetas" }));
+    selectInMessage(text.length, text.length);
+    await user.keyboard("cd");
+
+    expect(messageBox().value).toBe("- a\n- bcd");
+  });
+
+  it("los botones no le quitan el foco al área", () => {
+    renderComposer();
+    const toolbar = screen.getByRole("toolbar", {
+      name: "Formato del mensaje",
+    });
+
+    const pressed = within(toolbar)
+      .getAllByRole("button")
+      .map((button) => fireEvent.mouseDown(button));
+
+    // `fireEvent` devuelve `false` cuando el evento se canceló.
+    expect(pressed).toEqual([false, false, false, false, false]);
+  });
+
+  it("las flechas mueven el foco por la barra, con un solo botón en el tabulador", async () => {
+    renderComposer();
+    const user = userEvent.setup();
+    const bold = screen.getByRole("button", { name: "Negrita" });
+
+    bold.focus();
+    await user.keyboard("{ArrowRight}");
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Cursiva" }),
+    );
+    expect(bold.tabIndex).toBe(-1);
+  });
+});
+
+async function showPreview(): Promise<HTMLElement> {
+  await userEvent
+    .setup()
+    .click(screen.getByRole("tab", { name: "Vista previa" }));
+  return screen.getByRole("tabpanel", { name: "Vista previa" });
+}
+
+describe("la vista previa", () => {
+  it("las pestañas siguen el patrón de WAI-ARIA", async () => {
+    renderComposer();
+
+    const tablist = screen.getByRole("tablist", {
+      name: "Cómo ver el mensaje",
+    });
+    const [write, preview] = within(tablist).getAllByRole("tab");
+    expect(write?.getAttribute("aria-selected")).toBe("true");
+    expect(preview?.getAttribute("aria-selected")).toBe("false");
+
+    const panel = await showPreview();
+
+    expect(preview?.getAttribute("aria-selected")).toBe("true");
+    expect(preview?.getAttribute("aria-controls")).toBe(panel.id);
+    expect(screen.queryByRole("textbox", { name: "Mensaje" })).toBeNull();
+  });
+
+  it("enseña de quién, para quién y el asunto", async () => {
+    renderComposer();
+    await fillDraft("Entreno a las 8", "Hola");
+
+    const panel = await showPreview();
+
+    expect(panel).toHaveTextContent(
+      "De Victoria Seadragons · las respuestas te llegan a ti",
+    );
+    expect(panel).toHaveTextContent(
+      "Para 2 miembros · cada uno recibe su copia",
+    );
+    expect(within(panel).getByText("Entreno a las 8")).toBeTruthy();
+  });
+
+  it("con un solo destinatario pone su nombre", async () => {
+    renderWithRecipients([NEREA]);
+
+    const panel = await showPreview();
+
+    expect(panel).toHaveTextContent("Para Nerea Ruiz");
+  });
+
+  it("sin asunto ni mensaje lo dice", async () => {
+    renderComposer();
+
+    const panel = await showPreview();
+
+    expect(within(panel).getByText("Todavía sin asunto")).toBeTruthy();
+    expect(
+      within(panel).getByText("Todavía no hay nada que ver."),
+    ).toBeTruthy();
+  });
+
+  it("pinta el cuerpo con el árbol del correo: negrita, cursiva, enlace y listas", async () => {
+    renderComposer();
+    fireEvent.change(messageBox(), {
+      target: {
+        value:
+          "Este **sábado** a las _8_.\n\n- Aletas\n- [La hoja](https://club.org)\n\n1. Uno\n2. Dos",
+      },
+    });
+
+    const panel = await showPreview();
+
+    expect(within(panel).getByText("sábado").tagName).toBe("STRONG");
+    expect(within(panel).getByText("8").tagName).toBe("EM");
+    expect(
+      within(panel).getByRole("link", { name: "La hoja" }).getAttribute("href"),
+    ).toBe("https://club.org");
+    const [bullets, numbers] = within(panel).getAllByRole("list");
+    expect(bullets?.tagName).toBe("UL");
+    expect(within(bullets!).getAllByRole("listitem")).toHaveLength(2);
+    expect(numbers?.tagName).toBe("OL");
+    expect(within(numbers!).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("lo que no es de la lista sale como se escribió, y los saltos se respetan", async () => {
+    renderComposer();
+    fireEvent.change(messageBox(), {
+      target: { value: "<b>Hola</b>\nAdiós\n[x](javascript:alert(1))" },
+    });
+
+    const panel = await showPreview();
+
+    expect(panel).toHaveTextContent("<b>Hola</b>");
+    expect(panel).toHaveTextContent("[x](javascript:alert(1))");
+    expect(panel.querySelector("b")).toBeNull();
+    expect(within(panel).queryByRole("link")).toBeNull();
+    expect(panel.querySelectorAll("br")).toHaveLength(2);
+  });
+});
+
+describe("los contadores", () => {
+  it("cuentan los caracteres del asunto y del mensaje", async () => {
+    renderComposer();
+
+    await fillDraft("Entreno", "Hola");
+
+    expect(screen.getByText("7 / 150")).toBeTruthy();
+    expect(screen.getByText("4 / 5.000")).toBeTruthy();
+  });
+
+  it("el del mensaje se nota pasado el 90 % y se marca pasado el 100 %", () => {
+    renderComposer();
+
+    fireEvent.change(messageBox(), { target: { value: "a".repeat(4_500) } });
+    expect(
+      screen.getByText("4.500 / 5.000").getAttribute("data-level"),
+    ).toBeNull();
+
+    fireEvent.change(messageBox(), { target: { value: "a".repeat(4_501) } });
+    expect(screen.getByText("4.501 / 5.000").getAttribute("data-level")).toBe(
+      "near",
+    );
+
+    fireEvent.change(messageBox(), { target: { value: "a".repeat(5_001) } });
+    expect(screen.getByText("5.001 / 5.000").getAttribute("data-level")).toBe(
+      "over",
+    );
+  });
+});
+
+describe("el cupo en el pie", () => {
+  it("dice cuántos correos quedan hoy en cuanto carga", async () => {
+    renderComposer();
+
+    await waitForQuota(38);
+    expect(
+      calls.filter((call) => call.url === EMAILS_PATH && call.method === "GET"),
+    ).toHaveLength(1);
+  });
+
+  it("con menos de 10 la barra avisa", async () => {
+    stubApi({ quota: [quotaResponse(9)] });
+    renderComposer();
+
+    await waitForQuota(9);
+
+    expect(
+      screen.getByRole("meter", { name: "9 de 50 correos libres hoy" }),
+    ).toHaveAttribute("data-level", "low");
+  });
+
+  it("si no se pudo cargar lo dice y deja enviar", async () => {
+    stubApi({ quota: [async () => errorResponse(500, "internal", "x")] });
+    renderComposer();
+
+    expect(
+      await screen.findByText(
+        "No se pudo saber cuántos correos quedan hoy. Puedes enviar igual.",
+      ),
+    ).toBeTruthy();
+    await fillDraft();
+    await userEvent.setup().click(sendButton());
+    const dialog = await screen.findByRole("dialog", {
+      name: "¿Enviar a 2 miembros?",
+    });
+    expect(
+      within(dialog).getByText("No se pudo saber cuántos correos quedan hoy."),
+    ).toBeTruthy();
+  });
+
+  it("con más destinatarios que correos libres avisa y no deja enviar", async () => {
+    stubApi({ quota: [quotaResponse(41)] });
+    renderWithRecipients(membersNumbered(45));
+
+    const alert = await screen.findByRole("alert");
+
+    expect(alert).toHaveTextContent(
+      "Solo quedan 41 correos hoy. Quita a 4 personas o envía el resto mañana.",
+    );
+    expect(sendButton(45).disabled).toBe(true);
+  });
+
+  it("con tantos destinatarios como correos libres deja enviar", async () => {
+    stubApi({ quota: [quotaResponse(2)] });
+    renderComposer();
+
+    await waitForQuota(2);
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(sendButton().disabled).toBe(false);
+  });
+});
+
+describe("los errores", () => {
+  it("sin asunto y con 5.240 caracteres marca los dos campos, los cuenta y lleva el foco al asunto", async () => {
+    renderComposer();
+    fireEvent.change(messageBox(), { target: { value: "a".repeat(5_240) } });
+
+    await userEvent.setup().click(sendButton());
+
+    const subjectError = screen.getByText("Añade un asunto.");
+    const messageError = screen.getByText(
+      "Al mensaje le sobran 240 caracteres. Acórtalo a 5.000.",
+    );
+    expect(subjectBox()).toHaveAttribute("aria-invalid", "true");
+    expect(subjectBox().getAttribute("aria-describedby")).toContain(
+      subjectError.id,
+    );
+    expect(messageBox()).toHaveAttribute("aria-invalid", "true");
+    expect(messageBox().getAttribute("aria-describedby")).toContain(
+      messageError.id,
+    );
+    expect(screen.getByText("2 cosas por arreglar")).toBeTruthy();
+    expect(document.activeElement).toBe(subjectBox());
+  });
+
+  it("si la vista previa estaba abierta vuelve a Escribir con el foco en el mensaje", async () => {
+    renderComposer();
+    await userEvent.setup().type(subjectBox(), "Entreno");
+    await showPreview();
+
+    await userEvent.setup().click(sendButton());
+
+    expect(
+      screen
+        .getByRole("tab", { name: "Escribir" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(document.activeElement).toBe(messageBox());
+    expect(screen.getByText("1 cosa por arreglar")).toBeTruthy();
+  });
+
+  it("si la vista previa estaba abierta y sólo falla el asunto, también vuelve a Escribir", async () => {
+    renderComposer();
+    await userEvent.setup().type(messageBox(), "Hola");
+    await showPreview();
+
+    await userEvent.setup().click(sendButton());
+
+    expect(
+      screen
+        .getByRole("tab", { name: "Escribir" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(document.activeElement).toBe(subjectBox());
+  });
+
+  it("los errores no salen hasta intentar enviar", () => {
+    renderComposer();
+
+    expect(subjectBox()).toHaveAttribute("aria-invalid", "false");
+    expect(screen.queryByText(/por arreglar/)).toBeNull();
+  });
+});
+
+describe("el diálogo de confirmación", () => {
+  it("es un diálogo modal que dice a cuántos va, con qué asunto y el cupo antes y después", async () => {
+    stubApi({ quota: [quotaResponse(41)] });
+    renderWithRecipients(membersNumbered(25));
+    await waitForQuota(41);
+    await fillDraft("Entreno a las 8");
+
+    await userEvent.setup().click(sendButton(25));
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "¿Enviar a 25 miembros?",
+    });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveTextContent(
+      "Cada uno recibe su propio correo de Victoria Seadragons con el asunto “Entreno a las 8”. Las respuestas te llegan a ti.",
+    );
+    expect(dialog).toHaveTextContent("Correos libres hoy 41 → 16 de 50");
+    expect(dialog).toHaveTextContent("Mañana vuelven a ser 50.");
+    expect(posts()).toEqual([]);
+  });
+
+  it("con un destinatario pregunta por su nombre", async () => {
+    renderWithRecipients([NEREA]);
+    await fillDraft();
+
+    await userEvent.setup().click(sendButton(1));
+
+    expect(
+      await screen.findByRole("dialog", { name: "¿Enviar a Nerea Ruiz?" }),
+    ).toBeTruthy();
+  });
+
+  it("si después quedan menos de 10, la nota lo dice", async () => {
+    stubApi({ quota: [quotaResponse(11)] });
+    renderComposer();
+    await waitForQuota(11);
 
     const dialog = await openConfirmation();
 
-    expect(within(dialog).getByText("Va a 2 miembros.")).toBeTruthy();
-    expect(
-      await within(dialog).findByText("Hoy quedan 38 correos del directorio."),
-    ).toBeTruthy();
-    expect(posts()).toEqual([]);
+    expect(dialog).toHaveTextContent("11 → 9 de 50");
+    expect(dialog).toHaveTextContent(
+      "Después de esto, solo quedan 9 hasta mañana.",
+    );
+  });
+
+  it("si usa los últimos de hoy, lo dice", async () => {
+    stubApi({ quota: [quotaResponse(2)] });
+    renderComposer();
+    await waitForQuota(2);
+
+    const dialog = await openConfirmation();
+
+    expect(dialog).toHaveTextContent("Esto usa los últimos correos de hoy.");
   });
 
   it("cancelar no manda nada y vuelve al formulario con lo escrito", async () => {
@@ -650,10 +1086,7 @@ describe("el diálogo de confirmación", () => {
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(posts()).toEqual([]);
-    expect(
-      (screen.getByRole("textbox", { name: "Asunto" }) as HTMLInputElement)
-        .value,
-    ).toBe("Entreno");
+    expect(subjectBox().value).toBe("Entreno");
   });
 
   it("al confirmar manda el borrador a los que quedan en la lista, con una clave de petición", async () => {
@@ -662,9 +1095,9 @@ describe("el diálogo de confirmación", () => {
 
     await userEvent
       .setup()
-      .click(within(dialog).getByRole("button", { name: "Mandar" }));
+      .click(within(dialog).getByRole("button", { name: "Enviar 2 correos" }));
 
-    await screen.findByText("Se mandaron 2 correos.");
+    await screen.findByText("2 correos enviados");
     expect(posts()).toHaveLength(1);
     expect(posts()[0]?.body).toEqual({
       requestId: expect.stringMatching(UUID_PATTERN),
@@ -674,67 +1107,170 @@ describe("el diálogo de confirmación", () => {
     });
   });
 
+  it("mientras manda dice Enviando… y desactiva los dos botones", async () => {
+    let release: () => void = () => undefined;
+    stubApi({
+      send: () =>
+        new Promise((resolve) => {
+          release = () => resolve(jsonResponse(200, SENT_TO_BOTH));
+        }),
+    });
+    renderComposer();
+    const dialog = await openConfirmation();
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Enviar 2 correos" }),
+    );
+
+    const sending = await within(dialog).findByRole("button", {
+      name: "Enviando…",
+    });
+    expect(sending).toBeDisabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Cancelar" }),
+    ).toBeDisabled();
+    release();
+    await screen.findByText("2 correos enviados");
+  });
+
   it("un doble clic manda una sola vez", async () => {
     let release: () => void = () => undefined;
     stubApi({
       send: () =>
         new Promise((resolve) => {
-          release = () =>
-            resolve(
-              jsonResponse(200, {
-                data: { sentCount: 2, failed: [], remaining: 10 },
-              }),
-            );
+          release = () => resolve(jsonResponse(200, SENT_TO_BOTH));
         }),
     });
     renderComposer();
     const dialog = await openConfirmation();
-    const confirm = within(dialog).getByRole("button", { name: "Mandar" });
+    const confirm = within(dialog).getByRole("button", {
+      name: "Enviar 2 correos",
+    });
 
     fireEvent.click(confirm);
     fireEvent.click(confirm);
     release();
 
-    await screen.findByText("Se mandaron 2 correos.");
+    await screen.findByText("2 correos enviados");
     expect(posts()).toHaveLength(1);
   });
 });
 
-describe("el resultado", () => {
-  it("si falla a medias dice cuántos salieron y a quiénes no llegó", async () => {
-    stubApi({ send: sentResponse(1, [TOMAS]) });
+const SENT_TO_BOTH = { data: { sentCount: 2, failed: [], remaining: 10 } };
+
+async function sendDraft(): Promise<void> {
+  const dialog = await openConfirmation();
+  await userEvent
+    .setup()
+    .click(within(dialog).getByRole("button", { name: "Enviar 2 correos" }));
+}
+
+describe("el envío hecho", () => {
+  it("dice cuántos salieron y cuántos correos quedan hoy", async () => {
     renderComposer();
-    const dialog = await openConfirmation();
+
+    await sendDraft();
+
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("2 correos enviados");
+    expect(status).toHaveTextContent(
+      "Las respuestas te llegarán a tu correo. 10 de 50 correos libres hoy",
+    );
+    expect(screen.queryByRole("textbox", { name: "Asunto" })).toBeNull();
+  });
+
+  it("Escribir otro vacía el asunto y el mensaje y conserva los destinatarios", async () => {
+    renderComposer();
+    await sendDraft();
 
     await userEvent
       .setup()
-      .click(within(dialog).getByRole("button", { name: "Mandar" }));
+      .click(await screen.findByRole("button", { name: "Escribir otro" }));
 
-    expect(await screen.findByText("Se mandó 1 correo.")).toBeTruthy();
+    expect(subjectBox().value).toBe("");
+    expect(messageBox().value).toBe("");
+    expect(recipientNames()).toEqual(["Nerea Ruiz", "Tomás Gil"]);
+    expect(screen.getByText("10 de 50 correos libres hoy")).toBeTruthy();
+    expect(screen.queryByText(/por arreglar/)).toBeNull();
+    expect(document.activeElement).toBe(subjectBox());
+  });
+
+  it("al enviar, el foco pasa al estado Enviado y no se pierde", async () => {
+    renderComposer();
+
+    await sendDraft();
+
+    const status = await screen.findByRole("status");
+    await waitFor(() =>
+      expect(status.contains(document.activeElement)).toBe(true),
+    );
+  });
+
+  it("Cerrar cierra el redactor", async () => {
+    const { onClose } = renderComposer();
+    await sendDraft();
+
+    const closeButtons = await screen.findAllByRole("button", {
+      name: "Cerrar",
+    });
+    await userEvent.setup().click(closeButtons.at(-1)!);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("si falla a medias dice cuántos salieron y a quiénes no llegó", async () => {
+    stubApi({ send: sentResponse(1, [TOMAS]) });
+    renderComposer();
+
+    await sendDraft();
+
+    expect(await screen.findByText("1 correo enviado")).toBeTruthy();
     const failed = screen.getByRole("list", { name: "No llegó a:" });
     expect(within(failed).getByText("Tomás Gil")).toBeTruthy();
   });
+});
 
-  it("si no caben, no cierra el formulario y dice cuántos caben ahora", async () => {
+describe("cuando el servidor dice que no", () => {
+  it("si no caben, vuelve a leer el cupo y avisa de cuántos sobran", async () => {
     stubApi({
       quota: [quotaResponse(5), quotaResponse(1)],
       send: async () =>
         errorResponse(409, "conflict", "directory_email_quota_exceeded"),
     });
     renderComposer();
-    const dialog = await openConfirmation();
+    await waitForQuota(5);
 
-    await userEvent
-      .setup()
-      .click(within(dialog).getByRole("button", { name: "Mandar" }));
+    await sendDraft();
 
     expect(
       await screen.findByText(
-        "No caben: hoy el directorio puede mandar 1 correo más. Quita miembros de la lista o inténtalo más tarde.",
+        "Solo queda 1 correo hoy. Quita a 1 persona o envía el resto mañana.",
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByRole("textbox", { name: "Asunto" })).toBeTruthy();
+    expect(subjectBox().value).toBe("Entreno");
+    expect(sendButton().disabled).toBe(true);
+  });
+
+  it("si no caben y no se puede volver a leer el cupo, lo dice", async () => {
+    stubApi({
+      quota: [
+        quotaResponse(5),
+        async () => errorResponse(500, "internal", "x"),
+      ],
+      send: async () =>
+        errorResponse(409, "conflict", "directory_email_quota_exceeded"),
+    });
+    renderComposer();
+    await waitForQuota(5);
+
+    await sendDraft();
+
+    expect(
+      await screen.findByText(
+        "No caben en lo que el directorio puede mandar hoy. Quita miembros de la lista o inténtalo más tarde.",
+      ),
+    ).toBeTruthy();
   });
 
   it("si el proveedor no está, dice que el envío no está disponible ahora", async () => {
@@ -743,11 +1279,8 @@ describe("el resultado", () => {
         errorResponse(503, "service_unavailable", "email_unavailable"),
     });
     renderComposer();
-    const dialog = await openConfirmation();
 
-    await userEvent
-      .setup()
-      .click(within(dialog).getByRole("button", { name: "Mandar" }));
+    await sendDraft();
 
     expect(
       await screen.findByText(
@@ -762,11 +1295,8 @@ describe("el resultado", () => {
         errorResponse(403, "forbidden", "directory_email_forbidden"),
     });
     renderComposer();
-    const dialog = await openConfirmation();
 
-    await userEvent
-      .setup()
-      .click(within(dialog).getByRole("button", { name: "Mandar" }));
+    await sendDraft();
 
     expect(
       await screen.findByText(
@@ -779,16 +1309,26 @@ describe("el resultado", () => {
 describe("el idioma", () => {
   it("el formulario y el diálogo cambian con el interruptor", async () => {
     const { rerender } = renderComposer();
+    await waitForQuota(38);
     await openConfirmation();
 
     rerender("en");
 
     expect(screen.getByRole("textbox", { name: "Subject" })).toBeTruthy();
-    const dialog = screen.getByRole("dialog", { name: "Send the email?" });
-    expect(within(dialog).getByText("It goes to 2 members.")).toBeTruthy();
+    expect(screen.getByText("38 of 50 emails left today")).toBeTruthy();
+    const dialog = screen.getByRole("dialog", { name: "Send to 2 members?" });
+    expect(dialog).toHaveTextContent("Emails left today 38 → 36 of 50");
+    expect(
+      within(dialog).getByRole("button", { name: "Send 2 emails" }),
+    ).toBeTruthy();
+  });
+
+  it("los contadores escriben los miles a la inglesa", () => {
+    renderComposer("en");
+
+    expect(screen.getByText("0 / 5,000")).toBeTruthy();
   });
 });
-
 describe("en el directorio", () => {
   const MEMBER: CommitteeDirectoryMember = {
     userId: NEREA.userId,

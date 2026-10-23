@@ -5724,10 +5724,6 @@ a.groups-icon-button {
   gap: var(--space-4);
 }
 
-.directory-email-form textarea {
-  resize: vertical;
-}
-
 /* El "Para" (#858): la etiqueta en mono como las del editor de Noticias, y
    "Quitar todos" a su derecha. */
 .directory-email-recipients {
@@ -6021,30 +6017,547 @@ a.groups-icon-button {
   margin: 0;
 }
 
-.directory-email-actions {
+/* El asunto y el mensaje (#859): cada campo con su etiqueta en mono y, a la
+   derecha, el contador o las pestañas. */
+.directory-email-fields {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
 }
 
-.directory-email-result,
-.directory-email-confirm {
+.directory-email-field {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-width: 0;
 }
 
-.directory-email-result p,
-.directory-email-confirm p {
+.directory-email-counter {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* Pasado el 90 % se nota, pasado el límite avisa. */
+.directory-email-counter[data-level="near"] {
+  color: var(--color-text);
+}
+
+.directory-email-counter[data-level="over"] {
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.directory-email-subject {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: 15px;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.directory-email-subject::placeholder,
+.directory-email-area::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.directory-email-subject:focus {
+  border-color: var(--color-accent);
+}
+
+.directory-email-subject[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.directory-email-field-error {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-danger);
+}
+
+.directory-email-field-error > svg {
+  flex-shrink: 0;
+}
+
+/* Escribir | Vista previa como un control segmentado. Se ve de 28 px; la
+   zona que se pulsa llega a los 44. */
+.directory-email-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.directory-email-tab {
+  position: relative;
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  height: 28px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.directory-email-tab::after {
+  position: absolute;
+  inset: calc((28px - var(--touch-target-min)) / 2) 0;
+  content: "";
+}
+
+.directory-email-tab:hover {
+  color: var(--color-text);
+}
+
+.directory-email-tab[aria-selected="true"] {
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-segment-selected);
+}
+
+/* La caja del mensaje: la barra arriba, el área o la vista previa, y el pie
+   con la ayuda y el contador. El borde toma el acento mientras se escribe y
+   el peligro si el mensaje no vale. */
+.directory-email-editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.directory-email-editor:focus-within {
+  border-color: var(--color-accent);
+}
+
+.directory-email-editor[data-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.directory-email-editor-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-editor-bar);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 10px 10px 0 0;
+}
+
+.directory-email-toolbar {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.directory-email-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 18px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.directory-email-toolbar-button:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.directory-email-toolbar-separator {
+  width: 1px;
+  height: 20px;
+  margin: 0 var(--space-1);
+  background: var(--color-border);
+}
+
+.directory-email-syntax {
+  font-family: var(--font-family-mono);
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.directory-email-area {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+  padding: var(--space-3) var(--space-4);
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--color-text);
+  background: transparent;
+  border: 0;
+  resize: vertical;
+}
+
+.directory-email-area:focus-visible,
+.directory-email-preview:focus-visible {
+  outline-offset: -2px;
+}
+
+.directory-email-preview {
+  min-height: 220px;
+  padding: var(--space-3) var(--space-4);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+
+/* La cabecera del correo como la verá el miembro, cortada del cuerpo por
+   una raya discontinua. */
+.directory-email-preview-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  border-bottom: 1px dashed var(--color-border-dashed);
+}
+
+.directory-email-preview-header p {
   margin: 0;
 }
 
-.directory-email-result ul {
-  margin: 0;
+.directory-email-preview-header strong {
+  color: var(--color-text);
+}
+
+.directory-email-preview-header .directory-email-preview-subject,
+.directory-email-preview-header .directory-email-preview-no-subject {
+  margin-top: var(--space-1);
+  font-size: 15.5px;
+  overflow-wrap: anywhere;
+}
+
+.directory-email-preview-header .directory-email-preview-subject {
+  font-weight: 650;
+  color: var(--color-text);
+}
+
+.directory-email-preview-body {
+  overflow-wrap: anywhere;
+}
+
+.directory-email-preview-body p,
+.directory-email-preview-body ul,
+.directory-email-preview-body ol {
+  margin: 0 0 var(--space-3);
+}
+
+.directory-email-preview-body > :last-child {
+  margin-bottom: 0;
+}
+
+.directory-email-preview-body ul,
+.directory-email-preview-body ol {
   padding-left: var(--space-6);
 }
 
-.directory-email-confirm {
-  margin-bottom: var(--space-4);
+.directory-email-preview-body li ul,
+.directory-email-preview-body li ol {
+  margin-bottom: 0;
+}
+
+.directory-email-preview-body a {
+  color: var(--color-accent-text);
+  text-decoration: underline;
+}
+
+.directory-email-preview-empty {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.directory-email-editor-foot {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-editor-bar);
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 10px 10px;
+}
+
+/* Más destinatarios que correos libres: un aviso, no un error del servidor,
+   así que lleva la barra del color de aviso. */
+.directory-email-warning {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-warning);
+  border-left: 4px solid var(--color-warning);
+  border-radius: var(--radius);
+}
+
+/* El pie del panel: llega hasta los bordes del panel, con el fondo de las
+   barras, como en el handoff. */
+.directory-email-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-editor-bar);
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 12px 12px;
+}
+
+.directory-email-footer-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
+  align-items: center;
+  min-width: 0;
+}
+
+.directory-email-quota {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+/* Lo que queda, en verde; con menos de 10, en el color de aviso. */
+.directory-email-quota-bar,
+.directory-email-dialog-quota-bar {
+  display: flex;
+  height: 4px;
+  overflow: hidden;
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+.directory-email-quota-bar {
+  width: 190px;
+  max-width: 100%;
+}
+
+.directory-email-quota-bar > :first-child,
+.directory-email-dialog-quota-bar > :first-child {
+  background: var(--color-success);
+}
+
+.directory-email-quota-bar[data-level="low"] > :first-child {
+  background: var(--color-warning);
+}
+
+.directory-email-problems {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.directory-email-footer-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin-left: auto;
+}
+
+/* Cancelar es un botón fantasma: sólo el texto hasta que se pasa por
+   encima. */
+.directory-email-footer-actions .admin-secondary {
+  background: transparent;
+  border-color: transparent;
+}
+
+.directory-email-footer-actions .auth-submit,
+.directory-email-dialog-actions .auth-submit {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+}
+
+/* Enviado: el panel entero pasa a decir cuántos salieron. */
+.directory-email-sent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-6) 0 var(--space-2);
+  text-align: center;
+}
+
+.directory-email-sent-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.directory-email-sent-status p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.directory-email-sent-icon {
+  display: inline-flex;
+  font-size: 40px;
+  color: var(--color-success);
+}
+
+.directory-email-sent-status .directory-email-sent-title {
+  font-size: 18px;
+  font-weight: 650;
+  color: var(--color-text);
+}
+
+.directory-email-sent-title:focus {
+  outline: none;
+}
+
+.directory-email-sent-status ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.directory-email-sent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+/* El diálogo de confirmar (#859): más estrecho que los demás que comparten
+   `.event-dialog`, con la baldosa del avión de papel junto al título. */
+.directory-email-dialog {
+  width: min(440px, calc(100% - 2 * var(--space-4)));
+  border-radius: 14px;
+}
+
+.directory-email-dialog .event-dialog-panel {
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+
+.directory-email-dialog-header {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.directory-email-dialog-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.directory-email-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.directory-email-dialog-body p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.directory-email-dialog-quota {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  font-size: 13px;
+  background: var(--color-editor-bar);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.directory-email-dialog-quota .directory-email-dialog-quota-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: space-between;
+}
+
+.directory-email-dialog-quota-row strong {
+  font-family: var(--font-family-mono);
+}
+
+/* Lo que gasta este envío, en el acento, detrás de lo que quedará. */
+.directory-email-dialog-quota-bar > :nth-child(2) {
+  background: var(--color-accent);
+}
+
+.directory-email-dialog-quota > p:last-child {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.directory-email-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+.directory-email-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentcolor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: directory-email-spin 0.8s linear infinite;
+}
+
+@keyframes directory-email-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .directory-email-spinner {
+    animation: none;
+  }
 }
 
 /* El panel de invitar a un socio (#862, docs/design/design_handoff_invite,

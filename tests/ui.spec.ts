@@ -5807,10 +5807,14 @@ type EmailLabels = {
   readonly moreEmail: RegExp;
   readonly subject: string;
   readonly message: string;
-  readonly send: string;
-  readonly dialog: string;
-  readonly confirm: string;
-  readonly remaining: RegExp;
+  /** Enviar lleva la cuenta de destinatarios (#859): "Send to 3". */
+  readonly send: RegExp;
+  readonly dialog: RegExp;
+  readonly confirm: RegExp;
+  /** El cupo antes y después, que el diálogo enseña en cuanto abre. */
+  readonly remaining: string;
+  /** El pie con los correos libres hoy, que llega después de abrir. */
+  readonly quotaLeft: RegExp;
 };
 
 const ENGLISH_EMAIL_LABELS: EmailLabels = {
@@ -5819,10 +5823,11 @@ const ENGLISH_EMAIL_LABELS: EmailLabels = {
   moreEmail: /^Email these members/,
   subject: "Subject",
   message: "Message",
-  send: "Send",
-  dialog: "Send the email?",
-  confirm: "Send now",
-  remaining: /emails? left today/,
+  send: /^Send to \d+$/,
+  dialog: /^Send to .+\?$/,
+  confirm: /^Send \d+ emails?$/,
+  remaining: "Emails left today",
+  quotaLeft: /^\d+ of 50 emails left today$/,
 };
 
 const SPANISH_EMAIL_LABELS: EmailLabels = {
@@ -5831,20 +5836,23 @@ const SPANISH_EMAIL_LABELS: EmailLabels = {
   moreEmail: /^Escribir a estos miembros/,
   subject: "Asunto",
   message: "Mensaje",
-  send: "Enviar",
-  dialog: "¿Mandar el correo?",
-  confirm: "Mandar",
-  remaining: /correos? del directorio/,
+  send: /^Enviar a \d+$/,
+  dialog: /^¿Enviar a .+\?$/,
+  confirm: /^Enviar \d+ correos?$/,
+  remaining: "Correos libres hoy",
+  quotaLeft: /^\d+ de 50 correos libres hoy$/,
 };
 
 type EmailAnswer = {
-  /** Lo que responde cada lectura del cupo, en orden; la última se repite. */
-  readonly quota: readonly number[];
+  /** Lo que responde cada lectura del cupo antes de enviar y, si cambia,
+   * después. Va por el envío y no por el orden: en desarrollo React monta dos
+   * veces el efecto que lo pide al abrir el redactor (#859). */
+  readonly quota: { readonly beforeSend: number; readonly afterSend?: number };
   readonly send: { readonly status: number; readonly body: unknown };
 };
 
 const EMAIL_SENT_TO_ALL: EmailAnswer = {
-  quota: [38],
+  quota: { beforeSend: 38 },
   send: {
     status: 200,
     body: { data: { sentCount: 3, failed: [], remaining: 35 } },
@@ -5852,7 +5860,7 @@ const EMAIL_SENT_TO_ALL: EmailAnswer = {
 };
 
 const EMAIL_DOES_NOT_FIT: EmailAnswer = {
-  quota: [38, 1],
+  quota: { beforeSend: 38, afterSend: 1 },
   send: {
     status: 409,
     body: {
@@ -5866,7 +5874,7 @@ const EMAIL_DOES_NOT_FIT: EmailAnswer = {
 };
 
 const EMAIL_PARTLY_SENT: EmailAnswer = {
-  quota: [38],
+  quota: { beforeSend: 38 },
   send: {
     status: 200,
     body: {
@@ -5890,18 +5898,20 @@ const EMAIL_PARTLY_SENT: EmailAnswer = {
 
 function stubDirectoryEmails(answer: EmailAnswer) {
   return async (page: Page): Promise<void> => {
-    const quotas = [...answer.quota];
+    let hasSent = false;
     await page.route(
       (url) => url.pathname === DIRECTORY_EMAILS_ENDPOINT,
       (route, request) => {
         if (request.method() === "POST") {
+          hasSent = true;
           return route.fulfill({
             status: answer.send.status,
             contentType: "application/json",
             body: JSON.stringify(answer.send.body),
           });
         }
-        const remaining = quotas.length > 1 ? quotas.shift() : quotas[0];
+        const { beforeSend, afterSend = beforeSend } = answer.quota;
+        const remaining = hasSent ? afterSend : beforeSend;
         return route.fulfill({
           status: 200,
           contentType: "application/json",
@@ -5937,24 +5947,73 @@ async function openEmailForm(page: Page, labels: EmailLabels): Promise<void> {
     .click();
 }
 
-/** Abre el formulario y escribe un correo de varias líneas. */
-function writeEmail(labels: EmailLabels) {
+/** Un mensaje con todo el formato que admite el correo (#859), como el del
+ * handoff. */
+const FORMATTED_EMAIL_MESSAGE = [
+  "Hi everyone,",
+  "",
+  "This **Saturday** training starts at **8 am** instead of 9: the pool has a school event later.",
+  "",
+  "- Bring your _own_ fins and snorkel",
+  "- Spare caps are at the front desk",
+  "- Carpool list: [see the sheet](https://docs.google.com)",
+  "",
+  "See you there,",
+  "Ana",
+].join("\n");
+
+/** Abre el formulario, espera al cupo del pie y escribe un correo. */
+function writeEmail(
+  labels: EmailLabels,
+  draft: { readonly subject: string; readonly message: string } = {
+    subject: "Saturday training moves to 8am",
+    message: "Hi all,\n\nThis Saturday we start at 8am sharp.\nBring fins.",
+  },
+) {
   return async (page: Page): Promise<void> => {
     await openEmailForm(page, labels);
+    await expect(page.getByText(labels.quotaLeft)).toBeVisible();
     await page
       .getByRole("textbox", { name: labels.subject })
-      .fill("Saturday training moves to 8am");
+      .fill(draft.subject);
     await page
       .getByRole("textbox", { name: labels.message })
-      .fill("Hi all,\n\nThis Saturday we start at 8am sharp.\nBring fins.");
+      .fill(draft.message);
   };
+}
+
+/** Escribe el correo con formato y pasa a la Vista previa. */
+async function previewEmail(page: Page): Promise<void> {
+  await writeEmail(ENGLISH_EMAIL_LABELS, {
+    subject: "Saturday training moves to 8 am",
+    message: FORMATTED_EMAIL_MESSAGE,
+  })(page);
+  await page.getByRole("tab", { name: "Preview" }).click();
+  await expect(
+    page.getByRole("tabpanel", { name: "Preview" }).getByRole("link", {
+      name: "see the sheet",
+    }),
+  ).toBeVisible();
+}
+
+/** Sin asunto y con 5.240 caracteres: los dos campos en rojo. */
+async function showEmailErrors(page: Page): Promise<void> {
+  const tooLong = `${FORMATTED_EMAIL_MESSAGE}\n\n${"Fins. ".repeat(900)}`.slice(
+    0,
+    5_240,
+  );
+  await writeEmail(ENGLISH_EMAIL_LABELS, { subject: "", message: tooLong })(
+    page,
+  );
+  await page.getByRole("button", { name: ENGLISH_EMAIL_LABELS.send }).click();
+  await expect(page.getByText("2 things to fix")).toBeVisible();
 }
 
 /** Escribe, pulsa enviar y espera a que el diálogo diga cuántos quedan. */
 function confirmEmail(labels: EmailLabels) {
   return async (page: Page): Promise<void> => {
     await writeEmail(labels)(page);
-    await page.getByRole("button", { name: labels.send, exact: true }).click();
+    await page.getByRole("button", { name: labels.send }).click();
     const dialog = page.getByRole("dialog", { name: labels.dialog });
     await expect(dialog.getByText(labels.remaining)).toBeVisible();
   };
@@ -5966,7 +6025,7 @@ function sendEmail(labels: EmailLabels, outcome: RegExp) {
     await confirmEmail(labels)(page);
     await page
       .getByRole("dialog", { name: labels.dialog })
-      .getByRole("button", { name: labels.confirm, exact: true })
+      .getByRole("button", { name: labels.confirm })
       .click();
     await expect(page.getByText(outcome)).toBeVisible();
     await expect(page.getByRole("dialog", { name: labels.dialog })).toHaveCount(
@@ -6002,7 +6061,10 @@ function emailStates(spanish: boolean): readonly DirectoryState[] {
       asAdmin: true,
       listHeading,
       beforeVisit: beforeEmailVisit(EMAIL_DOES_NOT_FIT, spanish),
-      prepare: sendEmail(labels, spanish ? /No caben/ : /It doesn't fit/),
+      prepare: sendEmail(
+        labels,
+        spanish ? /Solo queda 1 correo hoy/ : /Only 1 email left today/,
+      ),
     },
     {
       name: `correo-resultado-parcial${suffix}`,
@@ -6340,6 +6402,27 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
   },
   ...emailStates(false),
   ...emailStates(true),
+  {
+    name: "correo-vista-previa",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    beforeVisit: stubDirectoryEmails(EMAIL_SENT_TO_ALL),
+    prepare: previewEmail,
+  },
+  {
+    name: "correo-errores",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    beforeVisit: stubDirectoryEmails(EMAIL_SENT_TO_ALL),
+    prepare: showEmailErrors,
+  },
+  {
+    name: "correo-enviado",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    beforeVisit: stubDirectoryEmails(EMAIL_SENT_TO_ALL),
+    prepare: sendEmail(ENGLISH_EMAIL_LABELS, /^3 emails sent$/),
+  },
   {
     name: "correo-25-destinatarios",
     asAdmin: true,
