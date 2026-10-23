@@ -1,6 +1,8 @@
 "use client";
 
+import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { UserPlus } from "@phosphor-icons/react/dist/ssr/UserPlus";
+import { XCircle } from "@phosphor-icons/react/dist/ssr/XCircle";
 import { Fragment, useId, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { memberInitials } from "@/lib/auth/member-initials";
@@ -19,7 +21,14 @@ import type { CandidatesLoad } from "./use-recipient-candidates";
  * de E33): un combobox con su listbox debajo. ↑ y ↓ mueven, Enter añade,
  * Esc vacía la búsqueda y Retroceso con el campo vacío quita la última
  * ficha. Al añadir, el foco se queda en el campo para seguir escribiendo.
+ *
+ * En el móvil (#860) los resultados van en línea, debajo del campo, y no en
+ * un desplegable: siguen a la vista aunque el teclado se cierre y el campo
+ * pierda el foco. Cada fila lleva un "+" y el campo, un botón para vaciarlo.
  */
+
+/** Dónde salen los resultados: colgando del campo, o en línea debajo. */
+export type ResultsPlacement = "popover" | "inline";
 
 const NO_RESULTS: RecipientSearchResult = { kind: "empty" };
 
@@ -42,15 +51,45 @@ function describeEmptyResult(
   return null;
 }
 
+/** "Añadir" o "Enter ↵" junto al desplegable; un "+" en línea. */
+function OptionHint({
+  translate,
+  placement,
+  isHighlighted,
+}: {
+  readonly translate: Translator;
+  readonly placement: ResultsPlacement;
+  readonly isHighlighted: boolean;
+}): React.JSX.Element {
+  if (placement === "inline") {
+    return (
+      <span className="directory-email-option-add" aria-hidden="true">
+        <Icon glyph={Plus} />
+      </span>
+    );
+  }
+  return (
+    <span className="directory-email-option-hint" aria-hidden="true">
+      {translate(
+        isHighlighted
+          ? "directory.email.search.enterHint"
+          : "directory.email.search.add",
+      )}
+    </span>
+  );
+}
+
 function SuggestionOption({
   translate,
   id,
+  placement,
   suggestion,
   isHighlighted,
   onAdd,
 }: {
   readonly translate: Translator;
   readonly id: string;
+  readonly placement: ResultsPlacement;
   readonly suggestion: RecipientSuggestion;
   readonly isHighlighted: boolean;
   readonly onAdd: (candidate: RecipientCandidate) => void;
@@ -84,13 +123,11 @@ function SuggestionOption({
           {translate(`role.${candidate.role}`)}
         </span>
       </span>
-      <span className="directory-email-option-hint" aria-hidden="true">
-        {translate(
-          isHighlighted
-            ? "directory.email.search.enterHint"
-            : "directory.email.search.add",
-        )}
-      </span>
+      <OptionHint
+        translate={translate}
+        placement={placement}
+        isHighlighted={isHighlighted}
+      />
     </li>
   );
 }
@@ -98,6 +135,7 @@ function SuggestionOption({
 export function RecipientSearch({
   translate,
   inputRef,
+  placement,
   recipients,
   load,
   onFirstFocus,
@@ -106,6 +144,7 @@ export function RecipientSearch({
 }: {
   readonly translate: Translator;
   readonly inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly placement: ResultsPlacement;
   readonly recipients: readonly EmailRecipient[];
   readonly load: CandidatesLoad;
   readonly onFirstFocus: () => void;
@@ -127,7 +166,9 @@ export function RecipientSearch({
       : NO_RESULTS;
   const suggestions = result.kind === "matches" ? result.suggestions : [];
   const highlightedIndex = Math.min(highlighted, suggestions.length - 1);
-  const isOpen = isFocused && query.trim() !== "" && load.kind !== "failed";
+  const isInline = placement === "inline";
+  const isOpen =
+    (isFocused || isInline) && query.trim() !== "" && load.kind !== "failed";
   const isExpanded = isOpen && suggestions.length > 0;
   const optionId = (index: number): string => `${listboxId}-${index}`;
 
@@ -136,10 +177,14 @@ export function RecipientSearch({
     setHighlighted(0);
   }
 
-  function add(candidate: RecipientCandidate): void {
-    onAdd({ userId: candidate.userId, fullName: candidate.fullName });
+  function clearAndFocus(): void {
     changeQuery("");
     inputRef.current?.focus();
+  }
+
+  function add(candidate: RecipientCandidate): void {
+    onAdd({ userId: candidate.userId, fullName: candidate.fullName });
+    clearAndFocus();
   }
 
   function moveHighlight(step: number): void {
@@ -158,6 +203,10 @@ export function RecipientSearch({
       return;
     }
     if (event.key === "Escape") {
+      // Con texto, Esc sólo vacía: en el móvil no cierra también la ventana.
+      if (query !== "") {
+        event.preventDefault();
+      }
       changeQuery("");
       return;
     }
@@ -176,33 +225,52 @@ export function RecipientSearch({
     : null;
 
   return (
-    <div className="directory-email-search">
-      <span className="directory-email-search-icon">
-        <Icon glyph={UserPlus} />
-      </span>
-      <input
-        ref={inputRef}
-        type="text"
-        role="combobox"
-        autoComplete="off"
-        aria-label={translate("directory.email.search.label")}
-        placeholder={translate("directory.email.search.label")}
-        aria-autocomplete="list"
-        aria-expanded={isExpanded}
-        aria-controls={listboxId}
-        aria-activedescendant={
-          isExpanded ? optionId(highlightedIndex) : undefined
+    <div className="directory-email-search" data-placement={placement}>
+      <div className="directory-email-search-field">
+        <span className="directory-email-search-icon">
+          <Icon glyph={UserPlus} />
+        </span>
+        <input
+          ref={inputRef}
+          type="text"
+          role="combobox"
+          autoComplete="off"
+          aria-label={translate("directory.email.search.label")}
+          placeholder={translate("directory.email.search.label")}
+          aria-autocomplete="list"
+          aria-expanded={isExpanded}
+          aria-controls={listboxId}
+          aria-activedescendant={
+            isExpanded ? optionId(highlightedIndex) : undefined
+          }
+          value={query}
+          onChange={(event) => changeQuery(event.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => {
+            setIsFocused(true);
+            onFirstFocus();
+          }}
+          onBlur={() => setIsFocused(false)}
+        />
+        {isInline && query !== "" ? (
+          <button
+            type="button"
+            className="directory-email-search-clear"
+            aria-label={translate("directory.email.search.clear")}
+            onClick={clearAndFocus}
+          >
+            <Icon glyph={XCircle} />
+          </button>
+        ) : null}
+      </div>
+      <div
+        className={
+          isInline
+            ? "directory-email-search-results"
+            : "directory-email-search-popover"
         }
-        value={query}
-        onChange={(event) => changeQuery(event.target.value)}
-        onKeyDown={handleKeyDown}
-        onFocus={() => {
-          setIsFocused(true);
-          onFirstFocus();
-        }}
-        onBlur={() => setIsFocused(false)}
-      />
-      <div className="directory-email-search-popover" hidden={!isOpen}>
+        hidden={!isOpen}
+      >
         <ul
           id={listboxId}
           role="listbox"
@@ -214,6 +282,7 @@ export function RecipientSearch({
               key={suggestion.candidate.userId}
               translate={translate}
               id={optionId(index)}
+              placement={placement}
               suggestion={suggestion}
               isHighlighted={index === highlightedIndex}
               onAdd={add}
@@ -225,7 +294,7 @@ export function RecipientSearch({
             {emptyMessage}
           </p>
         )}
-        {isExpanded ? (
+        {isExpanded && !isInline ? (
           <p className="directory-email-search-keys" aria-hidden="true">
             {translate("directory.email.search.keys")}
           </p>

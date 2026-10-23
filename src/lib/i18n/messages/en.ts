@@ -1170,6 +1170,7 @@ export const englishMessages = {
     'Everyone matching "{query}" is already on the list.',
   "directory.email.search.failed": "We couldn't load the club's members.",
   "directory.email.search.retry": "Try again",
+  "directory.email.search.clear": "Clear the search",
   "directory.email.remove": "Remove {name}",
   "directory.email.noRecipients": "No one to email yet. Add members by name.",
   "directory.email.subject": "Subject",
@@ -1213,6 +1214,10 @@ export const englishMessages = {
     one: "{count} thing to fix",
     other: "{count} things to fix",
   },
+  "directory.email.errorSummaryBeforeSend": {
+    one: "{count} thing to fix before sending",
+    other: "{count} things to fix before sending",
+  },
   "directory.email.quota.left": "{remaining} of {limit} emails left today",
   "directory.email.quota.loading": "Checking how many emails are left today…",
   "directory.email.quota.unknown":
@@ -1227,6 +1232,7 @@ export const englishMessages = {
     other: "Remove {count} people or send the rest tomorrow.",
   },
   "directory.email.send": "Send to {count}",
+  "directory.email.sendShort": "Send",
   "directory.email.cancel": "Cancel",
   "directory.email.close": "Close",
   "directory.email.confirm.title": {

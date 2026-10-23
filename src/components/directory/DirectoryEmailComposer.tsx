@@ -1,8 +1,9 @@
 "use client";
 
 import { EnvelopeSimple } from "@phosphor-icons/react/dist/ssr/EnvelopeSimple";
+import { PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr/PaperPlaneTilt";
 import { X } from "@phosphor-icons/react/dist/ssr/X";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   type ApiRequestFailure,
@@ -20,9 +21,10 @@ import { formatCharacterCount } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import { Icon } from "@/components/Icon";
+import { useIsPhone } from "@/components/use-is-phone";
 import { DirectoryEmailConfirmDialog } from "./DirectoryEmailConfirmDialog";
 import { DirectoryEmailFieldError } from "./DirectoryEmailFieldError";
-import { DirectoryEmailFooter } from "./DirectoryEmailFooter";
+import { DirectoryEmailFooter, ProblemSummary } from "./DirectoryEmailFooter";
 import {
   DirectoryEmailMessageField,
   type EditorTab,
@@ -50,7 +52,13 @@ import {
  *
  * Valida con la misma función que el servidor, pero quien decide es él: las
  * bajas, el rol de quien escribe y el cupo se comprueban al enviar.
+ *
+ * En el móvil (#860) es una ventana a pantalla completa con la × y Enviar en
+ * la barra de arriba; el formulario es el mismo.
  */
+
+/** Por debajo de 768 px el redactor es la ventana del móvil. */
+export type ComposerLayout = "desktop" | "phone";
 
 export type EmailRecipient = {
   readonly userId: string;
@@ -209,6 +217,16 @@ function useEmailSending(onSettled: (settlement: Settlement) => void): {
   return { isSending, send };
 }
 
+/** Quien lo abre desde el directorio llega al formulario, no se queda
+ * arriba: el foco va al título en cuanto se pinta. */
+function useFocusedTitle(): React.RefObject<HTMLHeadingElement | null> {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+  return titleRef;
+}
+
 function ComposerHeader({
   translate,
   titleId,
@@ -218,12 +236,7 @@ function ComposerHeader({
   readonly titleId: string;
   readonly onClose: () => void;
 }): React.JSX.Element {
-  const titleRef = useRef<HTMLHeadingElement>(null);
-
-  // Quien lo abre desde el directorio llega al formulario, no se queda arriba.
-  useEffect(() => {
-    titleRef.current?.focus();
-  }, []);
+  const titleRef = useFocusedTitle();
 
   return (
     <div className="directory-email-header">
@@ -245,6 +258,93 @@ function ComposerHeader({
         <Icon glyph={X} />
       </button>
     </div>
+  );
+}
+
+/** El Enviar de la barra del móvil: dice "Enviar" y se nombra con la cuenta,
+ * como el del pie de escritorio. Está fuera del formulario y lo envía por su
+ * id. */
+function PhoneSendButton({
+  translate,
+  formId,
+  recipientCount,
+  canSend,
+}: {
+  readonly translate: Translator;
+  readonly formId: string;
+  readonly recipientCount: number;
+  readonly canSend: boolean;
+}): React.JSX.Element {
+  return (
+    <button
+      type="submit"
+      form={formId}
+      className="auth-submit directory-email-screen-send"
+      aria-label={translate("directory.email.send", { count: recipientCount })}
+      disabled={!canSend}
+    >
+      <Icon glyph={PaperPlaneTilt} />
+      {translate("directory.email.sendShort")}
+    </button>
+  );
+}
+
+/** El redactor del móvil: un `<dialog>` modal que ocupa la pantalla. Se
+ * cierra con `close`, y no desmontándolo, para que el foco vuelva a lo que lo
+ * abrió cuando lo de detrás ya no está inerte. */
+function PhoneComposerScreen({
+  translate,
+  titleId,
+  screenRef,
+  sendButton,
+  onClosed,
+  children,
+}: {
+  readonly translate: Translator;
+  readonly titleId: string;
+  readonly screenRef: React.RefObject<HTMLDialogElement | null>;
+  /** Nada cuando ya se envió: no queda formulario que enviar. */
+  readonly sendButton: React.ReactNode;
+  /** Ya cerrado: quien lo abrió lo desmonta. */
+  readonly onClosed: () => void;
+  readonly children: React.ReactNode;
+}): React.JSX.Element {
+  const titleRef = useFocusedTitle();
+
+  // Antes que los efectos: el del título lleva el foco, y `showModal` lo
+  // movería al primer control si fuera después.
+  useLayoutEffect(() => {
+    screenRef.current?.showModal();
+  }, [screenRef]);
+
+  return (
+    <dialog
+      ref={screenRef}
+      className="directory-email-screen"
+      aria-labelledby={titleId}
+      onClose={onClosed}
+    >
+      <div className="directory-email-screen-bar">
+        <button
+          type="button"
+          className="directory-email-close"
+          aria-label={translate("directory.email.close")}
+          onClick={() => screenRef.current?.close()}
+        >
+          <Icon glyph={X} />
+        </button>
+        <h2 id={titleId} ref={titleRef} tabIndex={-1}>
+          {translate("directory.email.title")}
+        </h2>
+        {sendButton}
+      </div>
+      <div className="directory-email-screen-body">
+        <p className="directory-email-screen-lead">
+          {translate("directory.email.lead")}
+        </p>
+        {children}
+      </div>
+    </dialog>
   );
 }
 
@@ -323,6 +423,9 @@ export function DirectoryEmailComposer({
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const titleId = useId();
+  const formId = useId();
+  const layout: ComposerLayout = useIsPhone() ? "phone" : "desktop";
+  const screenRef = useRef<HTMLDialogElement>(null);
   const [recipients, setRecipients] = useState(initialRecipients);
   const [phase, setPhase] = useState<Phase>({ kind: "editing", notice: null });
   const editor = useEmailDraft();
@@ -330,6 +433,10 @@ export function DirectoryEmailComposer({
   const { isSending, send } = useEmailSending(showSettlement);
   const known = knownQuota(quota);
   const isOverQuota = known !== null && recipients.length > known.remaining;
+  const canSend = recipients.length > 0 && !isOverQuota;
+  const problemCount = countProblems(editor.problems);
+  // En el móvil se cierra la ventana, que avisa con `onClose` al cerrarse.
+  const close = layout === "phone" ? () => screenRef.current?.close() : onClose;
 
   function showSettlement(settlement: Settlement): void {
     if (settlement.kind === "sent") {
@@ -359,7 +466,7 @@ export function DirectoryEmailComposer({
 
   function submit(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    if (!editor.validate() || recipients.length === 0 || isOverQuota) {
+    if (!editor.validate() || !canSend) {
       return;
     }
     setPhase({ kind: "confirming", requestId: crypto.randomUUID() });
@@ -375,28 +482,33 @@ export function DirectoryEmailComposer({
     editor.subjectRef.current?.focus();
   }
 
-  return (
-    <section
-      className="admin-section directory-email"
-      aria-labelledby={titleId}
-    >
-      <ComposerHeader
-        translate={translate}
-        titleId={titleId}
-        onClose={onClose}
-      />
+  const body = (
+    <>
       {phase.kind === "sent" ? (
         <DirectoryEmailSent
           translate={translate}
           result={phase.result}
           onWriteAnother={writeAnother}
-          onClose={onClose}
+          onClose={close}
         />
       ) : (
-        <form className="directory-email-form" onSubmit={submit} noValidate>
+        <form
+          id={formId}
+          className="directory-email-form"
+          onSubmit={submit}
+          noValidate
+        >
           <div className="directory-email-fields">
+            {layout === "phone" ? (
+              <ProblemSummary
+                translate={translate}
+                layout={layout}
+                count={problemCount}
+              />
+            ) : null}
             <DirectoryEmailRecipients
               translate={translate}
+              layout={layout}
               recipients={recipients}
               onChange={setRecipients}
             />
@@ -436,10 +548,11 @@ export function DirectoryEmailComposer({
           </div>
           <DirectoryEmailFooter
             translate={translate}
+            layout={layout}
             quota={quota}
-            problemCount={countProblems(editor.problems)}
+            problemCount={problemCount}
             recipientCount={recipients.length}
-            canSend={recipients.length > 0 && !isOverQuota}
+            canSend={canSend}
             onCancel={onClose}
           />
         </form>
@@ -465,6 +578,42 @@ export function DirectoryEmailComposer({
           }}
         />
       ) : null}
+    </>
+  );
+
+  if (layout === "phone") {
+    return (
+      <PhoneComposerScreen
+        translate={translate}
+        titleId={titleId}
+        screenRef={screenRef}
+        sendButton={
+          phase.kind === "sent" ? null : (
+            <PhoneSendButton
+              translate={translate}
+              formId={formId}
+              recipientCount={recipients.length}
+              canSend={canSend}
+            />
+          )
+        }
+        onClosed={onClose}
+      >
+        {body}
+      </PhoneComposerScreen>
+    );
+  }
+  return (
+    <section
+      className="admin-section directory-email"
+      aria-labelledby={titleId}
+    >
+      <ComposerHeader
+        translate={translate}
+        titleId={titleId}
+        onClose={onClose}
+      />
+      {body}
     </section>
   );
 }

@@ -6559,6 +6559,350 @@ a.groups-icon-button {
     animation: none;
   }
 }
+/* El redactor del móvil (#860, "Layout — mobile" del handoff de E33): una
+   ventana que ocupa la pantalla, con la × de 44 px, el título y Enviar de
+   40 px en una barra de 56. Todo cuelga de la ventana y no de un corte de
+   ancho: la ventana sólo existe cuando el código ya decidió que es un
+   móvil. Sólo se pinta abierta: el `display` de aquí taparía el `none` del
+   `<dialog>` cerrado. */
+.directory-email-screen[open] {
+  display: flex;
+  flex-direction: column;
+  inset: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: none;
+}
+
+.directory-email-screen-bar {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 56px;
+  padding: env(safe-area-inset-top) var(--space-3) 0 var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.directory-email-screen-bar .directory-email-close {
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  font-size: 22px;
+}
+
+.directory-email-screen-bar h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directory-email-screen-bar h2:focus {
+  outline: none;
+}
+
+.directory-email-screen-send {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-2);
+  align-items: center;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  font-size: 15px;
+  border-radius: 10px;
+}
+
+.directory-email-screen-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-3) var(--space-4)
+    calc(var(--space-4) + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+.directory-email-screen-lead {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+/* Los errores, encima de los campos y lejos de Enviar: una caja como la de
+   los demás avisos de error. */
+.directory-email-screen .directory-email-problems {
+  padding: var(--space-3);
+  background: var(--color-panel);
+  border: 1px solid var(--color-danger);
+  border-radius: 10px;
+}
+
+/* Las fichas: 32 px con avatar de 22 y texto de 13,5. La × se ve de 30 px y
+   se pulsa en 44: la zona que se toca la amplía un pseudo-elemento. Sin la
+   caja del escritorio, que aquí sólo llevaría las fichas. */
+.directory-email-screen .directory-email-to-box {
+  gap: var(--space-2);
+  min-height: 0;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+.directory-email-screen .directory-email-chip {
+  gap: 6px;
+  height: 32px;
+  padding: 0 0 0 5px;
+  font-size: 13.5px;
+}
+
+.directory-email-screen .directory-email-chip .directory-email-avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 9px;
+}
+
+.directory-email-screen .directory-email-chip-remove {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+}
+
+.directory-email-screen .directory-email-chip-remove::after {
+  position: absolute;
+  inset: calc((30px - var(--touch-target-min)) / 2);
+  content: "";
+}
+
+.directory-email-screen .directory-email-more {
+  height: 32px;
+  padding: 0 var(--space-3);
+  font-size: 13.5px;
+}
+
+/* La búsqueda, aparte y de 46 px, con texto de 16 para que iOS no acerque
+   la página; los resultados, en línea debajo y en filas de 58 px. */
+.directory-email-search[data-placement="inline"] {
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.directory-email-search-field {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+[data-placement="inline"] .directory-email-search-field {
+  height: 46px;
+  padding: 0 0 0 var(--space-3);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+[data-placement="inline"] .directory-email-search-field:focus-within {
+  border-color: var(--color-accent);
+}
+
+[data-placement="inline"] .directory-email-search-icon {
+  font-size: 18px;
+}
+
+[data-placement="inline"] .directory-email-search input {
+  height: 100%;
+  font-size: 16px;
+}
+
+.directory-email-search-clear {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  font-size: 20px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.directory-email-search-results {
+  overflow: hidden;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.directory-email-search-results ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.directory-email-search-results .directory-email-option {
+  min-height: 58px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 0;
+}
+
+.directory-email-search-results li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.directory-email-search-results .directory-email-avatar {
+  width: 34px;
+  height: 34px;
+  font-size: 11px;
+}
+
+.directory-email-search-results .directory-email-option-name {
+  font-size: 15px;
+}
+
+.directory-email-search-results .directory-email-option-meta {
+  font-size: 13px;
+}
+
+.directory-email-option-add {
+  display: inline-flex;
+  flex: none;
+  font-size: 20px;
+  color: var(--color-accent-text);
+}
+
+.directory-email-option[aria-selected="true"] .directory-email-option-add {
+  color: var(--color-accent-soft-text);
+}
+
+/* El asunto de 48 px, Escribir | Vista previa a todo el ancho y de 38, los
+   cinco botones del formato de 44 y el mensaje con texto de 16. La chuleta
+   de la sintaxis no cabe junto a los botones: la ayuda de debajo la dice. */
+.directory-email-screen .directory-email-subject {
+  height: 48px;
+  font-size: 16px;
+}
+
+.directory-email-screen .directory-email-label-row {
+  flex-wrap: wrap;
+}
+
+.directory-email-screen .directory-email-tabs {
+  display: flex;
+  flex: 1 0 100%;
+}
+
+.directory-email-screen .directory-email-tab {
+  flex: 1 1 0;
+  justify-content: center;
+  height: 32px;
+  font-size: 14px;
+}
+
+.directory-email-screen .directory-email-tab::after {
+  inset: calc((32px - var(--touch-target-min)) / 2) 0;
+}
+
+.directory-email-screen .directory-email-toolbar {
+  gap: 0;
+}
+
+.directory-email-screen .directory-email-toolbar-button {
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  font-size: 20px;
+}
+
+.directory-email-screen .directory-email-syntax {
+  display: none;
+}
+
+.directory-email-screen .directory-email-area {
+  min-height: 240px;
+  font-size: 16px;
+}
+
+/* El cupo, al final del scroll y sin el fondo del pie de escritorio. */
+.directory-email-screen .directory-email-footer {
+  margin: 0;
+  padding: var(--space-3) 0 0;
+  background: none;
+  border-radius: 0;
+}
+
+.directory-email-screen .directory-email-quota {
+  flex: 1 1 auto;
+}
+
+.directory-email-screen .directory-email-quota-bar {
+  width: 100%;
+}
+
+/* La confirmación, como hoja de abajo con el radio de 20 arriba, el asa y
+   botones de 48 px. */
+.directory-email-dialog-grip {
+  display: none;
+}
+
+.directory-email-screen .directory-email-dialog {
+  inset: auto 0 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  border-width: 1px 0 0;
+  border-radius: 20px 20px 0 0;
+}
+
+.directory-email-screen .directory-email-dialog .event-dialog-panel {
+  padding: var(--space-2) var(--space-4)
+    calc(var(--space-4) + env(safe-area-inset-bottom));
+}
+
+.directory-email-screen .directory-email-dialog-grip {
+  display: block;
+  flex: none;
+  width: 36px;
+  height: 4px;
+  margin: 0 auto var(--space-1);
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+.directory-email-screen
+  .directory-email-dialog-header
+  .directory-email-header-icon {
+  display: none;
+}
+
+.directory-email-screen .directory-email-dialog-actions {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+}
+
+.directory-email-screen .directory-email-dialog-actions button {
+  height: 48px;
+  min-height: 48px;
+  padding: 0 var(--space-3);
+}
 
 /* El panel de invitar a un socio (#862, docs/design/design_handoff_invite,
    "Layout"): bajo la cabecera del Directorio, como el redactor de correo y
