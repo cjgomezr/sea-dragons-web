@@ -4897,9 +4897,10 @@ a.groups-icon-button {
   color: var(--color-text-secondary);
 }
 
-/* La ficha "Sin activar" ocupa la tercera columna; sin ficha queda vacía. */
-.groups-member-pill {
-  grid-column: 3;
+/* La ficha de aviso: "Sin activar" en los grupos, "Ya no viene" en la
+ * alineación publicada (#839). */
+.groups-member-pill,
+.event-lineup-pill {
   padding: 2px var(--space-2);
   font-size: 12px;
   font-weight: 600;
@@ -4907,6 +4908,11 @@ a.groups-icon-button {
   white-space: nowrap;
   background: color-mix(in srgb, var(--color-warning) 22%, var(--color-panel));
   border-radius: 999px;
+}
+
+/* En los grupos ocupa la tercera columna; sin ficha queda vacía. */
+.groups-member-pill {
+  grid-column: 3;
 }
 
 .groups-member-remove {
@@ -14496,6 +14502,7 @@ a.groups-icon-button {
    color-mix, como los chips de tipo: el texto sigue en el color de siempre y
    el contraste no depende del color que eligiera el coach. */
 .event-teams {
+  container: event-teams / inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -14554,7 +14561,9 @@ a.groups-icon-button {
   gap: var(--space-3);
 }
 
-@media (min-width: 768px) {
+/* Dos columnas sólo si caben: en escritorio el panel del evento mide unos
+ * 350 px y partidos en dos los nombres se cortaban por la mitad (#839). */
+@container event-teams (min-width: 380px) {
   .event-lineups {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -14597,6 +14606,21 @@ a.groups-icon-button {
 .event-lineup-name {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* Quien ya no viene: el nombre tachado en gris y la ficha, que baja de
+ * línea si el nombre no la deja caber. */
+.event-lineup-not-coming {
+  display: inline-flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+.event-lineup-not-coming s {
+  min-width: 0;
 }
 
 .event-lineup-player .team-position {
@@ -20725,6 +20749,18 @@ p.dashboard-next-up-line {
     var(--color-background)
   );
   border: 1px solid color-mix(in srgb, var(--team-color) 60%, transparent);
+}
+
+/* Quien ya no viene (#839): la franja neutra, como la del candado, y la
+   camiseta en gris. */
+.dashboard-next-up-team-not-coming {
+  background: var(--color-background);
+  border-color: var(--color-border);
+}
+
+.dashboard-next-up-team-not-coming .dashboard-next-up-team-swatch {
+  color: var(--color-text-secondary);
+  background: var(--color-panel);
 }
 
 .dashboard-next-up-team-swatch {

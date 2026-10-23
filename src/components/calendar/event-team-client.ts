@@ -28,6 +28,7 @@ export const publishedTeamSchema = z.object({
       userId: z.uuid(),
       fullName: z.string(),
       position: positionSchema.nullable(),
+      isOutsideSquad: z.boolean(),
     }),
   ),
 });
@@ -38,7 +39,11 @@ const myTeamSchema = z.discriminatedUnion("status", [
     status: z.literal("published"),
     publishedAt: z.iso.datetime(),
     me: z
-      .object({ team: z.enum(TEAM_IDS), position: positionSchema.nullable() })
+      .object({
+        team: z.enum(TEAM_IDS),
+        position: positionSchema.nullable(),
+        isOutsideSquad: z.boolean(),
+      })
       .nullable(),
     teams: z.object({ a: publishedTeamSchema, b: publishedTeamSchema }),
   }),

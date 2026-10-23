@@ -32,6 +32,32 @@ function teamBuilderHref(eventId: string): string {
   return `${TEAMS_PATH}?${TEAMS_EVENT_QUERY_PARAM}=${eventId}`;
 }
 
+/** El equipo y la posición, o que respondió que no va: sigue en el equipo
+ * hasta que el coach lo quite (#839). */
+function TeamLine({
+  translate,
+  team,
+}: {
+  readonly translate: Translator;
+  readonly team: NextUpTeam;
+}): React.JSX.Element {
+  if (team.isOutsideSquad) {
+    return (
+      <p className="dashboard-next-up-team-line">
+        {translate("dashboard.nextUp.notComing")}
+      </p>
+    );
+  }
+  return (
+    <p className="dashboard-next-up-team-line">
+      <strong>{team.name}</strong>
+      {team.position === null
+        ? null
+        : `${PART_SEPARATOR}${positionName(team.position.names, translate.locale)}`}
+    </p>
+  );
+}
+
 export function MyTeamStrip({
   translate,
   eventId,
@@ -41,9 +67,15 @@ export function MyTeamStrip({
   readonly eventId: string;
   readonly team: NextUpTeam;
 }): React.JSX.Element {
+  // Quien ya no viene sigue en el equipo, pero no "juega en" él: la franja
+  // pierde el tinte y la etiqueta lo dice sin contradecir la línea.
   return (
     <div
-      className="dashboard-next-up-team"
+      className={
+        team.isOutsideSquad
+          ? "dashboard-next-up-team dashboard-next-up-team-not-coming"
+          : "dashboard-next-up-team"
+      }
       style={{ "--team-color": team.color } as React.CSSProperties}
     >
       <span className="dashboard-next-up-team-swatch" aria-hidden="true">
@@ -51,14 +83,13 @@ export function MyTeamStrip({
       </span>
       <div className="dashboard-next-up-team-text">
         <p className="dashboard-next-up-eyebrow">
-          {translate("calendar.teams.playingInEyebrow")}
+          {translate(
+            team.isOutsideSquad
+              ? "calendar.teams.heading"
+              : "calendar.teams.playingInEyebrow",
+          )}
         </p>
-        <p className="dashboard-next-up-team-line">
-          <strong>{team.name}</strong>
-          {team.position === null
-            ? null
-            : `${PART_SEPARATOR}${positionName(team.position.names, translate.locale)}`}
-        </p>
+        <TeamLine translate={translate} team={team} />
       </div>
       <Link
         href={eventTeamsHref(eventId)}

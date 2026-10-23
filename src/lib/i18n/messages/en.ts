@@ -270,6 +270,7 @@ export const englishMessages = {
   "dashboard.nextUp.locked": "RSVP is for current members.",
   "dashboard.nextUp.renew": "Renew",
   "dashboard.nextUp.seeTeams": "See teams",
+  "dashboard.nextUp.notComing": "You said you can't make it",
   // La frase va en tres trozos para poner en negrita el del medio; el último
   // lleva su espacio delante porque en español no lo hay.
   "dashboard.nextUp.draft.start": "Teams are saved but",
@@ -1914,6 +1915,8 @@ export const englishMessages = {
   "calendar.teams.noPosition": "No position",
   "calendar.teams.notAssigned": "You're not in either team for this event.",
   "calendar.teams.noPlayers": "Nobody in this team yet.",
+  "calendar.teams.notComing": "Can't make it",
+  "calendar.teams.notComingPlayer": "{name}, can't make it",
   "calendar.teams.error": "The teams could not be loaded.",
   "calendar.teams.retry": "Load the teams again",
   "calendar.teams.color.red": "red",

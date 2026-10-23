@@ -15,7 +15,7 @@ import {
   type TeamId,
   type TeamLabel,
   type TeamSplitsGateway,
-  readSquadEntries,
+  readAssignedEntries,
 } from "./team-builder";
 
 /**
@@ -38,7 +38,7 @@ export type MyTeamGateways = {
   readonly memberGroups: MemberGroupsGateway;
   readonly teams: Pick<
     TeamSplitsGateway,
-    "findEvent" | "findSplit" | "findPlayers"
+    "findEvent" | "findSplit" | "findPlayers" | "findLiveResponses"
   >;
   readonly positions: ClubPositionsGateway;
 };
@@ -47,6 +47,16 @@ export type LineupPlayer = {
   readonly userId: string;
   readonly fullName: string;
   readonly position: NamedPosition | null;
+  /** Respondió que no va, o salió de la escuadra, después de publicarse:
+   * sigue en su equipo hasta que el coach lo quite (§6 del PRD de E10). */
+  readonly isOutsideSquad: boolean;
+};
+
+/** El sitio de quien mira en el reparto. */
+export type MyPlace = {
+  readonly team: TeamId;
+  readonly position: NamedPosition | null;
+  readonly isOutsideSquad: boolean;
 };
 
 export type PublishedTeam = TeamLabel & {
@@ -59,10 +69,7 @@ export type MyTeam =
       readonly status: "published";
       readonly publishedAt: string;
       /** `null` si quien pregunta no está en ningún equipo. */
-      readonly me: {
-        readonly team: TeamId;
-        readonly position: NamedPosition | null;
-      } | null;
+      readonly me: MyPlace | null;
       readonly teams: { readonly [Team in TeamId]: PublishedTeam };
     };
 
@@ -128,11 +135,12 @@ function byName(first: LineupPlayer, second: LineupPlayer): number {
 
 async function toLineups(
   gateways: MyTeamGateways,
-  clubId: string,
+  event: TeamBuilderEvent,
   split: PublishedSplit,
 ): Promise<{ readonly [Team in TeamId]: PublishedTeam }> {
-  const entries = await readSquadEntries(gateways, {
-    clubId,
+  const entries = await readAssignedEntries(gateways, {
+    clubId: event.clubId,
+    eventId: event.id,
     userIds: split.assignments.map((assignment) => assignment.userId),
   });
   const lineupOf = (team: TeamId): PublishedTeam => ({
@@ -148,6 +156,7 @@ async function toLineups(
                 userId: entry.userId,
                 fullName: entry.fullName,
                 position: entry.position,
+                isOutsideSquad: entry.isOutsideSquad,
               },
             ];
       })
@@ -159,13 +168,17 @@ async function toLineups(
 function findMe(
   teams: { readonly [Team in TeamId]: PublishedTeam },
   callerId: string,
-): { readonly team: TeamId; readonly position: NamedPosition | null } | null {
+): MyPlace | null {
   for (const team of TEAM_IDS) {
     const player = teams[team].players.find(
       (candidate) => candidate.userId === callerId,
     );
     if (player !== undefined) {
-      return { team, position: player.position };
+      return {
+        team,
+        position: player.position,
+        isOutsideSquad: player.isOutsideSquad,
+      };
     }
   }
   return null;
@@ -190,7 +203,7 @@ export async function openMyTeam(
   if (split === null) {
     return NOT_PUBLISHED;
   }
-  const teams = await toLineups(gateways, viewer.clubId, split);
+  const teams = await toLineups(gateways, event, split);
   return {
     status: "published",
     publishedAt: split.publishedAt.toISOString(),

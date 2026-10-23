@@ -268,6 +268,7 @@ export const spanishMessages: MessageCatalog = {
   "dashboard.nextUp.locked": "Responder es para miembros al día.",
   "dashboard.nextUp.renew": "Renovar",
   "dashboard.nextUp.seeTeams": "Ver equipos",
+  "dashboard.nextUp.notComing": "Respondiste que no puedes ir",
   "dashboard.nextUp.draft.start": "Los equipos están guardados pero",
   "dashboard.nextUp.draft.emphasis": "sin publicar",
   "dashboard.nextUp.draft.end": ".",
@@ -1912,6 +1913,8 @@ export const spanishMessages: MessageCatalog = {
   "calendar.teams.notAssigned":
     "No estás en ninguno de los equipos de este evento.",
   "calendar.teams.noPlayers": "Este equipo todavía no tiene jugadores.",
+  "calendar.teams.notComing": "Ya no viene",
+  "calendar.teams.notComingPlayer": "{name}, ya no viene",
   "calendar.teams.error": "No pudimos cargar los equipos.",
   "calendar.teams.retry": "Volver a cargar los equipos",
   "calendar.teams.color.red": "rojo",

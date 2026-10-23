@@ -17973,13 +17973,21 @@ function lineupPlayer(
     userId: `7f7f7f7f-0000-4000-8000-${String(index).padStart(12, "0")}`,
     fullName,
     position: position === null ? null : CALENDAR_TEAM_POSITIONS[position],
+    isOutsideSquad: false,
   };
 }
+
+const LONG_LINEUP_NAME =
+  "Maximiliana Alejandra Fernández-Rodríguez de la Torre";
 
 const PUBLISHED_TEAMS = {
   status: "published",
   publishedAt: "2026-06-20T08:00:00.000Z",
-  me: { team: "a", position: CALENDAR_TEAM_POSITIONS.forward },
+  me: {
+    team: "a",
+    position: CALENDAR_TEAM_POSITIONS.forward,
+    isOutsideSquad: false,
+  },
   teams: {
     a: {
       name: "Team Kelp",
@@ -18001,11 +18009,7 @@ const PUBLISHED_TEAMS = {
         lineupPlayer(8, "Grace Lee", "goalkeeper"),
         lineupPlayer(9, "Hamish MacLeod", "defender"),
         lineupPlayer(10, "Liam O'Connor", "forward"),
-        lineupPlayer(
-          11,
-          "Maximiliana Alejandra Fernández-Rodríguez de la Torre",
-          "defender",
-        ),
+        lineupPlayer(11, LONG_LINEUP_NAME, "defender"),
         lineupPlayer(12, "Sam Patel", null),
       ],
     },
@@ -18013,6 +18017,31 @@ const PUBLISHED_TEAMS = {
 } as const;
 
 const UNASSIGNED_TEAMS = { ...PUBLISHED_TEAMS, me: null } as const;
+
+// Dos que respondieron "No puedo ir" después de publicarse (#839): siguen en
+// su sitio, tachados y con la ficha. El nombre largo prueba que a 320 px la
+// ficha baja de línea sin abrir scroll horizontal.
+const NOT_COMING_TEAMS = {
+  ...PUBLISHED_TEAMS,
+  teams: {
+    a: {
+      ...PUBLISHED_TEAMS.teams.a,
+      players: PUBLISHED_TEAMS.teams.a.players.map((player) =>
+        player.fullName === "Mateo Restrepo"
+          ? { ...player, isOutsideSquad: true }
+          : player,
+      ),
+    },
+    b: {
+      ...PUBLISHED_TEAMS.teams.b,
+      players: PUBLISHED_TEAMS.teams.b.players.map((player) =>
+        player.fullName === LONG_LINEUP_NAME
+          ? { ...player, isOutsideSquad: true }
+          : player,
+      ),
+    },
+  },
+} as const;
 
 type CalendarReads = {
   readonly events: readonly unknown[];
@@ -18200,6 +18229,33 @@ async function openFirstPanelWithTeams(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+/** En escritorio el panel del evento mide como mucho la ventana y corta en
+ * la cabecera de los equipos (#839). La captura alarga la ventana hasta que
+ * el panel entero cabe sin su scroll, y se ve a quien ya no viene. Bajar el
+ * scroll del panel no servía: la ventana de 1×1 de la captura de página
+ * entera lo devolvía arriba, y alargar la ventana poco a poco no acababa
+ * nunca, porque el panel crece con ella. */
+async function showNotComingTeammates(page: Page): Promise<void> {
+  await openFirstPanelWithTeams(page);
+  const viewport = page.viewportSize();
+  if (viewport === null) {
+    throw new Error("La página no tiene un tamaño de ventana fijo.");
+  }
+  const panelBottom = await eventPanel(
+    page,
+    STUBBED_AGENDA_EVENTS[0].title,
+  ).evaluate(
+    (panel) =>
+      panel.getBoundingClientRect().top + window.scrollY + panel.scrollHeight,
+  );
+  await page.setViewportSize({
+    width: viewport.width,
+    height: Math.max(viewport.height, Math.ceil(panelBottom)),
+  });
+  await fitViewportToPage(page);
+  await page.mouse.move(0, 0);
+}
+
 /** Cambia a los pasados y espera a que estén pintados. */
 async function showPastEvents(page: Page): Promise<void> {
   await waitForAgendaRows(page);
@@ -18325,6 +18381,19 @@ const CALENDAR_STATES: readonly CalendarState[] = [
     teams: UNASSIGNED_TEAMS,
     beforeVisit: chooseSpanish,
     ready: openFirstPanelWithTeams,
+  },
+  {
+    ...CALENDAR_EXPANDED_AS_PLAYER,
+    name: "evento-equipos-ya-no-viene",
+    teams: NOT_COMING_TEAMS,
+    ready: showNotComingTeammates,
+  },
+  {
+    ...CALENDAR_EXPANDED_AS_PLAYER,
+    name: "evento-equipos-ya-no-viene-es",
+    teams: NOT_COMING_TEAMS,
+    beforeVisit: chooseSpanish,
+    ready: showNotComingTeammates,
   },
   {
     name: "calendario-sin-membresia",
@@ -24069,6 +24138,7 @@ const DASHBOARD_MY_TEAM = {
     id: "d0d0d0d0-0000-4000-8000-0000000000d7",
     names: { en: "Full back", es: "Defensa" },
   },
+  isOutsideSquad: false,
 } as const;
 
 // Las noticias del inicio (#751): la fijada con extracto, que va destacada
@@ -24275,6 +24345,16 @@ const MY_TEAM_DASHBOARD = {
   nextUp: { ...DASHBOARD_NEXT_UP, myTeam: DASHBOARD_MY_TEAM },
 };
 
+// Quien juega pero respondió que no puede ir después de publicarse (#839).
+const NOT_COMING_DASHBOARD = {
+  ...PLAYER_DASHBOARD,
+  nextUp: {
+    ...DASHBOARD_NEXT_UP,
+    myResponse: "no",
+    myTeam: { ...DASHBOARD_MY_TEAM, isOutsideSquad: true },
+  },
+};
+
 const UNPUBLISHED_TEAMS_DASHBOARD = {
   ...ADMIN_DASHBOARD,
   nextUp: { ...DASHBOARD_NEXT_UP, teamsStatus: "draft" },
@@ -24443,6 +24523,11 @@ const DASHBOARD_STATES: readonly DashboardScreenState[] = [
   ...dashboardStates(
     "inicio-proximo-equipo",
     MY_TEAM_DASHBOARD,
+    E2E_STORAGE_STATE_PATH,
+  ),
+  ...dashboardStates(
+    "inicio-proximo-ya-no-viene",
+    NOT_COMING_DASHBOARD,
     E2E_STORAGE_STATE_PATH,
   ),
   ...dashboardStates(

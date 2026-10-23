@@ -75,7 +75,10 @@ const nextUpEventSchema = agendaEventSchema
     audience: audienceSchema,
     myTeam: publishedTeamSchema
       .pick({ name: true, color: true })
-      .extend({ position: positionSchema.nullable() })
+      .extend({
+        position: positionSchema.nullable(),
+        isOutsideSquad: z.boolean(),
+      })
       .nullable(),
     // Sólo a Admin y Coach (RF-2 de E27).
     teamsStatus: z.enum(["none", "draft", "published"]).optional(),
