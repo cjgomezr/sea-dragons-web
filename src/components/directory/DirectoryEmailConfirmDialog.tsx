@@ -18,6 +18,10 @@ import { type QuotaState, isQuotaLow } from "./use-directory-email-quota";
  * si cabe es el servidor al enviar. Un `<dialog>` modal trae el rol, la capa
  * modal y lo que queda detrás inerte; mientras manda no se cierra con Escape,
  * porque lo que el servidor responda tiene que verse.
+ *
+ * En el móvil (#860) la hoja de estilos lo pega abajo como una hoja, con su
+ * asa. El asa sólo dibuja: Cancelar y Escape ya lo cierran, y mientras manda
+ * no tiene que poder cerrarse.
  */
 
 function QuotaNote({
@@ -197,6 +201,7 @@ export function DirectoryEmailConfirmDialog({
       }}
     >
       <form className="event-dialog-panel" onSubmit={submit}>
+        <span className="directory-email-dialog-grip" aria-hidden="true" />
         <div className="directory-email-dialog-header">
           <span className="directory-email-header-icon" aria-hidden="true">
             <Icon glyph={PaperPlaneTilt} />

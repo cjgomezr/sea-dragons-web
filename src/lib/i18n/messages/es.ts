@@ -1162,6 +1162,7 @@ export const spanishMessages: MessageCatalog = {
     'Todos los que coinciden con "{query}" ya están en la lista.',
   "directory.email.search.failed": "No pudimos cargar a los miembros del club.",
   "directory.email.search.retry": "Reintentar",
+  "directory.email.search.clear": "Vaciar la búsqueda",
   "directory.email.remove": "Quitar a {name}",
   "directory.email.noRecipients":
     "Todavía no hay a quién escribir. Añade miembros por su nombre.",
@@ -1206,6 +1207,10 @@ export const spanishMessages: MessageCatalog = {
     one: "{count} cosa por arreglar",
     other: "{count} cosas por arreglar",
   },
+  "directory.email.errorSummaryBeforeSend": {
+    one: "{count} cosa por arreglar antes de enviar",
+    other: "{count} cosas por arreglar antes de enviar",
+  },
   "directory.email.quota.left": "{remaining} de {limit} correos libres hoy",
   "directory.email.quota.loading": "Mirando cuántos correos quedan hoy…",
   "directory.email.quota.unknown":
@@ -1220,6 +1225,7 @@ export const spanishMessages: MessageCatalog = {
     other: "Quita a {count} personas o envía el resto mañana.",
   },
   "directory.email.send": "Enviar a {count}",
+  "directory.email.sendShort": "Enviar",
   "directory.email.cancel": "Cancelar",
   "directory.email.close": "Cerrar",
   "directory.email.confirm.title": {

@@ -1409,3 +1409,138 @@ describe("en el directorio", () => {
     ).toBeNull();
   });
 });
+
+/* En el móvil (#860, RF-6 del PRD de E33) el redactor es una ventana a
+   pantalla completa con Enviar arriba. El ancho lo dice `matchMedia`, que
+   aquí se simula; las medidas y el scroll a 320 px los prueba Playwright. */
+describe("en el móvil", () => {
+  const PHONE_QUERY = "(width < 768px)";
+  const MARTA = {
+    userId: "d1d1d1d1-0000-4000-8000-000000000001",
+    fullName: "Marta Gil",
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === PHONE_QUERY,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }));
+  });
+
+  function composerScreen(): HTMLElement {
+    return screen.getByRole("dialog", { name: "Escribir a los miembros" });
+  }
+
+  it("es una ventana modal con la × y Enviar en la barra de arriba", async () => {
+    const { onClose } = renderComposer();
+
+    const composer = composerScreen();
+    expect(composer).toHaveAttribute("open");
+    const send = within(composer).getByRole("button", { name: "Enviar a 2" });
+    expect(send.textContent).toBe("Enviar");
+    await userEvent
+      .setup()
+      .click(within(composer).getByRole("button", { name: "Cerrar" }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("el pie deja el cupo y no repite Cancelar ni Enviar", async () => {
+    renderComposer();
+
+    await waitForQuota(38);
+
+    expect(screen.queryByRole("button", { name: "Cancelar" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^Enviar/ })).toHaveLength(1);
+  });
+
+  it("Enviar de la barra abre la confirmación", async () => {
+    renderComposer();
+    await fillDraft();
+
+    await userEvent.setup().click(sendButton());
+
+    expect(
+      await screen.findByRole("dialog", { name: "¿Enviar a 2 miembros?" }),
+    ).toBeTruthy();
+  });
+
+  it("cerrar la confirmación con Escape vuelve al redactor con el borrador", async () => {
+    const { onClose } = renderComposer();
+    const confirmation = await openConfirmation();
+
+    // Escape o el Atrás de Android cierran el diálogo con su evento `close`.
+    fireEvent(confirmation, new Event("close"));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(composerScreen()).toHaveAttribute("open");
+    expect(subjectBox().value).toBe("Entreno");
+  });
+
+  it("con 25, enseña 6 fichas y +19 más", () => {
+    renderWithRecipients(membersNumbered(25));
+
+    expect(recipientNames()).toHaveLength(6);
+    expect(
+      screen.getByRole("button", { name: "Ver los 25 destinatarios" })
+        .textContent,
+    ).toBe("+19 más");
+  });
+
+  it("con 7, las enseña todas sin +N más", () => {
+    renderWithRecipients(membersNumbered(7));
+
+    expect(recipientNames()).toHaveLength(7);
+    expect(screen.queryByRole("button", { name: /^Ver los / })).toBeNull();
+  });
+
+  it("los resultados siguen en línea al salir del buscador, con un + por fila", async () => {
+    stubApi({ directory: directoryResponse([MARTA]) });
+    renderComposer();
+    const user = userEvent.setup();
+
+    await user.type(searchBox(), "mar");
+    await screen.findByRole("option", { name: /Marta Gil/ });
+    await user.click(subjectBox());
+
+    const option = screen.getByRole("option", { name: /Marta Gil/ });
+    expect(option.querySelector(".directory-email-option-add")).not.toBeNull();
+    expect(option.textContent).not.toContain("Añadir");
+  });
+
+  it("el botón de vaciar borra la búsqueda y deja el foco en el campo", async () => {
+    stubApi({ directory: directoryResponse([MARTA]) });
+    renderComposer();
+    const user = userEvent.setup();
+
+    expect(
+      screen.queryByRole("button", { name: "Vaciar la búsqueda" }),
+    ).toBeNull();
+    await user.type(searchBox(), "mar");
+    await user.click(
+      screen.getByRole("button", { name: "Vaciar la búsqueda" }),
+    );
+
+    expect(searchBox().value).toBe("");
+    expect(document.activeElement).toBe(searchBox());
+    expect(screen.queryByRole("option")).toBeNull();
+  });
+
+  it("con errores, dice cuántas cosas arreglar antes de enviar encima de los campos", async () => {
+    renderComposer();
+
+    await userEvent.setup().click(sendButton());
+
+    const summary = screen.getByText("2 cosas por arreglar antes de enviar");
+    const recipients = screen.getByRole("list", { name: "2 destinatarios" });
+    expect(
+      summary.compareDocumentPosition(recipients) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.queryByText("2 cosas por arreglar")).toBeNull();
+  });
+});

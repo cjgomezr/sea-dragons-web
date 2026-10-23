@@ -2484,7 +2484,7 @@ describe("en el móvil (#831)", () => {
       ).toBeVisible();
     });
 
-    it("Escribir a todos abre el redactor con los activos del grupo", async () => {
+    it("Escribir a todos abre el redactor a pantalla completa con los activos del grupo", async () => {
       const user = userEvent.setup();
       stubApi({ groups: [SENIOR], members: [NEREA, PENDING_TOMAS] });
       await renderScreen();
@@ -2494,8 +2494,9 @@ describe("en el móvil (#831)", () => {
         within(panel).getByRole("button", { name: "Email all" }),
       );
 
+      // En el móvil el redactor es una ventana (#860), no un panel.
       expect(
-        await screen.findByRole("region", { name: "Email members" }),
+        await screen.findByRole("dialog", { name: "Email members" }),
       ).toHaveTextContent("Nerea Ruiz");
     });
 

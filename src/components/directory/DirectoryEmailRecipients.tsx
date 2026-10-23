@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { memberInitials } from "@/lib/auth/member-initials";
 import type { Translator } from "@/lib/i18n/translator";
-import type { EmailRecipient } from "./DirectoryEmailComposer";
+import type { ComposerLayout, EmailRecipient } from "./DirectoryEmailComposer";
 import { RecipientSearch } from "./RecipientSearch";
 import { useRecipientCandidates } from "./use-recipient-candidates";
 
@@ -14,12 +14,17 @@ import { useRecipientCandidates } from "./use-recipient-candidates";
  * El "Para" del correo (#858, RF-2 y D10 del PRD de E33): una caja con una
  * ficha por destinatario y el buscador, que saltan de línea juntos. Desde
  * Grupos llegan veinte o más, así que una lista larga se pliega.
+ *
+ * En el móvil (#860) se pliega antes, y el buscador va debajo de la caja, con
+ * los resultados en línea.
  */
 
-/** Con más de estas se pliega: esconder una sola detrás de "+1 más" no
- * ahorra sitio. */
-const UNFOLDED_MAX_COUNT = 11;
-const FOLDED_VISIBLE_COUNT = 10;
+/** Cuántas fichas se ven plegada la lista. Sólo se pliega con dos o más
+ * de más: esconder una sola detrás de "+1 más" no ahorra sitio. */
+const FOLDED_VISIBLE_COUNT: Readonly<Record<ComposerLayout, number>> = {
+  desktop: 10,
+  phone: 6,
+};
 /** "Quitar todos" sólo cuando hay más de uno: con uno basta su ×. */
 const CLEAR_ALL_MIN_COUNT = 2;
 
@@ -57,11 +62,13 @@ function RecipientChip({
 function FoldToggle({
   translate,
   total,
+  visibleCount,
   isExpanded,
   onToggle,
 }: {
   readonly translate: Translator;
   readonly total: number;
+  readonly visibleCount: number;
   readonly isExpanded: boolean;
   readonly onToggle: () => void;
 }): React.JSX.Element {
@@ -84,7 +91,7 @@ function FoldToggle({
       onClick={onToggle}
     >
       {translate("directory.email.hiddenCount", {
-        count: total - FOLDED_VISIBLE_COUNT,
+        count: total - visibleCount,
       })}
     </button>
   );
@@ -109,21 +116,34 @@ function CandidatesFailure({
 
 export function DirectoryEmailRecipients({
   translate,
+  layout,
   recipients,
   onChange,
 }: {
   readonly translate: Translator;
+  readonly layout: ComposerLayout;
   readonly recipients: readonly EmailRecipient[];
   readonly onChange: (recipients: readonly EmailRecipient[]) => void;
 }): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const { load, requestOnce, retry } = useRecipientCandidates();
-  const isFoldable = recipients.length > UNFOLDED_MAX_COUNT;
+  const visibleCount = FOLDED_VISIBLE_COUNT[layout];
+  const isFoldable = recipients.length > visibleCount + 1;
   const visible =
-    isFoldable && !isExpanded
-      ? recipients.slice(0, FOLDED_VISIBLE_COUNT)
-      : recipients;
+    isFoldable && !isExpanded ? recipients.slice(0, visibleCount) : recipients;
+  const search = (
+    <RecipientSearch
+      translate={translate}
+      inputRef={inputRef}
+      placement={layout === "phone" ? "inline" : "popover"}
+      recipients={recipients}
+      load={load}
+      onFirstFocus={requestOnce}
+      onAdd={(recipient) => onChange([...recipients, recipient])}
+      onRemoveLast={() => onChange(recipients.slice(0, -1))}
+    />
+  );
 
   function remove(userId: string): void {
     onChange(recipients.filter((recipient) => recipient.userId !== userId));
@@ -175,20 +195,14 @@ export function DirectoryEmailRecipients({
           <FoldToggle
             translate={translate}
             total={recipients.length}
+            visibleCount={visibleCount}
             isExpanded={isExpanded}
             onToggle={() => setIsExpanded((current) => !current)}
           />
         ) : null}
-        <RecipientSearch
-          translate={translate}
-          inputRef={inputRef}
-          recipients={recipients}
-          load={load}
-          onFirstFocus={requestOnce}
-          onAdd={(recipient) => onChange([...recipients, recipient])}
-          onRemoveLast={() => onChange(recipients.slice(0, -1))}
-        />
+        {layout === "desktop" ? search : null}
       </div>
+      {layout === "phone" ? search : null}
       {recipients.length === 0 ? (
         <p className="directory-email-empty">
           <Icon glyph={Info} />
