@@ -59,9 +59,12 @@ function foldWithSpans(fullName: string): {
 }
 
 function splitAtMatch(
-  fullName: string,
+  storedName: string,
   foldedQuery: string,
 ): readonly NamePart[] | null {
+  // Compuesto, para que cada tilde viaje con su letra y no quede fuera de
+  // la parte marcada.
+  const fullName = storedName.normalize("NFC");
   const { folded, spans } = foldWithSpans(fullName);
   const index = folded.indexOf(foldedQuery);
   if (index === -1) {

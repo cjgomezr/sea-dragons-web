@@ -59,7 +59,6 @@ function SuggestionOption({
   return (
     // El teclado lo maneja el combobox (aria-activedescendant): la opción
     // sólo atiende al ratón, y sin robarle el foco al campo.
-
     <li
       id={id}
       role="option"
