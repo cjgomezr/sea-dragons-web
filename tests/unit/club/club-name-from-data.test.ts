@@ -35,7 +35,6 @@ const SCREEN_PATHS = [
   "@/app/(app)/cuenta/page",
   "@/app/(app)/grupos/page",
   "@/app/(app)/directorio/page",
-  "@/app/(app)/directorio/nuevo/page",
   "@/app/(app)/directorio/[id]/page",
 ] as const;
 

@@ -315,7 +315,7 @@ function lastRequest(): URLSearchParams {
 }
 
 async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
-  render(<DirectoryScreen locale={locale} />);
+  render(<DirectoryScreen clubName="Victoria Seadragons" locale={locale} />);
   await screen.findByRole("region", {
     name: locale === "en" ? "Club members" : "Miembros del club",
   });
@@ -456,7 +456,7 @@ describe("pantalla del directorio", () => {
       members: [{ ...NEREA, photoUrl: "javascript:alert(1)" }],
     });
 
-    render(<DirectoryScreen locale="en" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="en" />);
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.queryByRole("presentation")).not.toBeInTheDocument();
@@ -660,7 +660,7 @@ describe("pantalla del directorio", () => {
         });
       },
     });
-    render(<DirectoryScreen locale="en" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="en" />);
 
     const retry = await screen.findByRole("button", { name: "Try again" });
     expect(
@@ -679,7 +679,7 @@ describe("pantalla del directorio", () => {
   it("dice que la sesión terminó cuando el servidor no reconoce a quien pregunta", async () => {
     stubApi({ respond: () => errorResponse(401, "unauthenticated") });
 
-    render(<DirectoryScreen locale="en" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="en" />);
 
     expect(
       await screen.findByText(
@@ -691,7 +691,7 @@ describe("pantalla del directorio", () => {
   it("descarta la respuesta de una consulta que ya nadie pidió", async () => {
     const { pending, respond } = deferredResponses();
     stubApi({ respond });
-    render(<DirectoryScreen locale="en" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="en" />);
     await waitFor(() => {
       expect(pending).toHaveLength(1);
     });
@@ -723,7 +723,7 @@ describe("pantalla del directorio", () => {
   it("deja la lista anterior a la vista mientras llega la nueva", async () => {
     const { pending, respond } = deferredResponses();
     stubApi({ respond });
-    render(<DirectoryScreen locale="en" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="en" />);
     await waitFor(() => {
       expect(pending).toHaveLength(1);
     });
@@ -743,7 +743,7 @@ describe("pantalla del directorio", () => {
   it("dice que la cuenta no puede ver el directorio cuando el servidor lo niega", async () => {
     stubApi({ respond: () => errorResponse(403, "forbidden") });
 
-    render(<DirectoryScreen locale="en" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="en" />);
 
     expect(
       await screen.findByText("Your account can't see the club's directory."),
@@ -753,7 +753,7 @@ describe("pantalla del directorio", () => {
   it("trata un cuerpo que no sabe leer como un fallo, no como una lista vacía", async () => {
     stubApi({ respond: () => jsonResponse(200, { data: { kind: "member" } }) });
 
-    render(<DirectoryScreen locale="en" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="en" />);
 
     expect(
       await screen.findByText(
@@ -1238,6 +1238,7 @@ describe("llegar con un texto buscado", () => {
 
     render(
       <DirectoryScreen
+        clubName="Victoria Seadragons"
         locale="en"
         initialQuery={{ ...DEFAULT_DIRECTORY_QUERY, search: "nerea" }}
       />,
@@ -1471,6 +1472,7 @@ describe("filtros del directorio", () => {
 
     render(
       <DirectoryScreen
+        clubName="Victoria Seadragons"
         locale="en"
         initialQuery={{
           ...DEFAULT_DIRECTORY_QUERY,
@@ -1572,6 +1574,7 @@ describe("filtros del directorio", () => {
     });
     render(
       <DirectoryScreen
+        clubName="Victoria Seadragons"
         locale="en"
         initialQuery={{ ...DEFAULT_DIRECTORY_QUERY, groupId: SENIOR_GROUP.id }}
       />,
@@ -1820,7 +1823,7 @@ describe("cabecera del directorio", () => {
 
     const email = screen.getByRole("button", { name: "Write an email" });
     const csv = screen.getByRole("button", { name: "Export CSV" });
-    const invite = screen.getByRole("link", { name: "Invite member" });
+    const invite = screen.getByRole("button", { name: "Invite member" });
     expect(email).toHaveAttribute("title", "Write an email");
     expect(csv).toHaveAttribute("title", "Export CSV");
     expect(invite).toHaveAttribute("title", "Invite member");
@@ -2106,6 +2109,7 @@ describe("las fichas de los filtros activos", () => {
   function renderWithFilters(locale: "en" | "es" = "en"): void {
     render(
       <DirectoryScreen
+        clubName="Victoria Seadragons"
         locale={locale}
         initialQuery={{
           ...DEFAULT_DIRECTORY_QUERY,
@@ -2142,6 +2146,7 @@ describe("las fichas de los filtros activos", () => {
 
     render(
       <DirectoryScreen
+        clubName="Victoria Seadragons"
         locale="en"
         initialQuery={{
           ...DEFAULT_DIRECTORY_QUERY,

@@ -1207,27 +1207,61 @@ export const englishMessages = {
   "directory.email.error.noRecipients":
     "None of the members in the list can receive it: their account may be deactivated.",
   "directory.email.error.unexpected": "We couldn't send the email. Try again.",
-  "newMember.metaTitle": "Invite member · {club}",
-  "newMember.metaDescription":
-    "Invite a member to the club and send them an email to activate their account.",
-  "newMember.title": "Invite member",
+  "newMember.title": "Invite a member",
   "newMember.lead":
-    "They join as a Player and get an email to activate their account. Their role can be changed from the directory.",
+    "They get an email from the club to set a password and sign in.",
+  "newMember.close": "Close",
   "newMember.loading": "Loading the club's groups…",
   "newMember.loadFailed": "We couldn't load the club's groups. Try again.",
-  "newMember.details.title": "Member details",
+  "newMember.who": "Who",
+  "newMember.groups.title": "Groups",
+  "newMember.groups.chosen": {
+    one: "{count} chosen",
+    other: "{count} chosen",
+  },
+  "newMember.groups.none": "none",
+  "newMember.groups.optional": "Optional",
+  "newMember.groups.empty": "The club has no groups yet.",
+  "newMember.groups.create": "Create them in Groups",
+  "newMember.details.title": "Player details · optional",
+  "newMember.details.leadNamed":
+    "Leave them empty and {name} fills them in after signing in.",
+  "newMember.details.leadUnnamed":
+    "Leave them empty and the member fills them in after signing in.",
+  "newMember.details.filled": "{filled} of {total}",
+  "newMember.details.toFix": {
+    one: "{count} to fix",
+    other: "{count} to fix",
+  },
   "newMember.fullName": "Full name",
   "newMember.email": "Email",
   "newMember.country": "Country",
+  "newMember.countryPlaceholder": "Choose a country…",
   "newMember.position": "Position",
-  "newMember.experienceLevel": "Experience level",
+  "newMember.experienceLevel": "Experience",
   "newMember.gender": "Gender",
+  "newMember.gender.private": "only Admins and the member",
   "newMember.choose": "Choose one",
   "newMember.auf.title": "AUF registration",
-  "newMember.auf.number": "AUF number",
-  "newMember.auf.expiry": "AUF expiry date",
-  "newMember.submit": "Invite member",
-  "newMember.sending": "Inviting…",
+  "newMember.auf.hint": "Both or neither",
+  "newMember.auf.number": "Number",
+  "newMember.auf.expiry": "Expires",
+  "newMember.summary.title": {
+    one: "{count} thing to fix before sending",
+    other: "{count} things to fix before sending",
+  },
+  "newMember.summary.item": "{field}: {issue}",
+  "newMember.summary.aufNumber": "AUF number",
+  "newMember.summary.aufExpiry": "AUF expiry",
+  "newMember.preview.titleNamed": "What {name} will receive",
+  "newMember.preview.titleUnnamed": "What they will receive",
+  "newMember.preview.from": "From",
+  "newMember.preview.to": "to",
+  "newMember.preview.noEmail": "their email",
+  "newMember.footer": "Only name and email are required.",
+  "newMember.cancel": "Cancel",
+  "newMember.submit": "Send invitation",
+  "newMember.sending": "Sending…",
   "newMember.created.sent":
     "{name} was invited. We sent the invitation to {email}.",
   "newMember.created.notSent":
@@ -1250,8 +1284,8 @@ export const englishMessages = {
   "newMember.issue.aufExpiryNotADate": "Write the AUF expiry date.",
   "newMember.issue.aufExpiryInThePast":
     "The AUF has already expired. Check the date.",
-  "newMember.error.emailTaken":
-    "That email already has an account in the club.",
+  "newMember.error.emailTaken": "This email already belongs to a member.",
+  "newMember.error.openExisting": "Open {name}'s profile",
   "newMember.error.groupNotFound":
     "One of those groups is no longer in the club. Reload the page.",
   "newMember.error.invitationNotSent":

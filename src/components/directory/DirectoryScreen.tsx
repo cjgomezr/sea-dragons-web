@@ -36,7 +36,7 @@ import {
 import { AdministrationNotice } from "./AdministrationNotice";
 import { DirectoryBulkBar } from "./DirectoryBulkBar";
 import type { RowChecking } from "./DirectoryCheckboxes";
-import { DirectoryHeader } from "./DirectoryHeader";
+import { DirectoryHeader, INVITE_TOGGLE_ID } from "./DirectoryHeader";
 import type { DirectoryOrder } from "./DirectorySortControl";
 import type { OverviewContext } from "./ClubOverview";
 import {
@@ -49,6 +49,7 @@ import {
   type RequestedRoles,
   memberRowId,
 } from "./DirectoryTable";
+import { InviteMemberPanel } from "./InviteMemberPanel";
 import { RoleRequestsBanner } from "./RoleRequestsBanner";
 import { RoleRequestsScreen } from "./RoleRequestsScreen";
 import {
@@ -170,6 +171,19 @@ const FIRST_DIRECTION: Readonly<Record<DirectorySort, DirectoryDirection>> = {
 const NO_REQUESTED_ROLES: RequestedRoles = new Map();
 
 const NO_MEMBERS: readonly DirectoryMember[] = [];
+
+/** El panel que se abre bajo la cabecera (#862): el correo (#501) o la
+ * invitación de un socio. Sólo hay uno a la vez; abrir uno cierra el otro. */
+type HeaderPanel =
+  | { readonly kind: "none" }
+  | {
+      readonly kind: "email";
+      /** A quién va el correo que se está escribiendo. */
+      readonly recipients: readonly EmailRecipient[];
+    }
+  | { readonly kind: "invite" };
+
+const NO_HEADER_PANEL: HeaderPanel = { kind: "none" };
 
 /** Lo que las filas necesitan de los marcados. */
 function rowCheckingOf(
@@ -338,12 +352,20 @@ function LoadFailure({
 
 export function DirectoryScreen({
   locale,
+  clubName,
   initialQuery = DEFAULT_DIRECTORY_QUERY,
+  isInviteOpenAtStart = false,
 }: {
   locale: Locale;
+  /** El que firma la invitación, para su vista previa (#862). */
+  clubName: string;
   /** La consulta con la que llega: la de la dirección (#497), como el nombre
    * que trae la búsqueda global (#427). */
   initialQuery?: DirectoryQuery;
+  /** Llega con el panel de invitar abierto: `?invite=1`, a donde lleva la
+   * dirección vieja del alta (#862). Sólo se abre a quien recibe la lista de
+   * Admin. */
+  isInviteOpenAtStart?: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [filters, setFilters] = useState<DirectoryFilterState>(() =>
@@ -357,11 +379,9 @@ export function DirectoryScreen({
   // Volver a intentarlo cuenta como una lectura más, aunque la consulta sea la
   // misma de antes: así el pedido vive sólo en el efecto.
   const [reloads, setReloads] = useState(0);
-  // A quién va el correo que se está escribiendo (#501), o `null` sin
-  // formulario abierto.
-  const [emailRecipients, setEmailRecipients] = useState<
-    readonly EmailRecipient[] | null
-  >(null);
+  const [headerPanel, setHeaderPanel] = useState<HeaderPanel>(
+    isInviteOpenAtStart ? { kind: "invite" } : NO_HEADER_PANEL,
+  );
 
   const isAdminListing =
     state.kind === "ready" && state.listing.kind === "admin";
@@ -533,6 +553,15 @@ export function DirectoryScreen({
   }
 
   const isPanelShown = panel.isOpen && panelView !== null && !isPhone;
+  const isInviteShown = isAdminListing && headerPanel.kind === "invite";
+  const openEmail = (recipients: readonly EmailRecipient[]): void =>
+    setHeaderPanel({ kind: "email", recipients });
+
+  /** La × y Cancelar devuelven el foco al botón que lo abrió. */
+  function closeInvite(): void {
+    focusById(INVITE_TOGGLE_ID);
+    setHeaderPanel(NO_HEADER_PANEL);
+  }
 
   return (
     <div
@@ -552,15 +581,26 @@ export function DirectoryScreen({
         }
         titleRef={titleRef}
         checkedMembers={checked.members}
-        onOpenEmail={setEmailRecipients}
+        isInviteOpen={isInviteShown}
+        onOpenEmail={openEmail}
+        onToggleInvite={() =>
+          setHeaderPanel(isInviteShown ? NO_HEADER_PANEL : { kind: "invite" })
+        }
       />
-      {emailRecipients === null ? null : (
+      {headerPanel.kind === "email" ? (
         <DirectoryEmailComposer
           locale={locale}
-          recipients={emailRecipients}
-          onClose={() => setEmailRecipients(null)}
+          recipients={headerPanel.recipients}
+          onClose={() => setHeaderPanel(NO_HEADER_PANEL)}
         />
-      )}
+      ) : null}
+      {isInviteShown ? (
+        <InviteMemberPanel
+          locale={locale}
+          clubName={clubName}
+          onClose={closeInvite}
+        />
+      ) : null}
       {state.kind === "loading" ? (
         <p className="admin-empty">{translate("directory.loading")}</p>
       ) : null}
@@ -653,7 +693,7 @@ export function DirectoryScreen({
                           canChangeRole: canChangeRoles(state.listing),
                         }}
                         isSavingRoles={bulkRoles.isSaving}
-                        onEmail={setEmailRecipients}
+                        onEmail={openEmail}
                         onChangeRoles={(role) =>
                           bulkRoles.changeRoles(checked.members, role)
                         }

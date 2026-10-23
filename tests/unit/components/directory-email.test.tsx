@@ -834,7 +834,7 @@ describe("en el directorio", () => {
 
   it("un Committee abre el formulario con la lista que está viendo", async () => {
     stubDirectory("committee", [MEMBER]);
-    render(<DirectoryScreen locale="es" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="es" />);
 
     await userEvent
       .setup()
@@ -846,7 +846,7 @@ describe("en el directorio", () => {
 
   it("con la lista vacía el botón está deshabilitado y dice por qué", async () => {
     stubDirectory("committee", []);
-    render(<DirectoryScreen locale="es" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="es" />);
 
     const button = (await screen.findByRole("button", {
       name: "Escribir correo",
@@ -860,7 +860,7 @@ describe("en el directorio", () => {
 
   it("a un Player no le ofrece escribir correos", async () => {
     stubDirectory("member", [MEMBER]);
-    render(<DirectoryScreen locale="es" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="es" />);
 
     await screen.findByText("Nerea Ruiz");
 

@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { readRequestFailure } from "@/components/auth/request-failure";
 import {
   type ApiRequestFailure,
   JSON_REQUEST_HEADERS,
+  UNRECOGNIZED_RESPONSE,
   readApiPayload,
   requestApi,
 } from "@/lib/api/request-api";
+import { readStringAt } from "@/lib/api/read-string-at";
 import {
   MEMBERS_API_PATH,
   MEMBER_INVITATION_API_PATH,
@@ -12,6 +15,7 @@ import {
 import type { Translator } from "@/lib/i18n/translator";
 import {
   EMAIL_TAKEN_REASON,
+  type ExistingMember,
   INVITATION_NOT_PENDING_REASON,
   INVITATION_NOT_SENT_REASON,
   NEW_MEMBER_ISSUE_CODES,
@@ -50,26 +54,64 @@ export type CreatedMemberView = z.infer<typeof createdSchema>["data"];
 
 export type NewMemberFailure = ApiRequestFailure;
 
+const NETWORK_FAILURE: NewMemberFailure = {
+  kind: "failed",
+  failure: "network",
+  reason: null,
+};
+
+/** Un alta que no salió. Si el correo ya es de un socio del club, la
+ * respuesta lo nombra para que el aviso enlace a su ficha (D14 del PRD de
+ * E33). */
+export type MemberCreationFailure = NewMemberFailure & {
+  readonly existingMember: ExistingMember | null;
+};
+
 export type MemberCreation =
   | { readonly kind: "created"; readonly created: CreatedMemberView }
-  | NewMemberFailure;
+  | MemberCreationFailure;
 
 export type InvitationResend = { readonly kind: "sent" } | NewMemberFailure;
 
+const existingMemberSchema = z.object({
+  error: z.object({
+    existingMember: z.object({ userId: z.uuid(), fullName: z.string() }),
+  }),
+});
+
+function readExistingMember(payload: unknown): ExistingMember | null {
+  const parsed = existingMemberSchema.safeParse(payload);
+  return parsed.success ? parsed.data.error.existingMember : null;
+}
+
+/** Va por su cuenta y no por `requestApi`: del 409 hace falta, además del
+ * motivo, el socio que trae. */
 export async function createMember(
   submission: NewMemberSubmission,
 ): Promise<MemberCreation> {
-  const read = readApiPayload(
-    await requestApi(MEMBERS_API_PATH, {
+  let response: Response;
+  try {
+    response = await fetch(MEMBERS_API_PATH, {
       method: "POST",
       headers: JSON_REQUEST_HEADERS,
       body: JSON.stringify(submission),
-    }),
-    createdSchema,
-  );
-  return read.kind === "failed"
-    ? read
-    : { kind: "created", created: read.value.data };
+    });
+  } catch {
+    return { ...NETWORK_FAILURE, existingMember: null };
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    return {
+      kind: "failed",
+      failure: readRequestFailure(payload),
+      reason: readStringAt(payload, ["error", "reason"]),
+      existingMember: readExistingMember(payload),
+    };
+  }
+  const created = createdSchema.safeParse(payload);
+  return created.success
+    ? { kind: "created", created: created.data.data }
+    : { ...UNRECOGNIZED_RESPONSE, existingMember: null };
 }
 
 export async function resendMemberInvitation(

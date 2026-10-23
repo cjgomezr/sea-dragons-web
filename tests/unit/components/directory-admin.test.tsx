@@ -206,7 +206,7 @@ const REQUESTS_STATUS = {
 /** Espera a que el directorio y las solicitudes hayan pintado lo que
  * leyeron. */
 async function renderAdminDirectory(locale: "en" | "es" = "en"): Promise<void> {
-  render(<DirectoryScreen locale={locale} />);
+  render(<DirectoryScreen clubName="Victoria Seadragons" locale={locale} />);
   await screen.findByRole("region", {
     name: locale === "en" ? "Club members" : "Miembros del club",
   });
@@ -389,7 +389,7 @@ describe("directorio para Admin: solicitudes en el resumen del panel", () => {
   it("si las solicitudes no cargan, la cabecera lo dice y deja volver a intentar sin perder la lista", async () => {
     const user = userEvent.setup();
     stubApi({ loadRequests: async () => errorResponse(500, "internal_error") });
-    render(<DirectoryScreen locale="en" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="en" />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't load the pending requests.",
@@ -504,16 +504,115 @@ function memberRow(name: string): HTMLElement {
   return screen.getByRole("row", { name });
 }
 
-describe("directorio para Admin: alta de un miembro (#243)", () => {
-  it("ofrece dar de alta a un miembro desde la cabecera", async () => {
+describe("directorio para Admin: el panel de invitar (#862)", () => {
+  function inviteToggle(): HTMLElement {
+    return screen.getByRole("button", { name: "Invite member" });
+  }
+
+  function invitePanel(): HTMLElement | null {
+    return screen.queryByRole("region", { name: "Invite a member" });
+  }
+
+  it("el botón de la cabecera abre el panel bajo la cabecera", async () => {
+    stubApi({ members: [NEREA, ANA], requests: [] });
+    await renderAdminDirectory();
+    expect(inviteToggle()).toHaveAttribute("aria-expanded", "false");
+
+    await userEvent.setup().click(inviteToggle());
+
+    expect(
+      await screen.findByRole("region", { name: "Invite a member" }),
+    ).toBeVisible();
+    expect(inviteToggle()).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("volver a pulsar el botón lo cierra", async () => {
+    stubApi({ members: [NEREA, ANA], requests: [] });
+    await renderAdminDirectory();
+    const user = userEvent.setup();
+    await user.click(inviteToggle());
+    await screen.findByRole("region", { name: "Invite a member" });
+
+    await user.click(inviteToggle());
+
+    expect(invitePanel()).not.toBeInTheDocument();
+  });
+
+  it("la × lo cierra y devuelve el foco al botón", async () => {
+    stubApi({ members: [NEREA, ANA], requests: [] });
+    await renderAdminDirectory();
+    const user = userEvent.setup();
+    await user.click(inviteToggle());
+    const panel = await screen.findByRole("region", {
+      name: "Invite a member",
+    });
+
+    await user.click(within(panel).getByRole("button", { name: "Close" }));
+
+    expect(invitePanel()).not.toBeInTheDocument();
+    expect(inviteToggle()).toHaveFocus();
+  });
+
+  it("abrirlo cierra el redactor de correo: solo hay un panel a la vez", async () => {
+    stubApi({ members: [NEREA, ANA], requests: [] });
+    await renderAdminDirectory();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Write an email" }));
+    expect(screen.getByRole("region", { name: "Email members" })).toBeVisible();
+
+    await user.click(inviteToggle());
+
+    await screen.findByRole("region", { name: "Invite a member" });
+    expect(
+      screen.queryByRole("region", { name: "Email members" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("abrir el correo cierra el panel de invitar", async () => {
+    stubApi({ members: [NEREA, ANA], requests: [] });
+    await renderAdminDirectory();
+    const user = userEvent.setup();
+    await user.click(inviteToggle());
+    await screen.findByRole("region", { name: "Invite a member" });
+
+    await user.click(screen.getByRole("button", { name: "Write an email" }));
+
+    expect(invitePanel()).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Email members" })).toBeVisible();
+  });
+
+  it("llega abierto cuando se pide al montar", async () => {
     stubApi({ members: [NEREA, ANA], requests: [] });
 
-    await renderAdminDirectory();
-
-    expect(screen.getByRole("link", { name: "Invite member" })).toHaveAttribute(
-      "href",
-      "/directorio/nuevo",
+    render(
+      <DirectoryScreen
+        clubName="Victoria Seadragons"
+        locale="en"
+        isInviteOpenAtStart
+      />,
     );
+
+    expect(
+      await screen.findByRole("region", { name: "Invite a member" }),
+    ).toBeVisible();
+  });
+
+  it("a quien no es Admin no se le abre aunque se pida al montar", async () => {
+    stubApi({ kind: "member", members: [NEREA, ANA] });
+
+    render(
+      <DirectoryScreen
+        clubName="Victoria Seadragons"
+        locale="en"
+        isInviteOpenAtStart
+      />,
+    );
+
+    await screen.findByRole("region", { name: "Club members" });
+    expect(invitePanel()).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Invite member" }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -605,7 +704,7 @@ describe("directorio para quien no es Admin", () => {
     async (role) => {
       stubApi({ kind: "member", members: [{ ...NEREA, role }] });
 
-      render(<DirectoryScreen locale="en" />);
+      render(<DirectoryScreen clubName="Victoria Seadragons" locale="en" />);
       await screen.findByRole("region", { name: "Club members" });
 
       expect(
@@ -661,7 +760,7 @@ describe("directorio para Admin en español", () => {
   it("traduce al español que las solicitudes no cargaron", async () => {
     stubApi({ loadRequests: async () => errorResponse(500, "internal_error") });
 
-    render(<DirectoryScreen locale="es" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="es" />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "No pudimos cargar las solicitudes pendientes.",
@@ -735,7 +834,7 @@ describe("directorio para Admin: solicitudes en la cabecera", () => {
   it("a quien no es Admin no le dice nada de solicitudes", async () => {
     stubApi({ kind: "member", members: [NEREA] });
 
-    render(<DirectoryScreen locale="en" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="en" />);
     await screen.findByRole("region", { name: "Club members" });
 
     expect(screen.queryByText("No pending requests")).toBeNull();

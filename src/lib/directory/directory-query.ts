@@ -126,6 +126,17 @@ function readPosition(
     : { kind: "position", positionId: value };
 }
 
+/** El panel de invitar abierto al llegar (#862): a donde lleva la dirección
+ * vieja del alta, `/directorio/nuevo`. No es parte de la consulta de la
+ * lista, y la pantalla lo quita de la dirección al escribir la suya. */
+const INVITE_QUERY_PARAM = "invite";
+const INVITE_REQUESTED_VALUE = "1";
+export const INVITE_QUERY = `${INVITE_QUERY_PARAM}=${INVITE_REQUESTED_VALUE}`;
+
+export function isInviteRequested(searchParams: URLSearchParams): boolean {
+  return searchParams.get(INVITE_QUERY_PARAM) === INVITE_REQUESTED_VALUE;
+}
+
 /** Los socios marcados de una exportación (#552): uno por parámetro, como
  * `?member=a&member=b`. No es parte de la consulta de la pantalla, que se
  * comparte por la dirección: marcar es de un momento. */
