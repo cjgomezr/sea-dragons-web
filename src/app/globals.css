@@ -4935,6 +4935,331 @@ a.groups-icon-button {
   opacity: 0.6;
 }
 
+/* Las flechas de las filas de la lista y de "Audiencia de" sólo van en el
+   móvil (#831). */
+.groups-audience-caret,
+.groups-row-caret {
+  display: none;
+}
+
+/* Grupos en el móvil (#831, RF-7 de E32, "#2a" del handoff). La disposición
+   la decide `useIsBelowDesktop` (D13) y llega en `data-layout`: por debajo de
+   1024 px la lista lleva a la pantalla del grupo, que la sustituye. Los
+   toques miden al menos 44 px y los campos llevan letra de 16 px. */
+.app-main .groups[data-layout="compact"] h1 {
+  font-size: 24px;
+}
+
+.groups[data-layout="compact"] .groups-head .app-lead {
+  display: none;
+}
+
+/* La pantalla del grupo ya dice dónde se está en su barra. */
+.groups[data-step="group"] .groups-head {
+  display: none;
+}
+
+.groups[data-layout="compact"] .groups-create-field,
+.groups[data-layout="compact"] .groups-create .groups-create-submit {
+  height: 46px;
+}
+
+/* El + solo, cuadrado, como en el handoff. */
+.groups[data-layout="compact"] .groups-create .groups-create-submit {
+  justify-content: center;
+  width: 46px;
+  padding: 0;
+  font-size: 20px;
+}
+
+.groups[data-layout="compact"] .groups-create-submit-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.groups[data-layout="compact"] .groups-row {
+  min-height: 66px;
+}
+
+.groups[data-layout="compact"] .groups-row-name {
+  font-size: 15.5px;
+}
+
+.groups[data-layout="compact"] .groups-row-usage {
+  font-size: 12.5px;
+}
+
+.groups[data-layout="compact"] .groups-row-avatar {
+  width: 26px;
+  height: 26px;
+}
+
+.groups[data-layout="compact"] .groups-row-caret,
+.groups[data-layout="compact"] .groups-audience-caret {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+}
+
+/* La pantalla del grupo no es una caja: sus partes son tarjetas sueltas, y
+   deja abajo el hueco de la barra fija para que no tape el último miembro. */
+.groups[data-step="group"] {
+  padding-bottom: calc(50px + 2 * var(--space-3));
+}
+
+.groups[data-layout="compact"] .groups-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow: visible;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+.groups-phone-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.groups-phone-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-main .groups-phone-bar h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groups-bar-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  font-size: 20px;
+  color: var(--color-text);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.groups-bar-button:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.groups-bar-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.groups-phone-head .groups-panel-summary {
+  margin: 0;
+}
+
+/* Escribir a todos y Directorio, a partes iguales; el Coach sólo ve el
+   segundo, y ocupa la fila entera. */
+.groups-phone-actions {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-2);
+}
+
+.groups-phone-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 0;
+  height: 46px;
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.groups-phone-action:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.groups-phone-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.groups[data-layout="compact"] .groups-panel-error {
+  margin: 0;
+}
+
+.groups[data-layout="compact"] .groups-panel-body {
+  gap: var(--space-3);
+}
+
+.groups[data-layout="compact"] .groups-audience {
+  padding: var(--space-3);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.groups[data-layout="compact"] .groups-audience-row {
+  min-height: var(--touch-target-min);
+}
+
+.groups[data-layout="compact"] .groups-members-toolbar {
+  padding: 0 0 var(--space-3);
+  border-bottom: none;
+}
+
+.groups[data-layout="compact"] .groups-search input {
+  height: 46px;
+  font-size: 16px;
+}
+
+/* Los miembros van en su tarjeta, sin tope de alto: es la página la que se
+   desplaza. */
+.groups[data-layout="compact"] .groups-members-list,
+.groups[data-layout="compact"] .groups-members-empty {
+  max-height: none;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.groups[data-layout="compact"] .groups-member {
+  grid-template-columns: 38px minmax(0, 1fr) var(--touch-target-min);
+  min-height: 60px;
+  padding: var(--space-2) var(--space-1) var(--space-2) var(--space-3);
+}
+
+.groups[data-layout="compact"] .groups-member-avatar {
+  width: 38px;
+  height: 38px;
+  font-size: 13px;
+}
+
+/* El nombre puede ocupar dos líneas, nunca más. */
+.groups[data-layout="compact"] .groups-member-name {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 15px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.groups[data-layout="compact"] .groups-member-position {
+  font-size: 12.5px;
+}
+
+.groups-member-position-pending {
+  font-weight: 600;
+  /* El aviso puro no llega a 4.5:1 sobre el panel claro. */
+  color: color-mix(in srgb, var(--color-warning) 55%, var(--color-text));
+}
+
+.groups[data-layout="compact"] .groups-member-remove {
+  grid-column: 3;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  font-size: 18px;
+}
+
+/* "Añadir miembros", fijo abajo como la barra de Evaluaciones: a la derecha
+   de la barra lateral en la tableta, encima de las pestañas en el móvil. */
+.groups-bottom-bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: var(--sidebar-width);
+  z-index: 9;
+  padding: var(--space-3) var(--space-4)
+    calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: var(--color-panel);
+  border-top: 1px solid var(--color-border);
+  box-shadow: var(--shadow);
+}
+
+.groups-bottom-bar .groups-add-toggle {
+  justify-content: center;
+  width: 100%;
+  height: 50px;
+  font-size: 16px;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: none;
+  border-radius: 12px;
+}
+
+.groups-bottom-bar .groups-add-toggle:hover {
+  background: var(--color-accent-hover);
+}
+
+@media (width < 768px) {
+  .groups-bottom-bar {
+    bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+    left: 0;
+    padding-bottom: var(--space-3);
+  }
+}
+
+/* La hoja ⋯: la línea entre renombrar y borrar, el campo de 48 px con
+   Guardar y el aviso de D11 con sus dos botones de 48 px a partes iguales. */
+.groups-sheet-rule {
+  margin: var(--space-1) 0;
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.groups-sheet-rename {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.groups-sheet-rename .groups-rename-field,
+.groups-sheet-rename .groups-create-submit {
+  height: 48px;
+}
+
+.groups-sheet-rename .groups-rename-field {
+  font-size: 16px;
+}
+
+.news-sheet-step .groups-delete-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.news-sheet-step .groups-delete-actions button {
+  min-height: 48px;
+}
+
 /* Lo que sigue lo comparten otras pantallas que nacieron copiando la de E4:
    las acciones de un evento, de una noticia, del reparto y de las categorías
    de Evaluaciones. */
