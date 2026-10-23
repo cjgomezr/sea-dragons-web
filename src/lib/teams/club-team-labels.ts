@@ -1,11 +1,24 @@
 import { z } from "zod";
 import { TEAM_BIB_COLORS } from "./team-color-name";
-import { CLUB_TEAM_NAME_MAX_LENGTH, type EventSplitLabels } from "./team-ids";
+import { type AuditActor, recordAuditEvent } from "@/lib/audit/audit-log";
 import {
+  CLUB_TEAM_NAME_MAX_LENGTH,
+  type EventSplitChange,
+  type TeamLabel,
+} from "./team-ids";
+import {
+  TEAM_IDS,
+  type StoredTeamSplit,
+  type TeamBuilderEvent,
   type TeamBuilderGateways,
   type TeamLabels,
   findTeamBuilderActor,
 } from "./team-builder";
+import {
+  AUDITED_ENTITY_TYPE,
+  sendPublicationNotices,
+  withoutPublisher,
+} from "./team-publication";
 
 /**
  * Los equipos del club (#755, RF-1 y D1 a D3 del PRD de E28), contados sin
@@ -15,7 +28,8 @@ import {
  * decide por el camino; aquí se vuelve a comprobar.
  *
  * Un reparto publicado conserva los suyos (D4): los socios ya recibieron el
- * aviso con ellos. Uno guardado y sin publicar los estrena en cuanto se
+ * aviso con ellos. Sólo los estrena si quien cambia lo pide desde su builder
+ * (#871), y entonces se les vuelve a avisar. Uno guardado y sin publicar los estrena en cuanto se
  * cambian desde su builder (`eventId`). El guardado del reparto sigue
  * aceptando cualquier `#RRGGBB` (D5); sólo esto exige el muestrario.
  */
@@ -61,25 +75,28 @@ export const clubTeamLabelsSchema = teamPairSchema.superRefine(
 );
 
 /** Lo que recibe el cambio: los dos equipos y, si se cambian desde el
- * builder de un evento, ese evento, para llevarlos a su reparto. */
+ * builder de un evento, ese evento, para llevarlos a su reparto. Con
+ * `applyToPublished` también llegan a su reparto publicado (#871). */
 export const clubTeamLabelsChangeSchema = teamPairSchema
-  .extend({ eventId: z.uuid().optional() })
+  .extend({
+    eventId: z.uuid().optional(),
+    applyToPublished: z.boolean().optional(),
+  })
   .superRefine(requireDistinctColors);
 
 type ClubTeamLabelsGateways = Pick<
   TeamBuilderGateways,
-  "members" | "clubTeams"
+  "members" | "clubTeams" | "notifications" | "audit"
 > & {
   readonly teams: Pick<
     TeamBuilderGateways["teams"],
-    "findEvent" | "findSplit" | "relabelDraftSplit"
+    "findEvent" | "findSplit" | "relabelDraftSplit" | "relabelPublishedSplit"
   >;
 };
 
 export type ClubTeamLabelsChange = {
   readonly teams: TeamLabels;
-  readonly eventSplit: EventSplitLabels;
-};
+} & EventSplitChange;
 
 export async function readClubTeamLabels(
   gateways: ClubTeamLabelsGateways,
@@ -92,13 +109,15 @@ export async function readClubTeamLabels(
 /** Los guarda en el club de quien llama, nunca en uno de la petición
  * (NFR-009). Con `eventId` también los lleva al reparto de ese evento si
  * está guardado y sin publicar, y sólo si el evento es de ese club; el
- * publicado conserva los suyos (D4). Los demás repartos no cambian. */
+ * publicado conserva los suyos (D4) salvo con `applyToPublished`. Los demás
+ * repartos no cambian. */
 export async function changeClubTeamLabels(
   gateways: ClubTeamLabelsGateways,
   request: {
     readonly callerId: string;
     readonly teams: TeamLabels;
     readonly eventId?: string;
+    readonly applyToPublished?: boolean;
   },
 ): Promise<ClubTeamLabelsChange> {
   const actor = await findTeamBuilderActor(gateways, request.callerId);
@@ -109,15 +128,16 @@ export async function changeClubTeamLabels(
   // Las dos escrituras no van en una transacción: el cambio es idempotente
   // y, si la del reparto falla, la petición responde error y repetirla deja
   // el club y el reparto iguales.
-  const eventSplit =
+  const eventSplit: EventSplitChange =
     request.eventId === undefined
-      ? "none"
+      ? { eventSplit: "none" }
       : await relabelEventSplit(gateways, {
-          clubId: actor.clubId,
+          actor,
           eventId: request.eventId,
           teams: saved,
+          applyToPublished: request.applyToPublished ?? false,
         });
-  return { teams: saved, eventSplit };
+  return { teams: saved, ...eventSplit };
 }
 
 /** El evento se busca en el club antes de mirar su reparto: el de otro club
@@ -125,21 +145,90 @@ export async function changeClubTeamLabels(
 async function relabelEventSplit(
   gateways: ClubTeamLabelsGateways,
   change: {
-    readonly clubId: string;
+    readonly actor: AuditActor;
     readonly eventId: string;
     readonly teams: TeamLabels;
+    readonly applyToPublished: boolean;
   },
-): Promise<EventSplitLabels> {
+): Promise<EventSplitChange> {
+  const { actor, eventId, teams } = change;
   const event = await gateways.teams.findEvent({
-    clubId: change.clubId,
-    eventId: change.eventId,
+    clubId: actor.clubId,
+    eventId,
   });
   if (event === null) {
-    return "none";
+    return { eventSplit: "none" };
   }
-  if (await gateways.teams.relabelDraftSplit(change)) {
-    return "relabelled";
+  if (
+    await gateways.teams.relabelDraftSplit({
+      clubId: actor.clubId,
+      eventId,
+      teams,
+    })
+  ) {
+    return { eventSplit: "relabelled" };
   }
-  const split = await gateways.teams.findSplit(change.eventId);
-  return split !== null && split.publishedAt !== null ? "published" : "none";
+  const split = await gateways.teams.findSplit(eventId);
+  if (split === null || split.publishedAt === null) {
+    return { eventSplit: "none" };
+  }
+  if (!change.applyToPublished) {
+    return { eventSplit: "published" };
+  }
+  return relabelPublishedSplit(gateways, { actor, event, split, teams });
+}
+
+function isSameLabel(first: TeamLabel, second: TeamLabel): boolean {
+  return (
+    first.name === second.name &&
+    first.color.toUpperCase() === second.color.toUpperCase()
+  );
+}
+
+function hasSameLabels(first: TeamLabels, second: TeamLabels): boolean {
+  return TEAM_IDS.every((team) => isSameLabel(first[team], second[team]));
+}
+
+/** Lleva los nuevos al reparto publicado y avisa a sus jugadores con el
+ * mismo `team_assigned` de publicar, menos a quien cambia. Si ya los tenía,
+ * nadie se entera. Como al publicar, se avisa antes de la bitácora y un
+ * aviso que falla queda en el log sin deshacer el cambio. */
+async function relabelPublishedSplit(
+  gateways: ClubTeamLabelsGateways,
+  change: {
+    readonly actor: AuditActor;
+    readonly event: TeamBuilderEvent;
+    readonly split: StoredTeamSplit;
+    readonly teams: TeamLabels;
+  },
+): Promise<EventSplitChange> {
+  const { actor, event, split, teams } = change;
+  if (hasSameLabels(split.teams, teams)) {
+    return { eventSplit: "relabelledPublished", notifiedCount: 0 };
+  }
+  const isRelabelled = await gateways.teams.relabelPublishedSplit({
+    clubId: actor.clubId,
+    eventId: event.id,
+    teams,
+  });
+  if (!isRelabelled) {
+    // Dejó de estar publicado entre leerlo y escribirlo.
+    return { eventSplit: "none" };
+  }
+  const notices = withoutPublisher(
+    { assigned: split.assignments, unassignedIds: [] },
+    actor.id,
+  );
+  await sendPublicationNotices(gateways, { event, teams, notices });
+  const notifiedCount = notices.assigned.length;
+  await recordAuditEvent(gateways.audit, {
+    actor,
+    clubId: actor.clubId,
+    action: "team_split.relabelled",
+    entityType: AUDITED_ENTITY_TYPE,
+    entityId: event.id,
+    result: "success",
+    metadata: { notifiedCount },
+  });
+  return { eventSplit: "relabelledPublished", notifiedCount };
 }

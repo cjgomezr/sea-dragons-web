@@ -719,4 +719,66 @@ describeRls("el team builder en Supabase", () => {
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
+
+  it(
+    "aplicarlos al publicado sólo toca el reparto publicado del evento y del club pedidos, con su fecha y sus jugadores (#871)",
+    async () => {
+      await withSquad(async (squad) => {
+        const gateways = createTeamBuilderGateways(squad.serviceClient.client);
+        const request = {
+          callerId: squad.coach.id,
+          eventId: squad.eventId,
+          now: new Date(),
+        };
+        const orcas = {
+          a: { name: "Orcas", color: "#D64545" },
+          b: { name: "Rayas", color: "#2B3F7A" },
+        };
+        const builder = await openTeamBuilder(gateways, request);
+        await saveTeamSplit(gateways, {
+          ...request,
+          teams: builder.teams,
+          assignments: [
+            { userId: squad.pia.id, team: "a" },
+            { userId: squad.maya.id, team: "b" },
+          ],
+        });
+        const relabel = {
+          clubId: squad.clubId,
+          eventId: squad.eventId,
+          teams: orcas,
+        };
+
+        await expect(
+          gateways.teams.relabelPublishedSplit(relabel),
+        ).resolves.toBe(false);
+        await publishTeamSplit(gateways, request);
+        const published = await gateways.teams.findSplit(squad.eventId);
+        await expect(
+          gateways.teams.relabelPublishedSplit({
+            ...relabel,
+            clubId: randomUUID(),
+          }),
+        ).resolves.toBe(false);
+        await expect(
+          gateways.teams.relabelPublishedSplit({
+            ...relabel,
+            eventId: randomUUID(),
+          }),
+        ).resolves.toBe(false);
+        await expect(gateways.teams.findSplit(squad.eventId)).resolves.toEqual(
+          published,
+        );
+
+        await expect(
+          gateways.teams.relabelPublishedSplit(relabel),
+        ).resolves.toBe(true);
+        await expect(gateways.teams.findSplit(squad.eventId)).resolves.toEqual({
+          ...published,
+          teams: orcas,
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
 });

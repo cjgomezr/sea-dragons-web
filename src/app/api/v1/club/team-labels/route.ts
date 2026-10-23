@@ -7,7 +7,7 @@ import {
   readClubTeamLabels,
 } from "@/lib/teams/club-team-labels";
 import type { TeamLabels } from "@/lib/teams/team-builder";
-import type { EventSplitLabels } from "@/lib/teams/team-ids";
+import type { EventSplitChange } from "@/lib/teams/team-ids";
 import {
   asTeamsApiError,
   requireTeamBuilderGateways,
@@ -23,7 +23,8 @@ import {
  * vuelve a comprobar. Un nombre vacío o de más de 24 caracteres, un color
  * fuera del muestrario o los dos colores iguales son un 400 que nombra el
  * campo. Con `eventId`, el cambio también llega al reparto de ese evento si
- * está guardado y sin publicar (D4).
+ * está guardado y sin publicar (D4), y con `applyToPublished` también al
+ * publicado, avisando a sus jugadores (#871).
  */
 
 // Depende de la sesión de quien llama y de lo que el club tiene guardado.
@@ -34,10 +35,9 @@ type ClubTeamLabelsBody = z.infer<typeof clubTeamLabelsChangeSchema>;
 export type ClubTeamLabelsResponse = TeamLabels;
 
 /** Los equipos que quedaron y qué pasó con el reparto del evento, si el
- * cambio llegó desde su builder. */
-export type ClubTeamLabelsChangeResponse = TeamLabels & {
-  readonly eventSplit: EventSplitLabels;
-};
+ * cambio llegó desde su builder; con `relabelledPublished`, a cuántos
+ * jugadores se avisó. */
+export type ClubTeamLabelsChangeResponse = TeamLabels & EventSplitChange;
 
 const getClubTeamLabels = createApiRoute<ClubTeamLabelsResponse>({
   handler: async ({ request, decorateResponse }) => {
@@ -64,8 +64,10 @@ const patchClubTeamLabels = createApiRoute<
         callerId,
         teams: { a: body.a, b: body.b },
         eventId: body.eventId,
+        applyToPublished: body.applyToPublished,
       });
-      return { data: { ...change.teams, eventSplit: change.eventSplit } };
+      const { teams, ...eventSplit } = change;
+      return { data: { ...teams, ...eventSplit } };
     } catch (error) {
       asTeamsApiError(error);
     }

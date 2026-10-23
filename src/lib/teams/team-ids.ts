@@ -43,3 +43,12 @@ export type TeamAssignment = {
 export const EVENT_SPLIT_LABELS = ["relabelled", "published", "none"] as const;
 
 export type EventSplitLabels = (typeof EVENT_SPLIT_LABELS)[number];
+
+/** Lo mismo, más `relabelledPublished` (#871): estaba publicado, se pidió
+ * llevarle los nuevos y ya los lleva, con a cuántos jugadores se avisó. */
+export type EventSplitChange =
+  | { readonly eventSplit: EventSplitLabels }
+  | {
+      readonly eventSplit: "relabelledPublished";
+      readonly notifiedCount: number;
+    };

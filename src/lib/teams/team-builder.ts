@@ -185,6 +185,13 @@ export type TeamSplitsGateway = {
     readonly eventId: string;
     readonly teams: TeamLabels;
   }): Promise<boolean>;
+  /** Su gemelo para el publicado (#871): cambia sólo el nombre y el color,
+   * sin tocar la fecha de publicación ni los jugadores. Dice si cambió. */
+  relabelPublishedSplit(change: {
+    readonly clubId: string;
+    readonly eventId: string;
+    readonly teams: TeamLabels;
+  }): Promise<boolean>;
 };
 
 /** Los equipos del club (#755, D1 del PRD de E28): los que estrena un

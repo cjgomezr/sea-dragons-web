@@ -238,6 +238,16 @@ export function fakeTeamsClub(
       split = { ...split, teams };
       return true;
     },
+    relabelPublishedSplit: async ({ clubId, eventId, teams }) => {
+      const isClubEvent = events.some(
+        (event) => event.id === eventId && event.clubId === clubId,
+      );
+      if (!isClubEvent || split === null || split.publishedAt === null) {
+        return false;
+      }
+      split = { ...split, teams };
+      return true;
+    },
     publishSplit: async ({ publisherId }) => {
       if (split === null || split.assignments.length === 0) {
         return { kind: "empty" };

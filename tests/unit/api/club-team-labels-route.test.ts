@@ -7,9 +7,11 @@ import { DEFAULT_TEAM_LABELS } from "@/lib/teams/team-builder";
 import {
   EVENT_ID,
   type FakeTeamsClub,
+  PUBLISHED_AT,
   TEAMS_CALLER_ID,
   TEAMS_CLUB_ID,
   fakeTeamsClub,
+  playerId,
 } from "../helpers/team-builder-club";
 
 /**
@@ -221,6 +223,69 @@ describe("PATCH /api/v1/club/team-labels", () => {
     });
     expect(club.split()?.teams).toEqual(ORCAS_AND_RAYS);
   });
+
+  it("con applyToPublished, lleva los equipos al reparto publicado y dice a cuántos avisó", async () => {
+    givenSession("Coach");
+    club = fakeTeamsClub({
+      callerRole: "Coach",
+      split: {
+        teams: DEFAULT_TEAM_LABELS,
+        mode: "manual",
+        publishedAt: PUBLISHED_AT,
+        assignments: [
+          { userId: playerId(1), team: "a" },
+          { userId: playerId(2), team: "b" },
+        ],
+      },
+    });
+
+    const response = await changeTeams({
+      ...ORCAS_AND_RAYS,
+      eventId: EVENT_ID,
+      applyToPublished: true,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        ...ORCAS_AND_RAYS,
+        eventSplit: "relabelledPublished",
+        notifiedCount: 2,
+      },
+    });
+    expect(club.split()?.teams).toEqual(ORCAS_AND_RAYS);
+  });
+
+  it("responde 400 a un applyToPublished que no es un sí o un no", async () => {
+    givenSession("Coach");
+
+    await expectValidationError(
+      await changeTeams({
+        ...ORCAS_AND_RAYS,
+        eventId: EVENT_ID,
+        applyToPublished: "yes",
+      }),
+      ["applyToPublished"],
+    );
+    expect(club.clubTeamChanges).toEqual([]);
+  });
+
+  it.each<Role>(["Committee", "Player"])(
+    "responde 403 a un %s que pide aplicarlo al publicado, sin avisar a nadie",
+    async (role) => {
+      givenSession(role);
+
+      const response = await changeTeams({
+        ...ORCAS_AND_RAYS,
+        eventId: EVENT_ID,
+        applyToPublished: true,
+      });
+
+      expect(response.status).toBe(403);
+      expect(club.clubTeamChanges).toEqual([]);
+      expect(club.notices).toEqual([]);
+    },
+  );
 
   it("responde 400 a un evento que no es un id y no guarda nada", async () => {
     givenSession("Coach");

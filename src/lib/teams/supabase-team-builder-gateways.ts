@@ -396,17 +396,20 @@ async function publishSplit(
   };
 }
 
-/** El filtro por `published_at` nulo es la regla (D4): uno publicado no se
- * toca. El de `club_id` es la frontera del club (NFR-009). */
-async function relabelDraftSplit(
+type SplitRelabel = {
+  readonly clubId: string;
+  readonly eventId: string;
+  readonly teams: TeamLabels;
+};
+
+/** Sólo el nombre y el color: ni los jugadores ni `published_at`. El filtro
+ * por `club_id` es la frontera del club (NFR-009). `isPublished` decide qué
+ * reparto se toca: el borrador (D4) o el publicado (#871). */
+async function relabelSplit(
   serviceClient: SupabaseClient,
-  change: {
-    readonly clubId: string;
-    readonly eventId: string;
-    readonly teams: TeamLabels;
-  },
+  change: SplitRelabel & { readonly isPublished: boolean },
 ): Promise<boolean> {
-  const { data, error } = await serviceClient
+  const update = serviceClient
     .from(SPLITS_TABLE)
     .update({
       team_a_name: change.teams.a.name,
@@ -416,9 +419,12 @@ async function relabelDraftSplit(
       updated_at: new Date().toISOString(),
     })
     .eq("event_id", change.eventId)
-    .eq("club_id", change.clubId)
-    .is("published_at", null)
-    .select("id");
+    .eq("club_id", change.clubId);
+  const { data, error } = await (
+    change.isPublished
+      ? update.not("published_at", "is", null)
+      : update.is("published_at", null)
+  ).select("id");
   if (error) {
     throw new Error(
       `No se pudo cambiar el nombre y el color del reparto del evento ${change.eventId}: ${error.message}`,
@@ -487,7 +493,10 @@ function createTeamSplitsGateway(
     findSplit: (eventId) => findSplit(serviceClient, eventId),
     saveSplit: (split) => saveSplit(serviceClient, split),
     publishSplit: (query) => publishSplit(serviceClient, query),
-    relabelDraftSplit: (change) => relabelDraftSplit(serviceClient, change),
+    relabelDraftSplit: (change) =>
+      relabelSplit(serviceClient, { ...change, isPublished: false }),
+    relabelPublishedSplit: (change) =>
+      relabelSplit(serviceClient, { ...change, isPublished: true }),
   };
 }
 
