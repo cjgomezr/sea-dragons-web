@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { evaluateAccentColor } from "@/lib/club/accent-color";
 import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
 import type { Locale } from "@/lib/i18n/locale";
@@ -831,6 +832,78 @@ describe("correo del directorio", () => {
 
     expect(text).toContain(
       "Ana Admin, Committee at Victoria Seadragons, wrote to you.",
+    );
+  });
+});
+
+/** El color con el que el correo escribe un enlace sobre el panel claro. */
+function readAccentText(accentColor: string): string {
+  const evaluation = evaluateAccentColor(accentColor);
+  if (evaluation.kind === "rejected") {
+    throw new Error(`El acento de prueba no se lee: ${accentColor}`);
+  }
+  return evaluation.palette.light.accentText;
+}
+
+describe("correo del directorio con formato", () => {
+  const FORMATTED_MESSAGE = [
+    "**Hola** _equipo_",
+    "",
+    "- aletas",
+    "- gorro",
+    "",
+    "Más en [la web](https://club.org) o <b>aquí</b>.",
+  ].join("\n");
+
+  function renderFormatted() {
+    return renderDirectoryEmail({
+      draft: { subject: "Entreno", message: FORMATTED_MESSAGE },
+      sender: { fullName: "Ana Admin", role: "Committee" },
+      locale: "es",
+      brand: DEFAULT_CLUB_BRAND,
+    });
+  }
+
+  it("pinta la negrita, la cursiva y la lista en el HTML", () => {
+    const { html } = renderFormatted();
+
+    expect(html).toContain("<strong>Hola</strong> <em>equipo</em>");
+    expect(html).toMatch(
+      /<ul style="[^"]*">\n<li>aletas<\/li>\n<li>gorro<\/li>/,
+    );
+  });
+
+  it("pinta el enlace con el color de acento del club en línea", () => {
+    const accentText = readAccentText(DEFAULT_CLUB_BRAND.accentColor);
+
+    expect(renderFormatted().html).toMatch(
+      new RegExp(
+        `<a href="https://club.org" style="[^"]*color: ${accentText}[^"]*">la web</a>`,
+      ),
+    );
+  });
+
+  it("escapa el HTML que escribió el autor", () => {
+    expect(renderFormatted().html).toContain("&lt;b&gt;aquí&lt;/b&gt;");
+  });
+
+  it("no añade ninguna hoja de estilo", () => {
+    expect(renderFormatted().html).not.toContain("<style");
+  });
+
+  it("lleva en el texto plano el mensaje sin marcas, con la lista y la dirección", () => {
+    expect(renderFormatted().text).toBe(
+      [
+        "Hola equipo",
+        "",
+        "- aletas",
+        "- gorro",
+        "",
+        "Más en la web (https://club.org) o <b>aquí</b>.",
+        "",
+        "Te escribe Ana Admin, Comité de Victoria Seadragons.",
+        "",
+      ].join("\n"),
     );
   });
 });

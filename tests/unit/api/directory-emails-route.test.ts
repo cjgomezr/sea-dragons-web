@@ -231,6 +231,29 @@ describe("POST /api/v1/directory/emails", () => {
     expect(batches).toEqual([]);
   });
 
+  // D6 del PRD de E33: las marcas del formato cuentan como lo que se escribió.
+  it("responde 400 con su motivo a un mensaje de 5.001 caracteres contando las marcas", async () => {
+    const response = await postEmail({
+      ...VALID_BODY,
+      message: `**${"a".repeat(4_997)}**`,
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "validation_error", reason: "invalid_directory_email" },
+    });
+    expect(batches).toEqual([]);
+  });
+
+  it("acepta un mensaje de 5.000 caracteres contando las marcas", async () => {
+    const response = await postEmail({
+      ...VALID_BODY,
+      message: `**${"a".repeat(4_996)}**`,
+    });
+
+    expect(response.status).toBe(200);
+  });
+
   it("responde 400 a un cuerpo sin la clave de la petición", async () => {
     const response = await postEmail({ ...VALID_BODY, requestId: "otra" });
 
