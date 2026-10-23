@@ -31,7 +31,7 @@ export function DirectoryEmailSent({
   // El diálogo y su botón ya no existen: sin esto el foco caería al
   // principio de la página.
   useEffect(() => {
-    titleRef.current?.focus();
+    titleRef.current?.focus({ preventScroll: true });
   }, []);
 
   return (
