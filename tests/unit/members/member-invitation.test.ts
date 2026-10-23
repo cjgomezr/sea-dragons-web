@@ -62,9 +62,28 @@ const VALID_SUBMISSION: NewMemberSubmission = {
   groupIds: [SENIOR_ID, MASTERS_ID],
 };
 
+/** Lo único obligatorio (D12 del PRD de E33): los datos de jugador van
+ * vacíos, que es como llegan sin enviar. */
+const ONLY_NAME_AND_EMAIL: NewMemberSubmission = {
+  fullName: "Nerea Silva",
+  email: "nerea.silva@example.com",
+  country: "",
+  positionId: "",
+  experienceLevel: "",
+  gender: "",
+  aufNumber: "",
+  aufExpiry: "",
+  groupIds: [],
+};
+
 type FakeOptions = {
   readonly callerRole?: Role;
   readonly emailTaken?: boolean;
+  /** El socio del club que ya tiene el correo, si lo tiene uno. */
+  readonly clubMemberWithEmail?: {
+    readonly userId: string;
+    readonly fullName: string;
+  };
   readonly insertFails?: boolean;
   readonly emailDelivery?: EmailDeliveryAvailability;
   readonly deliveryCheckFails?: boolean;
@@ -87,6 +106,10 @@ type Fake = {
   readonly createdIdentities: string[];
   readonly deletedIdentities: string[];
   readonly sentEmails: { readonly email: string; readonly appUrl: string }[];
+  readonly emailsLookedUp: {
+    readonly clubId: string;
+    readonly email: string;
+  }[];
 };
 
 function fake(options: FakeOptions = {}): Fake {
@@ -97,6 +120,7 @@ function fake(options: FakeOptions = {}): Fake {
   const sentEmails: { email: string; appUrl: string }[] = [];
   const positionsRead: string[] = [];
   const positionsReferenced: (readonly string[])[] = [];
+  const emailsLookedUp: { clubId: string; email: string }[] = [];
   let requestsInWindow = options.previousRequests ?? 0;
   const invitee =
     options.invitee === undefined
@@ -160,6 +184,10 @@ function fake(options: FakeOptions = {}): Fake {
               email: "nerea.silva@example.com",
               accountStatus: invitee.accountStatus,
             },
+      findClubMemberByEmail: async (scope) => {
+        emailsLookedUp.push(scope);
+        return options.clubMemberWithEmail ?? null;
+      },
     },
     invitationEmail: {
       requestConfirmationEmail: async (email, appUrl) => {
@@ -192,6 +220,7 @@ function fake(options: FakeOptions = {}): Fake {
     createdIdentities,
     deletedIdentities,
     sentEmails,
+    emailsLookedUp,
   };
 }
 
@@ -305,6 +334,31 @@ describe("alta de un miembro", () => {
     expect(sentEmails).toEqual([]);
   });
 
+  it("names the club member who already has the address", async () => {
+    const existingMember = { userId: SENIOR_ID, fullName: "Nerea Vieja" };
+    const { gateways, emailsLookedUp } = fake({
+      emailTaken: true,
+      clubMemberWithEmail: existingMember,
+    });
+
+    await expect(create(gateways)).rejects.toMatchObject({
+      name: "MemberEmailTakenError",
+      existingMember,
+    });
+    expect(emailsLookedUp).toEqual([
+      { clubId: CLUB_ID, email: "nerea.silva@example.com" },
+    ]);
+  });
+
+  it("names nobody when the address has an account but no member in the club", async () => {
+    const { gateways } = fake({ emailTaken: true });
+
+    await expect(create(gateways)).rejects.toMatchObject({
+      name: "MemberEmailTakenError",
+      existingMember: null,
+    });
+  });
+
   it("names every invalid field at once", async () => {
     const codes = await captureValidationCodes({
       ...VALID_SUBMISSION,
@@ -345,7 +399,6 @@ describe("alta de un miembro", () => {
   it.each([
     ["an archived position", ARCHIVED_POSITION.id],
     ["another club's position", OTHER_CLUBS_POSITION_ID],
-    ["no position while the club offers some", ""],
   ])("rejects %s before creating anything", async (_kind, positionId) => {
     const { gateways, createdIdentities } = fake();
 
@@ -369,19 +422,123 @@ describe("alta de un miembro", () => {
     expect(insertedRows[0]?.position_id).toBeNull();
   });
 
-  it("rejects empty required fields", async () => {
-    const codes = await captureValidationCodes({
-      ...VALID_SUBMISSION,
-      fullName: "   ",
+  it("creates the member without a position although the club offers some", async () => {
+    const { gateways, insertedRows } = fake();
+
+    await create(gateways, { ...VALID_SUBMISSION, positionId: "" });
+
+    expect(insertedRows[0]?.position_id).toBeNull();
+  });
+
+  it("creates an incomplete Player with only the name and the email", async () => {
+    const { gateways, insertedRows, sentEmails } = fake();
+
+    await create(gateways, ONLY_NAME_AND_EMAIL);
+
+    expect(insertedRows).toEqual([
+      {
+        club_id: CLUB_ID,
+        user_id: NEW_USER_ID,
+        full_name: "Nerea Silva",
+        email: "nerea.silva@example.com",
+        country: null,
+        position_id: null,
+        experience_level: null,
+        gender: null,
+        auf_number: null,
+        auf_expiry: null,
+        role: "Player",
+        account_status: "incomplete",
+        email_locale: "en",
+      },
+    ]);
+    expect(sentEmails).toHaveLength(1);
+  });
+
+  it("treats blank optional fields as not sent", async () => {
+    const { gateways, insertedRows } = fake();
+
+    await create(gateways, {
+      ...ONLY_NAME_AND_EMAIL,
+      country: "  ",
       aufNumber: " ",
-      aufExpiry: "",
     });
 
-    expect(codes).toEqual([
-      "fullName:full_name_missing",
-      "aufNumber:auf_number_missing",
-      "aufExpiry:auf_expiry_not_a_date",
-    ]);
+    expect(insertedRows[0]).toMatchObject({ country: null, auf_number: null });
+  });
+
+  it.each([
+    ["country", { country: "au" }, { country: "AU" }],
+    ["position", { positionId: FORWARD.id }, { position_id: FORWARD.id }],
+    [
+      "experience level",
+      { experienceLevel: "Beginner" },
+      { experience_level: "Beginner" },
+    ],
+    ["gender", { gender: "undisclosed" }, { gender: "undisclosed" }],
+    [
+      "AUF",
+      { aufNumber: "AUF-1", aufExpiry: "2027-01-31" },
+      { auf_number: "AUF-1", auf_expiry: "2027-01-31" },
+    ],
+  ])(
+    "keeps a valid %s sent on its own",
+    async (_field, sent: Partial<NewMemberSubmission>, written) => {
+      const { gateways, insertedRows } = fake();
+
+      await create(gateways, { ...ONLY_NAME_AND_EMAIL, ...sent });
+
+      expect(insertedRows[0]).toMatchObject(written);
+    },
+  );
+
+  it.each([
+    ["country", { country: "Atlantis" }, "country:country_unknown"],
+    ["position", { positionId: "Striker" }, "positionId:position_unknown"],
+    [
+      "experience level",
+      { experienceLevel: "Expert" },
+      "experienceLevel:experience_level_unknown",
+    ],
+    ["gender", { gender: "other" }, "gender:gender_unknown"],
+  ])(
+    "rejects an invalid %s sent on its own",
+    async (_field, sent: Partial<NewMemberSubmission>, code) => {
+      const codes = await captureValidationCodes({
+        ...ONLY_NAME_AND_EMAIL,
+        ...sent,
+      });
+
+      expect(codes).toEqual([code]);
+    },
+  );
+
+  it("rejects a blank name", async () => {
+    const codes = await captureValidationCodes({
+      ...ONLY_NAME_AND_EMAIL,
+      fullName: "   ",
+    });
+
+    expect(codes).toEqual(["fullName:full_name_missing"]);
+  });
+
+  it("asks for the expiry when only the AUF number is sent", async () => {
+    const codes = await captureValidationCodes({
+      ...ONLY_NAME_AND_EMAIL,
+      aufNumber: "AUF-2210",
+    });
+
+    expect(codes).toEqual(["aufExpiry:auf_expiry_missing"]);
+  });
+
+  it("asks for the number when only the AUF expiry is sent", async () => {
+    const codes = await captureValidationCodes({
+      ...ONLY_NAME_AND_EMAIL,
+      aufNumber: "  ",
+      aufExpiry: "2027-06-30",
+    });
+
+    expect(codes).toEqual(["aufNumber:auf_number_missing"]);
   });
 
   it("rejects an AUF number longer than the database allows", async () => {

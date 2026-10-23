@@ -45,8 +45,12 @@ import { useCardSubmission } from "./use-card-submission";
 
 export const ABOUT_HEADING_ID = "perfil-sobre-mi";
 export const FULL_NAME_ID = "perfil-nombre";
-/** La franja de lo que falta (#771) pone aquí el foco cuando falta el país. */
+/** La franja de lo que falta (#771, #861) pone en estos el foco cuando falta
+ * su dato. */
 export const COUNTRY_ID = "perfil-pais";
+export const POSITION_ID = "perfil-posicion";
+export const EXPERIENCE_ID = "perfil-experiencia";
+export const GENDER_ID = "perfil-genero";
 const FULL_NAME_ERROR_ID = "perfil-nombre-error";
 const GENDER_HINT_ID = "perfil-genero-pista";
 
@@ -323,7 +327,7 @@ function AboutEditor({
         />
         {positions.length === 0 ? null : (
           <SelectField
-            id="perfil-posicion"
+            id={POSITION_ID}
             label={translate("account.profile.position")}
             value={draft.positionId}
             options={positions.map((position) => ({
@@ -344,9 +348,10 @@ function AboutEditor({
           }))}
           selected={draft.experienceLevel}
           onChoose={(experienceLevel) => update({ experienceLevel })}
+          firstOptionId={EXPERIENCE_ID}
         />
         <SelectField
-          id="perfil-genero"
+          id={GENDER_ID}
           label={translate("account.profile.gender")}
           value={draft.gender}
           options={GENDERS.map((value) => ({

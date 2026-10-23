@@ -12,12 +12,17 @@ export type ApiSuccessBody<T> = { readonly data: T };
  * tiene que explicar distinto, y es tan estable como el código: la pantalla
  * lo traduce, igual que traduce el código. */
 export type ApiErrorBody = {
-  readonly error: {
+  readonly error: ApiErrorDetails & {
     readonly code: ApiErrorCode;
     readonly message: string;
     readonly reason?: string;
   };
 };
+
+/** Lo que un error lleva además de su código para que quien llama pueda
+ * actuar, como el socio que ya tiene un correo (#861). Va dentro de `error`,
+ * junto al código, y nunca lo pisa. */
+export type ApiErrorDetails = Readonly<Record<string, unknown>>;
 
 const HTTP_STATUS_BY_ERROR_CODE: Record<ApiErrorCode, number> = {
   validation_error: 400,
@@ -47,6 +52,24 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.code = code;
     this.reason = reason;
+  }
+}
+
+/** Un error con datos para quien llama, además del motivo que lo distingue. */
+export class ApiErrorWithDetails extends ApiError {
+  readonly details: ApiErrorDetails;
+
+  constructor(
+    code: ApiErrorCode,
+    message: string,
+    {
+      reason,
+      details,
+    }: { readonly reason: string; readonly details: ApiErrorDetails },
+  ) {
+    super(code, message, reason);
+    this.name = "ApiErrorWithDetails";
+    this.details = details;
   }
 }
 
@@ -116,8 +139,22 @@ export function apiError(
   message: string,
   reason?: string,
 ): NextResponse<ApiErrorBody> {
+  return apiErrorFrom(new ApiError(code, message, reason));
+}
+
+/** La respuesta de un `ApiError`, con los datos que lleve. */
+export function apiErrorFrom(error: ApiError): NextResponse<ApiErrorBody> {
+  const details = error instanceof ApiErrorWithDetails ? error.details : {};
+  const { code, message, reason } = error;
   return NextResponse.json(
-    { error: { code, message, ...(reason === undefined ? {} : { reason }) } },
+    {
+      error: {
+        ...details,
+        code,
+        message,
+        ...(reason === undefined ? {} : { reason }),
+      },
+    },
     { status: HTTP_STATUS_BY_ERROR_CODE[code] },
   );
 }

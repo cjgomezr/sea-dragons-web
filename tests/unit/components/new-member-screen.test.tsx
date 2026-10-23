@@ -167,9 +167,59 @@ describe("formulario de alta", () => {
     expect(screen.getByLabelText("Email")).toHaveAccessibleDescription(
       "Write a valid email address.",
     );
-    expect(screen.getByLabelText("AUF number")).toHaveAttribute(
+    expect(screen.getByLabelText("AUF number")).not.toHaveAttribute(
       "aria-invalid",
       "true",
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it("manda el alta con sólo el nombre y el correo (#861)", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Full name"), "Nerea Silva");
+    await user.type(screen.getByLabelText("Email"), "nerea@example.com");
+
+    await user.click(submitButton());
+
+    expect(
+      await screen.findByText(
+        "Nerea Silva was invited. We sent the invitation to nerea@example.com.",
+      ),
+    ).toBeVisible();
+    expect(calls).toEqual([
+      {
+        url: MEMBERS_PATH,
+        body: {
+          fullName: "Nerea Silva",
+          email: "nerea@example.com",
+          country: "",
+          positionId: "",
+          experienceLevel: "",
+          gender: "",
+          aufNumber: "",
+          aufExpiry: "",
+          groupIds: [],
+        },
+      },
+    ]);
+  });
+
+  it("pide el vencimiento cuando sólo se escribe el número de AUF (#861)", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Full name"), "Nerea Silva");
+    await user.type(screen.getByLabelText("Email"), "nerea@example.com");
+    await user.type(screen.getByLabelText("AUF number"), "AUF-2210");
+
+    await user.click(submitButton());
+
+    expect(
+      screen.getByLabelText("AUF expiry date"),
+    ).toHaveAccessibleDescription(
+      "Add the expiry date that goes with the AUF number.",
     );
     expect(calls).toEqual([]);
   });

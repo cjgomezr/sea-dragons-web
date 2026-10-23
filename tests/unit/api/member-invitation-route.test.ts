@@ -47,6 +47,7 @@ const insertedRows: InvitedMemberRow[] = [];
 const sentEmails: string[] = [];
 let callerRole: Role = "Admin";
 let emailTaken = false;
+let clubMemberWithEmail: { userId: string; fullName: string } | null = null;
 let inviteeStatus: AccountStatus = "incomplete";
 let emailOutcome: ConfirmationEmailOutcome = { kind: "requested" };
 let requestsInWindow = 0;
@@ -92,6 +93,7 @@ function invitationGateways(): MemberInvitationGateways {
         userId === NEW_USER_ID
           ? { email: VALID_BODY.email, accountStatus: inviteeStatus }
           : null,
+      findClubMemberByEmail: async () => clubMemberWithEmail,
     },
     invitationEmail: {
       requestConfirmationEmail: async (email) => {
@@ -194,6 +196,7 @@ beforeEach(() => {
   insertedRows.length = 0;
   sentEmails.length = 0;
   emailTaken = false;
+  clubMemberWithEmail = null;
   inviteeStatus = "incomplete";
   emailOutcome = { kind: "requested" };
   requestsInWindow = 0;
@@ -251,6 +254,57 @@ describe("POST /api/v1/members", () => {
     expect(sentEmails).toEqual([]);
   });
 
+  it("responde 409 con el socio que ya tiene ese correo", async () => {
+    emailTaken = true;
+    clubMemberWithEmail = {
+      userId: UNKNOWN_MEMBER_ID,
+      fullName: "Nerea Vieja",
+    };
+
+    const response = await createMember(VALID_BODY);
+
+    expect(response.status).toBe(409);
+    await expect(errorOf(response)).resolves.toMatchObject({
+      code: "conflict",
+      reason: "email_taken",
+      existingMember: { userId: UNKNOWN_MEMBER_ID, fullName: "Nerea Vieja" },
+    });
+  });
+
+  it("responde 201 con sólo el nombre y el correo, y crea al socio sin datos de jugador", async () => {
+    const response = await createMember({
+      fullName: VALID_BODY.fullName,
+      email: VALID_BODY.email,
+    });
+
+    expect(response.status).toBe(201);
+    expect(insertedRows[0]).toMatchObject({
+      country: null,
+      position_id: null,
+      experience_level: null,
+      gender: null,
+      auf_number: null,
+      auf_expiry: null,
+      role: "Player",
+      account_status: "incomplete",
+    });
+    expect(sentEmails).toEqual([VALID_BODY.email]);
+  });
+
+  it("responde 400 con auf_expiry_missing a un número de AUF sin vencimiento", async () => {
+    const response = await createMember({
+      fullName: VALID_BODY.fullName,
+      email: VALID_BODY.email,
+      aufNumber: "AUF-2210",
+    });
+
+    expect(response.status).toBe(400);
+    await expect(errorOf(response)).resolves.toMatchObject({
+      reason: "auf_expiry_missing",
+    });
+    expect(insertedRows).toEqual([]);
+  });
+
   it("responde 400 con el motivo a un correo con formato inválido", async () => {
     const response = await createMember({ ...VALID_BODY, email: "nerea" });
 
@@ -269,11 +323,11 @@ describe("POST /api/v1/members", () => {
   });
 
   it("responde 400 a un campo que falta o sobra", async () => {
-    const withoutGender = Object.fromEntries(
-      Object.entries(VALID_BODY).filter(([field]) => field !== "gender"),
+    const withoutEmail = Object.fromEntries(
+      Object.entries(VALID_BODY).filter(([field]) => field !== "email"),
     );
 
-    const missing = await createMember(withoutGender);
+    const missing = await createMember(withoutEmail);
     const extra = await createMember({ ...VALID_BODY, role: "Admin" });
 
     expect(missing.status).toBe(400);

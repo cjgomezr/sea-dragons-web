@@ -1,4 +1,4 @@
-import { ApiError } from "@/lib/api/response";
+import { ApiError, ApiErrorWithDetails } from "@/lib/api/response";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { GroupNotFoundError } from "@/lib/groups/groups";
 import { asGroupsApiError } from "@/lib/groups/groups-api";
@@ -38,6 +38,18 @@ export function requireMemberInvitationGateways(): MemberInvitationGateways {
   return wiring.gateways;
 }
 
+/** Si el correo es de un socio del club, la respuesta lo nombra para que la
+ * pantalla enlace a su ficha (D14 del PRD de E33). */
+function asEmailTakenApiError(error: MemberEmailTakenError): never {
+  if (error.existingMember === null) {
+    throw new ApiError("conflict", error.message, EMAIL_TAKEN_REASON);
+  }
+  throw new ApiErrorWithDetails("conflict", error.message, {
+    reason: EMAIL_TAKEN_REASON,
+    details: { existingMember: error.existingMember },
+  });
+}
+
 /** El primer campo que no vale va como `reason`, que la pantalla traduce. */
 export function asMemberInvitationApiError(error: unknown): never {
   if (error instanceof NewMemberValidationError) {
@@ -51,7 +63,7 @@ export function asMemberInvitationApiError(error: unknown): never {
     throw new ApiError("forbidden", error.message);
   }
   if (error instanceof MemberEmailTakenError) {
-    throw new ApiError("conflict", error.message, EMAIL_TAKEN_REASON);
+    asEmailTakenApiError(error);
   }
   if (error instanceof InvitationNotPendingError) {
     throw new ApiError(

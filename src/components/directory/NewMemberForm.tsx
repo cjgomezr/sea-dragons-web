@@ -86,6 +86,7 @@ const FIELD_OF_ISSUE: Readonly<Record<NewMemberIssueCode, NewMemberField>> = {
   gender_unknown: "gender",
   auf_number_missing: "aufNumber",
   auf_number_too_long: "aufNumber",
+  auf_expiry_missing: "aufExpiry",
   auf_expiry_not_a_date: "aufExpiry",
   auf_expiry_before_joined: "aufExpiry",
 };

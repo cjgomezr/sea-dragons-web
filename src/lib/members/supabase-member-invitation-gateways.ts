@@ -87,10 +87,13 @@ export function createInvitedMemberStore(serviceClient: SupabaseClient): Pick<
     },
     invitees: {
       async insertInvitedMember(row) {
-        // El AUF del alta lo escribe un Admin: nace verificado (#274).
-        const { error } = await serviceClient
-          .from(MEMBERS_TABLE)
-          .insert({ ...row, auf_verified_at: new Date().toISOString() });
+        // El AUF del alta lo escribe un Admin: nace verificado (#274). Sin
+        // AUF no hay nada que verificar, y la base no deja marcarlo.
+        const { error } = await serviceClient.from(MEMBERS_TABLE).insert({
+          ...row,
+          auf_verified_at:
+            row.auf_number === null ? null : new Date().toISOString(),
+        });
         if (error) {
           throw new Error(
             `No se pudo crear la fila del miembro dado de alta: ${error.message}`,
@@ -111,6 +114,26 @@ export function createInvitedMemberStore(serviceClient: SupabaseClient): Pick<
           );
         }
         return data === null ? null : toInvitee(data);
+      },
+
+      async findClubMemberByEmail({ clubId, email }) {
+        const { data, error } = await serviceClient
+          .from(MEMBERS_TABLE)
+          .select("user_id, full_name")
+          .eq("club_id", clubId)
+          .eq("email", email)
+          // `email` es una copia del de Auth, sin índice único: una copia
+          // vieja repetida no puede convertir el 409 en un 500.
+          .limit(1)
+          .maybeSingle();
+        if (error) {
+          throw new Error(
+            `No se pudo buscar al socio que ya tiene el correo: ${error.message}`,
+          );
+        }
+        return data === null
+          ? null
+          : { userId: data.user_id, fullName: data.full_name };
       },
     },
   };

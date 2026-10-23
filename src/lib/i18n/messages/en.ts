@@ -563,6 +563,9 @@ export const englishMessages = {
   "profileCompletion.item.emergency_contact": "Emergency contact",
   "profileCompletion.item.phone": "Phone",
   "profileCompletion.item.country": "Country",
+  "profileCompletion.item.position": "Position",
+  "profileCompletion.item.experience_level": "Experience",
+  "profileCompletion.item.gender": "Gender",
   "profileCompletion.phoneTitle": "Almost there · {percent} complete",
   "profileBar.back": "Back",
   "profileBar.ownTitle": "My profile",
@@ -1222,6 +1225,8 @@ export const englishMessages = {
   "newMember.issue.aufNumberMissing": "Write the AUF number.",
   "newMember.issue.aufNumberTooLong":
     "The AUF number can have at most {max} characters.",
+  "newMember.issue.aufExpiryMissing":
+    "Add the expiry date that goes with the AUF number.",
   "newMember.issue.aufExpiryNotADate": "Write the AUF expiry date.",
   "newMember.issue.aufExpiryInThePast":
     "The AUF has already expired. Check the date.",

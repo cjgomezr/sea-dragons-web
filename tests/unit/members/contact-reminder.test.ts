@@ -58,51 +58,103 @@ describe("isDismissibleReminder", () => {
 });
 
 /**
- * La franja de lo que falta en el perfil (#771, D8 del PRD de E30): cuenta el
- * contacto de emergencia, el teléfono y el país. El nombre y el correo los
- * tiene siempre, así que cuentan como hechos y el porcentaje nunca baja de
- * 40.
+ * La franja de lo que falta en el perfil (#771, D8 del PRD de E30; #861, D13
+ * del de E33): cuenta el contacto de emergencia, el teléfono, el país, la
+ * posición (sólo si el club ofrece alguna), la experiencia y el género. El
+ * nombre y el correo los tiene siempre, así que cuentan como hechos.
  */
 describe("profileCompletenessOf", () => {
+  const WITH_POSITIONS = { hasActivePositions: true } as const;
+  const WITHOUT_POSITIONS = { hasActivePositions: false } as const;
   const COMPLETE = {
     country: "AU",
     phone: "0412 345 678",
     emergencyContact: SISTER,
+    positionId: "90000000-0000-4000-8000-000000000001",
+    experienceLevel: "Intermediate",
+    gender: "female",
+  } as const;
+  const NO_PLAYER_DATA = {
+    ...COMPLETE,
+    positionId: null,
+    experienceLevel: null,
+    gender: null,
   } as const;
 
   it("con todo, no falta nada y está al 100", () => {
-    expect(profileCompletenessOf(COMPLETE)).toEqual({
+    expect(profileCompletenessOf(COMPLETE, WITH_POSITIONS)).toEqual({
       missing: [],
       percent: 100,
     });
   });
 
-  it("sin contacto de emergencia, falta ese y está al 80", () => {
+  it("sin contacto de emergencia, falta ese y está al 88", () => {
     expect(
-      profileCompletenessOf({ ...COMPLETE, emergencyContact: null }),
-    ).toEqual({ missing: ["emergency_contact"], percent: 80 });
+      profileCompletenessOf(
+        { ...COMPLETE, emergencyContact: null },
+        WITH_POSITIONS,
+      ),
+    ).toEqual({ missing: ["emergency_contact"], percent: 88 });
   });
 
-  it("sin contacto ni teléfono, faltan los dos y está al 60", () => {
+  it("sin contacto ni teléfono, faltan los dos y está al 75", () => {
     expect(
-      profileCompletenessOf({
-        ...COMPLETE,
-        phone: null,
-        emergencyContact: null,
-      }),
-    ).toEqual({ missing: ["emergency_contact", "phone"], percent: 60 });
+      profileCompletenessOf(
+        { ...COMPLETE, phone: null, emergencyContact: null },
+        WITH_POSITIONS,
+      ),
+    ).toEqual({ missing: ["emergency_contact", "phone"], percent: 75 });
   });
 
-  it("sin los tres, faltan en ese orden y está al 40", () => {
+  it("sin posición, experiencia ni género, los pide después del país", () => {
     expect(
-      profileCompletenessOf({
-        country: null,
-        phone: null,
-        emergencyContact: null,
-      }),
+      profileCompletenessOf(
+        { ...NO_PLAYER_DATA, country: null },
+        WITH_POSITIONS,
+      ),
     ).toEqual({
-      missing: ["emergency_contact", "phone", "country"],
-      percent: 40,
+      missing: ["country", "position", "experience_level", "gender"],
+      percent: 50,
     });
+  });
+
+  it("sin nada, lo pide todo en orden y está al 25", () => {
+    expect(
+      profileCompletenessOf(
+        {
+          ...NO_PLAYER_DATA,
+          country: null,
+          phone: null,
+          emergencyContact: null,
+        },
+        WITH_POSITIONS,
+      ),
+    ).toEqual({
+      missing: [
+        "emergency_contact",
+        "phone",
+        "country",
+        "position",
+        "experience_level",
+        "gender",
+      ],
+      percent: 25,
+    });
+  });
+
+  it("en un club sin posiciones activas, no pide la posición ni la cuenta", () => {
+    expect(profileCompletenessOf(NO_PLAYER_DATA, WITHOUT_POSITIONS)).toEqual({
+      missing: ["experience_level", "gender"],
+      percent: 71,
+    });
+  });
+
+  it("en un club sin posiciones activas, con lo demás completo está al 100", () => {
+    expect(
+      profileCompletenessOf(
+        { ...COMPLETE, positionId: null },
+        WITHOUT_POSITIONS,
+      ),
+    ).toEqual({ missing: [], percent: 100 });
   });
 });

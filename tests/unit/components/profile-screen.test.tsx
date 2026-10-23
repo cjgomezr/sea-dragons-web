@@ -2114,13 +2114,22 @@ describe("pantalla de perfil: la cabecera (#771)", () => {
 });
 
 describe("pantalla de perfil: la franja de lo que falta (#771)", () => {
+  /** Con el contacto completo, para que la franja sólo pida lo demás. */
+  const NO_PLAYER_DATA = {
+    phone: "0412 345 678",
+    emergencyContact: SISTER,
+    positionId: null,
+    experienceLevel: null,
+    gender: null,
+  } as const;
+
   function completionStrip(): HTMLElement {
     return screen.getByRole("note", {
       name: "Your profile is almost complete. Missing:",
     });
   }
 
-  it("sin contacto de emergencia pide ese dato con el 80 %", () => {
+  it("sin contacto de emergencia pide ese dato con el 88 %", () => {
     renderScreen({
       profile: { ...PROFILE, phone: "0412 345 678", emergencyContact: null },
     });
@@ -2128,8 +2137,8 @@ describe("pantalla de perfil: la franja de lo que falta (#771)", () => {
     const strip = completionStrip();
     expect(
       within(strip).getByRole("progressbar", { name: "Profile completeness" }),
-    ).toHaveAttribute("aria-valuenow", "80");
-    expect(within(strip).getByText("80%")).toBeInTheDocument();
+    ).toHaveAttribute("aria-valuenow", "88");
+    expect(within(strip).getByText("88%")).toBeInTheDocument();
     expect(
       within(strip)
         .getAllByRole("button")
@@ -2137,7 +2146,7 @@ describe("pantalla de perfil: la franja de lo que falta (#771)", () => {
     ).toEqual(["Emergency contact"]);
   });
 
-  it("pide cada dato que falta, con el 40 % si faltan los tres", () => {
+  it("pide cada dato que falta, con el 63 % si faltan los tres de contacto", () => {
     renderScreen({
       profile: {
         ...PROFILE,
@@ -2150,7 +2159,7 @@ describe("pantalla de perfil: la franja de lo que falta (#771)", () => {
     const strip = completionStrip();
     expect(within(strip).getByRole("progressbar")).toHaveAttribute(
       "aria-valuenow",
-      "40",
+      "63",
     );
     expect(
       within(strip)
@@ -2158,6 +2167,47 @@ describe("pantalla de perfil: la franja de lo que falta (#771)", () => {
         .map((button) => button.textContent),
     ).toEqual(["Emergency contact", "Phone", "Country"]);
   });
+
+  it("sin posición, experiencia ni género los pide después del país (#861)", () => {
+    renderScreen({ profile: { ...PROFILE, ...NO_PLAYER_DATA, country: null } });
+
+    expect(
+      within(completionStrip())
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Country", "Position", "Experience", "Gender"]);
+  });
+
+  it("en un club sin posiciones activas no pide la posición (#861)", () => {
+    renderScreen({
+      profile: { ...PROFILE, ...NO_PLAYER_DATA },
+      positionOptions: [{ ...FORWARD, isArchived: true }],
+    });
+
+    expect(
+      within(completionStrip())
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Experience", "Gender"]);
+  });
+
+  it.each([
+    ["Position", () => screen.getByLabelText("Position")],
+    ["Experience", () => screen.getByRole("radio", { name: "Beginner" })],
+    ["Gender", () => screen.getByLabelText("Gender")],
+  ])(
+    "la ficha %s abre Sobre mí y pone el foco en su campo (#861)",
+    async (item, field) => {
+      const user = userEvent.setup();
+      renderScreen({ profile: { ...PROFILE, ...NO_PLAYER_DATA } });
+
+      await user.click(
+        within(completionStrip()).getByRole("button", { name: item }),
+      );
+
+      expect(field()).toHaveFocus();
+    },
+  );
 
   it.each([
     ["Emergency contact", "Contact name"],
@@ -2333,7 +2383,7 @@ describe("perfil propio en el móvil (#777)", () => {
     });
 
     const card = screen.getByRole("note", {
-      name: "Almost there · 60% complete",
+      name: "Almost there · 75% complete",
     });
     expect(
       within(card)
@@ -2350,7 +2400,7 @@ describe("perfil propio en el móvil (#777)", () => {
 
     await user.click(
       within(
-        screen.getByRole("note", { name: "Almost there · 60% complete" }),
+        screen.getByRole("note", { name: "Almost there · 75% complete" }),
       ).getByRole("button", { name: "Phone" }),
     );
 
@@ -2400,7 +2450,7 @@ describe("perfil propio en el móvil (#777)", () => {
       within(phoneBar("Mi perfil")).getByRole("button", { name: "Volver" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("note", { name: /^Casi listo · 60\s%\scompleto$/ }),
+      screen.getByRole("note", { name: /^Casi listo · 75\s%\scompleto$/ }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Solicitar un cambio de rol" }),
