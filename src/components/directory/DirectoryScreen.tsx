@@ -599,6 +599,7 @@ export function DirectoryScreen({
           locale={locale}
           clubName={clubName}
           onClose={closeInvite}
+          onMemberCreated={() => setReloads((count) => count + 1)}
         />
       ) : null}
       {state.kind === "loading" ? (

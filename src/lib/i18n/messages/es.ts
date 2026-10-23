@@ -1327,14 +1327,21 @@ export const spanishMessages: MessageCatalog = {
   "newMember.cancel": "Cancelar",
   "newMember.submit": "Enviar invitación",
   "newMember.sending": "Enviando…",
-  "newMember.created.sent":
-    "Invitamos a {name}. Le mandamos la invitación a {email}.",
-  "newMember.created.notSent":
-    "Creamos la cuenta de {name}, pero la invitación no se pudo mandar.",
-  "newMember.resend": "Reenviar la invitación",
+  "newMember.result.sentTitle": "Invitación enviada a {email}",
+  "newMember.result.resentTitle": "Invitación enviada otra vez a {email}",
+  "newMember.result.sentText": {
+    one: "{name} sale como Invitado en el Directorio hasta que entre. El enlace dura {count} minuto y puedes reenviarlo desde su ficha.",
+    other:
+      "{name} sale como Invitado en el Directorio hasta que entre. El enlace dura {count} minutos y puedes reenviarlo desde su ficha.",
+  },
+  "newMember.result.notSentTitle":
+    "{name} quedó añadido, pero el correo no salió",
+  "newMember.result.notSentText":
+    "{name} ya está en el Directorio como Invitado. Prueba a mandar la invitación otra vez; si sigue fallando, revisa la dirección.",
+  "newMember.result.inviteAnother": "Invitar a otro",
+  "newMember.result.openProfile": "Abrir la ficha de {name}",
+  "newMember.resend": "Reenviar invitación",
   "newMember.resending": "Reenviando…",
-  "newMember.resent": "Le mandamos una invitación nueva a {email}.",
-  "newMember.addAnother": "Invitar a otro miembro",
   "newMember.issue.fullNameMissing": "Escribe el nombre del miembro.",
   "newMember.issue.emailMalformed": "Escribe una dirección de correo válida.",
   "newMember.issue.countryUnknown": "Elige un país.",

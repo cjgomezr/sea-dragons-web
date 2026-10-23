@@ -10,12 +10,15 @@ import {
   GOALKEEPER,
   asDirectoryPosition,
 } from "../helpers/seeded-positions";
+import { stubScreenWidth } from "../../support/screen-width";
 
 /**
  * La invitación de un miembro como panel del Directorio (#862, RF-9 y D11 del
  * PRD de E33): quién, los grupos en fichas, los datos de jugador plegados, el
  * resumen de errores con enlaces, el correo que ya es de un miembro y la vista
- * previa de la invitación. Los estados de después de enviar llegan con #863.
+ * previa de la invitación. Después de enviar (#863, RF-10): enviada, o no
+ * salió con Reenviar, Invitar a otro con los grupos y el enlace a la ficha; y
+ * en el móvil, una ventana que ocupa la pantalla.
  */
 
 const NEW_USER_ID = "c2c2c2c2-0000-4000-8000-00000000000c";
@@ -109,6 +112,7 @@ async function renderPanel(
   options: {
     readonly locale?: "en" | "es";
     readonly onClose?: () => void;
+    readonly onMemberCreated?: () => void;
   } = {},
 ): Promise<void> {
   render(
@@ -116,6 +120,7 @@ async function renderPanel(
       locale={options.locale ?? "en"}
       clubName={CLUB_NAME}
       onClose={options.onClose ?? (() => undefined)}
+      onMemberCreated={options.onMemberCreated ?? (() => undefined)}
     />,
   );
   await screen.findByLabelText(options.locale === "es" ? "Correo" : "Email");
@@ -145,6 +150,7 @@ function sendButton(): HTMLElement {
 
 beforeEach(() => {
   calls.length = 0;
+  stubScreenWidth(false);
 });
 
 afterEach(() => {
@@ -262,7 +268,7 @@ describe("los grupos", () => {
 
     await user.click(sendButton());
 
-    await screen.findByText(/was invited/);
+    await screen.findByText(/^Invitation sent to/);
     expect(calls[0]?.body).toMatchObject({ groupIds: [SENIOR_ID] });
   });
 });
@@ -422,7 +428,7 @@ describe("los datos de jugador", () => {
 
     await user.click(sendButton());
 
-    await screen.findByText(/was invited/);
+    await screen.findByText(/^Invitation sent to/);
     expect(calls).toEqual([
       {
         url: MEMBERS_PATH,
@@ -720,44 +726,286 @@ describe("mientras se envía", () => {
     expect(sendButton()).toHaveTextContent("Sending…");
     expect(calls).toHaveLength(1);
     answer(createdResponse("sent"));
-    await screen.findByText(/was invited/);
+    await screen.findByText(/^Invitation sent to/);
   });
 });
 
 describe("después de enviar", () => {
-  it("dice que salió la invitación", async () => {
+  async function inviteNerea(
+    options: { readonly group?: string; readonly locale?: "en" | "es" } = {},
+  ): Promise<void> {
+    const user = userEvent.setup();
+    const isSpanish = options.locale === "es";
+    await user.type(
+      screen.getByLabelText(isSpanish ? "Nombre completo" : "Full name"),
+      "Nerea Silva",
+    );
+    await user.type(
+      screen.getByLabelText(isSpanish ? "Correo" : "Email"),
+      "nerea@example.com",
+    );
+    if (options.group !== undefined) {
+      await user.click(screen.getByRole("button", { name: options.group }));
+    }
+    await user.click(
+      screen.getByRole("button", {
+        name: isSpanish ? "Enviar invitación" : "Send invitation",
+      }),
+    );
+  }
+
+  it("dice a quién salió la invitación, que sale como Invitado y cuánto dura el enlace", async () => {
     stubApi();
     await renderPanel();
-    await typeWho("Nerea Silva", "nerea@example.com");
 
-    await userEvent.setup().click(sendButton());
+    await inviteNerea();
 
+    const sent = await screen.findByRole("status");
     expect(
-      await screen.findByText(
-        "Nerea Silva was invited. We sent the invitation to nerea@example.com.",
-      ),
+      within(sent).getByRole("heading", {
+        name: "Invitation sent to nerea@example.com",
+      }),
+    ).toBeVisible();
+    expect(sent).toHaveTextContent(
+      "Nerea Silva shows as Invited in the directory until they sign in. The link works for 60 minutes and you can resend it from their profile.",
+    );
+    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
+  });
+
+  it.each(["sent", "not_sent"] as const)(
+    "avisa al directorio de que hay un socio nuevo (%s)",
+    async (invitation) => {
+      stubApi({ create: () => createdResponse(invitation) });
+      const onMemberCreated = vi.fn();
+      await renderPanel({ onMemberCreated });
+
+      await inviteNerea();
+
+      await screen.findByRole("link", { name: "Open Nerea's profile" });
+      expect(onMemberCreated).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("cuando el correo no sale, lo dice y ofrece reenviarlo", async () => {
+    stubApi({ create: () => createdResponse("not_sent") });
+    await renderPanel();
+
+    await inviteNerea();
+
+    const notSent = await screen.findByRole("alert");
+    expect(
+      within(notSent).getByRole("heading", {
+        name: "Nerea was added, but the email didn't go out",
+      }),
+    ).toBeVisible();
+    expect(notSent).toHaveTextContent(
+      "Nerea Silva is in the directory as Invited. Try sending the invitation again; if it keeps failing, check the address.",
+    );
+    expect(
+      screen.getByRole("button", { name: "Resend invitation" }),
     ).toBeVisible();
   });
 
-  it("cuando la invitación no sale, ofrece reenviarla", async () => {
+  it("reenviada con éxito, pasa a enviada otra vez", async () => {
     stubApi({ create: () => createdResponse("not_sent") });
     await renderPanel();
-    await typeWho("Nerea Silva", "nerea@example.com");
+    await inviteNerea();
     const user = userEvent.setup();
-    await user.click(sendButton());
 
     await user.click(
       await screen.findByRole("button", { name: "Resend invitation" }),
     );
 
+    const sent = await screen.findByRole("status");
     expect(
-      await screen.findByText("We sent a new invitation to nerea@example.com."),
+      within(sent).getByRole("heading", {
+        name: "Invitation sent again to nerea@example.com",
+      }),
     ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Resend invitation" }),
+    ).not.toBeInTheDocument();
     expect(calls.map((call) => call.url)).toEqual([
       MEMBERS_PATH,
       INVITATION_PATH,
     ]);
   });
+
+  it("si el reenvío vuelve a fallar, lo dice y deja reintentar", async () => {
+    let resends = 0;
+    stubApi({
+      create: () => createdResponse("not_sent"),
+      resend: () => {
+        resends += 1;
+        return resends === 1
+          ? errorResponse(503, "service_unavailable", "invitation_not_sent")
+          : jsonResponse(200, { data: { invitation: "sent" } });
+      },
+    });
+    await renderPanel();
+    await inviteNerea();
+    const user = userEvent.setup();
+    const resend = await screen.findByRole("button", {
+      name: "Resend invitation",
+    });
+
+    await user.click(resend);
+
+    expect(
+      await screen.findByText(/^The invitation could not be sent/),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Resend invitation" }));
+    expect(
+      await screen.findByRole("heading", {
+        name: "Invitation sent again to nerea@example.com",
+      }),
+    ).toBeVisible();
+  });
+
+  it.each(["sent", "not_sent"] as const)(
+    "Invitar a otro vacía el formulario y conserva los grupos (%s)",
+    async (invitation) => {
+      stubApi({ create: () => createdResponse(invitation) });
+      await renderPanel();
+      await inviteNerea({ group: "Senior Squad" });
+
+      await userEvent
+        .setup()
+        .click(await screen.findByRole("button", { name: "Invite another" }));
+
+      expect(screen.getByLabelText("Full name")).toHaveValue("");
+      expect(screen.getByLabelText("Full name")).toHaveFocus();
+      expect(screen.getByLabelText("Email")).toHaveValue("");
+      expect(
+        screen.getByRole("button", { name: "Senior Squad" }),
+      ).toHaveAttribute("aria-pressed", "true");
+      expect(
+        screen.getByRole("button", { name: "Masters Squad" }),
+      ).toHaveAttribute("aria-pressed", "false");
+      expect(
+        screen.getByRole("group", { name: /^Groups/ }),
+      ).toHaveAccessibleName("Groups · 1 chosen");
+    },
+  );
+
+  it("Invitar a otro tras un reenvío fallido no deja el aviso", async () => {
+    stubApi({
+      create: () => createdResponse("not_sent"),
+      resend: () =>
+        errorResponse(503, "service_unavailable", "invitation_not_sent"),
+    });
+    await renderPanel();
+    await inviteNerea();
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole("button", { name: "Resend invitation" }),
+    );
+    await screen.findByText(/^The invitation could not be sent/);
+
+    await user.click(screen.getByRole("button", { name: "Invite another" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Full name")).not.toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+  });
+
+  it("el grupo conservado sale con el alta siguiente", async () => {
+    stubApi();
+    await renderPanel();
+    await inviteNerea({ group: "Senior Squad" });
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole("button", { name: "Invite another" }),
+    );
+
+    await typeWho("Ona Pujol", "ona@example.com");
+    await user.click(sendButton());
+
+    await screen.findByRole("status");
+    expect(calls[1]?.body).toMatchObject({
+      fullName: "Ona Pujol",
+      groupIds: [SENIOR_ID],
+    });
+  });
+
+  it.each(["sent", "not_sent"] as const)(
+    "enlaza a la ficha del socio nuevo (%s)",
+    async (invitation) => {
+      stubApi({ create: () => createdResponse(invitation) });
+      await renderPanel();
+
+      await inviteNerea();
+
+      expect(
+        await screen.findByRole("link", { name: "Open Nerea's profile" }),
+      ).toHaveAttribute("href", `/directorio/${NEW_USER_ID}`);
+    },
+  );
+
+  it("lo dice en español", async () => {
+    stubApi({ create: () => createdResponse("not_sent") });
+    await renderPanel({ locale: "es" });
+    await inviteNerea({ locale: "es" });
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Nerea quedó añadido, pero el correo no salió",
+      }),
+    ).toBeVisible();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Reenviar invitación" }));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Invitación enviada otra vez a nerea@example.com",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "Abrir la ficha de Nerea" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Invitar a otro" }),
+    ).toBeVisible();
+  });
+});
+
+/* Por debajo de 768 px (#863) el panel es una ventana modal que ocupa la
+   pantalla. Cómo se ve, el scroll del cuerpo y el pie fijo los prueba
+   Playwright a 320 y 375 px. */
+describe("en el móvil", () => {
+  beforeEach(() => {
+    stubScreenWidth(true);
+  });
+
+  it("abre el panel en una ventana modal", async () => {
+    stubApi();
+
+    await renderPanel();
+
+    const window = screen.getByRole("dialog", { name: "Invite a member" });
+    expect(window).toHaveAttribute("open");
+    expect(within(window).getByLabelText("Email")).toBeVisible();
+  });
+
+  it.each(["Cancel", "Close"])(
+    "%s cierra la ventana antes de avisar",
+    async (button) => {
+      stubApi();
+      const onClose = vi.fn();
+      await renderPanel({ onClose });
+      const window = screen.getByRole("dialog", { name: "Invite a member" });
+
+      await userEvent
+        .setup()
+        .click(within(window).getByRole("button", { name: button }));
+
+      expect(window).not.toHaveAttribute("open");
+      expect(onClose).toHaveBeenCalledTimes(1);
+    },
+  );
 });
 
 describe("en español", () => {

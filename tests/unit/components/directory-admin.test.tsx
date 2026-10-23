@@ -90,6 +90,19 @@ const DIRECTORY_PATH = "/api/v1/directory";
 const PENDING_REQUESTS_PATH = "/api/v1/role-requests?status=pending";
 const POSITIONS_PATH = "/api/v1/club/positions";
 const GROUPS_PATH = "/api/v1/groups";
+const MEMBERS_PATH = "/api/v1/members";
+const NEW_MEMBER_ID = "c2c2c2c2-0000-4000-8000-00000000000c";
+
+const CREATED_MEMBER = {
+  data: {
+    member: {
+      userId: NEW_MEMBER_ID,
+      fullName: "Ona Pujol",
+      email: "ona@club.test",
+    },
+    invitation: "sent",
+  },
+};
 
 type ApiCall = {
   readonly url: string;
@@ -183,6 +196,9 @@ function stubApi(stub: ApiStub = {}): void {
       calls.push({ url, method, body });
       if (method === "GET") {
         return readResponse(stub, url);
+      }
+      if (method === "POST" && url === MEMBERS_PATH) {
+        return jsonResponse(201, CREATED_MEMBER);
       }
       if (method === "POST") {
         return stub.decision?.() ?? jsonResponse(200, APPROVED_DECISION);
@@ -595,6 +611,29 @@ describe("directorio para Admin: el panel de invitar (#862)", () => {
     expect(
       await screen.findByRole("region", { name: "Invite a member" }),
     ).toBeVisible();
+  });
+
+  it("tras el alta vuelve a pedir la lista, sin dejar de enseñarla", async () => {
+    stubApi({ members: [NEREA, ANA], requests: [] });
+    await renderAdminDirectory();
+    const user = userEvent.setup();
+    await user.click(inviteToggle());
+    const panel = await screen.findByRole("region", {
+      name: "Invite a member",
+    });
+    const directoryReads = (): number =>
+      calls.filter((call) => call.url.startsWith(DIRECTORY_PATH)).length;
+    const readsBefore = directoryReads();
+    await user.type(within(panel).getByLabelText("Full name"), "Ona Pujol");
+    await user.type(within(panel).getByLabelText("Email"), "ona@club.test");
+
+    await user.click(
+      within(panel).getByRole("button", { name: "Send invitation" }),
+    );
+
+    await within(panel).findByRole("status");
+    await waitFor(() => expect(directoryReads()).toBe(readsBefore + 1));
+    expect(screen.getByRole("region", { name: "Club members" })).toBeVisible();
   });
 
   it("a quien no es Admin no se le abre aunque se pida al montar", async () => {

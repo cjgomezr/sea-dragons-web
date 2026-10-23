@@ -281,12 +281,17 @@ type NewMemberFormState = {
  * llevar a quien lo rellena al campo de cada error. */
 function useNewMemberForm({
   positions,
+  initialGroupIds,
   onCreated,
 }: {
   readonly positions: readonly NamedPosition[];
-  readonly onCreated: (created: CreatedMemberView) => void;
+  readonly initialGroupIds: readonly string[];
+  readonly onCreated: NewMemberFormProps["onCreated"];
 }): NewMemberFormState {
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<Draft>(() => ({
+    ...EMPTY_DRAFT,
+    groupIds: new Set(initialGroupIds),
+  }));
   const [status, setStatus] = useState<Status>({ kind: "editing" });
   const [localIssues, setLocalIssues] = useState<readonly FormIssue[]>([]);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -353,7 +358,7 @@ function useNewMemberForm({
     const result = await createMember(submission);
     isSendingRef.current = false;
     if (result.kind === "created") {
-      onCreated(result.created);
+      onCreated(result.created, submission.groupIds);
       return;
     }
     setStatus(result);
@@ -376,25 +381,35 @@ function useNewMemberForm({
   };
 }
 
-export function NewMemberForm({
-  locale,
-  clubName,
-  clubGroups,
-  positions,
-  onCreated,
-  onCancel,
-}: {
+type NewMemberFormProps = {
   readonly locale: Locale;
   readonly clubName: string;
   readonly clubGroups: readonly Group[];
   /** Las activas del club, en su orden (#299). */
   readonly positions: readonly NamedPosition[];
-  readonly onCreated: (created: CreatedMemberView) => void;
+  /** Los que ya salen elegidos: "Invitar a otro" conserva los del alta
+   * anterior (#863), para dar de alta a un equipo entero. */
+  readonly initialGroupIds: readonly string[];
+  /** Con los grupos que se mandaron, para conservarlos. */
+  readonly onCreated: (
+    created: CreatedMemberView,
+    groupIds: readonly string[],
+  ) => void;
   readonly onCancel: () => void;
-}): React.JSX.Element {
+};
+
+export function NewMemberForm({
+  locale,
+  clubName,
+  clubGroups,
+  positions,
+  initialGroupIds,
+  onCreated,
+  onCancel,
+}: NewMemberFormProps): React.JSX.Element {
   const translate = createTranslator(locale);
   const countries = useMemo(() => listCountryOptions(locale), [locale]);
-  const form = useNewMemberForm({ positions, onCreated });
+  const form = useNewMemberForm({ positions, initialGroupIds, onCreated });
   const { draft, status, issues } = form;
   const issueFor = (field: NewMemberField): FormIssue | null =>
     issues.find((issue) => issue.field === field) ?? null;
