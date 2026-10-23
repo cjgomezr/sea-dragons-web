@@ -6488,6 +6488,13 @@ for (const state of DIRECTORY_STATES) {
               const isPhoneComposer =
                 vp.name === "mobile" && state.endsInPhoneComposer === true;
               const fullPage = state.endsInModal !== true && !isPhoneComposer;
+              // El redactor usa `useIsPhone` (#860): si la página no cabe, la
+              // captura de página entera lo ve un instante como móvil, lo
+              // vuelve a montar y pierde el foco, el scroll y la lista de
+              // búsqueda abierta (#675). Con la ventana a su altura no pasa.
+              if (fullPage && state.endsInPhoneComposer === true) {
+                await fitViewportToPage(page);
+              }
               await createMissingLocalBaseline(snapshot, () =>
                 page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage }),
               );
