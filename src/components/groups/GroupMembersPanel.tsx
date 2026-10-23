@@ -311,6 +311,11 @@ export function GroupMembersPanel({
               isDisabled={isDisabled}
               isAdding={pending?.kind === "assign"}
               isNewGroup={isNewGroup}
+              failureMessage={
+                failure === null
+                  ? null
+                  : describeGroupsFailure(translate, failure)
+              }
               onAdd={addMany}
               onRemove={(member) => remove(state, member)}
             />

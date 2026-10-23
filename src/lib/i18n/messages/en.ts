@@ -738,6 +738,7 @@ export const englishMessages = {
   "groups.audience.posted": "Posted {date}",
   // El selector de varios a la vez (#829, RF-4 de E32).
   "groups.picker.label": "Add members to {group}",
+  "groups.picker.phoneTitle": "Add to {group}",
   "groups.picker.search": "Search members not in this group",
   "groups.picker.groupCount": {
     one: "in {count} group",

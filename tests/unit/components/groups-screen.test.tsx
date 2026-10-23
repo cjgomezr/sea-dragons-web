@@ -2530,18 +2530,6 @@ describe("en el móvil (#831)", () => {
       ).toBeVisible();
     });
 
-    it("Añadir miembros abre el selector en línea", async () => {
-      stubApi({ groups: [SENIOR] });
-      await renderScreen();
-      const panel = await openGroupScreen("Senior Squad");
-
-      const picker = await openPicker(panel);
-
-      expect(
-        within(picker).getByRole("checkbox", { name: /Tomás Errekondo/ }),
-      ).toBeVisible();
-    });
-
     it("volver enseña otra vez la lista, con el foco en la fila de ese grupo", async () => {
       const user = userEvent.setup();
       stubApi({ groups: [SENIOR, MASTERS] });
@@ -2709,6 +2697,247 @@ describe("en el móvil (#831)", () => {
       expect(calls.filter((call) => call.method === "DELETE")).toEqual([
         { url: `${GROUPS_PATH}/${SENIOR.id}`, method: "DELETE", body: null },
       ]);
+    });
+  });
+
+  describe("el selector a pantalla completa (#832)", () => {
+    function phonePicker(groupName: string): HTMLElement {
+      return screen.getByRole("dialog", { name: `Add to ${groupName}` });
+    }
+
+    async function openPhonePicker(panel: HTMLElement): Promise<HTMLElement> {
+      const user = userEvent.setup();
+      await user.click(addMembersButton(panel));
+      return phonePicker(panel.getAttribute("aria-label") ?? "");
+    }
+
+    async function check(picker: HTMLElement, name: string): Promise<void> {
+      const user = userEvent.setup();
+      await user.click(within(picker).getByRole("checkbox", { name }));
+    }
+
+    it("Añadir miembros abre una ventana con Cancelar, el título y la búsqueda, no el selector en línea", async () => {
+      stubApi({ groups: [SENIOR], members: [NEREA], candidates: [TOMAS] });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+
+      const picker = await openPhonePicker(panel);
+
+      expect(
+        within(picker).getByRole("heading", {
+          level: 2,
+          name: "Add to Senior Squad",
+        }),
+      ).toBeVisible();
+      expect(
+        within(picker).getByRole("button", { name: "Cancel" }),
+      ).toBeVisible();
+      expect(
+        within(picker).getByRole("searchbox", {
+          name: "Search members not in this group",
+        }),
+      ).toHaveFocus();
+      expect(
+        screen.queryByRole("group", { name: "Add members to Senior Squad" }),
+      ).toBeNull();
+    });
+
+    it("cada fila lleva la casilla con el nombre y, como descripción, la posición y sus grupos", async () => {
+      stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA, TOMAS] });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+
+      const picker = await openPhonePicker(panel);
+
+      expect(
+        within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
+      ).toHaveAccessibleDescription("Goalkeeper · in 0 groups");
+      expect(
+        within(picker).getByRole("checkbox", { name: "Ana Admin" }),
+      ).toHaveAccessibleDescription("in 2 groups");
+    });
+
+    it("sin nadie marcado, el botón de añadir está desactivado; al marcar se activa y cuenta", async () => {
+      stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA, BEA] });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+      const picker = await openPhonePicker(panel);
+
+      expect(
+        within(picker).getByRole("button", { name: "Add 0 members" }),
+      ).toBeDisabled();
+
+      await check(picker, "Ana Admin");
+      await check(picker, "Bea Nadal");
+
+      expect(
+        within(picker).getByRole("button", { name: "Add 2 members" }),
+      ).toBeEnabled();
+    });
+
+    it("añadir manda un solo POST, cierra la ventana y la pantalla del grupo lo avisa", async () => {
+      const user = userEvent.setup();
+      stubApi({
+        groups: [SENIOR],
+        members: [NEREA],
+        candidates: [ANA, BEA, TOMAS],
+      });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+      const picker = await openPhonePicker(panel);
+      for (const name of ["Ana Admin", "Bea Nadal", "Tomás Errekondo"]) {
+        await check(picker, name);
+      }
+
+      await user.click(
+        within(picker).getByRole("button", { name: "Add 3 members" }),
+      );
+
+      await waitFor(() =>
+        expect(statusNotice()).toHaveTextContent(
+          "3 members added to Senior Squad",
+        ),
+      );
+      expect(bulkPosts()).toEqual([
+        {
+          url: `${GROUPS_PATH}/${SENIOR.id}/members`,
+          method: "POST",
+          body: { userIds: [ANA.id, BEA.id, TOMAS.id] },
+        },
+      ]);
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(
+        within(memberRow(panel, "Bea Nadal")).getByText("Bea Nadal"),
+      ).toBeVisible();
+      expect(addMembersButton(panel)).toHaveFocus();
+    });
+
+    it("a quien el servidor rechaza lo dice la pantalla del grupo, como en escritorio", async () => {
+      const user = userEvent.setup();
+      stubApi({
+        groups: [SENIOR],
+        members: [NEREA],
+        candidates: [ANA, TOMAS],
+        assignMembers: () =>
+          jsonResponse(200, {
+            data: {
+              members: [ANA, NEREA],
+              candidates: [],
+              rejected: [{ userId: TOMAS.id, reason: "inactive" }],
+            },
+          }),
+      });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+      const picker = await openPhonePicker(panel);
+      await check(picker, "Ana Admin");
+      await check(picker, "Tomás Errekondo");
+
+      await user.click(
+        within(picker).getByRole("button", { name: "Add 2 members" }),
+      );
+
+      expect(await within(panel).findByRole("alert")).toHaveTextContent(
+        "Couldn't add: Tomás Errekondo (account deactivated).",
+      );
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(statusNotice()).toHaveTextContent(
+        "1 member added to Senior Squad",
+      );
+    });
+
+    it("si el alta falla, la ventana sigue abierta, con lo marcado, y lo dice dentro", async () => {
+      const user = userEvent.setup();
+      stubApi({
+        groups: [SENIOR],
+        members: [NEREA],
+        candidates: [TOMAS],
+        assignMembers: () => errorResponse(500, "internal_error"),
+      });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+      const picker = await openPhonePicker(panel);
+      await check(picker, "Tomás Errekondo");
+
+      await user.click(
+        within(picker).getByRole("button", { name: "Add 1 member" }),
+      );
+
+      expect(
+        await within(picker).findByText(
+          "We couldn't finish that. Try again in a moment.",
+        ),
+      ).toBeVisible();
+      expect(
+        within(picker).getByRole("checkbox", { name: "Tomás Errekondo" }),
+      ).toBeChecked();
+    });
+
+    it("Cancelar cierra sin añadir a nadie y devuelve el foco a Añadir miembros", async () => {
+      const user = userEvent.setup();
+      stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA] });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+      const picker = await openPhonePicker(panel);
+      await check(picker, "Ana Admin");
+
+      await user.click(within(picker).getByRole("button", { name: "Cancel" }));
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(bulkPosts()).toEqual([]);
+      expect(addMembersButton(panel)).toHaveFocus();
+      expect(addMembersButton(panel)).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("con todo el club en el grupo dice lo mismo que en escritorio", async () => {
+      stubApi({ groups: [SENIOR], members: [NEREA], candidates: [] });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+
+      const picker = await openPhonePicker(panel);
+
+      expect(
+        within(picker).getByText(
+          "Everyone in the club is already in this group.",
+        ),
+      ).toBeVisible();
+      expect(within(picker).queryByRole("checkbox")).toBeNull();
+    });
+
+    it("una búsqueda sin nadie dice lo mismo que en escritorio", async () => {
+      const user = userEvent.setup();
+      stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA] });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+      const picker = await openPhonePicker(panel);
+
+      await user.type(
+        within(picker).getByRole("searchbox", {
+          name: "Search members not in this group",
+        }),
+        "zzz",
+      );
+
+      expect(within(picker).getByText("No one matches.")).toBeVisible();
+      expect(within(picker).queryByRole("checkbox")).toBeNull();
+    });
+
+    // Qué control es "el primero" no se afirma: el `querySelectorAll` de jsdom
+    // agrupa por selector (los campos antes que los botones), y el navegador
+    // no. Lo que pide el ticket es que el foco no salga. Que lo de detrás
+    // quede inerte sólo existe en un navegador: lo prueba Playwright.
+    it("con el teclado, Tab desde el último control no saca el foco de la ventana", async () => {
+      const user = userEvent.setup();
+      stubApi({ groups: [SENIOR], members: [NEREA], candidates: [ANA] });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+      const picker = await openPhonePicker(panel);
+      await check(picker, "Ana Admin");
+      within(picker).getByRole("button", { name: "Add 1 member" }).focus();
+
+      await user.tab();
+
+      expect(picker).toContainElement(document.activeElement as HTMLElement);
     });
   });
 });

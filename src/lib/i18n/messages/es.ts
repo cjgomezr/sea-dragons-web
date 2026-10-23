@@ -725,6 +725,7 @@ export const spanishMessages: MessageCatalog = {
   "groups.audience.posted": "Publicada el {date}",
   // El selector de varios a la vez (#829, RF-4 de E32).
   "groups.picker.label": "Añadir miembros a {group}",
+  "groups.picker.phoneTitle": "Añadir a {group}",
   "groups.picker.search": "Buscar miembros que no están en este grupo",
   "groups.picker.groupCount": {
     one: "en {count} grupo",

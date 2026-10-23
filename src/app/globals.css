@@ -5235,6 +5235,146 @@ a.groups-icon-button {
   }
 }
 
+/* El selector del móvil (#832): una ventana que ocupa la pantalla, con
+   Cancelar y "Añadir a {grupo}" arriba, la búsqueda de 46 px, filas de 58 px
+   con casillas de 22 px y el botón de 50 px fijo abajo. Sólo se pinta
+   abierta: el `display` de aquí taparía el `none` del `<dialog>` cerrado. */
+.groups-picker-screen[open] {
+  display: flex;
+  flex-direction: column;
+  inset: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: none;
+}
+
+/* El título va centrado; si no cabe, se corta con puntos y Cancelar se
+   queda entero. */
+.groups-picker-screen-bar {
+  display: grid;
+  flex: none;
+  grid-template-columns: 1fr minmax(0, auto) 1fr;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 var(--space-2);
+  padding-top: env(safe-area-inset-top);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.groups-picker-screen-bar .groups-text-button {
+  justify-self: start;
+  padding: 0 var(--space-2);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.groups-picker-screen-bar h2 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groups-picker-screen-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.groups-picker-screen .groups-picker-search {
+  margin: var(--space-3) var(--space-4);
+}
+
+.groups-picker-screen .groups-picker-search input,
+.groups-picker-screen .groups-picker-search input:hover {
+  height: 46px;
+  font-size: 16px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.groups-picker-screen .groups-picker-search input:focus-visible {
+  outline-offset: 2px;
+}
+
+.groups-picker-screen .groups-picker-list {
+  max-height: none;
+  overflow: visible;
+  border-top: 1px solid var(--color-border);
+}
+
+/* La posición y los grupos van debajo del nombre, no a su derecha. */
+.groups-picker-screen .groups-picker-row {
+  grid-template-columns: 22px 36px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: var(--space-4);
+  row-gap: 2px;
+  min-height: 58px;
+  padding: var(--space-2) var(--space-4);
+}
+
+.groups-picker-screen .groups-picker-row input,
+.groups-picker-screen .groups-picker-avatar {
+  grid-row: 1 / span 2;
+}
+
+.groups-picker-screen .groups-picker-row input {
+  width: 22px;
+  height: 22px;
+}
+
+.groups-picker-screen .groups-picker-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 12px;
+}
+
+.groups-picker-screen .groups-picker-name {
+  align-self: end;
+  font-size: 15px;
+}
+
+.groups-picker-screen .groups-picker-detail {
+  grid-column: 3;
+  align-self: start;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.groups-picker-screen .groups-picker-list li:last-child {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.groups-picker-screen-error {
+  flex: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+}
+
+.groups-picker-screen-footer {
+  flex: none;
+  padding: var(--space-3) var(--space-4)
+    calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: var(--color-panel);
+  border-top: 1px solid var(--color-border);
+}
+
+.groups-picker-screen-footer .groups-picker-submit {
+  width: 100%;
+  height: 50px;
+  font-size: 16px;
+  border-radius: 12px;
+}
 /* La hoja ⋯: la línea entre renombrar y borrar, el campo de 48 px con
    Guardar y el aviso de D11 con sus dos botones de 48 px a partes iguales. */
 .groups-sheet-rule {
