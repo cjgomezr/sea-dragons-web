@@ -874,6 +874,7 @@ describe("después de enviar", () => {
         .click(await screen.findByRole("button", { name: "Invite another" }));
 
       expect(screen.getByLabelText("Full name")).toHaveValue("");
+      expect(screen.getByLabelText("Full name")).toHaveFocus();
       expect(screen.getByLabelText("Email")).toHaveValue("");
       expect(
         screen.getByRole("button", { name: "Senior Squad" }),

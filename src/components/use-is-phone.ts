@@ -29,7 +29,9 @@ function subscribeTo(mediaQuery: string): (onChange: () => void) => () => void {
 const subscribe = subscribeTo(PHONE_QUERY);
 const subscribeBelowDesktop = subscribeTo(BELOW_DESKTOP_QUERY);
 
-function isPhoneNow(): boolean {
+/** Si lo es ahora mismo, sin seguir los cambios: para quien sólo se monta
+ * en el navegador y elige su forma una vez, al abrirse. */
+export function isPhoneNow(): boolean {
   return window.matchMedia(PHONE_QUERY).matches;
 }
 

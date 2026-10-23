@@ -101,6 +101,8 @@ export function InvitationResult({
       </div>
       <div className="invite-result-actions">
         {isSent ? null : (
+          // Al salir, el título de "enviada otra vez" sustituye al aviso
+          // del propio reenvío, que no llega a verse.
           <InvitationResend
             translate={translate}
             userId={userId}

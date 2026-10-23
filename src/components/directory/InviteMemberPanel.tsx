@@ -8,7 +8,7 @@ import { Icon } from "@/components/Icon";
 import { loadPositionChoices } from "@/components/club/positions-client";
 import { cycleFocus } from "@/components/focus-cycle";
 import { loadGroups } from "@/components/groups/groups-client";
-import { useIsPhone } from "@/components/use-is-phone";
+import { isPhoneNow } from "@/components/use-is-phone";
 import type { NamedPosition } from "@/lib/club/club-positions";
 import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
@@ -257,7 +257,11 @@ export function InviteMemberPanel({
   readonly onMemberCreated: () => void;
 }): React.JSX.Element {
   const titleId = useId();
-  const isPhone = useIsPhone();
+  // Se decide al abrirlo y no cambia: pasar de un lado al otro del corte
+  // (girar el teléfono, o la captura de página entera, que estira la
+  // ventana) montaría el panel de nuevo y perdería lo escrito o el
+  // resultado. El panel sólo se pinta en el navegador, tras leer la lista.
+  const [isPhone] = useState(isPhoneNow);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   function closeScreen(): void {

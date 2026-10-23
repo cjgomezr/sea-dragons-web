@@ -10097,9 +10097,10 @@ test.describe("un Player frente a la ficha reservada al Admin", () => {
    La invitación de un socio por un Admin (#862, RF-9 del PRD de E33; antes la
    página del alta de #243): un panel bajo la cabecera del Directorio, que
    abre su botón `user-plus` o la dirección `?invite=1`. Mockup:
-   docs/design/design_handoff_invite/screenshots/01-desktop-filled.png y
-   02-desktop-errors.png. El móvil llega con #863, así que se fotografían
-   tableta y escritorio.
+   docs/design/design_handoff_invite/screenshots/01 a 07. Desde #863 sale
+   también lo de después de enviar (enviada, no salió, enviada otra vez), y
+   en el móvil el panel es una ventana que ocupa la pantalla: se fotografía a
+   375 sin página entera, porque la ventana mide lo que la pantalla.
 
    Las capturas leen datos fijos, servidos por `page.route`: los grupos de
    verdad cambian con cada test que siembre, y un alta de verdad mandaría una
@@ -10108,11 +10109,10 @@ test.describe("un Player frente a la ficha reservada al Admin", () => {
    --------------------------------------------------------------------------- */
 
 const INVITE_SCREEN_PATH = `${DIRECTORY_SCREEN_PATH}?invite=1`;
+const INVITE_TOGGLE_NAME = /^(Invite member|Invitar miembro)$/;
 const OLD_NEW_MEMBER_PATH = `${DIRECTORY_SCREEN_PATH}/nuevo`;
 const NEW_MEMBER_ID = "cccccccc-0000-4000-8000-000000000243";
 const EXISTING_MEMBER_ID = "cccccccc-0000-4000-8000-000000000862";
-
-const INVITE_VIEWPORTS = viewports.filter((vp) => vp.name !== "mobile");
 
 const EMAIL_TAKEN_ERROR = {
   error: {
@@ -10143,6 +10143,9 @@ type NewMemberCopy = {
   readonly issueSummary: RegExp;
   readonly preview: RegExp;
   readonly invitationSent: RegExp;
+  readonly notSent: RegExp;
+  readonly resend: string;
+  readonly sentAgain: RegExp;
 };
 
 const ENGLISH_NEW_MEMBER: NewMemberCopy = {
@@ -10162,7 +10165,10 @@ const ENGLISH_NEW_MEMBER: NewMemberCopy = {
   emailTaken: /^This email already belongs to a member\./,
   issueSummary: /things? to fix before sending/,
   preview: /^What .+ will receive$/,
-  invitationSent: /We sent the invitation to/,
+  invitationSent: /^Invitation sent to/,
+  notSent: /didn't go out$/,
+  resend: "Resend invitation",
+  sentAgain: /^Invitation sent again to/,
 };
 
 const SPANISH_NEW_MEMBER: NewMemberCopy = {
@@ -10182,10 +10188,26 @@ const SPANISH_NEW_MEMBER: NewMemberCopy = {
   emailTaken: /^Este correo ya es de un miembro\./,
   issueSummary: /cosas? por arreglar antes de enviar/,
   preview: /^Lo que recibirá/,
-  invitationSent: /Le mandamos la invitación a/,
+  invitationSent: /^Invitación enviada a/,
+  notSent: /el correo no salió$/,
+  resend: "Reenviar invitación",
+  sentAgain: /^Invitación enviada otra vez a/,
 };
 
-type NewMemberAnswer = "sent" | "email_taken";
+type NewMemberAnswer = "sent" | "not_sent" | "email_taken";
+
+function createdMemberBody(invitation: "sent" | "not_sent"): string {
+  return JSON.stringify({
+    data: {
+      member: {
+        userId: NEW_MEMBER_ID,
+        fullName: LONG_MEMBER_NAME,
+        email: "nerea.silva@example.com",
+      },
+      invitation,
+    },
+  });
+}
 
 async function stubNewMemberApi(
   page: Page,
@@ -10215,18 +10237,18 @@ async function stubNewMemberApi(
         : route.fulfill({
             status: 201,
             contentType: "application/json",
-            body: JSON.stringify({
-              data: {
-                member: {
-                  userId: NEW_MEMBER_ID,
-                  fullName: LONG_MEMBER_NAME,
-                  email: "nerea.silva@example.com",
-                },
-                invitation: "sent",
-              },
-            }),
+            body: createdMemberBody(answer),
           });
     },
+  );
+  await page.route(
+    (url) => url.pathname === `${MEMBERS_ENDPOINT}/${NEW_MEMBER_ID}/invitation`,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { invitation: "sent" } }),
+      }),
   );
 }
 
@@ -10305,6 +10327,19 @@ function submitWithIssues(copy: NewMemberCopy) {
     const summary = panel.getByRole("alert");
     await expect(summary).toContainText(copy.issueSummary);
     await expect(summary).toBeFocused();
+  };
+}
+
+/** No salió el correo y se reenvía: pasa a "enviada otra vez". */
+function resendAfterNotSent(copy: NewMemberCopy) {
+  return async (page: Page): Promise<void> => {
+    await submitNewMember(copy, copy.notSent)(page);
+    await invitePanel(page, copy)
+      .getByRole("button", { name: copy.resend })
+      .click();
+    await expect(
+      invitePanel(page, copy).getByRole("heading", { name: copy.sentAgain }),
+    ).toBeVisible();
   };
 }
 
@@ -10395,6 +10430,18 @@ const NEW_MEMBER_STATES: readonly NewMemberState[] = [
       SPANISH_NEW_MEMBER.invitationSent,
     ),
   },
+  {
+    name: "alta-no-salio",
+    copy: ENGLISH_NEW_MEMBER,
+    answer: "not_sent",
+    prepare: submitNewMember(ENGLISH_NEW_MEMBER, ENGLISH_NEW_MEMBER.notSent),
+  },
+  {
+    name: "alta-enviada-otra-vez",
+    copy: ENGLISH_NEW_MEMBER,
+    answer: "not_sent",
+    prepare: resendAfterNotSent(ENGLISH_NEW_MEMBER),
+  },
 ];
 
 async function goToNewMember(
@@ -10407,10 +10454,14 @@ async function goToNewMember(
   await state.beforeVisit?.(page);
   if (theme === undefined) {
     await page.goto(`${APP_URL}${INVITE_SCREEN_PATH}`);
+    await waitForDirectory(page, state.copy.listHeading, true);
   } else {
-    await goToWithTheme(page, INVITE_SCREEN_PATH, theme);
+    // El tema se elige en el menú de la cuenta, que en el móvil queda
+    // detrás de la ventana del panel: primero el tema, luego el panel.
+    await goToWithTheme(page, DIRECTORY_SCREEN_PATH, theme);
+    await waitForDirectory(page, state.copy.listHeading, true);
+    await page.getByRole("button", { name: INVITE_TOGGLE_NAME }).click();
   }
-  await waitForDirectory(page, state.copy.listHeading, true);
   const panel = invitePanel(page, state.copy);
   await expect(
     panel.getByRole("heading", { level: 2, name: state.copy.title }),
@@ -10427,9 +10478,12 @@ for (const state of NEW_MEMBER_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of INVITE_VIEWPORTS) {
+    for (const vp of viewports) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
+        // En el móvil la ventana mide la pantalla: la página entera sólo
+        // estiraría la ventana.
+        const fullPage = vp.name !== "mobile";
 
         if (isStatePhotographed(state.name)) {
           for (const theme of themes) {
@@ -10437,11 +10491,11 @@ for (const state of NEW_MEMBER_STATES) {
               await goToNewMember(page, state, theme);
               const snapshot = `${state.name}-${vp.name}-${theme}.png`;
               await createMissingLocalBaseline(snapshot, () =>
-                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage }),
               );
               await expect(page).toHaveScreenshot(snapshot, {
                 ...SCREENSHOT_OPTIONS,
-                fullPage: true,
+                fullPage,
                 maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
               });
             });
@@ -10457,6 +10511,16 @@ for (const state of NEW_MEMBER_STATES) {
           );
           expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
         });
+        if (vp.name === "mobile") {
+          for (const theme of themes) {
+            test(`has no accessibility violations on the phone (${theme})`, async ({
+              page,
+            }) => {
+              await goToNewMember(page, state, theme);
+              await expectNoAxeViolations(page);
+            });
+          }
+        }
       });
     }
 
@@ -10466,6 +10530,190 @@ for (const state of NEW_MEMBER_STATES) {
     });
   });
 }
+
+/** Hasta dónde llega el pie desde abajo: los botones de Cancelar y Enviar
+ * tienen que quedar en esa franja. */
+const FOOTER_REACH_PX = 72;
+
+function newMemberState(name: string): NewMemberState {
+  const state = NEW_MEMBER_STATES.find((each) => each.name === name);
+  if (state === undefined) {
+    throw new Error(`Falta el estado ${name}.`);
+  }
+  return state;
+}
+
+/* El panel en el móvil (#863, "Mobile" del handoff; mockups 05, 06 y 07):
+   una ventana que ocupa la pantalla, sin radio, con el cuerpo que se
+   desplaza en un div y el pie fijo abajo; nombre y correo uno debajo del
+   otro, ningún control de menos de 44 px y nada que se salga a 320 px. */
+test.describe("la invitación en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE, viewport: PHONE_VIEWPORT });
+
+  const NARROW_STATES = [
+    "alta-vacia",
+    "alta-con-datos",
+    "alta-errores",
+    "alta-correo-repetido",
+    "alta-no-salio",
+    "alta-invitacion-enviada",
+  ];
+
+  function inviteScreen(page: Page): Locator {
+    return page.getByRole("dialog", { name: ENGLISH_NEW_MEMBER.title });
+  }
+
+  function sendInvitation(page: Page): Locator {
+    return inviteScreen(page).getByRole("button", {
+      name: ENGLISH_NEW_MEMBER.submit,
+    });
+  }
+
+  test("ocupa la pantalla entera, sin radio, con Cancelar y Enviar fijos abajo", async ({
+    page,
+  }) => {
+    await goToNewMember(page, newMemberState("alta-vacia"));
+    const screen = inviteScreen(page);
+
+    expect(await boxOf(screen)).toEqual({
+      x: 0,
+      y: 0,
+      width: PHONE_VIEWPORT.width,
+      height: PHONE_VIEWPORT.height,
+    });
+    expect(
+      await invitePanel(page, ENGLISH_NEW_MEMBER).evaluate(
+        (panel) => getComputedStyle(panel).borderTopLeftRadius,
+      ),
+    ).toBe("0px");
+    const send = await boxOf(sendInvitation(page));
+    const cancel = await boxOf(screen.getByRole("button", { name: "Cancel" }));
+    for (const button of [send, cancel]) {
+      expect(button.y + button.height).toBeGreaterThan(
+        PHONE_VIEWPORT.height - FOOTER_REACH_PX,
+      );
+    }
+  });
+
+  test("el cuerpo se desplaza en su div, no en el fieldset, y el pie se queda", async ({
+    page,
+  }) => {
+    await goToNewMember(page, newMemberState("alta-con-datos"));
+    const screen = inviteScreen(page);
+    const body = screen.locator(".invite-body");
+    const fieldset = screen.locator("fieldset.invite-fields");
+    const sendBefore = await boxOf(sendInvitation(page));
+
+    await body.evaluate((element) =>
+      element.scrollTo({ top: element.scrollHeight }),
+    );
+
+    expect(await body.evaluate((element) => element.scrollTop)).toBeGreaterThan(
+      0,
+    );
+    expect(
+      await fieldset.evaluate((element) => getComputedStyle(element).overflowY),
+    ).toBe("visible");
+    expect(await boxOf(sendInvitation(page))).toEqual(sendBefore);
+  });
+
+  test("nombre y correo van uno debajo del otro", async ({ page }) => {
+    await goToNewMember(page, newMemberState("alta-vacia"));
+    const panel = invitePanel(page, ENGLISH_NEW_MEMBER);
+
+    const name = await boxOf(panel.getByLabel(ENGLISH_NEW_MEMBER.fullName));
+    const email = await boxOf(panel.getByLabel(ENGLISH_NEW_MEMBER.email));
+
+    expect(email.x).toBe(name.x);
+    expect(email.y).toBeGreaterThan(name.y + name.height);
+  });
+
+  test("ningún control mide menos de 44 px", async ({ page }) => {
+    await goToNewMember(page, newMemberState("alta-vacia"));
+    const panel = invitePanel(page, ENGLISH_NEW_MEMBER);
+    await panel
+      .getByRole("button", { name: ENGLISH_NEW_MEMBER.details })
+      .click();
+    await panel
+      .getByRole("button", { name: ENGLISH_NEW_MEMBER.preview })
+      .click();
+
+    // Las opciones de la experiencia esconden su radio: se toca la etiqueta.
+    const sizes = await panel
+      .locator("button, select, input:not([type=radio]), .invite-segment")
+      .evaluateAll((controls) =>
+        controls
+          .filter((control) => control.getClientRects().length > 0)
+          .map((control) => {
+            const box = control.getBoundingClientRect();
+            return {
+              control: control.id || (control.textContent ?? "").trim(),
+              height: Math.round(box.height),
+              width: Math.round(box.width),
+            };
+          }),
+      );
+
+    expect(sizes.length).toBeGreaterThan(10);
+    expect(
+      sizes.filter(
+        (size) =>
+          size.height < MIN_TOUCH_TARGET_PX || size.width < MIN_TOUCH_TARGET_PX,
+      ),
+    ).toEqual([]);
+  });
+
+  test("a 320 px nada se sale por el lado", async ({ page }) => {
+    await page.setViewportSize(NARROWEST_PHONE);
+    for (const name of NARROW_STATES) {
+      await goToNewMember(page, newMemberState(name));
+
+      const pageOverflows = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      );
+      const panelOverflows = await invitePanel(
+        page,
+        ENGLISH_NEW_MEMBER,
+      ).evaluate((panel) => panel.scrollWidth > panel.clientWidth);
+
+      expect(pageOverflows, name).toBe(false);
+      expect(panelOverflows, name).toBe(false);
+    }
+  });
+
+  test("Cancelar cierra la ventana y devuelve el foco al botón de invitar", async ({
+    page,
+  }) => {
+    await goToNewMember(page, newMemberState("alta-vacia"));
+
+    await inviteScreen(page).getByRole("button", { name: "Cancel" }).click();
+
+    await expect(inviteScreen(page)).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Invite member" }),
+    ).toBeFocused();
+  });
+
+  test("Invitar a otro vuelve al formulario vacío con el grupo elegido", async ({
+    page,
+  }) => {
+    await goToNewMember(page, newMemberState("alta-invitacion-enviada"));
+    const panel = invitePanel(page, ENGLISH_NEW_MEMBER);
+
+    await panel.getByRole("button", { name: "Invite another" }).click();
+
+    const fullName = panel.getByLabel(ENGLISH_NEW_MEMBER.fullName);
+    await expect(fullName).toHaveValue("");
+    await expect(fullName).toBeFocused();
+    await expect(
+      panel.getByRole("button", { name: STUBBED_CLUB_GROUPS[2].name }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+});
 
 test.describe("un Admin frente a la invitación con los datos de verdad", () => {
   skipWithoutSession();
