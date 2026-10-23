@@ -12,7 +12,8 @@ import { compareNames } from "@/lib/text/name-order";
 import { GroupAudienceColumn } from "./GroupAudienceColumn";
 import type { GroupActionResult } from "./GroupNameForm";
 import { GroupMemberList } from "./GroupMemberList";
-import { GroupPanelHeader } from "./GroupPanelHeader";
+import { GroupPanelHeader, type WriteToAll } from "./GroupPanelHeader";
+import { GroupPhoneHeader } from "./GroupPhoneHeader";
 import type { GroupAction } from "./group-action";
 import { type RejectedCandidate, describeRejection } from "./group-texts";
 import {
@@ -26,12 +27,14 @@ import {
   loadGroupRoster,
   removeMember,
 } from "./groups-client";
+import type { GroupPanelLayout } from "./groups-layout";
 import type { PendingAction } from "./use-pending-action";
 
 /**
  * El panel del grupo elegido, a la derecha de la lista (#828, RF-3 de E32):
  * la cabecera con el resumen, renombrar y borrar, la columna de miembros y,
- * desde #830, la de "Audiencia de" y Escribir a todos.
+ * desde #830, la de "Audiencia de" y Escribir a todos. En el móvil (#831) es
+ * la pantalla del grupo, con su barra y la hoja ⋯ en vez de la cabecera.
  *
  * El panel pide sus dos listas al abrirse y las mantiene él. Lo que la lista
  * de la izquierda enseña de este grupo (su conteo y sus avatares) se lo dice a
@@ -101,6 +104,7 @@ function countNotActivated(state: RosterState): number {
 
 export function GroupMembersPanel({
   translate,
+  layout,
   group,
   pendingAction,
   onMembersChange,
@@ -112,6 +116,7 @@ export function GroupMembersPanel({
   onWriteToAll,
 }: {
   translate: Translator;
+  layout: GroupPanelLayout;
   group: GroupOverview;
   /** Recién creado: su selector de añadir se abre solo. */
   isNewGroup: boolean;
@@ -122,7 +127,7 @@ export function GroupMembersPanel({
    * de la lista y vuelve a "Elige un grupo". */
   onGroupGone: () => void;
   onRename: (name: string) => Promise<GroupActionResult>;
-  onDelete: () => void;
+  onDelete: () => Promise<GroupActionResult>;
   onNotice: (notice: string) => void;
   /** Abre el redactor del Directorio; `null` si quien mira no puede (D6). */
   onWriteToAll: ((recipients: readonly EmailRecipient[]) => void) | null;
@@ -237,23 +242,39 @@ export function GroupMembersPanel({
   }
 
   const isDisabled = pending !== null;
+  const isDeleting = pending?.kind === "delete";
+  const writeToAll: WriteToAll | null =
+    onWriteToAll === null
+      ? null
+      : { recipients: emailRecipientsOf(state), onOpen: onWriteToAll };
 
   return (
     <section className="groups-panel" aria-label={group.name}>
-      <GroupPanelHeader
-        translate={translate}
-        group={group}
-        notActivatedCount={countNotActivated(state)}
-        writeToAll={
-          onWriteToAll === null
-            ? null
-            : { recipients: emailRecipientsOf(state), onOpen: onWriteToAll }
-        }
-        isDisabled={isDisabled}
-        isDeleting={pending?.kind === "delete"}
-        onRename={onRename}
-        onDelete={onDelete}
-      />
+      {layout.kind === "compact" ? (
+        <GroupPhoneHeader
+          translate={translate}
+          group={group}
+          notActivatedCount={countNotActivated(state)}
+          writeToAll={writeToAll}
+          failure={layout.failure}
+          isDisabled={isDisabled}
+          isDeleting={isDeleting}
+          onBack={layout.onBack}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
+      ) : (
+        <GroupPanelHeader
+          translate={translate}
+          group={group}
+          notActivatedCount={countNotActivated(state)}
+          writeToAll={writeToAll}
+          isDisabled={isDisabled}
+          isDeleting={isDeleting}
+          onRename={onRename}
+          onDelete={() => void onDelete()}
+        />
+      )}
       {failure === null ? null : (
         <p className="auth-error groups-panel-error" role="alert">
           {describeGroupsFailure(translate, failure)}
@@ -284,6 +305,7 @@ export function GroupMembersPanel({
           {state.kind === "ready" ? (
             <GroupMemberList
               translate={translate}
+              layout={layout.kind}
               groupName={group.name}
               roster={state}
               isDisabled={isDisabled}

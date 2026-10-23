@@ -76,9 +76,12 @@ export function GroupCreateForm({
           disabled={!canSubmit}
         >
           <Icon glyph={Plus} weight="bold" />
-          {translate(
-            isSaving ? "groups.create.saving" : "groups.create.submit",
-          )}
+          {/* En el móvil sólo se ve el +; el texto sigue siendo su nombre. */}
+          <span className="groups-create-submit-text">
+            {translate(
+              isSaving ? "groups.create.saving" : "groups.create.submit",
+            )}
+          </span>
         </button>
       </div>
       {isTaken ? (

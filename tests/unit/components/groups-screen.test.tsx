@@ -2337,3 +2337,378 @@ describe("escribir a todos y abrir en el directorio", () => {
     ).toHaveAttribute("href", `/directorio?group=${SENIOR.id}`);
   });
 });
+
+/* Por debajo de 1024 px (#831, RF-7 de E32, D13) Grupos lleva su propio
+   flujo: la lista lleva a la pantalla del grupo, y renombrar y borrar van en
+   la hoja ⋯. El ancho lo dice `matchMedia`, que aquí se simula; cómo se ve a
+   320, 375 y 768 px lo prueba Playwright. */
+describe("en el móvil (#831)", () => {
+  const BELOW_DESKTOP_QUERY = "(width < 1024px)";
+  const PHONE_QUERY = "(width < 768px)";
+  const PENDING_TOMAS: GroupCandidate = { ...TOMAS, isPendingActivation: true };
+  const PENDING_BEA: GroupCandidate = { ...BEA, isPendingActivation: true };
+
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === BELOW_DESKTOP_QUERY || query === PHONE_QUERY,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }));
+  });
+
+  /** Abre el grupo desde la lista y espera a que lleguen sus socios. */
+  async function openGroupScreen(name: string): Promise<HTMLElement> {
+    const user = userEvent.setup();
+    await user.click(groupRow(name));
+    await screen.findByRole("searchbox", { name: "Search in this group" });
+    return groupPanel(name);
+  }
+
+  function moreButton(name: string): HTMLElement {
+    return screen.getByRole("button", { name: `More actions for ${name}` });
+  }
+
+  async function openActions(name: string): Promise<HTMLElement> {
+    const user = userEvent.setup();
+    await user.click(moreButton(name));
+    return screen.getByRole("dialog", { name: `Actions for ${name}` });
+  }
+
+  /** La fila de un miembro en la pantalla del grupo. */
+  function memberRow(panel: HTMLElement, name: string): HTMLElement {
+    const row = within(panel)
+      .getAllByRole("listitem")
+      .find((item) => within(item).queryByText(name) !== null);
+    if (row === undefined) {
+      throw new Error(`No hay fila para ${name}`);
+    }
+    return row;
+  }
+
+  describe("la lista", () => {
+    it("cada fila lleva el nombre y, debajo, sus miembros y su uso", async () => {
+      stubApi({ groups: [SENIOR, MASTERS] });
+
+      await renderScreen();
+
+      expect(rowNames()).toEqual(["Masters Squad", "Senior Squad"]);
+      expect(
+        within(groupRow("Senior Squad")).getByText(
+          "2 members · 2 events · 1 post",
+        ),
+      ).toBeVisible();
+      expect(
+        within(groupRow("Masters Squad")).getByText("0 members · Not used yet"),
+      ).toBeVisible();
+    });
+
+    it("la fila se anuncia con el nombre y, como descripción, sus miembros y su uso", async () => {
+      stubApi({ groups: [SENIOR] });
+
+      await renderScreen();
+
+      expect(groupRow("Senior Squad")).toHaveAccessibleDescription(
+        "2 members · 2 events · 1 post",
+      );
+    });
+
+    it("no lleva la cabecera de la tabla de escritorio", async () => {
+      stubApi({ groups: [SENIOR] });
+
+      await renderScreen();
+
+      expect(within(groupsSection()).queryByText("MEMBERS")).toBeNull();
+    });
+  });
+
+  describe("la pantalla del grupo", () => {
+    it("pulsar una fila cambia la lista por la pantalla del grupo", async () => {
+      stubApi({ groups: [SENIOR, MASTERS] });
+      await renderScreen();
+
+      const panel = await openGroupScreen("Senior Squad");
+
+      expect(
+        within(panel).getByRole("heading", { level: 2, name: "Senior Squad" }),
+      ).toBeVisible();
+      expect(screen.queryByRole("region", { name: "Club groups" })).toBeNull();
+      expect(
+        within(panel).getByRole("button", { name: "Back to groups" }),
+      ).toBeVisible();
+      expect(moreButton("Senior Squad")).toBeVisible();
+    });
+
+    it("lleva el resumen con quien no activó su cuenta", async () => {
+      stubApi({ groups: [SENIOR], members: [NEREA, PENDING_TOMAS] });
+      await renderScreen();
+
+      const panel = await openGroupScreen("Senior Squad");
+
+      expect(
+        within(panel).getByText(
+          "2 members · 1 not activated · 2 events · 1 post",
+        ),
+      ).toBeVisible();
+    });
+
+    it("un Admin o un Committee ve Escribir a todos y Directorio", async () => {
+      stubApi({ groups: [SENIOR], members: [NEREA] });
+      await renderScreen();
+
+      const panel = await openGroupScreen("Senior Squad");
+
+      expect(
+        within(panel).getByRole("button", { name: "Email all" }),
+      ).toBeEnabled();
+      expect(
+        within(panel).getByRole("link", { name: "Directory" }),
+      ).toHaveAttribute("href", `/directorio?group=${SENIOR.id}`);
+    });
+
+    it("un Coach sólo ve Directorio", async () => {
+      stubApi({ groups: [SENIOR], members: [NEREA] });
+      await renderScreen("en", { canWriteEmails: false });
+
+      const panel = await openGroupScreen("Senior Squad");
+
+      expect(
+        within(panel).queryByRole("button", { name: "Email all" }),
+      ).toBeNull();
+      expect(
+        within(panel).getByRole("link", { name: "Directory" }),
+      ).toBeVisible();
+    });
+
+    it("Escribir a todos abre el redactor con los activos del grupo", async () => {
+      const user = userEvent.setup();
+      stubApi({ groups: [SENIOR], members: [NEREA, PENDING_TOMAS] });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+
+      await user.click(
+        within(panel).getByRole("button", { name: "Email all" }),
+      );
+
+      expect(
+        await screen.findByRole("region", { name: "Email members" }),
+      ).toHaveTextContent("Nerea Ruiz");
+    });
+
+    it("lleva la tarjeta Audiencia de", async () => {
+      stubApi({ groups: [SENIOR] });
+      await renderScreen();
+
+      const panel = await openGroupScreen("Senior Squad");
+
+      expect(
+        within(panel).getByRole("region", { name: "AUDIENCE OF" }),
+      ).toBeVisible();
+    });
+
+    it("cada miembro lleva su posición y, si no activó su cuenta, lo dice en la misma línea", async () => {
+      stubApi({
+        groups: [SENIOR],
+        members: [NEREA, PENDING_TOMAS, PENDING_BEA],
+      });
+      await renderScreen();
+
+      const panel = await openGroupScreen("Senior Squad");
+
+      expect(
+        within(memberRow(panel, "Nerea Ruiz")).getByText("Forward"),
+      ).toBeVisible();
+      expect(
+        within(memberRow(panel, "Tomás Errekondo")).getByText(
+          "Goalkeeper · Not activated",
+        ),
+      ).toBeVisible();
+      expect(
+        within(memberRow(panel, "Bea Nadal")).getByText("Not activated"),
+      ).toBeVisible();
+    });
+
+    it("Añadir miembros abre el selector en línea", async () => {
+      stubApi({ groups: [SENIOR] });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+
+      const picker = await openPicker(panel);
+
+      expect(
+        within(picker).getByRole("checkbox", { name: /Tomás Errekondo/ }),
+      ).toBeVisible();
+    });
+
+    it("volver enseña otra vez la lista, con el foco en la fila de ese grupo", async () => {
+      const user = userEvent.setup();
+      stubApi({ groups: [SENIOR, MASTERS] });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+
+      await user.click(
+        within(panel).getByRole("button", { name: "Back to groups" }),
+      );
+
+      expect(screen.queryByRole("region", { name: "Senior Squad" })).toBeNull();
+      expect(groupRow("Senior Squad")).toHaveFocus();
+    });
+  });
+
+  describe("la hoja ⋯", () => {
+    it("lleva Renombrar grupo y Borrar grupo, y el foco queda dentro", async () => {
+      stubApi({ groups: [SENIOR] });
+      await renderScreen();
+      await openGroupScreen("Senior Squad");
+
+      const sheet = await openActions("Senior Squad");
+
+      expect(
+        within(sheet).getByRole("button", { name: "Rename group" }),
+      ).toBeVisible();
+      expect(
+        within(sheet).getByRole("button", { name: "Delete group" }),
+      ).toBeVisible();
+      expect(sheet).toContainElement(document.activeElement as HTMLElement);
+      expect(moreButton("Senior Squad")).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+    });
+
+    it("Escape la cierra sin mandar nada y devuelve el foco a ⋯", async () => {
+      const user = userEvent.setup();
+      stubApi({ groups: [SENIOR] });
+      await renderScreen();
+      await openGroupScreen("Senior Squad");
+      await openActions("Senior Squad");
+
+      await user.keyboard("{Escape}");
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(moreButton("Senior Squad")).toHaveFocus();
+      expect(calls.filter((call) => call.method !== "GET")).toEqual([]);
+    });
+
+    it("Renombrar pasa a un campo con el nombre y Guardar lo cambia", async () => {
+      const user = userEvent.setup();
+      stubApi({ groups: [SENIOR] });
+      await renderScreen();
+      const panel = await openGroupScreen("Senior Squad");
+      const sheet = await openActions("Senior Squad");
+
+      await user.click(
+        within(sheet).getByRole("button", { name: "Rename group" }),
+      );
+      const field = within(sheet).getByRole("textbox", {
+        name: "New name for Senior Squad",
+      });
+      expect(field).toHaveValue("Senior Squad");
+      expect(field).toHaveFocus();
+      await user.clear(field);
+      await user.type(field, "Alevines");
+      await user.click(within(sheet).getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(
+        within(panel).getByRole("heading", { level: 2, name: "Alevines" }),
+      ).toBeVisible();
+      expect(statusNotice()).toHaveTextContent("Group renamed");
+      await waitFor(() => expect(moreButton("Alevines")).toHaveFocus());
+      expect(calls.filter((call) => call.method === "PATCH")).toEqual([
+        {
+          url: `${GROUPS_PATH}/${SENIOR.id}`,
+          method: "PATCH",
+          body: { name: "Alevines" },
+        },
+      ]);
+    });
+
+    it("si el servidor no deja renombrar, la hoja sigue abierta y lo dice dentro", async () => {
+      const user = userEvent.setup();
+      stubApi({
+        groups: [SENIOR],
+        renameGroup: () => errorResponse(409, "name_taken"),
+      });
+      await renderScreen();
+      await openGroupScreen("Senior Squad");
+      const sheet = await openActions("Senior Squad");
+      await user.click(
+        within(sheet).getByRole("button", { name: "Rename group" }),
+      );
+      const field = within(sheet).getByRole("textbox", {
+        name: "New name for Senior Squad",
+      });
+      await user.clear(field);
+      await user.type(field, "Masters Squad{Enter}");
+
+      expect(await within(sheet).findByRole("alert")).toBeVisible();
+      expect(field).toHaveValue("Masters Squad");
+    });
+
+    it("Borrar cambia la hoja al aviso, con Cancelar y Borrar", async () => {
+      const user = userEvent.setup();
+      stubApi({ groups: [SENIOR] });
+      await renderScreen();
+      await openGroupScreen("Senior Squad");
+      const sheet = await openActions("Senior Squad");
+
+      await user.click(
+        within(sheet).getByRole("button", { name: "Delete group" }),
+      );
+
+      expect(within(sheet).getByText("Delete “Senior Squad”?")).toBeVisible();
+      expect(
+        within(sheet).getByText(/2 events and 1 news post will lose/),
+      ).toBeVisible();
+      expect(
+        within(sheet).getByRole("button", { name: "Cancel" }),
+      ).toHaveFocus();
+      expect(
+        within(sheet).getByRole("button", { name: "Delete" }),
+      ).toBeVisible();
+      expect(calls.filter((call) => call.method === "DELETE")).toEqual([]);
+    });
+
+    it("Cancelar en el aviso vuelve a las acciones sin borrar", async () => {
+      const user = userEvent.setup();
+      stubApi({ groups: [SENIOR] });
+      await renderScreen();
+      await openGroupScreen("Senior Squad");
+      const sheet = await openActions("Senior Squad");
+      await user.click(
+        within(sheet).getByRole("button", { name: "Delete group" }),
+      );
+
+      await user.click(within(sheet).getByRole("button", { name: "Cancel" }));
+
+      expect(
+        within(sheet).getByRole("button", { name: "Rename group" }),
+      ).toBeVisible();
+      expect(calls.filter((call) => call.method === "DELETE")).toEqual([]);
+    });
+
+    it("al confirmar, borra el grupo, vuelve a la lista y lo avisa", async () => {
+      const user = userEvent.setup();
+      stubApi({ groups: [SENIOR, MASTERS] });
+      await renderScreen();
+      await openGroupScreen("Senior Squad");
+      const sheet = await openActions("Senior Squad");
+      await user.click(
+        within(sheet).getByRole("button", { name: "Delete group" }),
+      );
+
+      await user.click(within(sheet).getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => expect(rowNames()).toEqual(["Masters Squad"]));
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(statusNotice()).toHaveTextContent("Senior Squad deleted");
+      expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
+      expect(calls.filter((call) => call.method === "DELETE")).toEqual([
+        { url: `${GROUPS_PATH}/${SENIOR.id}`, method: "DELETE", body: null },
+      ]);
+    });
+  });
+});

@@ -4010,10 +4010,31 @@ async function chooseThreeCandidates(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
 }
 
+const MORE_ACTIONS = `More actions for ${OPENED_GROUP_NAME}`;
+const ACTIONS_SHEET = `Actions for ${OPENED_GROUP_NAME}`;
+
+/** La hoja ⋯ del móvil (#831), con sus dos acciones. */
+async function openGroupActions(page: Page): Promise<void> {
+  await selectGroup(page);
+  await page.getByRole("button", { name: MORE_ACTIONS }).click();
+  await expect(
+    page
+      .getByRole("dialog", { name: ACTIONS_SHEET })
+      .getByRole("button", { name: "Delete group" }),
+  ).toBeVisible();
+}
+
 type GroupsState = {
   readonly name: string;
   readonly withGroups: boolean;
   readonly audience?: StubbedAudience;
+  /** `compact` para los estados del flujo del móvil (#831): se fotografían a
+   * 375 y 768 px, pasan axe a esos anchos y miran el scroll a 320. Sin él,
+   * los de escritorio. */
+  readonly layout?: "desktop" | "compact";
+  /** Los de escritorio que preparan algo que el móvil no tiene, como el lápiz
+   * o la papelera de la cabecera: no se abren a 375 ni a 768 px. */
+  readonly isDesktopOnly?: boolean;
   /** Los de `GROUPS_VIEWPORTS` si no se dicen. */
   readonly viewports?: readonly GroupsViewport[];
   readonly beforeVisit?: (page: Page) => Promise<void>;
@@ -4024,8 +4045,8 @@ const ENGLISH_GROUPS_HEADING = "Club groups";
 const SPANISH_GROUPS_HEADING = "Grupos del club";
 
 /** El escritorio de #828 (RF-2 de E32). Por debajo de 1024px va el flujo del
- * móvil, que es otro ticket (D13): ahí sólo se comprueba que no hay scroll
- * horizontal. */
+ * móvil (#831, D13), con sus propios estados `grupos-movil-*`; los de
+ * escritorio sólo comprueban ahí que no hay scroll horizontal. */
 const GROUPS_DESKTOP_1024: GroupsViewport = {
   name: "desktop-1024",
   width: 1024,
@@ -4050,7 +4071,14 @@ const GROUPS_AUDIENCE_VIEWPORTS: readonly GroupsViewport[] = [
   GROUPS_DESKTOP,
 ];
 
+/** El móvil y la tableta: los dos van con el flujo del móvil (D13). */
+const GROUPS_COMPACT_VIEWPORTS: readonly GroupsViewport[] = [
+  { name: "mobile", width: 375, height: 812 },
+  { name: "tablet", width: 768, height: 1024 },
+];
+
 const GROUPS_NARROW_WIDTHS = [375, 768] as const;
+const GROUPS_COMPACT_NARROW_WIDTHS = [320] as const;
 
 const GROUPS_STATES: readonly GroupsState[] = [
   { name: "grupos-lista", withGroups: true },
@@ -4068,10 +4096,16 @@ const GROUPS_STATES: readonly GroupsState[] = [
     beforeVisit: chooseSpanish,
     prepare: selectGroup,
   },
-  { name: "grupos-borrar-aviso", withGroups: true, prepare: askToDeleteGroup },
+  {
+    name: "grupos-borrar-aviso",
+    withGroups: true,
+    isDesktopOnly: true,
+    prepare: askToDeleteGroup,
+  },
   {
     name: "grupos-renombrando",
     withGroups: true,
+    isDesktopOnly: true,
     prepare: startRenamingGroup,
   },
   {
@@ -4089,6 +4123,19 @@ const GROUPS_STATES: readonly GroupsState[] = [
     prepare: selectGroup,
   },
   { name: "grupos-anadir", withGroups: true, prepare: chooseThreeCandidates },
+  { name: "grupos-movil-lista", withGroups: true, layout: "compact" },
+  {
+    name: "grupos-movil-grupo",
+    withGroups: true,
+    layout: "compact",
+    prepare: selectGroup,
+  },
+  {
+    name: "grupos-movil-acciones",
+    withGroups: true,
+    layout: "compact",
+    prepare: openGroupActions,
+  },
 ];
 
 async function goToGroups(
@@ -4107,13 +4154,29 @@ async function goToGroups(
   await state.prepare?.(page);
 }
 
+function groupsViewportsOf(state: GroupsState): readonly GroupsViewport[] {
+  if (state.layout === "compact") {
+    return GROUPS_COMPACT_VIEWPORTS;
+  }
+  return state.viewports ?? GROUPS_VIEWPORTS;
+}
+
+function groupsNarrowWidthsOf(state: GroupsState): readonly number[] {
+  if (state.layout === "compact") {
+    return GROUPS_COMPACT_NARROW_WIDTHS;
+  }
+  return state.isDesktopOnly === true ? [] : GROUPS_NARROW_WIDTHS;
+}
+
 for (const state of GROUPS_STATES) {
+  const isCompact = state.layout === "compact";
+
   test.describe(state.name, () => {
     skipWithoutSession();
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of state.viewports ?? GROUPS_VIEWPORTS) {
+    for (const vp of groupsViewportsOf(state)) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -4121,6 +4184,11 @@ for (const state of GROUPS_STATES) {
           for (const theme of themes) {
             test(`matches approved baseline (${theme})`, async ({ page }) => {
               await goToGroups(page, state, theme);
+              // Grupos usa `useIsBelowDesktop` (#831): si la página no cabe,
+              // la captura entera la ve un instante como móvil y se pierde lo
+              // abierto (#675). Con la ventana a su altura no pasa, y la
+              // barra fija del móvil queda al pie de la página.
+              await fitViewportToPage(page);
               const snapshot = `${state.name}-${vp.name}-${theme}.png`;
               await createMissingLocalBaseline(snapshot, () =>
                 page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
@@ -4141,10 +4209,21 @@ for (const state of GROUPS_STATES) {
             `horizontal overflow at ${vp.width}px`,
           ).toBe(false);
         });
+
+        if (isCompact) {
+          for (const theme of themes) {
+            test(`has no accessibility violations (axe-core, ${theme})`, async ({
+              page,
+            }) => {
+              await goToGroups(page, state, theme);
+              await expectNoAxeViolations(page);
+            });
+          }
+        }
       });
     }
 
-    for (const width of GROUPS_NARROW_WIDTHS) {
+    for (const width of groupsNarrowWidthsOf(state)) {
       test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 812 });
         await goToGroups(page, state);
@@ -4152,18 +4231,179 @@ for (const state of GROUPS_STATES) {
       });
     }
 
-    for (const theme of themes) {
-      test(`has no accessibility violations (axe-core, ${theme})`, async ({
-        page,
-      }) => {
-        await page.setViewportSize({ width: 1440, height: 900 });
-        await goToGroups(page, state, theme);
-        await expectNoAxeViolations(page);
-      });
+    if (!isCompact) {
+      for (const theme of themes) {
+        test(`has no accessibility violations (axe-core, ${theme})`, async ({
+          page,
+        }) => {
+          await page.setViewportSize({ width: 1440, height: 900 });
+          await goToGroups(page, state, theme);
+          await expectNoAxeViolations(page);
+        });
+      }
     }
   });
 }
 
+/* Las medidas del handoff en el móvil (#831, "#2a"): los toques de al menos
+   44 px y los altos que fija el diseño. Se miden a 375 px; a 768 px el flujo
+   es el mismo (D13) y lo cubren sus capturas. */
+test.describe("la sección Grupos en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 375, height: 812 },
+  });
+
+  const LIST_STATE: GroupsState = {
+    name: "grupos-movil-lista",
+    withGroups: true,
+    layout: "compact",
+  };
+
+  function openedRow(page: Page): Locator {
+    return page.getByRole("button", { name: OPENED_GROUP_NAME, exact: true });
+  }
+
+  test("la lista lleva el título de 24 px, la fila de crear de 46 px y filas de al menos 66 px", async ({
+    page,
+  }) => {
+    await goToGroups(page, LIST_STATE);
+
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCSS(
+      "font-size",
+      "24px",
+    );
+    expect(
+      (await sizeOf(page.getByRole("textbox", { name: NEW_GROUP_FIELD })))
+        .height,
+    ).toBe(46);
+    expect(await sizeOf(page.getByRole("button", { name: "Create" }))).toEqual({
+      width: 46,
+      height: 46,
+    });
+    expect((await sizeOf(openedRow(page))).height).toBeGreaterThanOrEqual(66);
+    expect(
+      (await sizeOf(openedRow(page).locator(".groups-row-avatar").first()))
+        .width,
+    ).toBe(26);
+  });
+
+  test("la pantalla del grupo lleva la barra, los dos botones de 46 px y la búsqueda de 46 px", async ({
+    page,
+  }) => {
+    await goToGroups(page, { ...LIST_STATE, prepare: selectGroup });
+
+    for (const name of ["Back to groups", MORE_ACTIONS]) {
+      const size = await sizeOf(page.getByRole("button", { name }));
+      expect(size.width, name).toBeGreaterThanOrEqual(44);
+      expect(size.height, name).toBeGreaterThanOrEqual(44);
+    }
+    expect(
+      (await sizeOf(page.getByRole("button", { name: "Email all" }))).height,
+    ).toBe(46);
+    expect(
+      (await sizeOf(page.getByRole("link", { name: "Directory" }))).height,
+    ).toBe(46);
+    expect(
+      (await sizeOf(page.getByRole("searchbox", { name: GROUP_SEARCH })))
+        .height,
+    ).toBe(46);
+    const audienceRow = page
+      .getByRole("region", { name: AUDIENCE_HEADING })
+      .getByRole("link")
+      .first();
+    expect((await sizeOf(audienceRow)).height).toBeGreaterThanOrEqual(44);
+  });
+
+  test("cada miembro mide al menos 60 px, con avatar de 38 px y × de 44 px", async ({
+    page,
+  }) => {
+    await goToGroups(page, { ...LIST_STATE, prepare: selectGroup });
+
+    const member = page.locator(".groups-member").first();
+    expect((await sizeOf(member)).height).toBeGreaterThanOrEqual(60);
+    expect((await sizeOf(member.locator(".groups-member-avatar"))).width).toBe(
+      38,
+    );
+    expect(
+      await sizeOf(member.getByRole("button", { name: /^Remove / })),
+    ).toEqual({ width: 44, height: 44 });
+    await expect(
+      page.getByText("Goalkeeper · Not activated", { exact: true }),
+    ).toBeVisible();
+  });
+
+  test("Añadir miembros va fijo abajo, encima de las pestañas, con 50 px", async ({
+    page,
+  }) => {
+    await goToGroups(page, { ...LIST_STATE, prepare: selectGroup });
+
+    const add = page.getByRole("button", { name: OPEN_PICKER_BUTTON });
+    expect((await sizeOf(add)).height).toBe(50);
+    await expect(page.locator(".groups-bottom-bar")).toHaveCSS(
+      "position",
+      "fixed",
+    );
+    const tabBar = await boxOf(page.getByRole("navigation").last());
+    const addBox = await boxOf(add);
+    expect(addBox.y + addBox.height).toBeLessThanOrEqual(tabBar.y);
+  });
+
+  test("volver lleva a la lista con el foco en la fila del grupo", async ({
+    page,
+  }) => {
+    await goToGroups(page, { ...LIST_STATE, prepare: selectGroup });
+
+    await page.getByRole("button", { name: "Back to groups" }).click();
+
+    await expect(openedRow(page)).toBeFocused();
+  });
+
+  test("la hoja ⋯ retiene el foco y renombrar pasa a un campo de 48 px con Guardar", async ({
+    page,
+  }) => {
+    await goToGroups(page, { ...LIST_STATE, prepare: openGroupActions });
+    const sheet = page.getByRole("dialog", { name: ACTIONS_SHEET });
+
+    for (let press = 0; press < 5; press += 1) {
+      await page.keyboard.press("Tab");
+      expect(
+        await sheet.evaluate((dialog) =>
+          dialog.contains(document.activeElement),
+        ),
+      ).toBe(true);
+    }
+    await sheet.getByRole("button", { name: "Rename group" }).click();
+
+    const field = sheet.getByRole("textbox", {
+      name: `New name for ${OPENED_GROUP_NAME}`,
+    });
+    await expect(field).toBeFocused();
+    expect((await sizeOf(field)).height).toBe(48);
+    expect(
+      (await sizeOf(sheet.getByRole("button", { name: "Save" }))).height,
+    ).toBe(48);
+  });
+
+  test("borrar cambia la hoja al aviso con Cancelar y Borrar de 48 px", async ({
+    page,
+  }) => {
+    await goToGroups(page, { ...LIST_STATE, prepare: openGroupActions });
+    const sheet = page.getByRole("dialog", { name: ACTIONS_SHEET });
+
+    await sheet.getByRole("button", { name: "Delete group" }).click();
+
+    await expect(sheet.getByText(/will lose this audience/)).toBeVisible();
+    for (const name of ["Cancel", "Delete"]) {
+      expect(
+        (await sizeOf(sheet.getByRole("button", { name, exact: true }))).height,
+        name,
+      ).toBe(48);
+    }
+  });
+});
 test.describe("la sección Grupos en escritorio", () => {
   skipWithoutSession();
   quietNotificationBell();

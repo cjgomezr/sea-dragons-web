@@ -5,6 +5,7 @@ import {
   DirectoryEmailComposer,
   type EmailRecipient,
 } from "@/components/directory/DirectoryEmailComposer";
+import { useIsBelowDesktop } from "@/components/use-is-phone";
 import type { GroupRosterMember } from "@/lib/groups/group-members";
 import { GROUP_PREVIEW_SIZE } from "@/lib/groups/group-overview";
 import type { Group, GroupOverview } from "@/lib/groups/groups";
@@ -27,6 +28,11 @@ import {
   loadGroupOverviews,
   renameGroup,
 } from "./groups-client";
+import {
+  type GroupPanelLayout,
+  type GroupsLayout,
+  groupRowId,
+} from "./groups-layout";
 import { useChangeNotice } from "./use-change-notice";
 import { usePendingAction } from "./use-pending-action";
 
@@ -45,6 +51,10 @@ import { usePendingAction } from "./use-pending-action";
  * Escribir a todos (#830) abre aquí el redactor del Directorio, con los
  * activos del grupo. Si quien mira puede usarlo lo decide la página con su
  * rol; el servidor lo vuelve a comprobar al enviar (D6).
+ *
+ * Por debajo de 1024 px (#831, D13) la lista y el grupo no caben juntos: la
+ * lista lleva a la pantalla del grupo, que la sustituye, y volver la trae de
+ * nuevo con el foco en la fila de ese grupo.
  */
 
 type ScreenState =
@@ -152,6 +162,7 @@ export function GroupsScreen({
   canWriteEmails: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
+  const layout: GroupsLayout = useIsBelowDesktop() ? "compact" : "desktop";
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   // El grupo que se acaba de crear abre su selector al pintarse (#829); en
@@ -167,16 +178,28 @@ export function GroupsScreen({
   // son para montarlo de nuevo si se le escribe a otro con él abierto.
   const [emailDraft, setEmailDraft] = useState<EmailDraft | null>(null);
   // Tras borrar, el botón que tenía el foco desaparece con su panel: el foco
-  // pasa a "Elige un grupo" en cuanto se pinta, y no cae al principio.
+  // pasa a "Elige un grupo" en cuanto se pinta, y no cae al principio. En el
+  // móvil no hay "Elige un grupo": se vuelve a la lista, y el foco va al título.
   const placeholderRef = useRef<HTMLParagraphElement>(null);
-  const isFocusingPlaceholderRef = useRef(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const isFocusingAfterDeleteRef = useRef(false);
+  // La fila a la que vuelve el foco al volver de la pantalla del grupo.
+  const [returnFocusTo, setReturnFocusTo] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isFocusingPlaceholderRef.current && placeholderRef.current !== null) {
-      placeholderRef.current.focus();
-      isFocusingPlaceholderRef.current = false;
+    const target =
+      layout === "compact" ? headingRef.current : placeholderRef.current;
+    if (isFocusingAfterDeleteRef.current && target !== null) {
+      target.focus();
+      isFocusingAfterDeleteRef.current = false;
     }
   });
+
+  useEffect(() => {
+    if (returnFocusTo !== null) {
+      document.getElementById(groupRowId(returnFocusTo))?.focus();
+    }
+  }, [returnFocusTo]);
 
   // Volver a intentarlo cuenta como una lectura más, y por eso es el efecto
   // quien pide la lista: así el pedido vive en un solo sitio y el estado se
@@ -248,18 +271,30 @@ export function GroupsScreen({
     return result ?? "failed";
   }
 
-  function remove(group: GroupOverview): void {
-    void run({ kind: "delete" }, async () => {
+  async function remove(group: GroupOverview): Promise<GroupActionResult> {
+    const result = await run({ kind: "delete" }, async () => {
       const outcome = await deleteGroup(group.id);
       if (outcome.kind === "failed") {
-        reportFailure(outcome, group.id);
-        return;
+        return reportFailure(outcome, group.id);
       }
       forgetGroup(group.id);
       setFailure(null);
-      isFocusingPlaceholderRef.current = true;
+      isFocusingAfterDeleteRef.current = true;
       announce(translate("groups.deleted", { name: group.name }));
+      return "done";
     });
+    return result ?? "failed";
+  }
+
+  function selectGroup(group: GroupOverview): void {
+    setCreatedGroupId(null);
+    setReturnFocusTo(null);
+    setSelectedGroupId((selected) => (selected === group.id ? null : group.id));
+  }
+
+  function goBackToList(): void {
+    setReturnFocusTo(selectedGroupId);
+    setSelectedGroupId(null);
   }
 
   /** Lo llama el panel cuando el servidor le dice que su grupo ya no está. */
@@ -274,11 +309,24 @@ export function GroupsScreen({
   const groups = state.kind === "ready" ? state.groups : [];
   const selectedGroup = groups.find((group) => group.id === selectedGroupId);
   const isDisabled = pending !== null;
+  // En el móvil, la pantalla del grupo sustituye a la lista.
+  const isShowingGroupScreen =
+    layout === "compact" && selectedGroup !== undefined;
+  const panelLayout: GroupPanelLayout =
+    layout === "compact"
+      ? { kind: "compact", failure, onBack: goBackToList }
+      : { kind: "desktop" };
 
   return (
-    <div className="groups">
+    <div
+      className="groups"
+      data-layout={layout}
+      data-step={isShowingGroupScreen ? "group" : "list"}
+    >
       <div className="groups-head">
-        <h1>{translate("groups.title")}</h1>
+        <h1 ref={headingRef} tabIndex={-1}>
+          {translate("groups.title")}
+        </h1>
         <p className="app-lead">{translate("groups.lead")}</p>
       </div>
       <p className="groups-notice" role="status">
@@ -309,32 +357,33 @@ export function GroupsScreen({
       )}
       {state.kind === "ready" ? (
         <div className="groups-layout">
-          <section className="groups-column" aria-labelledby="grupos-del-club">
-            <h2 id="grupos-del-club" className="visually-hidden">
-              {translate("groups.list.title")}
-            </h2>
-            <GroupCreateForm
-              translate={translate}
-              takenNames={groups.map((group) => group.name)}
-              isDisabled={isDisabled}
-              isSaving={pending?.kind === "create"}
-              onSubmit={create}
-            />
-            <GroupList
-              translate={translate}
-              groups={groups}
-              selectedGroupId={selectedGroupId}
-              isDisabled={isDisabled}
-              onSelect={(group) => {
-                setCreatedGroupId(null);
-                setSelectedGroupId((selected) =>
-                  selected === group.id ? null : group.id,
-                );
-              }}
-            />
-          </section>
+          {isShowingGroupScreen ? null : (
+            <section
+              className="groups-column"
+              aria-labelledby="grupos-del-club"
+            >
+              <h2 id="grupos-del-club" className="visually-hidden">
+                {translate("groups.list.title")}
+              </h2>
+              <GroupCreateForm
+                translate={translate}
+                takenNames={groups.map((group) => group.name)}
+                isDisabled={isDisabled}
+                isSaving={pending?.kind === "create"}
+                onSubmit={create}
+              />
+              <GroupList
+                translate={translate}
+                layout={layout}
+                groups={groups}
+                selectedGroupId={selectedGroupId}
+                isDisabled={isDisabled}
+                onSelect={selectGroup}
+              />
+            </section>
+          )}
           {selectedGroup === undefined ? (
-            groups.length === 0 ? null : (
+            groups.length === 0 || layout === "compact" ? null : (
               <p
                 ref={placeholderRef}
                 className="groups-panel-placeholder"
@@ -347,6 +396,7 @@ export function GroupsScreen({
             <GroupMembersPanel
               key={selectedGroup.id}
               translate={translate}
+              layout={panelLayout}
               group={selectedGroup}
               pendingAction={pendingAction}
               isNewGroup={selectedGroup.id === createdGroupId}
