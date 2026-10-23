@@ -5790,6 +5790,10 @@ type DirectoryState = {
    * en la ventana: a página entera la capa modal, que es fija, sale partida a
    * media altura. */
   readonly endsInModal?: boolean;
+  /** En el móvil termina con el redactor del correo abierto (#860), que allí
+   * es un `<dialog>` modal a pantalla completa: se fotografía la ventana, por
+   * lo mismo que `endsInModal`. */
+  readonly endsInPhoneComposer?: boolean;
   readonly listHeading: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
@@ -6044,6 +6048,7 @@ function emailStates(spanish: boolean): readonly DirectoryState[] {
     {
       name: `correo-formulario${suffix}`,
       asAdmin: true,
+      endsInPhoneComposer: true,
       listHeading,
       beforeVisit: beforeEmailVisit(EMAIL_SENT_TO_ALL, spanish),
       prepare: writeEmail(labels),
@@ -6051,6 +6056,7 @@ function emailStates(spanish: boolean): readonly DirectoryState[] {
     {
       name: `correo-confirmacion${suffix}`,
       asAdmin: true,
+      endsInPhoneComposer: true,
       endsInModal: true,
       listHeading,
       beforeVisit: beforeEmailVisit(EMAIL_SENT_TO_ALL, spanish),
@@ -6059,6 +6065,7 @@ function emailStates(spanish: boolean): readonly DirectoryState[] {
     {
       name: `correo-no-cabe${suffix}`,
       asAdmin: true,
+      endsInPhoneComposer: true,
       listHeading,
       beforeVisit: beforeEmailVisit(EMAIL_DOES_NOT_FIT, spanish),
       prepare: sendEmail(
@@ -6069,6 +6076,7 @@ function emailStates(spanish: boolean): readonly DirectoryState[] {
     {
       name: `correo-resultado-parcial${suffix}`,
       asAdmin: true,
+      endsInPhoneComposer: true,
       listHeading,
       beforeVisit: beforeEmailVisit(EMAIL_PARTLY_SENT, spanish),
       prepare: sendEmail(labels, spanish ? /No llegó a/ : /It didn't reach/),
@@ -6405,6 +6413,7 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
   {
     name: "correo-vista-previa",
     asAdmin: true,
+    endsInPhoneComposer: true,
     listHeading: ENGLISH_DIRECTORY_HEADING,
     beforeVisit: stubDirectoryEmails(EMAIL_SENT_TO_ALL),
     prepare: previewEmail,
@@ -6412,6 +6421,7 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
   {
     name: "correo-errores",
     asAdmin: true,
+    endsInPhoneComposer: true,
     listHeading: ENGLISH_DIRECTORY_HEADING,
     beforeVisit: stubDirectoryEmails(EMAIL_SENT_TO_ALL),
     prepare: showEmailErrors,
@@ -6419,6 +6429,7 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
   {
     name: "correo-enviado",
     asAdmin: true,
+    endsInPhoneComposer: true,
     listHeading: ENGLISH_DIRECTORY_HEADING,
     beforeVisit: stubDirectoryEmails(EMAIL_SENT_TO_ALL),
     prepare: sendEmail(ENGLISH_EMAIL_LABELS, /^3 emails sent$/),
@@ -6426,6 +6437,7 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
   {
     name: "correo-25-destinatarios",
     asAdmin: true,
+    endsInPhoneComposer: true,
     members: TWENTY_FIVE_MEMBERS,
     listHeading: ENGLISH_DIRECTORY_HEADING,
     beforeVisit: stubDirectoryEmails(EMAIL_SENT_TO_ALL),
@@ -6434,6 +6446,7 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
   {
     name: "correo-buscando",
     asAdmin: true,
+    endsInPhoneComposer: true,
     members: TWENTY_FIVE_MEMBERS,
     listHeading: ENGLISH_DIRECTORY_HEADING,
     beforeVisit: stubDirectoryEmails(EMAIL_SENT_TO_ALL),
@@ -6472,7 +6485,9 @@ for (const state of DIRECTORY_STATES) {
             test(`matches approved baseline (${theme})`, async ({ page }) => {
               await goToDirectory(page, state, theme);
               const snapshot = `${state.name}-${vp.name}-${theme}.png`;
-              const fullPage = state.endsInModal !== true;
+              const isPhoneComposer =
+                vp.name === "mobile" && state.endsInPhoneComposer === true;
+              const fullPage = state.endsInModal !== true && !isPhoneComposer;
               await createMissingLocalBaseline(snapshot, () =>
                 page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage }),
               );
@@ -6503,6 +6518,215 @@ for (const state of DIRECTORY_STATES) {
     });
   });
 }
+/* El correo en el móvil (#860, RF-6 del PRD de E33): una ventana a pantalla
+   completa con la barra de 56 px, las fichas de 32, la búsqueda aparte de 46
+   con los resultados en línea en filas de 58, el asunto de 48, Escribir |
+   Vista previa a todo el ancho y la confirmación como hoja de abajo. Las
+   capturas de 375 las hace el bucle de los estados del directorio; aquí, axe
+   en claro y oscuro, las medidas del handoff y el scroll a 320. */
+const PHONE_EMAIL_STATE_NAMES = [
+  "correo-formulario",
+  "correo-buscando",
+  "correo-vista-previa",
+  "correo-errores",
+  "correo-confirmacion",
+] as const;
+
+function phoneEmailState(name: string): DirectoryState {
+  const state = DIRECTORY_STATES.find((candidate) => candidate.name === name);
+  if (state === undefined) {
+    throw new Error(`No hay un estado del directorio llamado ${name}`);
+  }
+  return state;
+}
+
+function phoneComposer(page: Page): Locator {
+  return page.getByRole("dialog", { name: "Email members" });
+}
+
+test.describe("el correo en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 375, height: 812 },
+  });
+
+  for (const name of PHONE_EMAIL_STATE_NAMES) {
+    for (const theme of themes) {
+      test(`${name} no tiene fallos de accesibilidad (${theme})`, async ({
+        page,
+      }) => {
+        await goToDirectory(page, phoneEmailState(name), theme);
+        await expectNoAxeViolations(page);
+      });
+    }
+  }
+
+  test("ocupa la pantalla con la barra de 56 px: la × de 44 y Enviar de 40", async ({
+    page,
+  }) => {
+    await goToDirectory(page, phoneEmailState("correo-formulario"));
+    const composer = phoneComposer(page);
+
+    expect(await boxOf(composer)).toEqual({
+      x: 0,
+      y: 0,
+      width: 375,
+      height: 812,
+    });
+    expect(
+      (await sizeOf(composer.locator(".directory-email-screen-bar"))).height,
+    ).toBe(56);
+    expect(
+      await sizeOf(composer.getByRole("button", { name: "Close" })),
+    ).toEqual({ width: 44, height: 44 });
+    const send = composer.getByRole("button", { name: /^Send to \d+$/ });
+    await expect(send).toHaveText("Send");
+    expect((await sizeOf(send)).height).toBe(40);
+  });
+
+  test("las fichas miden 32 px con avatar de 22, texto de 13,5 y la × se toca en 44", async ({
+    page,
+  }) => {
+    await goToDirectory(page, phoneEmailState("correo-formulario"));
+    const chip = phoneComposer(page).locator(".directory-email-chip").first();
+
+    expect((await sizeOf(chip)).height).toBe(32);
+    expect(await sizeOf(chip.locator(".directory-email-avatar"))).toEqual({
+      width: 22,
+      height: 22,
+    });
+    expect(
+      await chip.evaluate((element) => getComputedStyle(element).fontSize),
+    ).toBe("13.5px");
+    const hitArea = await chip
+      .getByRole("button", { name: /^Remove / })
+      .evaluate((button) => {
+        const after = getComputedStyle(button, "::after");
+        return { width: after.width, height: after.height };
+      });
+    expect(hitArea).toEqual({ width: "44px", height: "44px" });
+  });
+
+  test("con 25 se ven 6 fichas y +19 more", async ({ page }) => {
+    await goToDirectory(page, {
+      ...phoneEmailState("correo-buscando"),
+      prepare: openFoldedEmail,
+    });
+    const composer = phoneComposer(page);
+
+    await expect(composer.locator(".directory-email-chip")).toHaveCount(6);
+    await expect(
+      composer.getByRole("button", { name: "Show all 25 recipients" }),
+    ).toHaveText("+19 more");
+  });
+
+  test("la búsqueda mide 46 px con texto de 16 y los resultados van en línea en filas de 58", async ({
+    page,
+  }) => {
+    await goToDirectory(page, phoneEmailState("correo-buscando"));
+    const composer = phoneComposer(page);
+    const search = composer.getByRole("combobox", {
+      name: "Add a member by name",
+    });
+
+    expect(
+      (await sizeOf(composer.locator(".directory-email-search-field"))).height,
+    ).toBe(46);
+    expect(
+      await search.evaluate((input) => getComputedStyle(input).fontSize),
+    ).toBe("16px");
+    await expect(
+      composer.getByRole("button", { name: "Clear the search" }),
+    ).toBeVisible();
+    const option = composer.getByRole("option", { name: /Amara Okafor/ });
+    expect((await sizeOf(option)).height).toBeGreaterThanOrEqual(58);
+    expect(
+      await option.evaluate(
+        (element) =>
+          getComputedStyle(
+            element.closest(".directory-email-search-results") ?? element,
+          ).position,
+      ),
+    ).toBe("static");
+  });
+
+  test("el asunto mide 48 px, las pestañas 38 a todo el ancho, el formato cinco botones de 44 y el mensaje texto de 16", async ({
+    page,
+  }) => {
+    await goToDirectory(page, phoneEmailState("correo-formulario"));
+    const composer = phoneComposer(page);
+
+    const subject = composer.getByRole("textbox", { name: "Subject" });
+    expect((await sizeOf(subject)).height).toBe(48);
+    const tabs = composer.getByRole("tablist");
+    const tabsBox = await sizeOf(tabs);
+    expect(tabsBox.height).toBe(38);
+    expect(tabsBox.width).toBe((await sizeOf(subject)).width);
+    const buttons = composer
+      .getByRole("toolbar", { name: "Message formatting" })
+      .getByRole("button");
+    await expect(buttons).toHaveCount(5);
+    for (const button of await buttons.all()) {
+      expect(await sizeOf(button)).toEqual({ width: 44, height: 44 });
+    }
+    expect(
+      await composer
+        .getByRole("textbox", { name: "Message" })
+        .evaluate((area) => getComputedStyle(area).fontSize),
+    ).toBe("16px");
+  });
+
+  test("con errores dice cuántas cosas arreglar antes de enviar, encima de los campos", async ({
+    page,
+  }) => {
+    await goToDirectory(page, phoneEmailState("correo-errores"));
+    const composer = phoneComposer(page);
+
+    const summary = composer.getByText("2 things to fix before sending");
+    const subject = composer.getByRole("textbox", { name: "Subject" });
+    expect((await boxOf(summary)).y).toBeLessThan((await boxOf(subject)).y);
+  });
+
+  test("la confirmación es una hoja de abajo con asa y botones de 48 px", async ({
+    page,
+  }) => {
+    await goToDirectory(page, phoneEmailState("correo-confirmacion"));
+    const sheet = page.getByRole("dialog", { name: /^Send to .+\?$/ });
+
+    const box = await boxOf(sheet);
+    expect(box.x).toBe(0);
+    expect(box.width).toBe(375);
+    expect(Math.round(box.y + box.height)).toBe(812);
+    await expect(sheet.locator(".directory-email-dialog-grip")).toBeVisible();
+    for (const name of ["Cancel", /^Send \d+ emails?$/]) {
+      expect((await sizeOf(sheet.getByRole("button", { name }))).height).toBe(
+        48,
+      );
+    }
+  });
+
+  test.describe("a 320 px", () => {
+    test.use({ viewport: { width: 320, height: 640 } });
+
+    for (const name of PHONE_EMAIL_STATE_NAMES) {
+      test(`${name} no tiene scroll horizontal`, async ({ page }) => {
+        await goToDirectory(page, phoneEmailState(name));
+
+        // La ventana se desplaza por dentro: el ancho que sobra se vería en
+        // su cuerpo, no en el del documento.
+        const overflow = await page.evaluate(() =>
+          [
+            document.documentElement,
+            ...document.querySelectorAll(".directory-email-screen-body"),
+          ].some((element) => element.scrollWidth > element.clientWidth),
+        );
+        expect(overflow, "scroll horizontal a 320 px").toBe(false);
+      });
+    }
+  });
+});
 
 /* En la lista de tarjetas no hay cabeceras que den nombre a la cifra: la
    etiqueta que escribe la hoja de estilos entra en el nombre accesible de la

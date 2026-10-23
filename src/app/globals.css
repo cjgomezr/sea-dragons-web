@@ -6696,6 +6696,7 @@ a.groups-icon-button {
 /* La búsqueda, aparte y de 46 px, con texto de 16 para que iOS no acerque
    la página; los resultados, en línea debajo y en filas de 58 px. */
 .directory-email-search[data-placement="inline"] {
+  flex: none;
   flex-direction: column;
   gap: var(--space-2);
   align-items: stretch;
@@ -6710,6 +6711,7 @@ a.groups-icon-button {
 }
 
 [data-placement="inline"] .directory-email-search-field {
+  flex: none;
   height: 46px;
   padding: 0 0 0 var(--space-3);
   background: var(--color-background);
@@ -6721,11 +6723,11 @@ a.groups-icon-button {
   border-color: var(--color-accent);
 }
 
-[data-placement="inline"] .directory-email-search-icon {
+.directory-email-search[data-placement="inline"] .directory-email-search-icon {
   font-size: 18px;
 }
 
-[data-placement="inline"] .directory-email-search input {
+.directory-email-search[data-placement="inline"] input {
   height: 100%;
   font-size: 16px;
 }
