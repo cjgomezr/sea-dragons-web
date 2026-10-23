@@ -17219,6 +17219,11 @@ async function stubEvaluationCategories(page: Page): Promise<void> {
 async function typeTakenCategoryName(page: Page): Promise<void> {
   await page.getByRole("textbox", { name: NEW_CATEGORY_FIELD }).fill("speed");
   await expect(page.getByText(TAKEN_CATEGORY_NAME)).toBeVisible();
+  // En escritorio la página no cabe: la ventana de 1×1 de la captura pasa
+  // la pestaña al móvil, la fila de añadir vuelve vacía y la foto sale sin
+  // el aviso (#866). Ver fitViewportToPage.
+  await fitViewportToPage(page);
+  await expect(page.getByText(TAKEN_CATEGORY_NAME)).toBeVisible();
 }
 
 async function renameSpeed(page: Page): Promise<void> {
