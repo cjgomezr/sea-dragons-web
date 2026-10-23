@@ -28,10 +28,11 @@ import {
  * decide por el camino; aquí se vuelve a comprobar.
  *
  * Un reparto publicado conserva los suyos (D4): los socios ya recibieron el
- * aviso con ellos. Sólo los estrena si quien cambia lo pide desde su builder
- * (#871), y entonces se les vuelve a avisar. Uno guardado y sin publicar los estrena en cuanto se
- * cambian desde su builder (`eventId`). El guardado del reparto sigue
- * aceptando cualquier `#RRGGBB` (D5); sólo esto exige el muestrario.
+ * aviso con ellos. Uno guardado y sin publicar los estrena en cuanto se
+ * cambian desde su builder (`eventId`). El publicado sólo los estrena si
+ * quien cambia lo pide desde su builder (#871), y entonces se vuelve a
+ * avisar a sus jugadores. El guardado del reparto sigue aceptando cualquier
+ * `#RRGGBB` (D5); sólo esto exige el muestrario.
  */
 
 const BIB_HEXES = TEAM_BIB_COLORS.map((color) => color.hex);

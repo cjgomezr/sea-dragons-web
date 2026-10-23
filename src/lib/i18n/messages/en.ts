@@ -2852,11 +2852,12 @@ export const englishMessages = {
   "teams.edit.invalid":
     "Check the name and the colour: the name takes 1 to 24 characters and each team a different colour.",
   "teams.edit.changed": "Team updated · used for every event from now on",
-  // El reparto de este evento ya se publicó y conserva los suyos (D4).
+  // El publicado estrenó los nuevos y se avisó a sus jugadores (#871).
   "teams.edit.changedPublished": {
     one: "Teams changed. {count} player was notified.",
     other: "Teams changed. {count} players were notified.",
   },
+  // El reparto de este evento ya se publicó y conserva los suyos (D4).
   "teams.edit.changedKeptByPublished":
     "Team updated for the next events. These published teams keep their old name and colour: to use the new ones, save them again, apply the change again and publish.",
   // Guardar, publicar o balancear siguen en vuelo: el cambio no se manda.
