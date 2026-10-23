@@ -7076,10 +7076,8 @@ test.describe("el directorio en el móvil (#553)", () => {
     await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
 
     for (const name of ["More actions", "Invite member"]) {
-      const control = page.getByRole(
-        name === "More actions" ? "button" : "link",
-        { name },
-      );
+      // Invitar es un botón desde #862: abre su panel bajo la cabecera.
+      const control = page.getByRole("button", { name });
       const box = await control.boundingBox();
       expect(box?.width, name).toBe(44);
       expect(box?.height, name).toBe(44);
