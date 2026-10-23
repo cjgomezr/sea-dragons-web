@@ -5,8 +5,10 @@ import {
   DEFAULT_DIRECTORY_QUERY,
   type DirectoryQuery,
 } from "@/lib/directory/directory";
+import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import {
   InvalidDirectoryQueryError,
+  isInviteRequested,
   parseDirectoryQuery,
 } from "@/lib/directory/directory-query";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
@@ -24,6 +26,8 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
  * La consulta llega en la dirección: `?q=` es a donde llevan "Ver todos" y un
  * socio encontrado en la búsqueda global (#427), y los filtros viven ahí para
  * que recargar o compartir la página devuelva la misma lista (#497).
+ * `?invite=1` abre el panel de invitar (#862): es a donde lleva la dirección
+ * vieja del alta, `/directorio/nuevo`.
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -34,17 +38,20 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-/** Los mismos parámetros que lee el endpoint. Una dirección que no sabe leer
- * (escrita a mano, o de una versión anterior) no rompe la página: abre el
- * directorio sin filtros, igual que si no trajera ninguno. */
-function readInitialQuery(
+function toSearchParams(
   params: Record<string, string | string[] | undefined>,
-): DirectoryQuery {
-  const searchParams = new URLSearchParams(
+): URLSearchParams {
+  return new URLSearchParams(
     Object.entries(params).flatMap(([name, value]) =>
       typeof value === "string" ? [[name, value]] : [],
     ),
   );
+}
+
+/** Los mismos parámetros que lee el endpoint. Una dirección que no sabe leer
+ * (escrita a mano, o de una versión anterior) no rompe la página: abre el
+ * directorio sin filtros, igual que si no trajera ninguno. */
+function readInitialQuery(searchParams: URLSearchParams): DirectoryQuery {
   try {
     return parseDirectoryQuery(searchParams);
   } catch (error) {
@@ -60,18 +67,22 @@ export default async function DirectorioPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<React.JSX.Element> {
-  const [locale, params] = await Promise.all([
+  const [locale, brand, params] = await Promise.all([
     readRequestLocale(),
+    readClubBrand(),
     searchParams,
   ]);
-  const initialQuery = readInitialQuery(params);
+  const addressParams = toSearchParams(params);
+  const initialQuery = readInitialQuery(addressParams);
   return (
     // Llegar con otra consulta sin salir del directorio, como desde la
     // búsqueda global, vuelve a montarlo con ella.
     <DirectoryScreen
       key={JSON.stringify(initialQuery)}
       locale={locale}
+      clubName={brand.name}
       initialQuery={initialQuery}
+      isInviteOpenAtStart={isInviteRequested(addressParams)}
     />
   );
 }

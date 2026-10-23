@@ -168,7 +168,7 @@ function lastDirectoryRequest(): URLSearchParams | undefined {
 }
 
 async function renderDirectory(locale: "en" | "es" = "en"): Promise<void> {
-  render(<DirectoryScreen locale={locale} />);
+  render(<DirectoryScreen clubName="Victoria Seadragons" locale={locale} />);
   await screen.findByRole("region", {
     name: locale === "en" ? "Club members" : "Miembros del club",
   });

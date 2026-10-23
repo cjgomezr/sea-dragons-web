@@ -7403,10 +7403,8 @@ test.describe("el directorio en el móvil (#553)", () => {
     await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
 
     for (const name of ["More actions", "Invite member"]) {
-      const control = page.getByRole(
-        name === "More actions" ? "button" : "link",
-        { name },
-      );
+      // Invitar es un botón desde #862: abre su panel bajo la cabecera.
+      const control = page.getByRole("button", { name });
       const box = await control.boundingBox();
       expect(box?.width, name).toBe(44);
       expect(box?.height, name).toBe(44);
@@ -10013,9 +10011,12 @@ test.describe("un Player frente a la ficha reservada al Admin", () => {
   });
 });
 /* ---------------------------------------------------------------------------
-   El alta de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta desde
-   la cabecera del directorio. El botón está en el mockup del directorio; el
-   formulario no, así que se revisa contra design-system.md.
+   La invitación de un socio por un Admin (#862, RF-9 del PRD de E33; antes la
+   página del alta de #243): un panel bajo la cabecera del Directorio, que
+   abre su botón `user-plus` o la dirección `?invite=1`. Mockup:
+   docs/design/design_handoff_invite/screenshots/01-desktop-filled.png y
+   02-desktop-errors.png. El móvil llega con #863, así que se fotografían
+   tableta y escritorio.
 
    Las capturas leen datos fijos, servidos por `page.route`: los grupos de
    verdad cambian con cada test que siembre, y un alta de verdad mandaría una
@@ -10023,11 +10024,16 @@ test.describe("un Player frente a la ficha reservada al Admin", () => {
    aparte, con un correo que ya tiene cuenta, que no crea nada ni manda nada.
    --------------------------------------------------------------------------- */
 
-const NEW_MEMBER_SCREEN_PATH = `${DIRECTORY_SCREEN_PATH}/nuevo`;
+const INVITE_SCREEN_PATH = `${DIRECTORY_SCREEN_PATH}?invite=1`;
+const OLD_NEW_MEMBER_PATH = `${DIRECTORY_SCREEN_PATH}/nuevo`;
 const NEW_MEMBER_ID = "cccccccc-0000-4000-8000-000000000243";
+const EXISTING_MEMBER_ID = "cccccccc-0000-4000-8000-000000000862";
+
+const INVITE_VIEWPORTS = viewports.filter((vp) => vp.name !== "mobile");
 
 const EMAIL_TAKEN_ERROR = {
   error: {
+    existingMember: { userId: EXISTING_MEMBER_ID, fullName: "Sofia Reyes" },
     code: "conflict",
     message: "Ese correo ya tiene una cuenta.",
     reason: "email_taken",
@@ -10035,52 +10041,64 @@ const EMAIL_TAKEN_ERROR = {
 };
 
 type NewMemberCopy = {
+  readonly listHeading: string;
   readonly title: string;
   readonly submit: string;
   readonly fullName: string;
   readonly email: string;
+  readonly details: RegExp;
   readonly country: string;
   readonly position: string;
   /** El nombre de Forward en ese idioma: el desplegable lleva los del club
    * (#299), y la opción se elige por lo que dice. */
   readonly forward: string;
-  readonly experienceLevel: string;
+  readonly intermediate: string;
   readonly gender: string;
   readonly aufNumber: string;
   readonly aufExpiry: string;
-  readonly emailTaken: string;
+  readonly emailTaken: RegExp;
+  readonly issueSummary: RegExp;
+  readonly preview: RegExp;
   readonly invitationSent: RegExp;
 };
 
 const ENGLISH_NEW_MEMBER: NewMemberCopy = {
-  title: "Invite member",
-  submit: "Invite member",
+  listHeading: ENGLISH_DIRECTORY_HEADING,
+  title: "Invite a member",
+  submit: "Send invitation",
   fullName: "Full name",
   email: "Email",
+  details: /^Player details · optional/,
   country: "Country",
   position: "Position",
   forward: "Forward",
-  experienceLevel: "Experience level",
+  intermediate: "Intermediate",
   gender: "Gender",
-  aufNumber: "AUF number",
-  aufExpiry: "AUF expiry date",
-  emailTaken: "That email already has an account in the club.",
+  aufNumber: "Number",
+  aufExpiry: "Expires",
+  emailTaken: /^This email already belongs to a member\./,
+  issueSummary: /things? to fix before sending/,
+  preview: /^What .+ will receive$/,
   invitationSent: /We sent the invitation to/,
 };
 
 const SPANISH_NEW_MEMBER: NewMemberCopy = {
-  title: "Invitar miembro",
-  submit: "Invitar miembro",
+  listHeading: SPANISH_DIRECTORY_HEADING,
+  title: "Invitar a un miembro",
+  submit: "Enviar invitación",
   fullName: "Nombre completo",
   email: "Correo",
+  details: /^Datos de jugador · opcional/,
   country: "País",
   position: "Posición",
   forward: "Ataque",
-  experienceLevel: "Nivel de experiencia",
+  intermediate: "Intermedio",
   gender: "Género",
-  aufNumber: "Número de AUF",
-  aufExpiry: "Vencimiento del AUF",
-  emailTaken: "Ese correo ya tiene una cuenta en el club.",
+  aufNumber: "Número",
+  aufExpiry: "Vencimiento",
+  emailTaken: /^Este correo ya es de un miembro\./,
+  issueSummary: /cosas? por arreglar antes de enviar/,
+  preview: /^Lo que recibirá/,
   invitationSent: /Le mandamos la invitación a/,
 };
 
@@ -10143,22 +10161,38 @@ const STUBBED_ENTRY: NewMemberEntry = {
   groupName: STUBBED_CLUB_GROUPS[2].name,
 };
 
+function invitePanel(page: Page, copy: NewMemberCopy): Locator {
+  return page.getByRole("region", { name: copy.title });
+}
+
+async function fillWho(
+  page: Page,
+  copy: NewMemberCopy,
+  entry: NewMemberEntry,
+): Promise<void> {
+  const panel = invitePanel(page, copy);
+  await panel.getByLabel(copy.fullName).fill(entry.fullName);
+  await panel.getByLabel(copy.email).fill(entry.email);
+  if (entry.groupName !== null) {
+    await panel.getByRole("button", { name: entry.groupName }).click();
+  }
+}
+
+/** Nombre, correo, un grupo y los datos de jugador abiertos y rellenos. */
 async function fillNewMemberForm(
   page: Page,
   copy: NewMemberCopy,
   entry: NewMemberEntry,
 ): Promise<void> {
-  await page.getByLabel(copy.fullName).fill(entry.fullName);
-  await page.getByLabel(copy.email).fill(entry.email);
-  await page.getByLabel(copy.country).selectOption("AU");
-  await page.getByLabel(copy.position).selectOption({ label: copy.forward });
-  await page.getByLabel(copy.experienceLevel).selectOption("Intermediate");
-  await page.getByLabel(copy.gender).selectOption("female");
-  await page.getByLabel(copy.aufNumber).fill("AUF-2026-0243");
-  await page.getByLabel(copy.aufExpiry).fill("2099-06-30");
-  if (entry.groupName !== null) {
-    await page.getByRole("checkbox", { name: entry.groupName }).check();
-  }
+  await fillWho(page, copy, entry);
+  const panel = invitePanel(page, copy);
+  await panel.getByRole("button", { name: copy.details }).click();
+  await panel.getByLabel(copy.country).selectOption("AU");
+  await panel.getByLabel(copy.position).selectOption({ label: copy.forward });
+  await panel.getByRole("radio", { name: copy.intermediate }).check();
+  await panel.getByLabel(copy.gender).selectOption("female");
+  await panel.getByLabel(copy.aufNumber).fill("AUF-2026-0243");
+  await panel.getByLabel(copy.aufExpiry).fill("2099-06-30");
 }
 
 function fillNewMember(copy: NewMemberCopy) {
@@ -10169,8 +10203,36 @@ function fillNewMember(copy: NewMemberCopy) {
 function submitNewMember(copy: NewMemberCopy, expected: string | RegExp) {
   return async (page: Page): Promise<void> => {
     await fillNewMemberForm(page, copy, STUBBED_ENTRY);
-    await page.getByRole("button", { name: copy.submit }).click();
-    await expect(page.getByText(expected)).toBeVisible();
+    await invitePanel(page, copy)
+      .getByRole("button", { name: copy.submit })
+      .click();
+    await expect(page.getByText(expected).first()).toBeVisible();
+  };
+}
+
+/** Sin nombre, con un AUF sin vencimiento: el resumen cuenta dos cosas, y
+ * los datos de jugador dicen "1 por arreglar". */
+function submitWithIssues(copy: NewMemberCopy) {
+  return async (page: Page): Promise<void> => {
+    const panel = invitePanel(page, copy);
+    await panel.getByLabel(copy.email).fill(STUBBED_ENTRY.email);
+    await panel.getByRole("button", { name: copy.details }).click();
+    await panel.getByLabel(copy.aufNumber).fill("AUF-2026-0243");
+    await panel.getByRole("button", { name: copy.submit }).click();
+    const summary = panel.getByRole("alert");
+    await expect(summary).toContainText(copy.issueSummary);
+    await expect(summary).toBeFocused();
+  };
+}
+
+function openPreview(copy: NewMemberCopy) {
+  return async (page: Page): Promise<void> => {
+    await fillWho(page, copy, STUBBED_ENTRY);
+    const toggle = invitePanel(page, copy).getByRole("button", {
+      name: copy.preview,
+    });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
   };
 }
 
@@ -10197,17 +10259,39 @@ const NEW_MEMBER_STATES: readonly NewMemberState[] = [
     prepare: fillNewMember(ENGLISH_NEW_MEMBER),
   },
   {
+    name: "alta-errores",
+    copy: ENGLISH_NEW_MEMBER,
+    answer: "sent",
+    prepare: submitWithIssues(ENGLISH_NEW_MEMBER),
+  },
+  {
+    name: "alta-errores-es",
+    copy: SPANISH_NEW_MEMBER,
+    answer: "sent",
+    beforeVisit: chooseSpanish,
+    prepare: submitWithIssues(SPANISH_NEW_MEMBER),
+  },
+  {
     name: "alta-correo-repetido",
     copy: ENGLISH_NEW_MEMBER,
     answer: "email_taken",
-    prepare: submitNewMember(ENGLISH_NEW_MEMBER, ENGLISH_NEW_MEMBER.emailTaken),
+    prepare: submitNewMember(ENGLISH_NEW_MEMBER, "Open Sofia Reyes's profile"),
   },
   {
     name: "alta-correo-repetido-es",
     copy: SPANISH_NEW_MEMBER,
     answer: "email_taken",
     beforeVisit: chooseSpanish,
-    prepare: submitNewMember(SPANISH_NEW_MEMBER, SPANISH_NEW_MEMBER.emailTaken),
+    prepare: submitNewMember(
+      SPANISH_NEW_MEMBER,
+      "Abrir la ficha de Sofia Reyes",
+    ),
+  },
+  {
+    name: "alta-vista-previa",
+    copy: ENGLISH_NEW_MEMBER,
+    answer: "sent",
+    prepare: openPreview(ENGLISH_NEW_MEMBER),
   },
   {
     name: "alta-invitacion-enviada",
@@ -10235,18 +10319,21 @@ async function goToNewMember(
   state: NewMemberState,
   theme?: (typeof themes)[number],
 ): Promise<void> {
+  await stubDirectoryReads(page, { asAdmin: true });
   await stubNewMemberApi(page, state.answer);
   await state.beforeVisit?.(page);
   if (theme === undefined) {
-    await page.goto(`${APP_URL}${NEW_MEMBER_SCREEN_PATH}`);
+    await page.goto(`${APP_URL}${INVITE_SCREEN_PATH}`);
   } else {
-    await goToWithTheme(page, NEW_MEMBER_SCREEN_PATH, theme);
+    await goToWithTheme(page, INVITE_SCREEN_PATH, theme);
   }
+  await waitForDirectory(page, state.copy.listHeading, true);
+  const panel = invitePanel(page, state.copy);
   await expect(
-    page.getByRole("heading", { level: 1, name: state.copy.title }),
+    panel.getByRole("heading", { level: 2, name: state.copy.title }),
   ).toBeVisible();
   await expect(
-    page.getByRole("checkbox", { name: STUBBED_CLUB_GROUPS[2].name }),
+    panel.getByRole("button", { name: STUBBED_CLUB_GROUPS[2].name }),
   ).toBeVisible();
   await state.prepare?.(page);
 }
@@ -10257,7 +10344,7 @@ for (const state of NEW_MEMBER_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of INVITE_VIEWPORTS) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -10297,12 +10384,12 @@ for (const state of NEW_MEMBER_STATES) {
   });
 }
 
-test.describe("un Admin frente al alta con los datos de verdad", () => {
+test.describe("un Admin frente a la invitación con los datos de verdad", () => {
   skipWithoutSession();
   quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
-  test("la abre desde el directorio y un correo con cuenta se rechaza junto a su campo", async ({
+  test("la abre desde la cabecera del directorio y un correo con cuenta se rechaza junto a su campo", async ({
     page,
     request,
   }) => {
@@ -10322,12 +10409,10 @@ test.describe("un Admin frente al alta con los datos de verdad", () => {
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
-    await page.getByRole("link", { name: "Invite member" }).click();
-    await expect(
-      page.getByRole("heading", { level: 1, name: ENGLISH_NEW_MEMBER.title }),
-    ).toBeVisible();
+    await page.getByRole("button", { name: "Invite member" }).click();
+    await expect(invitePanel(page, ENGLISH_NEW_MEMBER)).toBeVisible();
 
-    await fillNewMemberForm(page, ENGLISH_NEW_MEMBER, {
+    await fillWho(page, ENGLISH_NEW_MEMBER, {
       fullName: "Alta repetida",
       email: adminEmail,
       groupName: null,
@@ -10338,24 +10423,40 @@ test.describe("un Admin frente al alta con los datos de verdad", () => {
         response.request().method() === "POST",
       { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
     );
-    await page.getByRole("button", { name: ENGLISH_NEW_MEMBER.submit }).click();
+    await invitePanel(page, ENGLISH_NEW_MEMBER)
+      .getByRole("button", { name: ENGLISH_NEW_MEMBER.submit })
+      .click();
 
     expect((await answered).status()).toBe(409);
     await expect(
-      page.getByLabel(ENGLISH_NEW_MEMBER.email),
+      invitePanel(page, ENGLISH_NEW_MEMBER).getByLabel(
+        ENGLISH_NEW_MEMBER.email,
+      ),
     ).toHaveAccessibleDescription(ENGLISH_NEW_MEMBER.emailTaken);
+  });
+
+  test("la dirección vieja del alta abre el directorio con el panel", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${OLD_NEW_MEMBER_PATH}`);
+
+    await expect(invitePanel(page, ENGLISH_NEW_MEMBER)).toBeVisible();
+    await expect(page).toHaveURL(/\/directorio$/);
   });
 });
 
-test.describe("un Player frente al alta de un miembro", () => {
+test.describe("un Player frente a la invitación de un miembro", () => {
   skipWithoutSession();
   quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
-  test("abrirla a mano lo manda al panel", async ({ page }) => {
-    await page.goto(`${APP_URL}${NEW_MEMBER_SCREEN_PATH}`);
+  test("la dirección vieja lo deja en el directorio, sin el panel", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${OLD_NEW_MEMBER_PATH}`);
+    await expect(page.getByRole("table")).toBeVisible();
 
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(invitePanel(page, ENGLISH_NEW_MEMBER)).toHaveCount(0);
   });
 
   test("el alta y el reenvío le responden 403", async ({ request }) => {
@@ -10370,13 +10471,13 @@ test.describe("un Player frente al alta de un miembro", () => {
     expect(resent.status()).toBe(403);
   });
 
-  test("su directorio no ofrece dar de alta", async ({ page }) => {
+  test("su directorio no ofrece invitar", async ({ page }) => {
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
     await expect(page.getByRole("table")).toBeVisible();
 
-    await expect(page.getByRole("link", { name: "Invite member" })).toHaveCount(
-      0,
-    );
+    await expect(
+      page.getByRole("button", { name: "Invite member" }),
+    ).toHaveCount(0);
   });
 });
 /* ---------------------------------------------------------------------------

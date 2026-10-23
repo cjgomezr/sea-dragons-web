@@ -234,7 +234,7 @@ async function renderDirectory(
   options: { readonly locale?: "en" | "es"; readonly isAdmin?: boolean } = {},
 ): Promise<void> {
   const locale = options.locale ?? "en";
-  render(<DirectoryScreen locale={locale} />);
+  render(<DirectoryScreen clubName="Victoria Seadragons" locale={locale} />);
   await screen.findByRole("table");
   if (options.isAdmin ?? true) {
     await waitFor(() =>

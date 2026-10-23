@@ -221,7 +221,7 @@ function rolesCalls(): readonly ApiCall[] {
 }
 
 async function renderDirectory(): Promise<ReturnType<typeof userEvent.setup>> {
-  render(<DirectoryScreen locale="es" />);
+  render(<DirectoryScreen clubName="Victoria Seadragons" locale="es" />);
   await screen.findByRole("table");
   return userEvent.setup();
 }

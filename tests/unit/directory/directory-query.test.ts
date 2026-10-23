@@ -3,6 +3,7 @@ import { DEFAULT_DIRECTORY_QUERY } from "@/lib/directory/directory";
 import {
   InvalidDirectoryQueryError,
   SELECTED_MEMBER_QUERY_PARAM,
+  isInviteRequested,
   parseDirectoryQuery,
   parseSelectedMembers,
   writeDirectoryQuery,
@@ -212,6 +213,25 @@ describe("los socios marcados de una exportación (#552)", () => {
 
     expect(() => parseSelectedMembers(params)).toThrow(
       InvalidDirectoryQueryError,
+    );
+  });
+});
+
+describe("el panel de invitar pedido en la dirección (#862)", () => {
+  it("se pide con ?invite=1", () => {
+    expect(isInviteRequested(new URLSearchParams("invite=1"))).toBe(true);
+  });
+
+  it.each(["", "invite=0", "invite=true", "q=Ana"])(
+    "%s no lo pide",
+    (query) => {
+      expect(isInviteRequested(new URLSearchParams(query))).toBe(false);
+    },
+  );
+
+  it("no es un parámetro de la consulta de la lista", () => {
+    expect(parseDirectoryQuery(new URLSearchParams("invite=1"))).toEqual(
+      DEFAULT_DIRECTORY_QUERY,
     );
   });
 });

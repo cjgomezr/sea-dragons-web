@@ -49,13 +49,8 @@ describe("textos de invitar y desactivar", () => {
 
   it.each<[MessageKey, string, string]>([
     ["directory.addMember", "Invitar miembro", "Invite member"],
-    ["newMember.title", "Invitar miembro", "Invite member"],
-    [
-      "newMember.metaTitle",
-      "Invitar miembro · {club}",
-      "Invite member · {club}",
-    ],
-    ["newMember.submit", "Invitar miembro", "Invite member"],
+    ["newMember.title", "Invitar a un miembro", "Invite a member"],
+    ["newMember.submit", "Enviar invitación", "Send invitation"],
     ["newMember.addAnother", "Invitar a otro miembro", "Invite another member"],
     ["memberRecord.menu.deactivate", "Desactivar miembro", "Deactivate member"],
     ["memberRecord.menu.reactivate", "Reactivar miembro", "Reactivate member"],

@@ -133,7 +133,7 @@ describe("el botón de exportar", () => {
     "se ofrece a quien recibe la lista de %s",
     async (kind, member) => {
       stubApi(kind, [member]);
-      render(<DirectoryScreen locale="es" />);
+      render(<DirectoryScreen clubName="Victoria Seadragons" locale="es" />);
 
       expect(
         await screen.findByRole("button", { name: "Exportar CSV" }),
@@ -148,7 +148,7 @@ describe("el botón de exportar", () => {
     "no se ofrece a quien recibe la lista de %s",
     async (kind, member) => {
       stubApi(kind, [member]);
-      render(<DirectoryScreen locale="es" />);
+      render(<DirectoryScreen clubName="Victoria Seadragons" locale="es" />);
 
       await screen.findByText("Nerea Ruiz");
 
@@ -158,7 +158,7 @@ describe("el botón de exportar", () => {
 
   it("con la lista vacía está deshabilitado y dice por qué", async () => {
     stubApi("committee", []);
-    render(<DirectoryScreen locale="es" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="es" />);
 
     const button = (await screen.findByRole("button", {
       name: "Exportar CSV",
@@ -172,7 +172,7 @@ describe("el botón de exportar", () => {
 
   it("pide la exportación con la misma consulta que la lista", async () => {
     stubApi("committee", [NEREA]);
-    render(<DirectoryScreen locale="es" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="es" />);
 
     await userEvent
       .setup()
@@ -190,7 +190,7 @@ describe("el botón de exportar", () => {
 
   it("descarga el archivo con el nombre que da el servidor", async () => {
     stubApi("committee", [NEREA]);
-    render(<DirectoryScreen locale="es" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="es" />);
 
     await userEvent
       .setup()
@@ -213,7 +213,7 @@ describe("el botón de exportar", () => {
         },
       }),
     );
-    render(<DirectoryScreen locale="es" />);
+    render(<DirectoryScreen clubName="Victoria Seadragons" locale="es" />);
 
     await userEvent
       .setup()

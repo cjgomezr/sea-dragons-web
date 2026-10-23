@@ -4,9 +4,7 @@ import { ArrowRight } from "@phosphor-icons/react/dist/ssr/ArrowRight";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { EnvelopeSimple } from "@phosphor-icons/react/dist/ssr/EnvelopeSimple";
 import { UserPlus } from "@phosphor-icons/react/dist/ssr/UserPlus";
-import Link from "next/link";
 import { Icon } from "@/components/Icon";
-import { NEW_MEMBER_PATH } from "@/lib/auth/routes";
 import type {
   DirectoryListing,
   DirectoryMember,
@@ -27,7 +25,8 @@ import type { PendingRequestsState } from "./use-pending-role-requests";
  * La cabecera del directorio (#548, RF-2 del PRD de E21): el título, cuántos
  * socios enseña la lista de cuántos tiene el club y, a un Admin, cómo van las
  * solicitudes de rol. A la derecha, los botones de solo icono de escribir un
- * correo (#501), exportar a CSV (#500) e invitar (#243), cada uno sólo para
+ * correo (#501), exportar a CSV (#500) e invitar (#243, que desde #862 abre su
+ * panel bajo la cabecera), cada uno sólo para
  * quien hoy puede usarlo. En el móvil (#553) el correo y el CSV van juntos
  * en el menú "⋯", y la hoja de estilos esconde el total y la línea de las
  * solicitudes: de ellas avisa la lista.
@@ -42,6 +41,9 @@ import type { PendingRequestsState } from "./use-pending-role-requests";
  */
 
 const EMAIL_EMPTY_REASON_ID = "correo-directorio-sin-socios";
+
+/** El botón de invitar, al que vuelve el foco al cerrar su panel (#862). */
+export const INVITE_TOGGLE_ID = "directorio-invitar";
 
 /** La lista que se ve y la consulta que la trajo: exportar (#500) tiene que
  * dar la que se ve, no la que piden ya los controles. */
@@ -83,23 +85,37 @@ function WriteEmailButton({
   );
 }
 
-function InviteLink({
+/** Abre y cierra el panel de invitar bajo la cabecera (#862). */
+function InviteToggle({
   translate,
+  isOpen,
+  onToggle,
 }: {
   translate: Translator;
+  isOpen: boolean;
+  onToggle: () => void;
 }): React.JSX.Element {
   const label = translate("directory.addMember");
   return (
-    <Link
-      href={NEW_MEMBER_PATH}
+    <button
+      type="button"
+      id={INVITE_TOGGLE_ID}
       className="directory-icon-button directory-icon-button-primary"
       aria-label={label}
+      aria-expanded={isOpen}
       title={label}
+      onClick={onToggle}
     >
       <Icon glyph={UserPlus} />
-    </Link>
+    </button>
   );
 }
+
+/** Lo que el botón de invitar necesita de la pantalla. */
+type InviteControl = {
+  readonly isOpen: boolean;
+  readonly onToggle: () => void;
+};
 
 /** Lo que la línea de las solicitudes necesita de la pantalla. */
 export type RequestsLine = {
@@ -173,11 +189,13 @@ function HeaderActions({
   translate,
   listed,
   checkedMembers,
+  invite,
   onOpenEmail,
 }: {
   translate: Translator;
   listed: ListedDirectory;
   checkedMembers: readonly DirectoryMember[];
+  invite: InviteControl;
   onOpenEmail: (recipients: readonly EmailRecipient[]) => void;
 }): React.JSX.Element {
   const { listing, listedQuery } = listed;
@@ -215,7 +233,13 @@ function HeaderActions({
         />
       ) : null}
       {/* Sólo quien recibe la lista de Admin puede dar de alta (#243). */}
-      {listing.kind === "admin" ? <InviteLink translate={translate} /> : null}
+      {listing.kind === "admin" ? (
+        <InviteToggle
+          translate={translate}
+          isOpen={invite.isOpen}
+          onToggle={invite.onToggle}
+        />
+      ) : null}
     </div>
   );
 }
@@ -226,7 +250,9 @@ export function DirectoryHeader({
   requests,
   titleRef,
   checkedMembers,
+  isInviteOpen,
   onOpenEmail,
+  onToggleInvite,
 }: {
   translate: Translator;
   /** `null` mientras la lista no ha llegado, o si falló. */
@@ -238,7 +264,10 @@ export function DirectoryHeader({
   titleRef: React.Ref<HTMLHeadingElement>;
   /** Los socios marcados en la lista (#552); vacío sin ninguno. */
   checkedMembers: readonly DirectoryMember[];
+  /** El panel de invitar está abierto (#862). */
+  isInviteOpen: boolean;
   onOpenEmail: (recipients: readonly EmailRecipient[]) => void;
+  onToggleInvite: () => void;
 }): React.JSX.Element {
   return (
     <header className="directory-header">
@@ -265,6 +294,7 @@ export function DirectoryHeader({
           translate={translate}
           listed={listed}
           checkedMembers={checkedMembers}
+          invite={{ isOpen: isInviteOpen, onToggle: onToggleInvite }}
           onOpenEmail={onOpenEmail}
         />
       )}

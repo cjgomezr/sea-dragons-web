@@ -10,6 +10,7 @@ import {
   renderDirectoryEmailMessageText,
 } from "@/lib/directory/directory-email-markdown";
 import type { Role } from "@/lib/auth/roles";
+import { memberInvitationContent } from "@/lib/email/member-invitation-content";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import {
@@ -343,20 +344,19 @@ export function renderMemberInvitationEmail(
   input: EmailLinkInput & { readonly acceptUrl: string },
 ): RenderedEmail {
   const t = createTranslator(input.locale);
-  const clubName = input.brand.name;
+  const content = memberInvitationContent(t, {
+    clubName: input.brand.name,
+    linkLifetimeMinutes: input.linkLifetimeMinutes,
+  });
   return renderEmail(t, input.brand, {
-    subject: t("email.invitation.subject", { clubName }),
-    intro: [
-      t("email.invitation.invited", { clubName }),
-      t("email.invitation.nextSteps"),
-      t("email.invitation.linkLifetime", { count: input.linkLifetimeMinutes }),
-    ],
+    subject: content.subject,
+    intro: content.intro,
     action: {
-      buttonLabel: t("email.invitation.button"),
-      label: t("email.invitation.linkLabel"),
+      buttonLabel: content.buttonLabel,
+      label: content.linkLabel,
       url: input.acceptUrl,
     },
-    outro: [t("email.invitation.ifExpired"), t("email.invitation.notYou")],
+    outro: content.outro,
   });
 }
 
