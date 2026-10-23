@@ -2247,12 +2247,14 @@ describe("escribir a todos y abrir en el directorio", () => {
     );
     await user.type(screen.getByRole("textbox", { name: "Subject" }), "Hola");
     await user.type(screen.getByRole("textbox", { name: "Message" }), "Mar.");
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send to 1" }));
     const dialog = await screen.findByRole("dialog", {
-      name: "Send the email?",
+      name: `Send to ${NEREA.fullName}?`,
     });
 
-    await user.click(within(dialog).getByRole("button", { name: "Send now" }));
+    await user.click(
+      within(dialog).getByRole("button", { name: "Send 1 email" }),
+    );
 
     await waitFor(() =>
       expect(

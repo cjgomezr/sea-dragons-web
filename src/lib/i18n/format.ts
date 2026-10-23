@@ -93,6 +93,18 @@ export function formatNumber(locale: Locale, value: number): string {
   return NUMBER_FORMATTERS[locale].format(value);
 }
 
+/** Un contador de caracteres (#859) separa los miles siempre: el español
+ * deja "5000" sin punto por defecto, y al lado de "5.240" no se lee igual.
+ * `useGrouping: true` es "always" en los motores actuales. */
+const COUNT_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.NumberFormat(displayLocale, { useGrouping: true }),
+);
+
+export function formatCharacterCount(locale: Locale, value: number): string {
+  return COUNT_FORMATTERS[locale].format(value);
+}
+
 /** El OVR siempre a un decimal (FR-052): "5.0" y no "5", para que una media
  * entera no parezca una nota puesta a mano. */
 const OVERALL_RATING_FORMATTERS = formattersByLocale(

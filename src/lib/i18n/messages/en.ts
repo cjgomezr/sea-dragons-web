@@ -1173,36 +1173,95 @@ export const englishMessages = {
   "directory.email.noRecipients": "No one to email yet. Add members by name.",
   "directory.email.subject": "Subject",
   "directory.email.message": "Message",
-  "directory.email.messageHint": "Plain text, sent exactly as you write it.",
-  "directory.email.error.subjectRequired": "Write a subject.",
+  "directory.email.subjectPlaceholder": "What is this about?",
+  "directory.email.messagePlaceholder": "Write your message…",
+  "directory.email.messageHint":
+    "Bold, italic, links and lists. No images or tables.",
+  "directory.email.counter": "{length} / {max}",
+  "directory.email.tabs": "Message view",
+  "directory.email.tab.write": "Write",
+  "directory.email.tab.preview": "Preview",
+  "directory.email.toolbar": "Message formatting",
+  "directory.email.toolbar.syntax": "**bold** · _italic_ · - list",
+  "directory.email.format.bold": "Bold",
+  "directory.email.format.italic": "Italic",
+  "directory.email.format.link": "Add link",
+  "directory.email.format.bulletList": "Bulleted list",
+  "directory.email.format.numberedList": "Numbered list",
+  "directory.email.placeholder.bold": "bold text",
+  "directory.email.placeholder.italic": "italic text",
+  "directory.email.placeholder.link": "link text",
+  "directory.email.preview.from": "From",
+  "directory.email.preview.repliesToYou": "replies go to you",
+  "directory.email.preview.to": "To",
+  "directory.email.preview.everyone": {
+    one: "{count} member · gets their own copy",
+    other: "{count} members · each gets their own copy",
+  },
+  "directory.email.preview.noSubject": "No subject yet",
+  "directory.email.preview.empty": "Nothing to preview yet.",
+  "directory.email.error.subjectRequired": "Add a subject.",
   "directory.email.error.subjectTooLong":
-    "The subject can be at most {max} characters.",
+    "Keep the subject to {max} characters (now {length}).",
   "directory.email.error.messageRequired": "Write a message.",
-  "directory.email.error.messageTooLong":
-    "The message can be at most {max} characters.",
-  "directory.email.send": "Send",
+  "directory.email.error.messageTooLong": {
+    one: "The message is {count} character too long. Shorten it to {max}.",
+    other: "The message is {count} characters too long. Shorten it to {max}.",
+  },
+  "directory.email.errorSummary": {
+    one: "{count} thing to fix",
+    other: "{count} things to fix",
+  },
+  "directory.email.quota.left": "{remaining} of {limit} emails left today",
+  "directory.email.quota.loading": "Checking how many emails are left today…",
+  "directory.email.quota.unknown":
+    "We couldn't check how many emails are left today. You can still send.",
+  "directory.email.quota.over": {
+    one: "Only {count} email left today.",
+    other: "Only {count} emails left today.",
+  },
+  "directory.email.quota.overNone": "No emails left today.",
+  "directory.email.quota.overRemove": {
+    one: "Remove {count} person or send the rest tomorrow.",
+    other: "Remove {count} people or send the rest tomorrow.",
+  },
+  "directory.email.send": "Send to {count}",
+  "directory.email.cancel": "Cancel",
   "directory.email.close": "Close",
-  "directory.email.confirm.title": "Send the email?",
-  "directory.email.confirm.recipients": {
-    one: "It goes to {count} member.",
-    other: "It goes to {count} members.",
+  "directory.email.confirm.title": {
+    one: "Send to {count} member?",
+    other: "Send to {count} members?",
   },
-  "directory.email.confirm.remaining": {
-    one: "The directory has {count} email left today.",
-    other: "The directory has {count} emails left today.",
+  "directory.email.confirm.titleOne": "Send to {name}?",
+  "directory.email.confirm.lead": {
+    one: "They get their own email from {club} with the subject",
+    other: "Each one gets their own email from {club} with the subject",
   },
-  "directory.email.confirm.loadingQuota":
-    "Checking how many emails are left today…",
+  "directory.email.confirm.replies": "Replies come to you.",
+  "directory.email.confirm.quotaLabel": "Emails left today",
+  "directory.email.confirm.quotaOf": "of {limit}",
   "directory.email.confirm.quotaUnknown":
     "We couldn't check how many emails are left today.",
-  "directory.email.confirm.send": "Send now",
+  "directory.email.confirm.noteResets":
+    "The count goes back to {limit} tomorrow.",
+  "directory.email.confirm.noteLow": {
+    one: "After this, only {count} left until tomorrow.",
+    other: "After this, only {count} left until tomorrow.",
+  },
+  "directory.email.confirm.noteLast": "This uses the last emails for today.",
+  "directory.email.confirm.send": {
+    one: "Send {count} email",
+    other: "Send {count} emails",
+  },
   "directory.email.confirm.sending": "Sending…",
   "directory.email.confirm.cancel": "Cancel",
   "directory.email.result.sent": {
-    one: "{count} email sent.",
-    other: "{count} emails sent.",
+    one: "{count} email sent",
+    other: "{count} emails sent",
   },
+  "directory.email.result.replies": "Replies will come to your inbox.",
   "directory.email.result.failed": "It didn't reach:",
+  "directory.email.result.writeAnother": "Write another",
   "directory.email.error.quotaExceeded": {
     one: "It doesn't fit: the directory can send {count} more email today. Remove members from the list or try again later.",
     other:

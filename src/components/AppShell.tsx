@@ -6,6 +6,7 @@ import {
   type AccountMenuTrigger,
 } from "@/components/AccountMenu";
 import { ClubBrandMark } from "@/components/ClubBrandMark";
+import { ClubNameProvider } from "@/components/club/ClubNameProvider";
 import { FailedPaymentNotice } from "@/components/FailedPaymentNotice";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -147,7 +148,9 @@ export function AppShell({
             failedAt={failedPayment.failedAt?.toISOString() ?? null}
           />
         )}
-        <main className="app-main">{children}</main>
+        <main className="app-main">
+          <ClubNameProvider name={brand.name}>{children}</ClubNameProvider>
+        </main>
       </div>
       {/* After main on purpose: the bar sits at the bottom of the screen, so
           the tab order should reach it after the content, not before. */}
