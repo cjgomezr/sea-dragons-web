@@ -6678,6 +6678,38 @@ test.describe("el correo en el móvil", () => {
     ).toBe("16px");
   });
 
+  // jsdom no lanza el `cancel` del `<dialog>`: sólo aquí se ve que Escape
+  // con texto vacía la búsqueda y no cierra también la ventana.
+  test("Escape en la búsqueda con texto la vacía y deja la ventana abierta", async ({
+    page,
+  }) => {
+    await goToDirectory(page, phoneEmailState("correo-buscando"));
+    const composer = phoneComposer(page);
+    const search = composer.getByRole("combobox", {
+      name: "Add a member by name",
+    });
+
+    await search.press("Escape");
+
+    await expect(search).toHaveValue("");
+    await expect(composer).toBeVisible();
+  });
+
+  test("Escape en la confirmación vuelve al redactor con el borrador", async ({
+    page,
+  }) => {
+    await goToDirectory(page, phoneEmailState("correo-confirmacion"));
+
+    await page.keyboard.press("Escape");
+
+    await expect(
+      page.getByRole("dialog", { name: /^Send to .+\?$/ }),
+    ).toHaveCount(0);
+    await expect(
+      phoneComposer(page).getByRole("textbox", { name: "Subject" }),
+    ).toHaveValue("Saturday training moves to 8am");
+  });
+
   test("con errores dice cuántas cosas arreglar antes de enviar, encima de los campos", async ({
     page,
   }) => {

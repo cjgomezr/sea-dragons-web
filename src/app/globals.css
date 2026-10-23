@@ -6841,6 +6841,7 @@ a.groups-icon-button {
 .directory-email-screen .directory-email-area {
   min-height: 240px;
   font-size: 16px;
+  resize: none;
 }
 
 /* El cupo, al final del scroll y sin el fondo del pie de escritorio. */

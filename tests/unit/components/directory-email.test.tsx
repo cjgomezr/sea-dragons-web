@@ -1469,6 +1469,18 @@ describe("en el móvil", () => {
     ).toBeTruthy();
   });
 
+  it("cerrar la confirmación con Escape vuelve al redactor con el borrador", async () => {
+    const { onClose } = renderComposer();
+    const confirmation = await openConfirmation();
+
+    // Escape o el Atrás de Android cierran el diálogo con su evento `close`.
+    fireEvent(confirmation, new Event("close"));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(composerScreen()).toHaveAttribute("open");
+    expect(subjectBox().value).toBe("Entreno");
+  });
+
   it("con 25, enseña 6 fichas y +19 más", () => {
     renderWithRecipients(membersNumbered(25));
 

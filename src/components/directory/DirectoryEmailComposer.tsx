@@ -322,7 +322,13 @@ function PhoneComposerScreen({
       ref={screenRef}
       className="directory-email-screen"
       aria-labelledby={titleId}
-      onClose={onClosed}
+      // React hace subir el `close` de la confirmación, que va dentro: ése
+      // sólo vuelve al formulario.
+      onClose={(event) => {
+        if (event.target === event.currentTarget) {
+          onClosed();
+        }
+      }}
     >
       <div className="directory-email-screen-bar">
         <button
