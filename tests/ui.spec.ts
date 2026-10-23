@@ -3991,6 +3991,9 @@ type GroupsViewport = {
 
 const OPEN_PICKER_BUTTON = /^(Add members|Añadir miembros)$/;
 const PICKER_LABEL = `Add members to ${OPENED_GROUP_NAME}`;
+/** El selector del móvil (#832) es una ventana con su título. */
+const PHONE_PICKER_TITLE = `Add to ${OPENED_GROUP_NAME}`;
+const PICKER_SEARCH = "Search members not in this group";
 
 /** Los tres que marca la captura del selector: el mockup enseña tres. */
 const CHOSEN_CANDIDATES = STUBBED_GROUP_CANDIDATES.slice(0, 3);
@@ -3998,7 +4001,11 @@ const CHOSEN_CANDIDATES = STUBBED_GROUP_CANDIDATES.slice(0, 3);
 async function openMemberPicker(page: Page): Promise<void> {
   await selectGroup(page);
   await page.getByRole("button", { name: OPEN_PICKER_BUTTON }).click();
-  await expect(page.getByRole("group", { name: PICKER_LABEL })).toBeVisible();
+  await expect(
+    page
+      .getByRole("group", { name: PICKER_LABEL })
+      .or(page.getByRole("dialog", { name: PHONE_PICKER_TITLE })),
+  ).toBeVisible();
 }
 
 async function chooseThreeCandidates(page: Page): Promise<void> {
@@ -4006,7 +4013,10 @@ async function chooseThreeCandidates(page: Page): Promise<void> {
   for (const candidate of CHOSEN_CANDIDATES) {
     await page.getByRole("checkbox", { name: candidate.fullName }).check();
   }
-  await expect(page.getByText("3 selected")).toBeVisible();
+  // El contador "3 selected" sólo lo lleva el de escritorio.
+  await expect(
+    page.getByRole("button", { name: "Add 3 members" }),
+  ).toBeEnabled();
   await page.mouse.move(0, 0);
 }
 
@@ -4135,6 +4145,12 @@ const GROUPS_STATES: readonly GroupsState[] = [
     withGroups: true,
     layout: "compact",
     prepare: openGroupActions,
+  },
+  {
+    name: "grupos-movil-anadir",
+    withGroups: true,
+    layout: "compact",
+    prepare: chooseThreeCandidates,
   },
 ];
 
@@ -4402,6 +4418,77 @@ test.describe("la sección Grupos en el móvil", () => {
         name,
       ).toBe(48);
     }
+  });
+
+  function phonePicker(page: Page): Locator {
+    return page.getByRole("dialog", { name: PHONE_PICKER_TITLE });
+  }
+
+  test("el selector ocupa la pantalla, con la búsqueda de 46 px y filas de 58 px con casillas de 22 px", async ({
+    page,
+  }) => {
+    await goToGroups(page, { ...LIST_STATE, prepare: openMemberPicker });
+    const picker = phonePicker(page);
+
+    expect(await boxOf(picker)).toEqual({
+      x: 0,
+      y: 0,
+      width: 375,
+      height: 812,
+    });
+    await expect(picker.getByRole("button", { name: "Cancel" })).toBeVisible();
+    await expect(
+      picker.getByRole("heading", { level: 2, name: PHONE_PICKER_TITLE }),
+    ).toBeVisible();
+    expect(
+      (await sizeOf(picker.getByRole("searchbox", { name: PICKER_SEARCH })))
+        .height,
+    ).toBe(46);
+    const row = picker.locator(".groups-picker-row").first();
+    expect((await sizeOf(row)).height).toBeGreaterThanOrEqual(58);
+    expect(await sizeOf(row.getByRole("checkbox"))).toEqual({
+      width: 22,
+      height: 22,
+    });
+  });
+
+  test("Añadir {n} miembros va fijo al pie de la ventana, con 50 px, y sólo se activa al marcar", async ({
+    page,
+  }) => {
+    await goToGroups(page, { ...LIST_STATE, prepare: openMemberPicker });
+    const picker = phonePicker(page);
+    const submit = picker.getByRole("button", { name: /^Add \d+ members?$/ });
+
+    await expect(submit).toBeDisabled();
+    await picker.getByRole("checkbox", { name: "Bea Nadal" }).check();
+
+    await expect(submit).toBeEnabled();
+    const box = await boxOf(submit);
+    expect(box.height).toBe(50);
+    expect(box.y + box.height).toBeGreaterThan(812 - 50);
+  });
+
+  test("el selector retiene el foco y Cancelar lo devuelve a Añadir miembros", async ({
+    page,
+  }) => {
+    await goToGroups(page, { ...LIST_STATE, prepare: openMemberPicker });
+    const picker = phonePicker(page);
+
+    for (const key of ["Tab", "Tab", "Shift+Tab", "Shift+Tab", "Shift+Tab"]) {
+      await page.keyboard.press(key);
+      expect(
+        await picker.evaluate((dialog) =>
+          dialog.contains(document.activeElement),
+        ),
+        key,
+      ).toBe(true);
+    }
+    await picker.getByRole("button", { name: "Cancel" }).click();
+
+    await expect(picker).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: OPEN_PICKER_BUTTON }),
+    ).toBeFocused();
   });
 });
 test.describe("la sección Grupos en escritorio", () => {

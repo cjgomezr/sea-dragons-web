@@ -22,8 +22,8 @@ import type { GroupsLayout } from "./groups-layout";
  * lo que pasó. "Añadir miembros" abre el selector de varios a la vez (#829).
  *
  * En el móvil (#831) "sin activar" va en la línea de la posición, en aviso, y
- * "Añadir miembros" va fijo abajo. Todavía abre el selector en línea: el de
- * pantalla completa es el ticket siguiente.
+ * "Añadir miembros" va fijo abajo y abre el selector a pantalla completa
+ * (#832).
  */
 
 const AVATAR_SIZE: Readonly<Record<GroupsLayout, number>> = {
@@ -180,6 +180,7 @@ export function GroupMemberList({
   isDisabled,
   isAdding,
   isNewGroup,
+  failureMessage,
   onAdd,
   onRemove,
 }: {
@@ -193,6 +194,9 @@ export function GroupMemberList({
   /** Recién creado: su selector se abre solo, porque lo siguiente es
    * llenarlo. */
   isNewGroup: boolean;
+  /** El fallo que la pantalla tiene a la vista, ya en palabras: el selector
+   * del móvil tapa la pantalla y lo dice dentro. */
+  failureMessage: string | null;
   onAdd: (chosen: readonly RosterCandidate[]) => Promise<GroupActionResult>;
   onRemove: (member: GroupRosterMember) => void;
 }): React.JSX.Element {
@@ -213,6 +217,7 @@ export function GroupMemberList({
       ref={toggleRef}
       type="button"
       className="groups-add-toggle"
+      aria-haspopup={layout === "compact" ? "dialog" : undefined}
       aria-expanded={isPickerOpen}
       onClick={() => setIsPickerOpen((isOpen) => !isOpen)}
     >
@@ -239,8 +244,10 @@ export function GroupMemberList({
       {isPickerOpen ? (
         <GroupMemberPicker
           translate={translate}
+          layout={layout}
           groupName={groupName}
           candidates={roster.candidates}
+          failureMessage={failureMessage}
           isDisabled={isDisabled}
           isAdding={isAdding}
           onAdd={onAdd}
