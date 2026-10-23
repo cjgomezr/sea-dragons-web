@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarBlank } from "@phosphor-icons/react/dist/ssr/CalendarBlank";
+import { CaretRight } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import { Newspaper } from "@phosphor-icons/react/dist/ssr/Newspaper";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react/dist/lib/types";
 import Link from "next/link";
@@ -33,6 +34,9 @@ import {
  * noticias que tienen al grupo de audiencia, cada uno enlazado a su página.
  * El servidor ya manda sólo lo vigente y como mucho cinco de cada uno, con su
  * total; aquí sólo se pinta, y se dice cuántos más quedan.
+ *
+ * En el móvil (#831) es una tarjeta encima de los miembros, y cada fila lleva
+ * una flecha; en escritorio la hoja de estilos la esconde.
  */
 
 type AudienceState =
@@ -101,6 +105,9 @@ function AudienceList({
               <span className="groups-audience-text">
                 <span className="groups-audience-title">{row.title}</span>
                 <span className="groups-audience-date">{row.date}</span>
+              </span>
+              <span className="groups-audience-caret">
+                <Icon glyph={CaretRight} />
               </span>
             </Link>
           </li>

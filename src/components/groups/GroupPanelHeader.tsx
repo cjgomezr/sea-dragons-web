@@ -36,7 +36,7 @@ export type WriteToAll = {
 };
 
 /** El Directorio filtrado por el grupo, con su ficha (D8). */
-function directoryHref(groupId: string): string {
+export function directoryHref(groupId: string): string {
   return `${DIRECTORY_PATH}?${GROUP_QUERY_PARAM}=${groupId}`;
 }
 
@@ -138,9 +138,12 @@ function RenameForm({
   );
 }
 
-function DeleteWarning({
+/** El aviso de D11. La hoja ⋯ del móvil (#831) lo reutiliza con su propio
+ * texto en el botón de confirmar. */
+export function DeleteWarning({
   translate,
   group,
+  confirmLabel,
   isDisabled,
   isDeleting,
   onConfirm,
@@ -148,6 +151,7 @@ function DeleteWarning({
 }: {
   translate: Translator;
   group: GroupOverview;
+  confirmLabel: string;
   isDisabled: boolean;
   isDeleting: boolean;
   onConfirm: () => void;
@@ -186,7 +190,7 @@ function DeleteWarning({
           disabled={isDisabled}
           onClick={onConfirm}
         >
-          {translate(isDeleting ? "groups.deleting" : "groups.deleteSubmit")}
+          {isDeleting ? translate("groups.deleting") : confirmLabel}
         </button>
       </div>
     </div>
@@ -309,6 +313,7 @@ export function GroupPanelHeader({
         <DeleteWarning
           translate={translate}
           group={group}
+          confirmLabel={translate("groups.deleteSubmit")}
           isDisabled={isDisabled}
           isDeleting={isDeleting}
           onConfirm={onDelete}

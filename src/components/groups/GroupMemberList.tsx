@@ -12,6 +12,7 @@ import { matchesNameSearch } from "@/lib/text/name-search";
 import { GroupMemberPicker } from "./GroupMemberPicker";
 import type { GroupActionResult } from "./GroupNameForm";
 import type { GroupRoster, RosterCandidate } from "./groups-client";
+import type { GroupsLayout } from "./groups-layout";
 
 /**
  * La columna de miembros del panel de un grupo (#828, RF-3 de E32): buscar
@@ -19,16 +20,69 @@ import type { GroupRoster, RosterCandidate } from "./groups-client";
  *
  * Quitar no pide confirmación (D10): volver a añadir es fácil y el aviso dice
  * lo que pasó. "Añadir miembros" abre el selector de varios a la vez (#829).
+ *
+ * En el móvil (#831) "sin activar" va en la línea de la posición, en aviso, y
+ * "Añadir miembros" va fijo abajo. Todavía abre el selector en línea: el de
+ * pantalla completa es el ticket siguiente.
  */
+
+const AVATAR_SIZE: Readonly<Record<GroupsLayout, number>> = {
+  desktop: 32,
+  compact: 38,
+};
+
+/** "posición · Sin activar", sin la parte que no haya. */
+function CompactMemberDetail({
+  translate,
+  member,
+}: {
+  translate: Translator;
+  member: GroupRosterMember;
+}): React.JSX.Element | null {
+  if (!member.isPendingActivation) {
+    return member.positionName === null ? null : (
+      <span className="groups-member-position">{member.positionName}</span>
+    );
+  }
+  const notActivated = translate("groups.members.notActivated");
+  return (
+    <span className="groups-member-position groups-member-position-pending">
+      {member.positionName === null
+        ? notActivated
+        : `${member.positionName} · ${notActivated}`}
+    </span>
+  );
+}
+
+/** La línea de debajo del nombre. En escritorio es sólo la posición: "Sin
+ * activar" va en su ficha, en la columna de al lado. */
+function MemberDetail({
+  translate,
+  layout,
+  member,
+}: {
+  translate: Translator;
+  layout: GroupsLayout;
+  member: GroupRosterMember;
+}): React.JSX.Element | null {
+  if (layout === "compact") {
+    return <CompactMemberDetail translate={translate} member={member} />;
+  }
+  return member.positionName === null ? null : (
+    <span className="groups-member-position">{member.positionName}</span>
+  );
+}
 
 function MemberRow({
   translate,
+  layout,
   groupName,
   member,
   isDisabled,
   onRemove,
 }: {
   translate: Translator;
+  layout: GroupsLayout;
   groupName: string;
   member: GroupRosterMember;
   isDisabled: boolean;
@@ -40,15 +94,13 @@ function MemberRow({
         className="groups-member-avatar"
         fullName={member.fullName}
         photoUrl={member.photoUrl}
-        size={32}
+        size={AVATAR_SIZE[layout]}
       />
       <span className="groups-member-identity">
         <span className="groups-member-name">{member.fullName}</span>
-        {member.positionName === null ? null : (
-          <span className="groups-member-position">{member.positionName}</span>
-        )}
+        <MemberDetail translate={translate} layout={layout} member={member} />
       </span>
-      {member.isPendingActivation ? (
+      {member.isPendingActivation && layout === "desktop" ? (
         <span className="groups-member-pill">
           {translate("groups.members.notActivated")}
         </span>
@@ -71,6 +123,7 @@ function MemberRow({
 
 function MembersBody({
   translate,
+  layout,
   groupName,
   members,
   search,
@@ -78,6 +131,7 @@ function MembersBody({
   onRemove,
 }: {
   translate: Translator;
+  layout: GroupsLayout;
   groupName: string;
   members: readonly GroupRosterMember[];
   search: string;
@@ -107,6 +161,7 @@ function MembersBody({
         <MemberRow
           key={member.id}
           translate={translate}
+          layout={layout}
           groupName={groupName}
           member={member}
           isDisabled={isDisabled}
@@ -119,6 +174,7 @@ function MembersBody({
 
 export function GroupMemberList({
   translate,
+  layout,
   groupName,
   roster,
   isDisabled,
@@ -128,6 +184,7 @@ export function GroupMemberList({
   onRemove,
 }: {
   translate: Translator;
+  layout: GroupsLayout;
   groupName: string;
   roster: GroupRoster;
   /** Hay una acción en vuelo en la pantalla. */
@@ -151,6 +208,19 @@ export function GroupMemberList({
     toggleRef.current?.focus();
   }
 
+  const addToggle = (
+    <button
+      ref={toggleRef}
+      type="button"
+      className="groups-add-toggle"
+      aria-expanded={isPickerOpen}
+      onClick={() => setIsPickerOpen((isOpen) => !isOpen)}
+    >
+      <Icon glyph={UserPlus} />
+      {translate("groups.members.openPicker")}
+    </button>
+  );
+
   return (
     <div className="groups-members">
       <div className="groups-members-toolbar">
@@ -164,16 +234,7 @@ export function GroupMemberList({
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
-        <button
-          ref={toggleRef}
-          type="button"
-          className="groups-add-toggle"
-          aria-expanded={isPickerOpen}
-          onClick={() => setIsPickerOpen((isOpen) => !isOpen)}
-        >
-          <Icon glyph={UserPlus} />
-          {translate("groups.members.openPicker")}
-        </button>
+        {layout === "desktop" ? addToggle : null}
       </div>
       {isPickerOpen ? (
         <GroupMemberPicker
@@ -188,12 +249,16 @@ export function GroupMemberList({
       ) : null}
       <MembersBody
         translate={translate}
+        layout={layout}
         groupName={groupName}
         members={roster.members}
         search={search}
         isDisabled={isDisabled}
         onRemove={onRemove}
       />
+      {layout === "compact" ? (
+        <div className="groups-bottom-bar">{addToggle}</div>
+      ) : null}
     </div>
   );
 }
