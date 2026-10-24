@@ -122,6 +122,16 @@ describe("endpoint de los países más comunes del club", () => {
     },
   );
 
+  it("responde 403 desde el dominio aunque la frontera dejara pasar a un Player", async () => {
+    callerRole = "Player";
+
+    const response = await GET(
+      new NextRequest(new URL(CLUB_COMMON_COUNTRIES_API_PATH, ORIGIN)),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
   it("responde 405 a un POST", async () => {
     const response = await requestCommonCountries(POST, "POST");
 

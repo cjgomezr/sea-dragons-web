@@ -18,6 +18,8 @@ const MEMBERS_TABLE = "members";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
+/** PostgREST corta en `max_rows` (1000 en Supabase) sin avisar. Un club de
+ * decenas de socios no llega; si alguno llegara, toca contar en SQL. */
 async function listMemberCountries(
   serviceClient: SupabaseClient,
   clubId: string,
