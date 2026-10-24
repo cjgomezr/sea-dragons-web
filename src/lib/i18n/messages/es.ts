@@ -1308,6 +1308,8 @@ export const spanishMessages: MessageCatalog = {
   "newMember.email": "Correo",
   "newMember.country": "País",
   "newMember.countryPlaceholder": "Elige un país…",
+  "newMember.countryGroup.common": "Más comunes en el club",
+  "newMember.countryGroup.all": "Todos los países",
   "newMember.position": "Posición",
   "newMember.experienceLevel": "Experiencia",
   "newMember.gender": "Género",

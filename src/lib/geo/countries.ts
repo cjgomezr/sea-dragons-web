@@ -36,7 +36,18 @@ const KNOWN_CODES: ReadonlySet<string> = new Set(COUNTRY_CODES);
 /** Acepta el código en cualquier caja: un cliente de la API puede mandar "au"
  * y sigue siendo Australia. */
 export function isKnownCountryCode(value: string): boolean {
-  return KNOWN_CODES.has(value.trim().toUpperCase());
+  return toCountryCode(value) !== null;
+}
+
+function isCountryCode(value: string): value is CountryCode {
+  return KNOWN_CODES.has(value);
+}
+
+/** El código del catálogo que es `value` en cualquier caja, o `null` si no
+ * es ninguno. */
+export function toCountryCode(value: string): CountryCode | null {
+  const normalized = value.trim().toUpperCase();
+  return isCountryCode(normalized) ? normalized : null;
 }
 
 /** El nombre visible de un país en el idioma pedido, para enseñar un código

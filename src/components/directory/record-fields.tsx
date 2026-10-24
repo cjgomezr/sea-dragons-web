@@ -9,6 +9,34 @@ import type { Translator } from "@/lib/i18n/translator";
 
 export type SelectOption = { readonly value: string; readonly label: string };
 
+/** Un `optgroup`: el país del alta propone primero los del club (#864). */
+export type SelectOptionGroup = {
+  readonly label: string;
+  readonly options: readonly SelectOption[];
+};
+
+export type SelectChoice = SelectOption | SelectOptionGroup;
+
+function renderOption(option: SelectOption): React.JSX.Element {
+  return (
+    <option key={option.value} value={option.value}>
+      {option.label}
+    </option>
+  );
+}
+
+function renderChoices(choices: readonly SelectChoice[]): React.JSX.Element[] {
+  return choices.map((choice) =>
+    "options" in choice ? (
+      <optgroup key={choice.label} label={choice.label}>
+        {choice.options.map(renderOption)}
+      </optgroup>
+    ) : (
+      renderOption(choice)
+    ),
+  );
+}
+
 /** Un desplegable obligatorio: empieza en una opción vacía que pide elegir, y
  * su aviso va junto a él. */
 export function SelectField({
@@ -23,7 +51,7 @@ export function SelectField({
   id: string;
   label: string;
   value: string;
-  options: readonly SelectOption[];
+  options: readonly SelectChoice[];
   placeholder: string;
   issueText: string | null;
   onChange: (value: string) => void;
@@ -40,11 +68,7 @@ export function SelectField({
         onChange={(event) => onChange(event.target.value)}
       >
         <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
+        {renderChoices(options)}
       </select>
       {issueText === null ? null : (
         <p className="auth-field-error" id={issueId}>

@@ -1314,6 +1314,8 @@ export const englishMessages = {
   "newMember.email": "Email",
   "newMember.country": "Country",
   "newMember.countryPlaceholder": "Choose a country…",
+  "newMember.countryGroup.common": "Most common in the club",
+  "newMember.countryGroup.all": "All countries",
   "newMember.position": "Position",
   "newMember.experienceLevel": "Experience",
   "newMember.gender": "Gender",

@@ -6,7 +6,7 @@ import { Lock } from "@phosphor-icons/react/dist/ssr/Lock";
 import { useId } from "react";
 import { Icon } from "@/components/Icon";
 import { type NamedPosition, positionName } from "@/lib/club/club-positions";
-import type { CountryOption } from "@/lib/geo/countries";
+import type { CountryCode, CountryOption } from "@/lib/geo/countries";
 import type { Translator } from "@/lib/i18n/translator";
 import type { NewMemberField } from "@/lib/members/member-invitation";
 import { EXPERIENCE_LEVELS, GENDERS } from "@/lib/members/profile-fields";
@@ -15,7 +15,12 @@ import {
   PLAYER_DETAIL_FIELDS,
   issueIdOf,
 } from "./new-member-issues";
-import { SelectField, type SelectOption, TextField } from "./record-fields";
+import {
+  type SelectChoice,
+  SelectField,
+  type SelectOption,
+  TextField,
+} from "./record-fields";
 
 /**
  * "Datos de jugador · opcional" del panel de invitar (#862, RF-9 del PRD de
@@ -172,18 +177,46 @@ function AufFields({
   );
 }
 
+/** Los más comunes del club primero, en su orden (#864, RF-11 del PRD de
+ * E33), y después la lista entera. Sin ninguno, sólo la lista entera. */
+function countryChoicesOf(
+  translate: Translator,
+  countries: readonly CountryOption[],
+  commonCountryCodes: readonly CountryCode[],
+): readonly SelectChoice[] {
+  const toOption = ({ code, name }: CountryOption): SelectOption => ({
+    value: code,
+    label: name,
+  });
+  const allCountries: SelectChoice = {
+    label: translate("newMember.countryGroup.all"),
+    options: countries.map(toOption),
+  };
+  const common = commonCountryCodes.flatMap((code) =>
+    countries.filter((country) => country.code === code).map(toOption),
+  );
+  return common.length === 0
+    ? [allCountries]
+    : [
+        { label: translate("newMember.countryGroup.common"), options: common },
+        allCountries,
+      ];
+}
+
 function DetailsFields({
   countries,
+  commonCountryCodes,
   positions,
   ...props
 }: FieldsProps & {
   readonly countries: readonly CountryOption[];
+  readonly commonCountryCodes: readonly CountryCode[];
   readonly positions: readonly NamedPosition[];
 }): React.JSX.Element {
   const { translate, draft, issueTextFor, onChange } = props;
   const select = (
     field: "country" | "positionId",
-    options: readonly SelectOption[],
+    options: readonly SelectChoice[],
   ): React.JSX.Element => (
     <SelectField
       id={FIELD_IDS[field]}
@@ -206,7 +239,7 @@ function DetailsFields({
       <div className="invite-selects">
         {select(
           "country",
-          countries.map(({ code, name }) => ({ value: code, label: name })),
+          countryChoicesOf(translate, countries, commonCountryCodes),
         )}
         {positions.length === 0
           ? null
@@ -230,6 +263,7 @@ export function NewMemberPlayerDetails({
   isOpen,
   onToggle,
   countries,
+  commonCountryCodes,
   positions,
   ...fieldsProps
 }: FieldsProps & {
@@ -239,6 +273,8 @@ export function NewMemberPlayerDetails({
   readonly onToggle: () => void;
   /** La lista entera, ya ordenada en el idioma de la pantalla. */
   readonly countries: readonly CountryOption[];
+  /** Los más comunes del club (#864), de más a menos; ninguno si no llegaron. */
+  readonly commonCountryCodes: readonly CountryCode[];
   /** Las activas del club, en su orden (#299). */
   readonly positions: readonly NamedPosition[];
 }): React.JSX.Element {
@@ -290,6 +326,7 @@ export function NewMemberPlayerDetails({
         <DetailsFields
           {...fieldsProps}
           countries={countries}
+          commonCountryCodes={commonCountryCodes}
           positions={positions}
         />
       </div>

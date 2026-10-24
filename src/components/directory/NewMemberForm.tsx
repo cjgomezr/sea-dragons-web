@@ -10,7 +10,7 @@ import { flushSync } from "react-dom";
 import { Icon } from "@/components/Icon";
 import { GROUPS_PATH, memberRecordHref } from "@/lib/auth/routes";
 import type { NamedPosition } from "@/lib/club/club-positions";
-import { listCountryOptions } from "@/lib/geo/countries";
+import { type CountryCode, listCountryOptions } from "@/lib/geo/countries";
 import type { Group } from "@/lib/groups/groups";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import type { Locale } from "@/lib/i18n/locale";
@@ -387,6 +387,8 @@ type NewMemberFormProps = {
   readonly clubGroups: readonly Group[];
   /** Las activas del club, en su orden (#299). */
   readonly positions: readonly NamedPosition[];
+  /** Los más comunes del club (#864), de más a menos; ninguno si no llegaron. */
+  readonly commonCountryCodes: readonly CountryCode[];
   /** Los que ya salen elegidos: "Invitar a otro" conserva los del alta
    * anterior (#863), para dar de alta a un equipo entero. */
   readonly initialGroupIds: readonly string[];
@@ -403,6 +405,7 @@ export function NewMemberForm({
   clubName,
   clubGroups,
   positions,
+  commonCountryCodes,
   initialGroupIds,
   onCreated,
   onCancel,
@@ -476,6 +479,7 @@ export function NewMemberForm({
             isOpen={form.isDetailsOpen}
             onToggle={form.toggleDetails}
             countries={countries}
+            commonCountryCodes={commonCountryCodes}
             positions={positions}
           />
           {bannerFailure === null ? null : (
