@@ -24271,6 +24271,13 @@ const DRAFTED_BUILDER = {
   },
 };
 
+/** El mismo reparto, ya publicado: la ventana de editar ofrece llevarle los
+ * equipos nuevos (#871). */
+const PUBLISHED_BUILDER = {
+  ...DRAFTED_BUILDER,
+  split: { ...DRAFTED_BUILDER.split, publishedAt: "2026-06-18T10:05:00.000Z" },
+};
+
 const BALANCED_SPLIT = {
   teams: TEAMS_LABELS,
   mode: "auto",
@@ -24309,9 +24316,19 @@ async function stubTeams(page: Page, reads: TeamsReads): Promise<TeamsWrite[]> {
         path: CLUB_TEAM_LABELS_ENDPOINT,
       });
       // Responde los equipos sin el evento, y que su reparto no estaba
-      // guardado (D4).
-      const { a, b } = request.postDataJSON() as { a: unknown; b: unknown };
-      return route.fulfill(jsonBody({ a, b, eventSplit: "none" }));
+      // guardado (D4), salvo si se pidió llevarlos al publicado (#871).
+      const { a, b, applyToPublished } = request.postDataJSON() as {
+        a: unknown;
+        b: unknown;
+        applyToPublished?: boolean;
+      };
+      return route.fulfill(
+        jsonBody(
+          applyToPublished === true
+            ? { a, b, eventSplit: "relabelledPublished", notifiedCount: 12 }
+            : { a, b, eventSplit: "none" },
+        ),
+      );
     },
   );
   await page.route(
@@ -24424,6 +24441,32 @@ async function openTeamEditor(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
 }
 
+const TEAMS_APPLY_TO_PUBLISHED =
+  /^(Also apply to this event's published teams|Aplicar también a los equipos publicados de este evento)$/;
+
+/** Con el reparto publicado, abre la ventana y marca la casilla (#871). */
+async function checkApplyToPublished(page: Page): Promise<void> {
+  await openTeamEditor(page);
+  await page
+    .getByRole("dialog", { name: TEAMS_EDIT_DIALOG })
+    .getByRole("checkbox", { name: TEAMS_APPLY_TO_PUBLISHED })
+    .check();
+  await page.mouse.move(0, 0);
+}
+
+/** Lo aplica al publicado y espera el aviso de a cuántos se avisó. */
+async function applyToPublishedTeams(page: Page): Promise<void> {
+  await checkApplyToPublished(page);
+  await page
+    .getByRole("dialog", { name: TEAMS_EDIT_DIALOG })
+    .getByRole("button", { name: /^(Apply|Aplicar)$/ })
+    .click();
+  await expect(
+    page.getByText(/^(Teams changed\.|Equipos cambiados\.) /),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
 async function askToPublish(page: Page): Promise<void> {
   await waitForTeamBuilder(page);
   await page.getByRole("button", { name: TEAMS_PUBLISH }).click();
@@ -24511,6 +24554,35 @@ const TEAMS_STATES: readonly TeamsState[] = [
     viewports: viewports.filter((vp) => vp.name === "mobile"),
     ready: openTeamEditor,
   },
+  // Con el reparto publicado (#871): la casilla sin marcar, marcada y el
+  // aviso después de aplicar.
+  {
+    name: "equipos-editar-publicado",
+    events: TEAMS_EVENTS,
+    builder: PUBLISHED_BUILDER,
+    viewports: viewports.filter((vp) => vp.name !== "mobile"),
+    ready: openTeamEditor,
+  },
+  {
+    name: "equipos-editar-publicado-marcada",
+    events: TEAMS_EVENTS,
+    builder: PUBLISHED_BUILDER,
+    viewports: viewports.filter((vp) => vp.name !== "mobile"),
+    ready: checkApplyToPublished,
+  },
+  {
+    name: "equipos-editar-publicado-movil",
+    events: TEAMS_EVENTS,
+    builder: PUBLISHED_BUILDER,
+    viewports: viewports.filter((vp) => vp.name === "mobile"),
+    ready: checkApplyToPublished,
+  },
+  ...teamsWithSpanish({
+    name: "equipos-publicado-cambiado",
+    events: TEAMS_EVENTS,
+    builder: PUBLISHED_BUILDER,
+    ready: applyToPublishedTeams,
+  }),
   // El móvil (#762): la pestaña de un equipo con cambios sin guardar, el
   // banco y la hoja de publicar.
   {
@@ -24580,7 +24652,11 @@ async function goToTeams(
 
 /** Las capturas del Team builder con una ventana abierta, que se mueve si
  * la página entera no cabe en la ventana (#675). */
-const OPEN_TEAMS_STATES: ReadonlySet<string> = new Set(["equipos-editar"]);
+const OPEN_TEAMS_STATES: ReadonlySet<string> = new Set([
+  "equipos-editar",
+  "equipos-editar-publicado",
+  "equipos-editar-publicado-marcada",
+]);
 
 for (const state of TEAMS_STATES) {
   test.describe(state.name, () => {

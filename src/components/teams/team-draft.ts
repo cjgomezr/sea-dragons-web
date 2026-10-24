@@ -41,7 +41,11 @@ export type TeamDraft = {
   readonly assignments: readonly TeamAssignment[];
   /** Lo que el servidor tiene: lo que llegó al abrir o lo último guardado. */
   readonly saved: readonly TeamAssignment[];
+  /** Si se publicó alguna vez: decide entre publicar y volver a publicar. */
   readonly publishedAt: string | null;
+  /** Si lo que el servidor tiene está publicado ahora: guardar lo vuelve
+   * borrador aunque `publishedAt` siga diciendo que se publicó (#871). */
+  readonly isPublished: boolean;
 };
 
 export type DraftSuggestion = {
@@ -73,6 +77,7 @@ export function startDraft(builder: OpenedBuilder): TeamDraft {
     assignments,
     saved: assignments,
     publishedAt: builder.split?.publishedAt ?? null,
+    isPublished: (builder.split?.publishedAt ?? null) !== null,
   };
 }
 
@@ -146,7 +151,7 @@ export function settleDraft(
   draft: TeamDraft,
   sent: readonly TeamAssignment[],
 ): TeamDraft {
-  return { ...draft, mode: "manual", saved: sent };
+  return { ...draft, mode: "manual", saved: sent, isPublished: false };
 }
 
 function assignmentKeys(assignments: readonly TeamAssignment[]): string {

@@ -162,6 +162,7 @@ export function TeamCard({
           translate={translate}
           team={team}
           teamName={name}
+          publishedPlayerCount={draft.isPublished ? draft.saved.length : null}
           onChangeTeams={onChangeTeams}
         />
       </div>

@@ -2838,6 +2838,12 @@ export const englishMessages = {
   "teams.edit.takenHint": "The crossed one is the other team's colour.",
   "teams.edit.scope":
     "Used for every event from now on. Teams already published keep their colours.",
+  // Sólo con el reparto del evento publicado (#871).
+  "teams.edit.applyToPublished": "Also apply to this event's published teams",
+  "teams.edit.applyToPublishedHint": {
+    one: "The {count} assigned player will be notified.",
+    other: "The {count} assigned players will be notified.",
+  },
   "teams.edit.loading": "Loading the club's teams…",
   "teams.edit.cancel": "Cancel",
   "teams.edit.apply": "Apply",
@@ -2846,6 +2852,11 @@ export const englishMessages = {
   "teams.edit.invalid":
     "Check the name and the colour: the name takes 1 to 24 characters and each team a different colour.",
   "teams.edit.changed": "Team updated · used for every event from now on",
+  // El publicado estrenó los nuevos y se avisó a sus jugadores (#871).
+  "teams.edit.changedPublished": {
+    one: "Teams changed. {count} player was notified.",
+    other: "Teams changed. {count} players were notified.",
+  },
   // El reparto de este evento ya se publicó y conserva los suyos (D4).
   "teams.edit.changedKeptByPublished":
     "Team updated for the next events. These published teams keep their old name and colour: to use the new ones, save them again, apply the change again and publish.",

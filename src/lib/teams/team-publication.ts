@@ -24,7 +24,7 @@ import {
  */
 
 /** En la bitácora la entidad es el evento: "qué reparto". */
-const AUDITED_ENTITY_TYPE = "event";
+export const AUDITED_ENTITY_TYPE = "event";
 
 export type PublishedTeamSplit = {
   readonly eventId: string;
@@ -58,7 +58,7 @@ export function diffPublishedAssignments(
   };
 }
 
-function withoutPublisher(
+export function withoutPublisher(
   notices: PublicationNotices,
   publisherId: string,
 ): PublicationNotices {
@@ -72,7 +72,7 @@ function withoutPublisher(
 
 /** Un aviso por equipo y otro para los que salen: en bloque, nunca uno a
  * uno. `notifyMembers` no lanza. */
-async function sendPublicationNotices(
+export async function sendPublicationNotices(
   gateways: Pick<TeamBuilderGateways, "notifications">,
   publication: {
     readonly event: TeamBuilderEvent;

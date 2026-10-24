@@ -202,6 +202,10 @@ function statusText(translate: Translator, action: BuilderAction): string {
           ? "teams.edit.changedKeptByPublished"
           : "teams.edit.changed",
       );
+    case "teamsChangedPublished":
+      return translate("teams.edit.changedPublished", {
+        count: action.notifiedCount,
+      });
     default:
       return "";
   }

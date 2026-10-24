@@ -107,6 +107,11 @@ export const AUDIT_ACTIONS = [
   // cuántos quedaron asignados (`{ assignedCount }`), nunca quiénes
   // (NFR-010).
   "team_split.published",
+  // #871 (D4 del PRD de E28): un Admin o un Coach lleva el nombre y el color
+  // nuevos de los equipos del club al reparto ya publicado de un evento. La
+  // entidad es el evento y la metadata, a cuántos se avisó
+  // (`{ notifiedCount }`). Ni los nombres ni quiénes.
+  "team_split.relabelled",
   "payment.status_changed",
   // RF-4 de E12 (#457): un Admin exime de cuota a un socio o le retira la
   // exención. La entidad es el `user_id` del socio (`member`). La exención

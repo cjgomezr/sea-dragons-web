@@ -2857,6 +2857,12 @@ export const spanishMessages: MessageCatalog = {
   "teams.edit.takenHint": "El tachado es el color del otro equipo.",
   "teams.edit.scope":
     "Se usa en todos los eventos desde ahora. Los equipos ya publicados conservan sus colores.",
+  "teams.edit.applyToPublished":
+    "Aplicar también a los equipos publicados de este evento",
+  "teams.edit.applyToPublishedHint": {
+    one: "Se avisará al {count} jugador asignado.",
+    other: "Se avisará a los {count} jugadores asignados.",
+  },
   "teams.edit.loading": "Cargando los equipos del club…",
   "teams.edit.cancel": "Cancelar",
   "teams.edit.apply": "Aplicar",
@@ -2866,6 +2872,10 @@ export const spanishMessages: MessageCatalog = {
     "Revisa el nombre y el color: el nombre lleva de 1 a 24 caracteres y cada equipo, un color distinto.",
   "teams.edit.changed":
     "Equipo actualizado · se usa en todos los eventos desde ahora",
+  "teams.edit.changedPublished": {
+    one: "Equipos cambiados. Se avisó a {count} jugador.",
+    other: "Equipos cambiados. Se avisó a {count} jugadores.",
+  },
   "teams.edit.changedKeptByPublished":
     "Equipo actualizado para los próximos eventos. El reparto publicado de este evento sigue con el nombre y el color de antes: para usar los nuevos, vuelve a guardarlo, aplica otra vez el cambio y publícalo.",
   "teams.edit.busy":

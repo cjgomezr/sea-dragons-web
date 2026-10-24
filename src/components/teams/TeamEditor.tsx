@@ -35,14 +35,21 @@ import {
  * Lo que se edita son los equipos del club, que se piden al abrir: un
  * reparto guardado conserva sus nombres y colores (D4, D5), así que los de
  * la tarjeta pueden no ser los del club. Lo aplicado vale para todos los
- * eventos desde ahora y para el borrador abierto.
+ * eventos desde ahora y para el borrador abierto. Con el reparto publicado,
+ * una casilla deja llevarlo también a él, avisando a sus jugadores (#871).
  */
 
-export type ChangeTeams = (teams: TeamLabels) => Promise<TeamsEditOutcome>;
+export type ChangeTeams = (
+  teams: TeamLabels,
+  options: { readonly applyToPublished: boolean },
+) => Promise<TeamsEditOutcome>;
 
 type EditedTeam = {
   readonly translate: Translator;
   readonly team: TeamId;
+  /** Cuántos jugadores tiene el reparto publicado del evento; null si no
+   * está publicado, y entonces no se ofrece la casilla. */
+  readonly publishedPlayerCount: number | null;
   readonly onChangeTeams: ChangeTeams;
 };
 
@@ -157,12 +164,50 @@ function ColorChoices({
   );
 }
 
+/** Sin marcar por defecto: el publicado conserva los suyos (D4). */
+function ApplyToPublishedChoice({
+  translate,
+  playerCount,
+  isChecked,
+  onToggle,
+}: {
+  readonly translate: Translator;
+  readonly playerCount: number;
+  readonly isChecked: boolean;
+  readonly onToggle: (isChecked: boolean) => void;
+}): React.JSX.Element {
+  const inputId = useId();
+  const hintId = useId();
+  return (
+    <div className="auth-consent team-edit-published">
+      <input
+        id={inputId}
+        type="checkbox"
+        checked={isChecked}
+        aria-describedby={hintId}
+        onChange={(event) => onToggle(event.target.checked)}
+      />
+      <div>
+        <label htmlFor={inputId}>
+          {translate("teams.edit.applyToPublished")}
+        </label>
+        <p id={hintId} className="team-edit-hint">
+          {translate("teams.edit.applyToPublishedHint", {
+            count: playerCount,
+          })}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /** El nombre, los colores, la ayuda y Cancelar y Aplicar: lo mismo en la
  * ventana y en la hoja. Lo escrito se queda si el servidor no lo acepta. */
 function TeamEditForm({
   translate,
   team,
   teams,
+  publishedPlayerCount,
   onChangeTeams,
   shouldFocusName,
   onApplied,
@@ -182,6 +227,7 @@ function TeamEditForm({
   }, [shouldFocusName]);
   const [name, setName] = useState(teams[team].name);
   const [color, setColor] = useState(teams[team].color.toUpperCase());
+  const [applyToPublished, setApplyToPublished] = useState(false);
   const [submission, setSubmission] = useState<Submission>({ kind: "idle" });
   // Dos clics seguidos llegan antes de que React vuelva a pintar.
   const isSendingRef = useRef(false);
@@ -197,6 +243,7 @@ function TeamEditForm({
     setSubmission({ kind: "sending" });
     const outcome = await onChangeTeams(
       withLabel(teams, team, { name: name.trim(), color }),
+      { applyToPublished },
     );
     isSendingRef.current = false;
     if (outcome.kind === "changed") {
@@ -235,6 +282,14 @@ function TeamEditForm({
         <Icon glyph={Info} />
         {translate("teams.edit.scope")}
       </p>
+      {publishedPlayerCount === null ? null : (
+        <ApplyToPublishedChoice
+          translate={translate}
+          playerCount={publishedPlayerCount}
+          isChecked={applyToPublished}
+          onToggle={setApplyToPublished}
+        />
+      )}
       {submission.kind === "failed" ? (
         <p className="auth-error" role="alert">
           {describeEditFailure(translate, submission.failure)}
