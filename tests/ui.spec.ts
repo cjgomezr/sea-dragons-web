@@ -10372,6 +10372,8 @@ test.describe("un Player frente a la ficha reservada al Admin", () => {
    --------------------------------------------------------------------------- */
 
 const INVITE_SCREEN_PATH = `${DIRECTORY_SCREEN_PATH}?invite=1`;
+/** Los países más comunes del club (#864), que pide el panel al abrirse. */
+const COMMON_COUNTRIES_ENDPOINT = "/api/v1/club/common-countries";
 const INVITE_TOGGLE_NAME = /^(Invite member|Invitar miembro)$/;
 const OLD_NEW_MEMBER_PATH = `${DIRECTORY_SCREEN_PATH}/nuevo`;
 const NEW_MEMBER_ID = "cccccccc-0000-4000-8000-000000000243";
@@ -11028,6 +11030,37 @@ test.describe("un Admin frente a la invitación con los datos de verdad", () => 
       ),
     ).toHaveAccessibleDescription(ENGLISH_NEW_MEMBER.emailTaken);
   });
+
+  // #864: los más comunes salen del endpoint de verdad; el club sembrado
+  // siempre tiene alguno, aunque sea el suyo, así que el grupo va primero.
+  for (const width of [375, 1440]) {
+    test(`el país propone primero los más comunes del club @ ${width}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      const commonCountries = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === COMMON_COUNTRIES_ENDPOINT,
+      );
+      await page.goto(`${APP_URL}${INVITE_SCREEN_PATH}`);
+      const panel = invitePanel(page, ENGLISH_NEW_MEMBER);
+      expect((await commonCountries).status()).toBe(200);
+
+      await panel
+        .getByRole("button", { name: /^Player details · optional/ })
+        .click();
+      const country = panel.getByLabel("Country", { exact: true });
+
+      await expect(country.locator("optgroup")).toHaveCount(2);
+      expect(
+        await country
+          .locator("optgroup")
+          .evaluateAll((groups) =>
+            groups.map((group) => group.getAttribute("label")),
+          ),
+      ).toEqual(["Most common in the club", "All countries"]);
+    });
+  }
 
   test("la dirección vieja del alta abre el directorio con el panel", async ({
     page,
