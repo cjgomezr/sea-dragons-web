@@ -17,6 +17,7 @@ import { InvitationResult } from "./InvitationResult";
 import type { CreatedMemberView } from "./new-member-client";
 import { FIELD_IDS } from "./new-member-issues";
 import { NewMemberForm } from "./NewMemberForm";
+import { useCommonCountries } from "./use-common-countries";
 
 /**
  * El panel de invitar a un socio (#862, RF-9 y D11 del PRD de E33), bajo la
@@ -143,6 +144,7 @@ function InvitePanel({
   const translate = createTranslator(locale);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const { catalogs, retry } = useCatalogs();
+  const commonCountryCodes = useCommonCountries();
   const [step, setStep] = useState<PanelStep>(FIRST_FORM);
 
   // Quien lo abre desde la cabecera llega al formulario, no se queda arriba.
@@ -200,6 +202,7 @@ function InvitePanel({
           clubName={clubName}
           clubGroups={catalogs.groups}
           positions={catalogs.positions}
+          commonCountryCodes={commonCountryCodes}
           initialGroupIds={step.groupIds}
           onCreated={showResult}
           onCancel={onClose}

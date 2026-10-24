@@ -292,6 +292,10 @@ export const CLUB_SESSION_PACKS_API_PATH = "/api/v1/club/session-packs";
  * no cuelga de la configuración del club, que es sólo del Admin. */
 export const CLUB_POSITIONS_API_PATH = "/api/v1/club/positions";
 
+/** Los países más comunes entre los socios del club (#864, RF-11 y D15 del
+ * PRD de E33). Los pide el panel de invitar, que es sólo del Admin. */
+export const CLUB_COMMON_COUNTRIES_API_PATH = "/api/v1/club/common-countries";
+
 /** El nombre y el color de los dos equipos del club (#755, D1 y D2 del PRD
  * de E28). GET los lee y PATCH los cambia. Son de Admin y Coach, los mismos
  * que arman equipos, así que no cuelga de la configuración del club, que es
@@ -756,6 +760,11 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
     capability: "manageUsersAndRoles",
   },
   { path: CLUB_SIGN_IN_TEXTS_API_PATH, capability: "manageUsersAndRoles" },
+  // Sólo los pide el alta de un socio, que es de usuarios y roles.
+  {
+    path: CLUB_COMMON_COUNTRIES_API_PATH,
+    capability: "manageUsersAndRoles",
+  },
   { path: NEWS_PUBLISH_API_PATH, capability: "publishNewsAndDocuments" },
   // Cuelgan del anterior; se declaran por el mismo motivo que el cambio de rol.
   {

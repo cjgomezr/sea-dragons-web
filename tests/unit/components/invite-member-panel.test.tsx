@@ -28,6 +28,7 @@ const MASTERS_ID = "9a9a9a9a-0000-4000-8000-000000000002";
 const MEMBERS_PATH = "/api/v1/members";
 const GROUPS_PATH = "/api/v1/groups";
 const POSITIONS_PATH = "/api/v1/club/positions";
+const COMMON_COUNTRIES_PATH = "/api/v1/club/common-countries";
 const INVITATION_PATH = `/api/v1/members/${NEW_USER_ID}/invitation`;
 const CLUB_NAME = "Victoria Seadragons";
 
@@ -46,6 +47,9 @@ const calls: Call[] = [];
 type Stub = {
   readonly groups?: readonly Group[];
   readonly positions?: readonly unknown[];
+  /** Los países más comunes del club (#864), o `"failed"` si la petición
+   * falla. */
+  readonly commonCountries?: readonly string[] | "failed";
   readonly create?: () => Response | Promise<Response>;
   readonly resend?: () => Response;
 };
@@ -91,6 +95,13 @@ function stubApi(stub: Stub = {}): void {
         return jsonResponse(200, {
           data: { positions: stub.positions ?? CLUB_POSITIONS },
         });
+      }
+      if (url === COMMON_COUNTRIES_PATH) {
+        return stub.commonCountries === "failed"
+          ? errorResponse(500, "internal_error")
+          : jsonResponse(200, {
+              data: { countries: stub.commonCountries ?? ["NZ", "AU"] },
+            });
       }
       const body: unknown =
         init?.body === undefined ? null : JSON.parse(String(init.body));
@@ -142,6 +153,12 @@ async function typeWho(name: string, email: string): Promise<void> {
   if (email !== "") {
     await user.type(screen.getByLabelText("Email"), email);
   }
+}
+
+function optionNamesOf(group: HTMLElement): readonly string[] {
+  return within(group)
+    .getAllByRole("option")
+    .map((option) => option.textContent ?? "");
 }
 
 function sendButton(): HTMLElement {
@@ -338,16 +355,82 @@ describe("los datos de jugador", () => {
         screen.getByRole("button", { name: /^Datos de jugador · opcional/ }),
       );
 
-    const names = within(screen.getByLabelText("País"))
-      .getAllByRole("option")
-      .slice(1)
-      .map((option) => option.textContent ?? "");
+    const names = optionNamesOf(
+      within(screen.getByLabelText("País")).getByRole("group", {
+        name: "Todos los países",
+      }),
+    );
 
     expect(names).toHaveLength(COUNTRY_CODES.length);
     expect(names).toContain("España");
     expect(names).toEqual(
       [...names].sort((first, second) => first.localeCompare(second, "es")),
     );
+  });
+
+  it("proponen primero los más comunes del club, en el orden de la API y en el idioma de la pantalla", async () => {
+    stubApi({ commonCountries: ["NZ", "AU"] });
+    await renderPanel({ locale: "es" });
+    await userEvent
+      .setup()
+      .click(
+        screen.getByRole("button", { name: /^Datos de jugador · opcional/ }),
+      );
+
+    const groups = within(await screen.findByLabelText("País")).getAllByRole(
+      "group",
+    );
+
+    expect(groups.map((group) => group.getAttribute("label"))).toEqual([
+      "Más comunes en el club",
+      "Todos los países",
+    ]);
+    expect(optionNamesOf(groups[0]!)).toEqual(["Nueva Zelanda", "Australia"]);
+  });
+
+  it("si la petición de los más comunes falla, sólo ofrecen todos los países", async () => {
+    stubApi({ commonCountries: "failed" });
+    await renderPanel();
+    await openDetails();
+
+    const groups = within(screen.getByLabelText("Country")).getAllByRole(
+      "group",
+    );
+
+    expect(groups.map((group) => group.getAttribute("label"))).toEqual([
+      "All countries",
+    ]);
+  });
+
+  it("si la petición de los más comunes falla, se invita igual con un país", async () => {
+    stubApi({ commonCountries: "failed" });
+    await renderPanel();
+    await openDetails();
+    const user = userEvent.setup();
+    await typeWho("Nerea Silva", "nerea@example.com");
+
+    await user.selectOptions(screen.getByLabelText("Country"), "CO");
+    await user.click(sendButton());
+
+    await screen.findByText(/^Invitation sent to/);
+    expect(calls[0]?.body).toMatchObject({ country: "CO" });
+  });
+
+  it("elegir un país de los más comunes lo guarda", async () => {
+    stubApi({ commonCountries: ["NZ", "AU"] });
+    await renderPanel();
+    await openDetails();
+    const user = userEvent.setup();
+    const commonGroup = within(
+      await screen.findByRole("group", { name: "Most common in the club" }),
+    );
+
+    await user.selectOptions(
+      screen.getByLabelText("Country"),
+      commonGroup.getByRole("option", { name: "New Zealand" }),
+    );
+
+    expect(screen.getByLabelText("Country")).toHaveValue("NZ");
   });
 
   it("ofrecen las posiciones activas del club, en su orden", async () => {
