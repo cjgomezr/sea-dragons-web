@@ -9,7 +9,7 @@
 - **D1.** **Desaparece el rol de juego.** Hoy cada posición tiene un rol fijo de tres (`goalkeeper`, `defender`, `forward`: `POSITION_COVERAGES` y el `check` de `club_positions.coverage` en `0046`). Lo sustituye un número por posición: el **mínimo por equipo**.
 - **D2.** **El mínimo vive en Club → Positions**, uno por posición y para todo el club. Lo cambia solo el Admin, como el resto de las posiciones. No hay ajuste por evento.
 - **D3.** **Solo mínimo, sin máximo.** El auto-balance ya iguala el número de jugadores (FR-046, objetivo 3).
-- **D4.** **El mínimo va de 0 a 5.** 0 quiere decir "no importa" y es el valor de una posición nueva. 5 alcanza para un equipo de seis en el agua; un valor mayor no se puede cumplir nunca.
+- **D4.** **El mínimo va de 0 a 20.** 0 quiere decir "no importa" y es el valor de una posición nueva. El tope de 20 no sale de ningún deporte: solo evita un valor absurdo escrito por error. Lo decidió el dueño el 26 de octubre de 2026, para que sirva a deportes con equipos grandes. Un mínimo que la escuadra no permite cumplir se reparte por mitades (D5).
 - **D5.** **Lo exigido se reparte con justicia cuando faltan jugadores.** Para una posición con mínimo N y C jugadores en la escuadra, cada equipo debe tener al menos `min(N, ⌊C / 2⌋)`. Con N = 1 es exactamente la regla de hoy: con dos o más se exige uno por equipo, con uno o ninguno nada. El auto-balance nunca se bloquea por no poder cumplir: cumple lo que puede.
 - **D6.** **Abreviatura por posición y por idioma.** Cada posición lleva una abreviatura corta (de 1 a 4 caracteres) en inglés y en español, como su nombre: GK y POR. Es lo que enseñan las fichas de cobertura. Si falta, se usan las tres primeras letras del nombre en ese idioma, en mayúsculas. Sin iconos por posición.
 - **D7.** **Las fichas de cobertura del builder enseñan solo las posiciones con mínimo mayor que 0**, en el orden del club. Un club con todo a 0 no enseña la fila de cobertura.
@@ -59,13 +59,13 @@ El auto-balance reparte los puestos con tres roles fijos: portero, defensa y ata
 
 ### RF-1 · Mínimo y abreviatura en cada posición · Must
 
-Cada posición del club guarda un mínimo por equipo de 0 a 5 y una abreviatura opcional por idioma.
+Cada posición del club guarda un mínimo por equipo de 0 a 20 y una abreviatura opcional por idioma.
 
 - **Dado** el club de hoy con Goalkeeper, Defender y Forward con rol, **cuando** se aplica la migración, **entonces** las tres tienen mínimo 1 y las abreviaturas GK/POR, DEF/DEF y ATT/ATA, y cualquier otra posición tiene mínimo 0 y sin abreviatura.
 - **Dado** que producción reaplica todas las migraciones, **cuando** se aplica dos veces, **entonces** no vuelve a poner 1 a una posición que el Admin dejó en 0 ni pisa una abreviatura cambiada.
 - **Dado** un club nuevo, **cuando** se crea, **entonces** sus tres posiciones sembradas nacen con mínimo 1 y sus abreviaturas.
 - **Dado** un Admin, **cuando** cambia el mínimo de una posición con `PATCH /api/v1/club/settings/positions/{id}`, **entonces** se guarda, queda en la bitácora (NFR-010) y `GET` lo devuelve.
-- **Dado** un mínimo fuera de 0 a 5, o no entero, **cuando** llega a la API, **entonces** responde 400 y no guarda nada.
+- **Dado** un mínimo fuera de 0 a 20, o no entero, **cuando** llega a la API, **entonces** responde 400 y no guarda nada.
 - **Dado** una abreviatura vacía, **cuando** se guarda, **entonces** se guarda como sin abreviatura; **dada** una de más de 4 caracteres, **entonces** responde 400.
 - **Dado** un Coach, un Committee o un Player, **cuando** intenta cambiar el mínimo o la abreviatura, **entonces** responde 403, como hoy con las posiciones.
 
@@ -92,7 +92,7 @@ El auto-balance reparte primero los mínimos (D5) y después iguala el nivel, co
 
 La columna "Role in auto-balance" de la tabla de posiciones se cambia por **"Minimum per team"** ("Mínimo por equipo"), y la abreviatura se edita junto al nombre.
 
-- **Dado** el Admin en Club → Positions en el escritorio, **cuando** se pinta la tabla, **entonces** cada posición activa tiene un control numérico de 0 a 5 con su valor, con nombre accesible "Minimum per team for {posición}".
+- **Dado** el Admin en Club → Positions en el escritorio, **cuando** se pinta la tabla, **entonces** cada posición activa tiene un control numérico de 0 a 20 con su valor, con nombre accesible "Minimum per team for {posición}".
 - **Dado** el Admin, **cuando** cambia el número, **entonces** se guarda al momento, como hoy el rol, y sale "{posición}: {n} per team · saved" (o "no minimum" con 0).
 - **Dado** el guardado falla, **cuando** vuelve el error, **entonces** el control vuelve al valor anterior y lo dice, como los demás cambios de la sección.
 - **Dado** el Admin renombrando una posición, **cuando** se abre la edición, **entonces** puede escribir también la abreviatura en cada idioma, con el texto de ayuda "Up to 4 characters. Shown on the team cards." y el límite en el campo.
@@ -157,7 +157,7 @@ Ninguna. Las cuatro del arranque las cerró el dueño el 26 de octubre de 2026: 
 
 ## Notas técnicas
 
-- **Migración (ticket 1):** columna `min_per_team smallint not null default 0` con `check (min_per_team between 0 and 5)` en `club_positions`, y `short_name text` con `check (char_length(short_name) between 1 and 4)` en `club_position_names`. El relleno desde `coverage` va dentro del mismo guardia que crea la columna (`if not exists ... then add column; update ...; end if`), como hace `0046`: así reaplicar no pisa lo que cambió el Admin. Cambia también `clubs_seed_default_positions()`.
+- **Migración (ticket 1):** columna `min_per_team smallint not null default 0` con `check (min_per_team between 0 and 20)` en `club_positions`, y `short_name text` con `check (char_length(short_name) between 1 and 4)` en `club_position_names`. El relleno desde `coverage` va dentro del mismo guardia que crea la columna (`if not exists ... then add column; update ...; end if`), como hace `0046`: así reaplicar no pisa lo que cambió el Admin. Cambia también `clubs_seed_default_positions()`.
 - **Retirar `coverage` (ticket 5):** `0046` crea la columna con `if not exists`, y producción reaplica todo el histórico. Si la nueva migración solo la borra, la siguiente pasada de `0046` la vuelve a crear vacía. Hay que cambiar el guardia de `0046` para que no la cree cuando ya existe `min_per_team`, o equivalente, y probarlo con el test de aplicar el histórico dos veces y con el de `apply-migrations.test.ts`. Ver la trampa en la skill `nextjs-supabase-practices` §7.
 - **Dónde está el rol hoy:** `src/lib/club/club-positions.ts` (`POSITION_COVERAGES`), `src/lib/teams/position-coverage.ts` (la regla y `countTeamCoverage`), `swap-suggestion.ts`, `squad.ts`, `team-builder.ts`, `supabase-team-builder-gateways.ts`, `src/components/teams/TeamCoverage.tsx` (fichas e iconos), `src/components/club/PositionCoverageControl.tsx`, `ClubPositionsSection.tsx`, `ClubPositionsPhone.tsx` y la ruta `src/app/api/v1/club/settings/positions/[id]/route.ts`.
 - **La regla (ticket 2):** `countCoverageGaps` pasa a recibir los requisitos del club (`{ positionId, minPerTeam }` de las posiciones activas) y cuenta, por equipo, `max(0, min(N, ⌊C/2⌋) − tiene)`. Con N = 1 da lo mismo que hoy, que es lo que protege el test de regresión.
