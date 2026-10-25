@@ -1,6 +1,6 @@
 # PRD: E34 · Mínimos por posición en el auto-balance
 
-**Estado:** borrador · **Fecha:** 26 de octubre de 2026 · **Autor:** Camilo Gómez, con Claude
+**Estado:** aprobado · **Fecha:** 26 de octubre de 2026 · **Autor:** Camilo Gómez, con Claude
 
 Épica añadida después del plan (fila E34 de `docs/plan-maestro.md`). Cambia la regla de cobertura de FR-046 del SRD (v1.8). Depende de E26 (posiciones en la configuración del club) y de E28 (las fichas de cobertura del Team builder).
 
