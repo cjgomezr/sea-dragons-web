@@ -2851,6 +2851,8 @@ export const spanishMessages: MessageCatalog = {
     other: "{count} jugadores",
   },
   "teams.column.empty": "Arrastra jugadores aquí o usa Añadir en el banco.",
+  "teams.column.emptyPhone": "Aún no hay jugadores.",
+  "teams.column.emptyPhoneAction": "Añádelos desde la pestaña Banco",
   "teams.edit.open": "Editar nombre y color de {team}",
   "teams.edit.title": "Editar equipo",
   "teams.edit.name": "Nombre",

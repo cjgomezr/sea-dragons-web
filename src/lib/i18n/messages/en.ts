@@ -2832,6 +2832,8 @@ export const englishMessages = {
     other: "{count} players",
   },
   "teams.column.empty": "Drag players here or use Add on the bench.",
+  "teams.column.emptyPhone": "No players yet.",
+  "teams.column.emptyPhoneAction": "Add them from the Bench tab",
   "teams.edit.open": "Edit name and colour of {team}",
   "teams.edit.title": "Edit team",
   "teams.edit.name": "Name",

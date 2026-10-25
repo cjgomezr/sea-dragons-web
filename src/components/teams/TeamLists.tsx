@@ -130,6 +130,7 @@ export function TeamCard({
   totals,
   onMove,
   onChangeTeams,
+  emptyState,
 }: {
   readonly translate: Translator;
   readonly draft: TeamDraft;
@@ -137,6 +138,9 @@ export function TeamCard({
   readonly totals: TeamTotals;
   readonly onMove: MovePlayer;
   readonly onChangeTeams: ChangeTeams;
+  /** Lo que dice el equipo vacío cuando no vale el texto de arrastrar: en el
+   * móvil no se arrastra (#762). */
+  readonly emptyState?: React.ReactNode;
 }): React.JSX.Element {
   const titleId = useId();
   const { name, color } = draft.teams[team];
@@ -171,14 +175,18 @@ export function TeamCard({
         coverage={countTeamCoverage(players)}
         hasPlayers={players.length > 0}
       />
-      <PlayerList
-        translate={translate}
-        draft={draft}
-        players={players}
-        team={team}
-        emptyText={translate("teams.column.empty")}
-        onMove={onMove}
-      />
+      {players.length === 0 && emptyState !== undefined ? (
+        emptyState
+      ) : (
+        <PlayerList
+          translate={translate}
+          draft={draft}
+          players={players}
+          team={team}
+          emptyText={translate("teams.column.empty")}
+          onMove={onMove}
+        />
+      )}
     </DropZone>
   );
 }

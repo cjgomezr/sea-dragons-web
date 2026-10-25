@@ -21948,6 +21948,27 @@ a.agenda-take-attendance {
   border-top: 1px solid var(--color-border);
 }
 
+.team-list-empty-phone p {
+  margin: 0;
+}
+
+/* Parece un enlace, pero cambia de pestaña sin salir de la página; mide 44
+   px de alto para el dedo. */
+.team-list-empty-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
 .team-list {
   margin: var(--space-2) 0 0;
   padding: 0;

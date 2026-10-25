@@ -114,21 +114,23 @@ function TabContent({
   );
 }
 
+type TabRefs = React.RefObject<Partial<Record<BoardTab, HTMLButtonElement>>>;
+
 function BoardTabs({
   translate,
   draft,
   idPrefix,
   activeTab,
+  tabRefs,
   onSelect,
 }: {
   readonly translate: Translator;
   readonly draft: TeamDraft;
   readonly idPrefix: string;
   readonly activeTab: BoardTab;
+  readonly tabRefs: TabRefs;
   readonly onSelect: (tab: BoardTab) => void;
 }): React.JSX.Element {
-  const tabRefs = useRef<Partial<Record<BoardTab, HTMLButtonElement>>>({});
-
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
     const next = tabForKey(event.key, activeTab);
     if (next === null) {
@@ -198,6 +200,30 @@ function BoardPanel({
   );
 }
 
+/** El equipo vacío en el móvil: allí no se arrastra, así que en vez del
+ * texto del escritorio dice que se añade desde el banco, con un botón que
+ * abre esa pestaña. */
+function EmptyPhoneTeam({
+  translate,
+  onShowBench,
+}: {
+  readonly translate: Translator;
+  readonly onShowBench: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="team-list-empty team-list-empty-phone">
+      <p>{translate("teams.column.emptyPhone")}</p>
+      <button
+        type="button"
+        className="team-list-empty-action"
+        onClick={onShowBench}
+      >
+        {translate("teams.column.emptyPhoneAction")}
+      </button>
+    </div>
+  );
+}
+
 export function PhoneBoard({
   translate,
   draft,
@@ -216,6 +242,15 @@ export function PhoneBoard({
 }): React.JSX.Element {
   const idPrefix = useId();
   const [activeTab, setActiveTab] = useState<BoardTab>("a");
+  const tabRefs = useRef<Partial<Record<BoardTab, HTMLButtonElement>>>({});
+
+  // El botón que lo pide queda en un panel escondido: el foco pasa a la
+  // pestaña del banco para no perderse.
+  function showBench(): void {
+    setActiveTab("bench");
+    tabRefs.current.bench?.focus();
+  }
+
   return (
     <>
       <BoardTabs
@@ -223,6 +258,7 @@ export function PhoneBoard({
         draft={draft}
         idPrefix={idPrefix}
         activeTab={activeTab}
+        tabRefs={tabRefs}
         onSelect={setActiveTab}
       />
       {TEAM_IDS.map((team) => (
@@ -239,6 +275,9 @@ export function PhoneBoard({
             totals={totals[team]}
             onMove={onMove}
             onChangeTeams={onChangeTeams}
+            emptyState={
+              <EmptyPhoneTeam translate={translate} onShowBench={showBench} />
+            }
           />
           {suggestion}
         </BoardPanel>
