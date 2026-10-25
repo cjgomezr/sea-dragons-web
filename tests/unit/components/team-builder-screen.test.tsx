@@ -2459,6 +2459,55 @@ describe("en el móvil (#762)", () => {
     expect(tab(/^Bench/)).toHaveAccessibleName("Bench 0 players");
   });
 
+  async function emptyTide(): Promise<void> {
+    await userEvent.click(tab(/^Tide/));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Remove Ethan Brown from Team Tide" }),
+    );
+  }
+
+  it("dice en un equipo vacío que se añade desde el banco, sin hablar de arrastrar", async () => {
+    await openPhoneScreen();
+
+    await emptyTide();
+
+    const card = region("Team Tide");
+    expect(card).toHaveTextContent("No players yet.");
+    expect(card).not.toHaveTextContent(/drag/i);
+    expect(
+      within(card).getByRole("button", { name: "Add them from the Bench tab" }),
+    ).toBeInTheDocument();
+  });
+
+  it("abre la pestaña del banco desde el equipo vacío y le pasa el foco", async () => {
+    await openPhoneScreen();
+    await emptyTide();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Add them from the Bench tab" }),
+    );
+
+    expect(tab(/^Bench/)).toHaveAttribute("aria-selected", "true");
+    expect(tab(/^Bench/)).toHaveFocus();
+    expect(region("Available · Going")).toBeInTheDocument();
+  });
+
+  it("dice en español cómo llenar un equipo vacío", async () => {
+    await openPhoneScreen("es");
+    await userEvent.click(tab(/^Tide/));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sacar a Ethan Brown de Team Tide" }),
+    );
+
+    const card = region("Team Tide");
+    expect(card).toHaveTextContent("Aún no hay jugadores.");
+    expect(
+      within(card).getByRole("button", {
+        name: "Añádelos desde la pestaña Banco",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("deja Guardar y Publicar en la barra fija, sin aviso mientras no hay cambios", async () => {
     await openPhoneScreen();
 
