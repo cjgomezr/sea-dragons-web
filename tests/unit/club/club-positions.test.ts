@@ -9,6 +9,7 @@ import {
   listPositionChoices,
   offeredPositions,
   positionName,
+  positionShortName,
   positionRank,
 } from "@/lib/club/club-positions";
 
@@ -347,5 +348,29 @@ describe("las posiciones que se pueden elegir", () => {
     await expect(
       listPositionChoices(gateways, CALLER_ID),
     ).rejects.toBeInstanceOf(MemberNotFoundError);
+  });
+});
+
+describe("la abreviatura de una posición (D6 del PRD de E34)", () => {
+  const SWEEPER = {
+    names: { en: "Sweeper", es: "Líbero" },
+    shortNames: { en: "SW", es: null },
+  };
+
+  it("usa la del idioma de la pantalla", () => {
+    expect(positionShortName(SWEEPER, "en")).toBe("SW");
+  });
+
+  it("sin abreviatura en el idioma usa las tres primeras letras de su nombre en mayúsculas", () => {
+    expect(positionShortName(SWEEPER, "es")).toBe("LÍB");
+  });
+
+  it("sin nombre en el idioma usa las tres primeras letras del otro", () => {
+    const position = {
+      names: { en: "Sweeper", es: null },
+      shortNames: { en: null, es: null },
+    };
+
+    expect(positionShortName(position, "es")).toBe("SWE");
   });
 });

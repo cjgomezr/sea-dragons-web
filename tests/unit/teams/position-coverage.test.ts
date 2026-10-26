@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { countCoverageGaps } from "@/lib/teams/position-coverage";
+import {
+  countCoverageGaps,
+  describeTeamCoverage,
+} from "@/lib/teams/position-coverage";
 import type { PositionRequirement, SquadPlayer } from "@/lib/teams/squad";
 import { squadPlayer } from "../helpers/squad-players";
 
@@ -92,5 +95,65 @@ describe("los huecos de los mínimos por posición", () => {
     ];
 
     expect(countCoverageGaps(split, requirements)).toBe(3);
+  });
+});
+
+describe("la cobertura de una tarjeta de equipo (#888)", () => {
+  it("cuenta los de cada posición y no avisa con el mínimo cumplido", () => {
+    const team = [...playersOf("gk", 1, "A"), ...playersOf(null, 2, "X")];
+    const squad = [...team, ...playersOf("gk", 1, "B")];
+
+    expect(describeTeamCoverage(team, squad, requiring("gk", 1))).toEqual([
+      { positionId: "gk", count: 1, missingCount: 0 },
+    ]);
+  });
+
+  it("avisa de uno que falta cuando la escuadra permitía cumplirlo", () => {
+    const team = playersOf(null, 3, "A");
+    const squad = [...team, ...playersOf("gk", 2, "B")];
+
+    expect(describeTeamCoverage(team, squad, requiring("gk", 1))).toEqual([
+      { positionId: "gk", count: 0, missingCount: 1 },
+    ]);
+  });
+
+  it("avisa de dos que faltan con mínimo 2 y cuatro en la escuadra", () => {
+    const team = playersOf(null, 3, "A");
+    const squad = [...team, ...playersOf("def", 4, "B")];
+
+    expect(describeTeamCoverage(team, squad, requiring("def", 2))).toEqual([
+      { positionId: "def", count: 0, missingCount: 2 },
+    ]);
+  });
+
+  it("no avisa de un mínimo que la escuadra no permitía cumplir", () => {
+    const team = playersOf(null, 3, "A");
+    const squad = [...team, ...playersOf("gk", 1, "B")];
+
+    expect(describeTeamCoverage(team, squad, requiring("gk", 1))).toEqual([
+      { positionId: "gk", count: 0, missingCount: 0 },
+    ]);
+  });
+
+  it("no avisa de nada a un equipo vacío", () => {
+    const squad = playersOf("gk", 2, "B");
+
+    expect(describeTeamCoverage([], squad, requiring("gk", 1))).toEqual([
+      { positionId: "gk", count: 0, missingCount: 0 },
+    ]);
+  });
+
+  it("sigue el orden de los requisitos, que es el del club", () => {
+    const team = playersOf("def", 1, "A");
+    const requirements = [
+      { positionId: "gk", minPerTeam: 1 },
+      { positionId: "def", minPerTeam: 1 },
+    ];
+
+    expect(
+      describeTeamCoverage(team, team, requirements).map(
+        ({ positionId }) => positionId,
+      ),
+    ).toEqual(["gk", "def"]);
   });
 });

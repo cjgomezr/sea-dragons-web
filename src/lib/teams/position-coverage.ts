@@ -15,11 +15,19 @@ import type {
 /** Lo que se puede dar a cada equipo es la mitad de los que hay. */
 const TEAMS_IN_SPLIT = 2;
 
+type PositionedPlayer = Pick<SquadPlayer, "positionId">;
+
 function countPosition(
-  team: readonly SquadPlayer[],
+  team: readonly PositionedPlayer[],
   positionId: string,
 ): number {
   return team.filter((player) => player.positionId === positionId).length;
+}
+
+/** Lo que se exige a cada equipo (D5): el mínimo, o la mitad de los que hay
+ * en la escuadra si no llegan. */
+function requiredPerTeam(inSquad: number, minPerTeam: number): number {
+  return Math.min(minPerTeam, Math.floor(inSquad / TEAMS_IN_SPLIT));
 }
 
 function countRequirementGaps(
@@ -28,7 +36,7 @@ function countRequirementGaps(
 ): number {
   const inSquad =
     countPosition(split.a, positionId) + countPosition(split.b, positionId);
-  const required = Math.min(minPerTeam, Math.floor(inSquad / TEAMS_IN_SPLIT));
+  const required = requiredPerTeam(inSquad, minPerTeam);
   return [split.a, split.b].reduce(
     (gaps, team) =>
       gaps + Math.max(0, required - countPosition(team, positionId)),
@@ -59,6 +67,35 @@ export function toPositionRequirements(
     positionId: id,
     minPerTeam,
   }));
+}
+
+/** Una ficha de la tarjeta de un equipo (RF-5 del PRD de E34): cuántos
+ * tiene de la posición y cuántos le faltan para su mínimo. */
+export type PositionTally = {
+  readonly positionId: string;
+  readonly count: number;
+  readonly missingCount: number;
+};
+
+/**
+ * Las fichas de un equipo, una por requisito y en su orden. Sólo le falta
+ * algo a un equipo con jugadores, y sólo lo que la escuadra permitía
+ * cumplir (D8): con un portero en toda la escuadra no se le pide a nadie.
+ */
+export function describeTeamCoverage(
+  team: readonly PositionedPlayer[],
+  squad: readonly PositionedPlayer[],
+  requirements: readonly PositionRequirement[],
+): readonly PositionTally[] {
+  return requirements.map(({ positionId, minPerTeam }) => {
+    const count = countPosition(team, positionId);
+    const required = requiredPerTeam(
+      countPosition(squad, positionId),
+      minPerTeam,
+    );
+    const missingCount = team.length === 0 ? 0 : Math.max(0, required - count);
+    return { positionId, count, missingCount };
+  });
 }
 
 export type TeamCoverage = Readonly<Record<PositionCoverage, number>>;

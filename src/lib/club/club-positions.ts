@@ -79,6 +79,23 @@ export function positionName(names: PositionNames, locale: Locale): string {
   return name;
 }
 
+/** Cuántas letras del nombre hacen de abreviatura cuando falta (D6). */
+const DEFAULT_SHORT_NAME_LENGTH = 3;
+
+/** La abreviatura de las fichas en el idioma de la pantalla (D6 del PRD de
+ * E34); sin ella, las tres primeras letras de su nombre, en mayúsculas. */
+export function positionShortName(
+  position: Pick<ClubPosition, "names" | "shortNames">,
+  locale: Locale,
+): string {
+  return (
+    position.shortNames[locale] ??
+    positionName(position.names, locale)
+      .slice(0, DEFAULT_SHORT_NAME_LENGTH)
+      .toLocaleUpperCase(locale)
+  );
+}
+
 /** Lo que ofrece el desplegable: las activas, más la archivada de quien ya la
  * tiene, todas en el orden del club. */
 export function offeredPositions(
