@@ -1,7 +1,7 @@
 /**
  * La escuadra que reparte el team builder (E10): quién juega, con qué OVR y
- * qué función cubre su posición. Sin Supabase delante: leer la escuadra de la
- * base es cosa del handler.
+ * en qué posición. Sin Supabase delante: leer la escuadra de la base es cosa
+ * del handler.
  */
 
 import type { PositionCoverage } from "@/lib/club/club-positions";
@@ -13,8 +13,15 @@ export type SquadPlayer = {
   readonly fullName: string;
   /** El OVR de E9, ya redondeado a un decimal; `null` es "sin evaluar". */
   readonly rating: number | null;
-  /** `null` si no tiene posición o su posición no lleva función. */
-  readonly coverage: PositionCoverage | null;
+  /** `null` si no tiene posición: no cuenta para ningún mínimo. */
+  readonly positionId: string | null;
+};
+
+/** Cuántos de una posición necesita cada equipo (RF-2 del PRD de E34). Sólo
+ * las posiciones activas con mínimo mayor que 0 llegan a ser requisito. */
+export type PositionRequirement = {
+  readonly positionId: string;
+  readonly minPerTeam: number;
 };
 
 export type TeamSplit = {

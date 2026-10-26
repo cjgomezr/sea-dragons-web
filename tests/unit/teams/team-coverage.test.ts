@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { countTeamCoverage } from "@/lib/teams/position-coverage";
-import { squadPlayer } from "../helpers/squad-players";
+import type { PositionCoverage } from "@/lib/teams/squad";
+
+/** Sólo lo que lee la tarjeta: la función de su posición. */
+function teamPlayer(
+  fullName: string,
+  coverage: PositionCoverage | null = null,
+): { readonly fullName: string; readonly coverage: PositionCoverage | null } {
+  return { fullName, coverage };
+}
 
 /**
  * La cobertura de un equipo en su tarjeta (#759, D9 del PRD de E28): cuántos
@@ -10,10 +18,10 @@ import { squadPlayer } from "../helpers/squad-players";
 describe("la cobertura de un equipo", () => {
   it("cuenta a cada jugador en la función de su posición", () => {
     const team = [
-      squadPlayer("Ana", 8, "goalkeeper"),
-      squadPlayer("Bea", 7, "defender"),
-      squadPlayer("Carla", 6, "defender"),
-      squadPlayer("Dani", 6, "forward"),
+      teamPlayer("Ana", "goalkeeper"),
+      teamPlayer("Bea", "defender"),
+      teamPlayer("Carla", "defender"),
+      teamPlayer("Dani", "forward"),
     ];
 
     expect(countTeamCoverage(team)).toEqual({
@@ -24,7 +32,7 @@ describe("la cobertura de un equipo", () => {
   });
 
   it("no cuenta a quien no tiene función", () => {
-    const team = [squadPlayer("Ana", 8), squadPlayer("Bea", 7, "forward")];
+    const team = [teamPlayer("Ana"), teamPlayer("Bea", "forward")];
 
     expect(countTeamCoverage(team)).toEqual({
       goalkeeper: 0,

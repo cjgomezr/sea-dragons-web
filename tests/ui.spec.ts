@@ -24205,6 +24205,7 @@ function teamsPlayer(
     userId: `7e7e7e7e-0000-4000-8000-${String(index).padStart(12, "0")}`,
     fullName,
     position: ATTENDANCE_POSITIONS[position],
+    positionId: ATTENDANCE_POSITIONS[position].id,
     coverage: position,
     rating: rating ?? 5,
     isUnrated: rating === null,
@@ -24219,6 +24220,20 @@ function withTeamsPhoto(
 ): ReturnType<typeof teamsPlayer> {
   return { ...player, photoUrl: STUBBED_PHOTO_URL };
 }
+
+/** Lo que deja la migración de #885: mínimo 1 en las tres posiciones con
+ * rol (E34), con sus abreviaturas. */
+const TEAMS_REQUIREMENTS = (
+  [
+    ["goalkeeper", { en: "GK", es: "POR" }],
+    ["defender", { en: "DEF", es: "DEF" }],
+    ["forward", { en: "ATT", es: "ATA" }],
+  ] as const
+).map(([position, shortNames]) => ({
+  ...ATTENDANCE_POSITIONS[position],
+  shortNames,
+  minPerTeam: 1,
+}));
 
 const LONG_NAMED_PLAYER =
   "Maximiliana Alejandra Fernández-Rodríguez de la Torre";
@@ -24287,6 +24302,7 @@ const MANUAL_BUILDER = {
       ...assignedTo("b", [P.camila, P.liam, P.noah], [P.noah]),
     ],
   },
+  requirements: TEAMS_REQUIREMENTS,
 };
 
 /** A mano y sin portero en Tide (#759): su ficha de portero dice Sin
@@ -24310,6 +24326,7 @@ const OPEN_BUILDER = {
   available: [...KELP, ...TIDE],
   maybe: [P.long],
   split: null,
+  requirements: TEAMS_REQUIREMENTS,
 };
 
 /** El reparto del mockup, guardado en borrador y listo para publicar. */

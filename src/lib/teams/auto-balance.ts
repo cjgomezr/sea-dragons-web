@@ -7,6 +7,7 @@
  */
 
 import {
+  type PositionRequirement,
   type SquadPlayer,
   type TeamSplit,
   sortByRanking,
@@ -66,14 +67,18 @@ function dealSnake(ranked: readonly SquadPlayer[]): TeamSplit {
  * Aplica el mejor intercambio mientras exista. Si se agota el presupuesto,
  * devuelve el reparto alcanzado y lo dice: cortar nunca es un error.
  */
-function improveBySwaps(initial: TeamSplit, now: () => number): ImprovedSplit {
+function improveBySwaps(
+  initial: TeamSplit,
+  requirements: readonly PositionRequirement[],
+  now: () => number,
+): ImprovedSplit {
   const startedAt = now();
   let split = initial;
   for (;;) {
     if (now() - startedAt >= AUTO_BALANCE_TIME_BUDGET_MS) {
       return { split, isTimeBudgetExhausted: true };
     }
-    const swap = suggestSwap(split);
+    const swap = suggestSwap(split, requirements);
     if (swap === null) {
       return { split, isTimeBudgetExhausted: false };
     }
@@ -81,13 +86,16 @@ function improveBySwaps(initial: TeamSplit, now: () => number): ImprovedSplit {
   }
 }
 
+/** `requirements` son los mínimos por posición del club (E34). */
 export function autoBalanceTeams(
   squad: readonly SquadPlayer[],
+  requirements: readonly PositionRequirement[],
   options: AutoBalanceOptions = {},
 ): AutoBalanceResult {
   const ranked = sortByRanking(squad);
   const { split, isTimeBudgetExhausted } = improveBySwaps(
     dealSnake(ranked),
+    requirements,
     options.now ?? readSystemClock,
   );
   return {
