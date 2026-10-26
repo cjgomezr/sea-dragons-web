@@ -2,17 +2,16 @@
 
 import { Archive } from "@phosphor-icons/react/dist/ssr/Archive";
 import { CaretRight } from "@phosphor-icons/react/dist/ssr/CaretRight";
+import { Minus } from "@phosphor-icons/react/dist/ssr/Minus";
+import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { useId, useState } from "react";
 import { BottomSheet } from "@/components/directory/BottomSheet";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
+import { positionName, positionShortName } from "@/lib/club/club-positions";
 import {
-  POSITION_COVERAGES,
-  type PositionCoverage,
-  positionName,
-} from "@/lib/club/club-positions";
-import type {
-  ManagedPosition,
-  PositionNamesInput,
+  type ManagedPosition,
+  POSITION_MIN_PER_TEAM_MAX,
+  type PositionNamesInput,
 } from "@/lib/club/manage-club-positions";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
@@ -27,7 +26,6 @@ import {
   missingNameLocale,
   ReorderHandle,
 } from "./ClubPositionItems";
-import { describeCoverage } from "./PositionCoverageControl";
 import { useSortableRow } from "./SortableRows";
 import {
   type PositionFormOutcome,
@@ -37,10 +35,11 @@ import {
 /**
  * Las posiciones en el móvil (#724, RF-6 del PRD de E26; "08-mobile-positions"
  * y "09-mobile-position-sheet" del handoff). La tabla no cabe: cada activa es
- * una fila con su asa, su nombre y, debajo, su rol y el nombre que le falte.
- * Tocarla fuera del asa sube una hoja con los dos nombres, el rol, Archivar y
- * Guardar. Lo que se manda y cómo se anuncia es lo de la tabla de escritorio:
- * lo pone `ClubPositionsSection`.
+ * una fila con su asa, su nombre y, debajo, su abreviatura, su mínimo por
+ * equipo (#887) y el nombre que le falte. Tocarla fuera del asa sube una hoja
+ * con los dos nombres y sus abreviaturas, el mínimo, Archivar y Guardar. Lo
+ * que se manda y cómo se anuncia es lo de la tabla de escritorio: lo pone
+ * `ClubPositionsSection`.
  *
  * La hoja no cambia nada hasta Guardar. Cerrarla de cualquier otra forma
  * (Escape, un toque fuera, arrastrarla) deja todo como estaba.
@@ -49,13 +48,17 @@ import {
 /** Lo que tenía la hoja al guardarla. */
 export type PositionSheetChanges = {
   readonly names: PositionNamesInput;
-  readonly coverage: PositionCoverage | null;
+  readonly shortNames: PositionNamesInput;
+  readonly minPerTeam: number;
 };
 
-/** El valor de "Sin rol": un radio sólo habla en textos. */
-const NO_COVERAGE = "none";
-
-const COVERAGE_OPTIONS = [null, ...POSITION_COVERAGES] as const;
+function describeMinimum(translate: Translator, minPerTeam: number): string {
+  return minPerTeam === 0
+    ? translate("clubSettings.positions.minimum.none")
+    : translate("clubSettings.positions.minimum.perTeam", {
+        count: minPerTeam,
+      });
+}
 
 export function openSheetFocusKey(positionId: string): string {
   return `${positionId}:open`;
@@ -118,7 +121,9 @@ export function PhonePositionRow({
             {name}
           </span>
           <span id={detailId} className="club-positions-note">
-            {describeCoverage(translate, position.coverage)}
+            {positionShortName(position, locale).text}
+            {" · "}
+            {describeMinimum(translate, position.minPerTeam)}
             {missing === null ? null : (
               <>
                 {" · "}
@@ -176,42 +181,55 @@ export function PhoneAddPosition({
   );
 }
 
-/** ROL EN EL REPARTO: los cuatro como radios que se ven como botones, 2×2.
- * El teclado los recorre con las flechas. */
-function SheetCoverageOptions({
+/** MÍNIMO POR EQUIPO: un paso a paso (− n +) con botones de 44 px, de 0 a
+ * 20. El número se anuncia al cambiar. */
+function SheetMinimumStepper({
   translate,
-  chosen,
+  minPerTeam,
   isBusy,
-  onChoose,
+  onChange,
 }: {
   translate: Translator;
-  chosen: PositionCoverage | null;
+  minPerTeam: number;
   isBusy: boolean;
-  onChoose: (coverage: PositionCoverage | null) => void;
+  onChange: (minPerTeam: number) => void;
 }): React.JSX.Element {
-  const groupName = useId();
+  const hintId = useId();
   return (
-    <fieldset className="club-positions-sheet-coverage" disabled={isBusy}>
+    <fieldset
+      className="club-positions-sheet-minimum"
+      disabled={isBusy}
+      aria-describedby={hintId}
+    >
       <legend className="directory-sheet-label">
-        {translate("clubSettings.positions.column.coverage")}
+        {translate("clubSettings.positions.column.minimum")}
       </legend>
-      <div className="club-positions-sheet-coverage-options">
-        {COVERAGE_OPTIONS.map((option) => (
-          <label
-            key={option ?? NO_COVERAGE}
-            className="club-positions-sheet-coverage-option"
-          >
-            <input
-              type="radio"
-              name={groupName}
-              value={option ?? NO_COVERAGE}
-              checked={chosen === option}
-              onChange={() => onChoose(option)}
-            />
-            <span>{describeCoverage(translate, option)}</span>
-          </label>
-        ))}
+      <div className="club-positions-stepper">
+        <button
+          type="button"
+          className="club-positions-stepper-button"
+          aria-label={translate("clubSettings.positions.minimum.fewer")}
+          disabled={minPerTeam === 0}
+          onClick={() => onChange(minPerTeam - 1)}
+        >
+          <Minus aria-hidden="true" />
+        </button>
+        <output className="club-positions-stepper-value" aria-live="polite">
+          {minPerTeam}
+        </output>
+        <button
+          type="button"
+          className="club-positions-stepper-button"
+          aria-label={translate("clubSettings.positions.minimum.more")}
+          disabled={minPerTeam === POSITION_MIN_PER_TEAM_MAX}
+          onClick={() => onChange(minPerTeam + 1)}
+        >
+          <Plus aria-hidden="true" />
+        </button>
       </div>
+      <p className="club-positions-sheet-hint" id={hintId}>
+        {translate("clubSettings.positions.minimum.hint")}
+      </p>
     </fieldset>
   );
 }
@@ -277,12 +295,15 @@ function SheetBody({
   onArchive: () => Promise<ManagedPositionsRead | null>;
   onReloadLatest: () => void;
 }): React.JSX.Element {
-  const [coverage, setCoverage] = useState(position.coverage);
+  const [minPerTeam, setMinPerTeam] = useState(position.minPerTeam);
   const [sheetFailure, setSheetFailure] = useState<SheetFailure | null>(null);
 
-  async function save(names: PositionNamesInput): Promise<PositionFormOutcome> {
+  async function save(
+    names: PositionNamesInput,
+    shortNames: PositionNamesInput,
+  ): Promise<PositionFormOutcome> {
     setSheetFailure(null);
-    const outcome = await onSave({ names, coverage });
+    const outcome = await onSave({ names, shortNames, minPerTeam });
     if (outcome?.kind === "done") {
       close();
     } else if (outcome !== null) {
@@ -316,16 +337,17 @@ function SheetBody({
         es: translate("clubSettings.positions.sheet.name.es"),
       }}
       initialNames={position.names}
+      initialShortNames={position.shortNames}
       isDisabled={isBusy}
       onSubmit={save}
     >
       {() => (
         <>
-          <SheetCoverageOptions
+          <SheetMinimumStepper
             translate={translate}
-            chosen={coverage}
+            minPerTeam={minPerTeam}
             isBusy={isBusy}
-            onChoose={setCoverage}
+            onChange={setMinPerTeam}
           />
           {sheetFailure === null ? null : (
             <SheetFailureNotice

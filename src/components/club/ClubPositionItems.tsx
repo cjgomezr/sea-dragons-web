@@ -5,15 +5,20 @@ import { Archive } from "@phosphor-icons/react/dist/ssr/Archive";
 import { CaretRight } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import { DotsSixVertical } from "@phosphor-icons/react/dist/ssr/DotsSixVertical";
 import { PencilSimple } from "@phosphor-icons/react/dist/ssr/PencilSimple";
-import { type ClubPosition, positionName } from "@/lib/club/club-positions";
+import {
+  type ClubPosition,
+  positionName,
+  positionShortName,
+} from "@/lib/club/club-positions";
 import { type Locale, otherLocale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
 import { type SortableRowBinding, useSortableRow } from "./SortableRows";
 
 /**
  * Las filas de la tabla de posiciones (#723, RF-5 del PRD de E26). Una activa
- * tiene su asa, su número, sus nombres, su función (#404) y sus acciones; una
- * archivada, sólo su nombre y Reactivar.
+ * tiene su asa, su número, sus nombres con su abreviatura, su mínimo por
+ * equipo (#887) y sus acciones; una archivada, sólo su nombre y Reactivar:
+ * su mínimo no cuenta mientras lo esté (D9 del PRD de E34).
  *
  * El asa reordena con ↑ y ↓, o arrastrándola con ratón o dedo (#725). Las
  * archivadas van plegadas debajo de la tabla.
@@ -94,6 +99,29 @@ function OtherLanguageNote({
   );
 }
 
+/** La de las fichas de los equipos; si el club no puso ninguna, la que se
+ * usará, apagada. */
+function ShortName({
+  locale,
+  position,
+}: {
+  locale: Locale;
+  position: ClubPosition;
+}): React.JSX.Element {
+  const shortName = positionShortName(position, locale);
+  return (
+    <span
+      className={
+        shortName.isDefault
+          ? "club-positions-short club-positions-short-default"
+          : "club-positions-short"
+      }
+    >
+      {shortName.text}
+    </span>
+  );
+}
+
 function NamesCell({
   translate,
   locale,
@@ -108,6 +136,7 @@ function NamesCell({
       <span className="club-positions-name">
         {positionName(position.names, locale)}
       </span>
+      <ShortName locale={locale} position={position} />
       <OtherLanguageNote
         translate={translate}
         locale={locale}
@@ -223,7 +252,7 @@ export function ActivePositionRow({
   total,
   handleHintId,
   isBusy,
-  coverageControl,
+  minimumControl,
   renameForm,
   onMove,
   onRename,
@@ -238,7 +267,7 @@ export function ActivePositionRow({
   /** El texto que explica cómo se mueve con el asa. */
   handleHintId: string;
   isBusy: boolean;
-  coverageControl: React.ReactNode;
+  minimumControl: React.ReactNode;
   /** El formulario de renombrar, que ocupa el resto de la fila mientras está
    * abierto. */
   renameForm: React.ReactNode | null;
@@ -274,7 +303,7 @@ export function ActivePositionRow({
             locale={locale}
             position={position}
           />
-          {coverageControl}
+          {minimumControl}
           <RowActions
             translate={translate}
             positionId={position.id}

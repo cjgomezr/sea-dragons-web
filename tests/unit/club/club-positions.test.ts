@@ -9,6 +9,7 @@ import {
   listPositionChoices,
   offeredPositions,
   positionName,
+  positionShortName,
   positionRank,
 } from "@/lib/club/club-positions";
 
@@ -347,5 +348,47 @@ describe("las posiciones que se pueden elegir", () => {
     await expect(
       listPositionChoices(gateways, CALLER_ID),
     ).rejects.toBeInstanceOf(MemberNotFoundError);
+  });
+});
+
+describe("la abreviatura que se enseña", () => {
+  it("es la del club en el idioma pedido", () => {
+    expect(positionShortName(GOALKEEPER, "es")).toEqual({
+      text: "POR",
+      isDefault: false,
+    });
+  });
+
+  it("sin abreviatura, son las tres primeras letras del nombre en mayúsculas", () => {
+    expect(positionShortName(FORWARD, "en")).toEqual({
+      text: "FOR",
+      isDefault: true,
+    });
+    expect(positionShortName(FORWARD, "es")).toEqual({
+      text: "ATA",
+      isDefault: true,
+    });
+  });
+
+  it("con abreviatura en un solo idioma, el otro usa las letras de su nombre", () => {
+    const position = { ...FORWARD, shortNames: { en: "ATT", es: null } };
+
+    expect(positionShortName(position, "es")).toEqual({
+      text: "ATA",
+      isDefault: true,
+    });
+  });
+
+  it("sin nombre en el idioma pedido, toma las letras del otro", () => {
+    const position = { ...FORWARD, names: { en: "Forward", es: null } };
+
+    expect(positionShortName(position, "es").text).toBe("FOR");
+  });
+
+  it("salta los espacios y respeta las letras con tilde", () => {
+    const position = { ...FORWARD, names: { en: "Ala pívot", es: "Él a" } };
+
+    expect(positionShortName(position, "en").text).toBe("ALA");
+    expect(positionShortName(position, "es").text).toBe("ÉLA");
   });
 });
