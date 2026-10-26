@@ -63,10 +63,12 @@ afterEach(() => {
 describe("GET /api/v1/club/positions", () => {
   it("responde 200 con las posiciones que puede elegir el club de quien llama", async () => {
     mockCaller(CALLER_ID);
-    listPositionChoices.mockResolvedValue([
-      asDirectoryPosition(GOALKEEPER),
-      asDirectoryPosition(FORWARD),
-    ]);
+    const choices = [GOALKEEPER, FORWARD].map((position) => ({
+      ...asDirectoryPosition(position),
+      minPerTeam: position.minPerTeam,
+      shortNames: position.shortNames,
+    }));
+    listPositionChoices.mockResolvedValue(choices);
 
     const response = await getPositions();
 
@@ -74,8 +76,18 @@ describe("GET /api/v1/club/positions", () => {
     await expect(response.json()).resolves.toEqual({
       data: {
         positions: [
-          asDirectoryPosition(GOALKEEPER),
-          asDirectoryPosition(FORWARD),
+          {
+            id: GOALKEEPER.id,
+            names: GOALKEEPER.names,
+            minPerTeam: 1,
+            shortNames: { en: "GK", es: "POR" },
+          },
+          {
+            id: FORWARD.id,
+            names: FORWARD.names,
+            minPerTeam: 1,
+            shortNames: { en: "ATT", es: "ATA" },
+          },
         ],
       },
     });

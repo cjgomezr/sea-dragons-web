@@ -6,7 +6,7 @@ import {
 } from "@/lib/auth/account-api";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import {
-  type NamedPosition,
+  type PositionChoice,
   type PositionChoicesGateways,
   listPositionChoices,
 } from "@/lib/club/club-positions";
@@ -15,7 +15,8 @@ import { createSupabasePositionChoicesGateways } from "@/lib/club/supabase-club-
 /**
  * Las posiciones que se pueden elegir en el club de quien llama (#299, RF-7
  * del PRD de E18a): las activas, en el orden del club, con un nombre por
- * idioma. La pantalla elige el del idioma en que se lee.
+ * idioma, su mínimo por equipo y sus abreviaturas (#885). La pantalla elige el
+ * del idioma en que se lee.
  *
  * Lo alcanza cualquier cuenta activa. El club sale de la fila de quien llama,
  * nunca de un parámetro (NFR-009).
@@ -25,7 +26,7 @@ import { createSupabasePositionChoicesGateways } from "@/lib/club/supabase-club-
 export const dynamic = "force-dynamic";
 
 export type ClubPositionsResponse = {
-  readonly positions: readonly NamedPosition[];
+  readonly positions: readonly PositionChoice[];
 };
 
 function requirePositionChoicesGateways(): PositionChoicesGateways {

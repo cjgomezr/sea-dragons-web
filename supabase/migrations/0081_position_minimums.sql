@@ -237,6 +237,10 @@ declare
   previous_es text;
   unnamed_locale text;
 begin
+  -- El mismo bloqueo que renombrar (`0027`): un nombre que se borra a la vez
+  -- no puede colarse entre la comprobación de abajo y la escritura.
+  perform public.lock_club_positions(acting_club_id);
+
   perform 1
      from public.club_positions p
     where p.id = target_position_id

@@ -11,6 +11,7 @@ import type {
   ManagedPosition,
   ManagedPositionsGateways,
   PositionInsertResult,
+  PositionShortNamesResult,
 } from "@/lib/club/manage-club-positions";
 
 /**
@@ -50,6 +51,7 @@ const invalidateClubPositions = vi.fn();
 const writes: string[] = [];
 let callerRole: Role = "Admin";
 let insertResult: PositionInsertResult;
+let shortNamesResult: PositionShortNamesResult;
 
 function isOwnPosition(positionId: string): boolean {
   return CATALOG.some((position) => position.id === positionId);
@@ -110,7 +112,7 @@ function managedPositionsGateways(): ManagedPositionsGateways {
           return { kind: "not_found" };
         }
         writes.push(`short ${shortNames.en ?? "-"}|${shortNames.es ?? "-"}`);
-        return { kind: "changed", previous: { en: null, es: null } };
+        return shortNamesResult;
       },
     },
     audit: {
@@ -230,6 +232,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   writes.length = 0;
   insertResult = { kind: "created", positionId: NEW_POSITION_ID };
+  shortNamesResult = { kind: "changed", previous: { en: null, es: null } };
   givenSession({ kind: "active", role: "Admin", membershipCurrent: true });
 });
 
@@ -455,6 +458,20 @@ describe("endpoints de posiciones", () => {
         reason: "short_name_en_too_long",
       });
       expect(writes).toEqual([]);
+    });
+
+    it("responde 400 junto al idioma con una abreviatura en un idioma sin nombre", async () => {
+      shortNamesResult = { kind: "name_missing", locale: "es" };
+
+      const response = await patchPosition(GOALKEEPER.id, {
+        shortNames: { en: "GK", es: "POR" },
+      });
+
+      expect(response.status).toBe(400);
+      await expect(errorOf(response)).resolves.toMatchObject({
+        reason: "short_name_es_without_name",
+      });
+      expect(writes).toEqual(["short GK|POR"]);
     });
 
     it.each([
