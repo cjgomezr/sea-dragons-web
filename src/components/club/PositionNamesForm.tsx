@@ -216,7 +216,7 @@ export function PositionNamesForm({
   locales?: readonly [Locale, ...Locale[]];
   /** Con ellas, las etiquetas se ven, y son estas en vez de las de siempre. */
   visibleLabels?: Readonly<Record<Locale, string>>;
-  /** Sin campos de abreviatura, las abreviaturas viajan como llegaron. */
+  /** Sin campos de abreviatura, viajan vacías (`null`). */
   onSubmit: (
     names: PositionNamesInput,
     shortNames: PositionNamesInput,

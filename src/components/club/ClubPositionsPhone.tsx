@@ -37,8 +37,9 @@ import {
  * y "09-mobile-position-sheet" del handoff). La tabla no cabe: cada activa es
  * una fila con su asa, su nombre y, debajo, su abreviatura, su mínimo por
  * equipo (#887) y el nombre que le falte. Tocarla fuera del asa sube una hoja
- * con los dos nombres y sus abreviaturas, el mínimo, Archivar y Guardar. Lo que se manda y cómo se anuncia es lo de la tabla de escritorio:
- * lo pone `ClubPositionsSection`.
+ * con los dos nombres y sus abreviaturas, el mínimo, Archivar y Guardar. Lo
+ * que se manda y cómo se anuncia es lo de la tabla de escritorio: lo pone
+ * `ClubPositionsSection`.
  *
  * La hoja no cambia nada hasta Guardar. Cerrarla de cualquier otra forma
  * (Escape, un toque fuera, arrastrarla) deja todo como estaba.

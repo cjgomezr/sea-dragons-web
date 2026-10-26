@@ -60,8 +60,9 @@ import {
  * archivadas van plegadas debajo.
  *
  * Todo se guarda al momento: el mínimo al cambiarlo, el orden con ↑ y ↓
- * sobre el asa, y los nombres y las abreviaturas con ✓ en la misma fila. Cada movimiento manda la
- * lista entera en el orden nuevo, y el foco se queda en el asa.
+ * sobre el asa, y los nombres y las abreviaturas con ✓ en la misma fila.
+ * Cada movimiento manda la lista entera en el orden nuevo, y el foco se
+ * queda en el asa.
  *
  * Nada cambia en la pantalla hasta que el servidor lo confirma: cada
  * respuesta trae el catálogo tal como quedó, y eso es lo que se pinta.
