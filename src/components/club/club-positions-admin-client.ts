@@ -10,17 +10,17 @@ import {
   CLUB_SETTINGS_POSITIONS_API_PATH,
   CLUB_SETTINGS_POSITIONS_ORDER_API_PATH,
 } from "@/lib/auth/routes";
-import {
-  POSITION_COVERAGES,
-  type PositionCoverage,
-} from "@/lib/club/club-positions";
+import { POSITION_COVERAGES } from "@/lib/club/club-positions";
 import {
   type ManagedPositions,
   POSITION_ISSUE_CODES,
   POSITION_NAME_MAX_LENGTH,
+  POSITION_SETTING_ISSUE_CODES,
+  POSITION_SHORT_NAME_MAX_LENGTH,
   POSITIONS_CHANGED_REASON,
   type PositionIssueCode,
   type PositionNamesInput,
+  type PositionSettingIssueCode,
 } from "@/lib/club/manage-club-positions";
 import type { Translator } from "@/lib/i18n/translator";
 import { namedPositionSchema } from "./positions-client";
@@ -103,12 +103,19 @@ export function setManagedPositionArchived(
   return sendJson(positionPath(positionId), "PATCH", { isArchived });
 }
 
-/** `null` le quita la función. */
-export function setManagedPositionCoverage(
+export function setManagedPositionMinimum(
   positionId: string,
-  coverage: PositionCoverage | null,
+  minPerTeam: number,
 ): Promise<ManagedPositionsRead> {
-  return sendJson(positionPath(positionId), "PATCH", { coverage });
+  return sendJson(positionPath(positionId), "PATCH", { minPerTeam });
+}
+
+/** `null` deja ese idioma sin abreviatura. */
+export function setManagedPositionShortNames(
+  positionId: string,
+  shortNames: PositionNamesInput,
+): Promise<ManagedPositionsRead> {
+  return sendJson(positionPath(positionId), "PATCH", { shortNames });
 }
 
 export function reorderManagedPositions(
@@ -119,14 +126,33 @@ export function reorderManagedPositions(
   });
 }
 
+/** Los avisos de una abreviatura (#887): el del mínimo no tiene campo en el
+ * formulario de los nombres. */
+export type ShortNameIssueCode = Exclude<
+  PositionSettingIssueCode,
+  "min_per_team_out_of_range"
+>;
+
+/** Lo que puede decir el formulario de los nombres junto a un campo. */
+export type PositionFormIssueCode = PositionIssueCode | ShortNameIssueCode;
+
+const POSITION_FORM_ISSUE_CODES: readonly PositionFormIssueCode[] = [
+  ...POSITION_ISSUE_CODES,
+  ...POSITION_SETTING_ISSUE_CODES.filter(
+    (code): code is ShortNameIssueCode => code !== "min_per_team_out_of_range",
+  ),
+];
+
 /** El campo del que habla un 400, si el `reason` es uno de esta sección. */
 export function readPositionIssueCode(
   failure: ApiRequestFailure,
-): PositionIssueCode | null {
+): PositionFormIssueCode | null {
   if (failure.failure !== "validation_error") {
     return null;
   }
-  return POSITION_ISSUE_CODES.find((code) => code === failure.reason) ?? null;
+  return (
+    POSITION_FORM_ISSUE_CODES.find((code) => code === failure.reason) ?? null
+  );
 }
 
 export function isPositionsConflict(failure: ApiRequestFailure): boolean {
@@ -135,7 +161,7 @@ export function isPositionsConflict(failure: ApiRequestFailure): boolean {
 
 export function describePositionIssue(
   translate: Translator,
-  code: PositionIssueCode,
+  code: PositionFormIssueCode,
 ): string {
   switch (code) {
     case "name_required":
@@ -148,6 +174,14 @@ export function describePositionIssue(
     case "name_en_taken":
     case "name_es_taken":
       return translate("clubSettings.positions.issue.nameTaken");
+    case "short_name_en_too_long":
+    case "short_name_es_too_long":
+      return translate("clubSettings.positions.issue.nameTooLong", {
+        max: POSITION_SHORT_NAME_MAX_LENGTH,
+      });
+    case "short_name_en_without_name":
+    case "short_name_es_without_name":
+      return translate("clubSettings.positions.issue.shortNameWithoutName");
   }
 }
 

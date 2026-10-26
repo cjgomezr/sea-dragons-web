@@ -11095,7 +11095,7 @@ a.groups-icon-button {
 
 .club-positions-row {
   display: grid;
-  grid-template-columns: 36px 28px 1fr 170px 84px;
+  grid-template-columns: 36px 28px 1fr 140px 84px;
   column-gap: var(--space-2);
   align-items: center;
   min-height: 46px;
@@ -11147,6 +11147,36 @@ a.groups-icon-button {
 
 .club-positions .club-positions-note {
   font-size: 12.5px;
+}
+
+/* La abreviatura de las fichas (#887), junto al nombre. La que sale del
+   nombre porque el club no puso ninguna va apagada. */
+.club-positions .club-positions-short {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.club-positions .club-positions-short-default {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+/* El mínimo por equipo (#887): un número corto, sin las flechas del
+   navegador. Con el ratón se escribe; las del teclado guardan al momento. */
+.club-positions-minimum-input.club-positions-input {
+  width: 64px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  appearance: textfield;
+}
+
+.club-positions-minimum-input::-webkit-inner-spin-button,
+.club-positions-minimum-input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 /* El aviso sobre --color-panel en claro no llega al contraste con el ámbar
@@ -11253,7 +11283,6 @@ a.groups-icon-button {
   gap: var(--space-1);
 }
 
-.club-positions-select,
 .club-positions-input {
   width: 100%;
   min-width: 0;
@@ -11265,10 +11294,6 @@ a.groups-icon-button {
   background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-}
-
-.club-positions-select {
-  font-weight: 600;
 }
 
 .club-positions-input[aria-invalid="true"] {
@@ -11300,6 +11325,34 @@ a.groups-icon-button {
 
 .club-positions-name-field .auth-field-error {
   font-size: 12.5px;
+}
+
+/* Al renombrar (#887), cada nombre lleva al lado su abreviatura: los dos
+   campos de un idioma van juntos y, si no caben, el otro idioma baja. */
+.club-positions-locale-fields {
+  display: flex;
+  flex: 1 1 200px;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.club-positions-short-field {
+  display: flex;
+  flex: 0 0 64px;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.club-positions-short-field .auth-field-error {
+  font-size: 12.5px;
+}
+
+.club-positions .club-positions-short-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
 }
 
 .club-positions .club-positions-names-cell .auth-error {
@@ -11423,7 +11476,7 @@ a.groups-icon-button {
    design_handoff_club_settings, "08-mobile-positions" y "09-mobile-position-
    sheet"). Las pinta otro componente, no una consulta de medios: sus clases
    sólo salen por debajo de 768px. Una tarjeta con filas de 60px: el asa de
-   44px, el nombre con el rol debajo y la flecha. */
+   44px, el nombre con la abreviatura y el mínimo debajo, y la flecha. */
 .club-positions-phone-card {
   margin: 0;
   overflow: hidden;
@@ -11538,8 +11591,9 @@ a.groups-icon-button {
   min-height: var(--touch-target-min);
 }
 
-/* La hoja de una posición: los dos nombres uno al lado del otro con su
-   etiqueta, el rol en 2×2 y, abajo, Archivar con borde y Guardar. La hoja
+/* La hoja de una posición: cada nombre con su etiqueta y su abreviatura al
+   lado, un idioma debajo del otro; el mínimo y, abajo, Archivar con borde y
+   Guardar. La hoja
    cuelga de la sección, así que gana a sus reglas de la tabla. */
 .club-positions .club-positions-sheet .club-positions-form {
   display: flex;
@@ -11548,8 +11602,13 @@ a.groups-icon-button {
 }
 
 .club-positions .club-positions-sheet .club-positions-fields {
+  flex-direction: column;
   flex-wrap: nowrap;
-  gap: var(--space-2);
+  gap: var(--space-3);
+}
+
+.club-positions-sheet .club-positions-short-field {
+  flex-basis: 96px;
 }
 
 .club-positions-sheet .club-positions-name-field {
@@ -11561,7 +11620,9 @@ a.groups-icon-button {
   color: var(--color-text-secondary);
 }
 
-.club-positions-sheet-coverage {
+/* MÍNIMO POR EQUIPO (#887): − n + con botones de 44px, y debajo para qué
+   sirve. */
+.club-positions-sheet-minimum {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -11571,61 +11632,54 @@ a.groups-icon-button {
   border: none;
 }
 
-.club-positions-sheet-coverage legend {
+.club-positions-sheet-minimum legend {
   margin-bottom: var(--space-2);
   padding: 0;
 }
 
-.club-positions-sheet-coverage-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
-}
-
-/* El radio no se ve, pero recibe el foco y las flechas; lo que se pinta es
-   el botón, como los segmentos del rol del directorio. */
-.club-positions-sheet-coverage-option {
-  position: relative;
+.club-positions-stepper {
   display: flex;
   align-items: center;
+  gap: var(--space-3);
+}
+
+.club-positions-stepper-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
   justify-content: center;
-  min-height: var(--touch-target-min);
-  padding: 0 var(--space-2);
-  font-size: 14px;
-  font-weight: 600;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  font-size: 20px;
   color: var(--color-text);
-  text-align: center;
   background: var(--color-background);
   border: 1px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
 }
 
-.club-positions-sheet-coverage-option input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.club-positions-sheet-coverage-option:hover {
+.club-positions-stepper-button:hover:not(:disabled) {
   background: var(--color-hover);
 }
 
-.club-positions-sheet-coverage-option:has(input:focus-visible) {
-  outline: 2px solid var(--color-accent-text);
-  outline-offset: 2px;
-}
-
-.club-positions-sheet-coverage-option:has(input:checked) {
-  background: var(--color-segment-selected);
-  border-color: var(--color-accent);
-}
-
-.club-positions-sheet-coverage:disabled .club-positions-sheet-coverage-option {
+.club-positions-stepper-button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.club-positions-stepper-value {
+  min-width: 2ch;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.club-positions .club-positions-sheet-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
 }
 
 .club-positions-sheet-failure {

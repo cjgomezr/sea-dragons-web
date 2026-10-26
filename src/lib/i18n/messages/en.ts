@@ -2315,10 +2315,10 @@ export const englishMessages = {
     "Only an Admin or a Committee member can change the session packs.",
   "clubSettings.positions.title": "Positions",
   "clubSettings.positions.lead":
-    "The order here is the order everywhere: directory filters, teams and evaluations. The role tells auto-balance where each position plays.",
+    "The order here is the order everywhere: directory filters, teams and evaluations. The minimum is how many of each position auto-balance tries to put in every team; 0 means it doesn't matter.",
   "clubSettings.positions.loading": "Loading the positions…",
   "clubSettings.positions.column.position": "Position",
-  "clubSettings.positions.column.coverage": "Role in auto-balance",
+  "clubSettings.positions.column.minimum": "Minimum per team",
   "clubSettings.positions.handle.label":
     "Reorder {name}, position {rank} of {total}",
   "clubSettings.reorder.hint":
@@ -2362,15 +2362,25 @@ export const englishMessages = {
   "clubSettings.positions.archived":
     "{name} archived: members who have it keep it",
   "clubSettings.positions.reactivated": "{name} can be chosen again",
-  // La función de cada posición en el auto-balance (#404). Sólo se ve aquí.
-  "clubSettings.positions.coverage.control.label": "Role of {name}",
-  "clubSettings.positions.coverage.none": "No role",
-  "clubSettings.positions.coverage.goalkeeper": "Goalkeeper",
-  "clubSettings.positions.coverage.defender": "Defender",
-  "clubSettings.positions.coverage.forward": "Forward",
-  "clubSettings.positions.coverage.saved": "{name} now counts as {coverage}",
-  "clubSettings.positions.coverage.cleared":
-    "{name} no longer counts as any role",
+  // El mínimo por equipo de cada posición en el auto-balance (#887).
+  "clubSettings.positions.minimum.control.label": "Minimum per team for {name}",
+  "clubSettings.positions.minimum.perTeam": "{count} per team",
+  "clubSettings.positions.minimum.none": "No minimum",
+  "clubSettings.positions.minimum.saved": "{name}: {count} per team",
+  "clubSettings.positions.minimum.cleared": "{name}: no minimum",
+  "clubSettings.positions.minimum.hint":
+    "How many of this position auto-balance tries to put in every team. 0 means it doesn't matter.",
+  "clubSettings.positions.minimum.more": "One more per team",
+  "clubSettings.positions.minimum.fewer": "One fewer per team",
+  // La abreviatura de cada idioma, la de las fichas de los equipos (#887).
+  "clubSettings.positions.shortName.en": "Short name in English",
+  "clubSettings.positions.shortName.es": "Short name in Spanish",
+  "clubSettings.positions.shortName.visible": "Short name",
+  "clubSettings.positions.shortName.hint":
+    "Up to {max} characters. Shown on the team cards.",
+  "clubSettings.positions.shortNames.saved": "{name}: short names updated",
+  "clubSettings.positions.issue.shortNameWithoutName":
+    "Give it a name in this language first.",
   // El móvil (#724): la lista con su hoja de edición.
   "clubSettings.positions.phone.hint": "Hold ⋮⋮ and drag to reorder",
   "clubSettings.positions.phone.savedNotice": "✓ Saved",

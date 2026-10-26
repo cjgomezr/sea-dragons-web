@@ -49,15 +49,15 @@ const GOALKEEPER: ManagedPosition = {
   names: { en: "Goalkeeper", es: "Portería" },
   isArchived: false,
   coverage: "goalkeeper",
-  minPerTeam: 0,
-  shortNames: { en: null, es: null },
+  minPerTeam: 1,
+  shortNames: { en: "GK", es: "POR" },
 };
 const DEFENDER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000002",
   names: { en: "Defender", es: "Defensa" },
   isArchived: false,
   coverage: "defender",
-  minPerTeam: 0,
+  minPerTeam: 2,
   shortNames: { en: null, es: null },
 };
 const FORWARD: ManagedPosition = {
@@ -138,10 +138,13 @@ function applyWrite(request: Request): Response {
     if ("names" in body) {
       return { ...position, names: body.names as ManagedPosition["names"] };
     }
-    if ("coverage" in body) {
+    if ("minPerTeam" in body) {
+      return { ...position, minPerTeam: body.minPerTeam as number };
+    }
+    if ("shortNames" in body) {
       return {
         ...position,
-        coverage: body.coverage as ManagedPosition["coverage"],
+        shortNames: body.shortNames as ManagedPosition["shortNames"],
       };
     }
     return { ...position, isArchived: body.isArchived as boolean };
@@ -249,8 +252,10 @@ function createForm(): HTMLElement {
   return screen.getByRole("form", { name: "Add a position" });
 }
 
-function coverageOf(name: string): HTMLElement {
-  return screen.getByRole("combobox", { name: `Role of ${name}` });
+function minimumOf(name: string): HTMLElement {
+  return screen.getByRole("spinbutton", {
+    name: `Minimum per team for ${name}`,
+  });
 }
 
 async function fillNames(
@@ -288,21 +293,57 @@ afterEach(() => {
 });
 
 describe("la tabla de posiciones", () => {
-  it("explica que el orden vale en todas partes y para qué es el rol", async () => {
+  it("explica que el orden vale en todas partes y qué es el mínimo", async () => {
     await renderSection();
 
     expect(
       screen.getByText(
-        "The order here is the order everywhere: directory filters, teams and evaluations. The role tells auto-balance where each position plays.",
+        "The order here is the order everywhere: directory filters, teams and evaluations. The minimum is how many of each position auto-balance tries to put in every team; 0 means it doesn't matter.",
       ),
     ).toBeInTheDocument();
   });
 
-  it("encabeza las columnas con la posición y el rol en el reparto", async () => {
+  it("en español explica el mínimo con tú", async () => {
+    await renderSection("es");
+
+    expect(
+      screen.getByText(
+        /El mínimo es cuántos de cada posición intenta poner auto-balance en cada equipo; 0 es que no importa./,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("encabeza las columnas con la posición y el mínimo por equipo", async () => {
     await renderSection();
 
     expect(screen.getByText("Position")).toBeInTheDocument();
-    expect(screen.getByText("Role in auto-balance")).toBeInTheDocument();
+    expect(screen.getByText("Minimum per team")).toBeInTheDocument();
+  });
+
+  it("en español la columna es Mínimo por equipo", async () => {
+    await renderSection("es");
+
+    expect(screen.getByText("Mínimo por equipo")).toBeInTheDocument();
+  });
+
+  it("junto al nombre enseña la abreviatura del club", async () => {
+    await renderSection();
+
+    expect(within(rowOf("Goalkeeper")).getByText("GK")).toBeInTheDocument();
+  });
+
+  it("sin abreviatura enseña la que se usará: tres letras del nombre", async () => {
+    await renderSection();
+
+    expect(within(rowOf("Defender")).getByText("DEF")).toBeInTheDocument();
+    expect(within(rowOf("Forward")).getByText("FOR")).toBeInTheDocument();
+  });
+
+  it("en español enseña la abreviatura en español", async () => {
+    await renderSection("es");
+
+    expect(screen.getByText("POR")).toBeInTheDocument();
+    expect(screen.getByText("ATA")).toBeInTheDocument();
   });
 
   it("pinta una fila por activa, en su orden, con su asa", async () => {
@@ -321,10 +362,7 @@ describe("la tabla de posiciones", () => {
 
     const row = rowOf("Defender");
     expect(within(row).getByText("2")).toBeInTheDocument();
-    // "Defender" es también una de las funciones del desplegable.
-    expect(
-      within(row).getByText("Defender", { ignore: "option" }),
-    ).toBeInTheDocument();
+    expect(within(row).getByText("Defender")).toBeInTheDocument();
     expect(within(row).getByText("ES · Defensa")).toBeInTheDocument();
   });
 
@@ -393,94 +431,193 @@ describe("la tabla de posiciones", () => {
   });
 });
 
-describe("el rol de cada posición", () => {
-  it("enseña el rol de cada activa", async () => {
+describe("el mínimo por equipo", () => {
+  it("enseña el mínimo de cada activa, de 0 a 20", async () => {
     await renderSection();
 
-    expect(coverageOf("Goalkeeper")).toHaveDisplayValue("Goalkeeper");
-    expect(coverageOf("Defender")).toHaveDisplayValue("Defender");
-    expect(coverageOf("Forward")).toHaveDisplayValue("Forward");
+    expect(minimumOf("Goalkeeper")).toHaveValue(1);
+    expect(minimumOf("Defender")).toHaveValue(2);
+    expect(minimumOf("Forward")).toHaveValue(0);
+    expect(minimumOf("Forward")).toHaveAttribute("min", "0");
+    expect(minimumOf("Forward")).toHaveAttribute("max", "20");
   });
 
-  it("ofrece los tres roles y ninguno", async () => {
+  it("ya no tiene el selector de rol", async () => {
     await renderSection();
+
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByText("Role in auto-balance")).toBeNull();
+  });
+
+  it("guarda el número al pulsar Enter, lo anuncia y deja el foco en él", async () => {
+    await renderSection();
+
+    await userEvent.clear(minimumOf("Defender"));
+    await userEvent.type(minimumOf("Defender"), "3{Enter}");
 
     expect(
-      within(coverageOf("Goalkeeper"))
-        .getAllByRole("option")
-        .map((option) => option.textContent),
-    ).toEqual(["No role", "Goalkeeper", "Defender", "Forward"]);
-  });
-
-  it("no tiene botón de guardar aparte", async () => {
-    await renderSection();
-
-    expect(screen.queryByRole("button", { name: /^Save role/ })).toBeNull();
-  });
-
-  it("guarda el rol al cambiarlo, lo anuncia y deja el foco en él", async () => {
-    await renderSection();
-
-    await userEvent.selectOptions(coverageOf("Forward"), "Defender");
-
-    expect(
-      await screen.findByText("Forward now counts as Defender"),
-    ).toHaveAttribute("aria-live", "polite");
+      await screen.findByText("Defender: 3 per team · saved"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Defender: 3 per team")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
     expect(requests).toEqual([
       {
         method: "PATCH",
-        url: `${POSITIONS_PATH}/${FORWARD.id}`,
-        body: { coverage: "defender" },
+        url: `${POSITIONS_PATH}/${DEFENDER.id}`,
+        body: { minPerTeam: 3 },
       },
     ]);
-    expect(coverageOf("Forward")).toHaveDisplayValue("Defender");
-    expect(coverageOf("Defender")).toHaveDisplayValue("Defender");
-    expect(coverageOf("Forward")).toHaveFocus();
+    expect(minimumOf("Defender")).toHaveValue(3);
+    expect(minimumOf("Defender")).toHaveFocus();
   });
 
-  it("le quita el rol con la opción de ninguno", async () => {
+  it("guarda el número al salir del campo", async () => {
     await renderSection();
 
-    await userEvent.selectOptions(coverageOf("Goalkeeper"), "No role");
+    await userEvent.clear(minimumOf("Defender"));
+    await userEvent.type(minimumOf("Defender"), "12");
+    await userEvent.tab();
 
-    expect(
-      await screen.findByText("Goalkeeper no longer counts as any role"),
-    ).toBeInTheDocument();
-    expect(requests[0]?.body).toEqual({ coverage: null });
+    await vi.waitFor(() =>
+      expect(requests.map((request) => request.body)).toEqual([
+        { minPerTeam: 12 },
+      ]),
+    );
+    expect(await screen.findByText("Defender: 12 per team")).toBeVisible();
   });
 
-  it("tras un fallo de red conserva el elegido y reintenta con un botón", async () => {
+  it("con 0 dice que no hay mínimo", async () => {
+    await renderSection();
+
+    await userEvent.clear(minimumOf("Goalkeeper"));
+    await userEvent.type(minimumOf("Goalkeeper"), "0{Enter}");
+
+    expect(
+      await screen.findByText("Goalkeeper: no minimum · saved"),
+    ).toBeInTheDocument();
+    expect(requests[0]?.body).toEqual({ minPerTeam: 0 });
+  });
+
+  it("la flecha arriba sube uno y lo guarda al momento", async () => {
+    await renderSection();
+
+    minimumOf("Forward").focus();
+    await userEvent.keyboard("{ArrowUp}");
+
+    await vi.waitFor(() =>
+      expect(requests.map((request) => request.body)).toEqual([
+        { minPerTeam: 1 },
+      ]),
+    );
+    await vi.waitFor(() => expect(minimumOf("Forward")).toHaveFocus());
+  });
+
+  it("la flecha abajo no baja de 0", async () => {
+    await renderSection();
+
+    minimumOf("Forward").focus();
+    await userEvent.keyboard("{ArrowDown}");
+
+    expect(minimumOf("Forward")).toHaveValue(0);
+    expect(requests).toEqual([]);
+  });
+
+  it("la flecha arriba no pasa de 20", async () => {
+    catalog = [{ ...FORWARD, minPerTeam: 20 }];
+    await renderSection();
+
+    minimumOf("Forward").focus();
+    await userEvent.keyboard("{ArrowUp}");
+
+    expect(minimumOf("Forward")).toHaveValue(20);
+    expect(requests).toEqual([]);
+  });
+
+  it.each(["21", "-1", "1.5", ""])(
+    "con %j escrito a mano no manda nada y vuelve al último válido",
+    async (typed) => {
+      await renderSection();
+
+      await userEvent.clear(minimumOf("Defender"));
+      if (typed !== "") {
+        await userEvent.type(minimumOf("Defender"), typed);
+      }
+      await userEvent.tab();
+
+      expect(minimumOf("Defender")).toHaveValue(2);
+      expect(requests).toEqual([]);
+    },
+  );
+
+  it("con el mismo número no manda nada", async () => {
+    await renderSection();
+
+    await userEvent.clear(minimumOf("Defender"));
+    await userEvent.type(minimumOf("Defender"), "2{Enter}");
+
+    expect(requests).toEqual([]);
+  });
+
+  it("si falla, vuelve al número anterior, lo dice y reintenta con un botón", async () => {
     await renderSection();
     nextWriteResponse = networkFailure;
 
-    await userEvent.selectOptions(coverageOf("Forward"), "Goalkeeper");
+    await userEvent.clear(minimumOf("Defender"));
+    await userEvent.type(minimumOf("Defender"), "4{Enter}");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /couldn't reach the server/i,
     );
-    expect(coverageOf("Forward")).toHaveDisplayValue("Goalkeeper");
+    expect(minimumOf("Defender")).toHaveValue(2);
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
 
-    await vi.waitFor(() =>
-      expect(catalog.find(({ id }) => id === FORWARD.id)?.coverage).toBe(
-        "goalkeeper",
-      ),
-    );
+    await vi.waitFor(() => expect(minimumOf("Defender")).toHaveValue(4));
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("en español nombra el rol de cada posición con sus textos de hoy", async () => {
+  it("una archivada no enseña ni deja cambiar su mínimo", async () => {
+    catalog = [GOALKEEPER, { ...UTILITY, minPerTeam: 3 }];
+    await renderSection();
+
+    const archived = await openArchived();
+
+    expect(within(archived).queryByRole("spinbutton")).toBeNull();
+    expect(within(archived).queryByText("3")).toBeNull();
+    expect(
+      screen.queryByRole("spinbutton", {
+        name: "Minimum per team for Utility",
+      }),
+    ).toBeNull();
+  });
+
+  it("en español nombra el mínimo y dice cuántos por equipo", async () => {
     await renderSection("es");
 
-    const control = screen.getByRole("combobox", {
-      name: "Función de Portería",
+    const control = screen.getByRole("spinbutton", {
+      name: "Mínimo por equipo de Portería",
     });
-    expect(control).toHaveDisplayValue("Portero");
+    await userEvent.clear(control);
+    await userEvent.type(control, "2{Enter}");
+
     expect(
-      within(control)
-        .getAllByRole("option")
-        .map((option) => option.textContent),
-    ).toEqual(["Sin función", "Portero", "Defensa", "Ataque"]);
+      await screen.findByText("Portería: 2 por equipo · guardado"),
+    ).toBeInTheDocument();
+  });
+
+  it("en español con 0 dice sin mínimo", async () => {
+    await renderSection("es");
+
+    const control = screen.getByRole("spinbutton", {
+      name: "Mínimo por equipo de Portería",
+    });
+    await userEvent.clear(control);
+    await userEvent.type(control, "0{Enter}");
+
+    expect(
+      await screen.findByText("Portería: sin mínimo · guardado"),
+    ).toBeInTheDocument();
   });
 });
 
@@ -591,6 +728,165 @@ describe("renombrar en la fila", () => {
       within(form).getByLabelText("Name in English"),
     ).toHaveAccessibleDescription(expect.stringContaining("Up to 40"));
     expect(requests).toEqual([]);
+  });
+
+  it("junto a cada nombre abre su abreviatura, de hasta 4 caracteres", async () => {
+    await renderSection();
+
+    const form = await openRename("Goalkeeper");
+    const english = within(form).getByLabelText("Short name in English");
+    const spanish = within(form).getByLabelText("Short name in Spanish");
+
+    expect(english).toHaveValue("GK");
+    expect(spanish).toHaveValue("POR");
+    expect(english).toHaveAttribute("maxLength", "4");
+    expect(spanish).toHaveAttribute("maxLength", "4");
+    expect(english).toHaveAccessibleDescription(
+      "Up to 4 characters. Shown on the team cards.",
+    );
+    expect(
+      within(form).getByText("Up to 4 characters. Shown on the team cards."),
+    ).toBeInTheDocument();
+  });
+
+  it("sin abreviatura, el campo sugiere la que se usará", async () => {
+    await renderSection();
+
+    const form = await openRename("Defender");
+
+    expect(within(form).getByLabelText("Short name in English")).toHaveValue(
+      "",
+    );
+    expect(
+      within(form).getByLabelText("Short name in English"),
+    ).toHaveAttribute("placeholder", "DEF");
+  });
+
+  it("guarda la abreviatura cambiada sin volver a mandar el nombre", async () => {
+    await renderSection();
+
+    const form = await openRename("Defender");
+    await userEvent.type(
+      within(form).getByLabelText("Short name in English"),
+      "DF",
+    );
+    await userEvent.click(
+      within(form).getByRole("button", { name: "Save name" }),
+    );
+
+    await vi.waitFor(() =>
+      expect(
+        screen.queryByRole("form", { name: "Rename Defender" }),
+      ).toBeNull(),
+    );
+    expect(requests).toEqual([
+      {
+        method: "PATCH",
+        url: `${POSITIONS_PATH}/${DEFENDER.id}`,
+        body: { shortNames: { en: "DF", es: null } },
+      },
+    ]);
+    expect(within(rowOf("Defender")).getByText("DF")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Defender: short names updated · saved"),
+    ).toBeInTheDocument();
+  });
+
+  it("con el nombre y la abreviatura cambiados, manda primero el nombre", async () => {
+    await renderSection();
+
+    const form = await openRename("Defender");
+    await fillNames(form, { en: "Back", es: "Defensa" });
+    await userEvent.type(
+      within(form).getByLabelText("Short name in English"),
+      "BK",
+    );
+    await userEvent.click(
+      within(form).getByRole("button", { name: "Save name" }),
+    );
+
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests.map((request) => request.body)).toEqual([
+      { names: { en: "Back", es: "Defensa" } },
+      { shortNames: { en: "BK", es: null } },
+    ]);
+  });
+
+  it("vaciada, queda sin abreviatura y la tabla enseña la que se usará", async () => {
+    await renderSection();
+
+    const form = await openRename("Goalkeeper");
+    await userEvent.clear(within(form).getByLabelText("Short name in English"));
+    await userEvent.click(
+      within(form).getByRole("button", { name: "Save name" }),
+    );
+
+    await vi.waitFor(() =>
+      expect(within(rowOf("Goalkeeper")).getByText("GOA")).toBeInTheDocument(),
+    );
+    expect(requests[0]?.body).toEqual({ shortNames: { en: null, es: "POR" } });
+  });
+
+  it("no manda una abreviatura en un idioma sin nombre, y lo dice junto al campo", async () => {
+    catalog = [{ ...UTILITY, isArchived: false }];
+    await renderSection();
+
+    const form = await openRename("Utility");
+    await userEvent.type(
+      within(form).getByLabelText("Short name in Spanish"),
+      "COM",
+    );
+    await userEvent.click(
+      within(form).getByRole("button", { name: "Save name" }),
+    );
+
+    expect(
+      within(form).getByLabelText("Short name in Spanish"),
+    ).toHaveAccessibleDescription(
+      expect.stringContaining("Give it a name in this language first."),
+    );
+    expect(requests).toEqual([]);
+  });
+
+  it("enseña junto a su campo la abreviatura que rechaza el servidor", async () => {
+    await renderSection();
+    nextWriteResponse = () =>
+      errorResponse(400, "validation_error", "short_name_en_too_long");
+
+    const form = await openRename("Defender");
+    await userEvent.type(
+      within(form).getByLabelText("Short name in English"),
+      "DF",
+    );
+    await userEvent.click(
+      within(form).getByRole("button", { name: "Save name" }),
+    );
+
+    const english = within(form).getByLabelText("Short name in English");
+    await vi.waitFor(() =>
+      expect(english).toHaveAttribute("aria-invalid", "true"),
+    );
+    expect(english).toHaveAccessibleDescription(
+      expect.stringContaining("Up to 4 characters."),
+    );
+  });
+
+  it("en español los campos se llaman Abreviatura", async () => {
+    await renderSection("es");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Renombrar Portería" }),
+    );
+    const form = screen.getByRole("form", { name: "Renombrar Portería" });
+
+    expect(
+      within(form).getByLabelText("Abreviatura en inglés"),
+    ).toHaveAccessibleDescription(
+      "Hasta 4 caracteres. Sale en las tarjetas de los equipos.",
+    );
+    expect(within(form).getByLabelText("Abreviatura en español")).toHaveValue(
+      "POR",
+    );
   });
 });
 
@@ -1025,7 +1321,7 @@ describe("lo que pasa al guardar", () => {
     expect(
       screen.getByRole("button", { name: "Rename Forward" }),
     ).toBeDisabled();
-    expect(coverageOf("Forward")).toBeDisabled();
+    expect(minimumOf("Forward")).toBeDisabled();
     expect(requests).toHaveLength(1);
   });
 });
@@ -1061,10 +1357,23 @@ async function openSheet(name: string): Promise<HTMLElement> {
   return sheet(name);
 }
 
-function roleOption(dialog: HTMLElement, role: string): HTMLElement {
-  return within(
-    within(dialog).getByRole("group", { name: "Role in auto-balance" }),
-  ).getByRole("radio", { name: role });
+function minimumStepper(dialog: HTMLElement): HTMLElement {
+  return within(dialog).getByRole("group", { name: "Minimum per team" });
+}
+
+function stepperValue(dialog: HTMLElement): HTMLElement {
+  return within(minimumStepper(dialog)).getByRole("status");
+}
+
+async function stepMinimum(
+  dialog: HTMLElement,
+  direction: "One more" | "One fewer",
+): Promise<void> {
+  await userEvent.click(
+    within(minimumStepper(dialog)).getByRole("button", {
+      name: `${direction} per team`,
+    }),
+  );
 }
 
 async function saveSheet(dialog: HTMLElement): Promise<void> {
@@ -1100,26 +1409,34 @@ describe("en el móvil", () => {
       expect(phoneRow("Defender")).toBeInTheDocument();
     });
 
-    it("debajo del nombre dice el rol", async () => {
+    it("debajo del nombre dice su abreviatura y su mínimo", async () => {
       await renderSection();
 
-      expect(phoneRow("Defender")).toHaveAccessibleDescription("Defender");
+      expect(phoneRow("Goalkeeper")).toHaveAccessibleDescription(
+        "GK · 1 per team",
+      );
+      expect(phoneRow("Defender")).toHaveAccessibleDescription(
+        "DEF · 2 per team",
+      );
+      expect(phoneRow("Forward")).toHaveAccessibleDescription(
+        "FOR · No minimum",
+      );
     });
 
-    it("dice también el nombre que falta y el rol vacío", async () => {
+    it("dice también el nombre que falta", async () => {
       catalog = [GOALKEEPER, { ...UTILITY, isArchived: false }];
 
       await renderSection();
 
       expect(phoneRow("Utility")).toHaveAccessibleDescription(
-        "No role · No Spanish name",
+        "UTI · No minimum · No Spanish name",
       );
     });
 
     it("no pinta los controles de la tabla de escritorio", async () => {
       await renderSection();
 
-      expect(screen.queryByRole("combobox", { name: /^Role of / })).toBeNull();
+      expect(screen.queryByRole("spinbutton")).toBeNull();
       expect(screen.queryByRole("button", { name: /^Rename / })).toBeNull();
       expect(screen.queryByRole("button", { name: /^Archive / })).toBeNull();
     });
@@ -1222,24 +1539,27 @@ describe("en el móvil", () => {
   });
 
   describe("la hoja de una posición", () => {
-    it("tocar la fila abre la hoja con sus nombres y su rol", async () => {
+    it("tocar la fila abre la hoja con sus nombres, sus abreviaturas y su mínimo", async () => {
       await renderSection();
 
-      const dialog = await openSheet("Forward");
+      const dialog = await openSheet("Defender");
 
       expect(
-        within(dialog).getByRole("heading", { name: "Forward" }),
+        within(dialog).getByRole("heading", { name: "Defender" }),
       ).toBeInTheDocument();
-      expect(within(dialog).getByLabelText("English")).toHaveValue("Forward");
-      expect(within(dialog).getByLabelText("Español")).toHaveValue("Ataque");
-      expect(roleOption(dialog, "Forward")).toBeChecked();
+      expect(within(dialog).getByLabelText("English")).toHaveValue("Defender");
+      expect(within(dialog).getByLabelText("Español")).toHaveValue("Defensa");
       expect(
-        within(
-          within(dialog).getByRole("group", { name: "Role in auto-balance" }),
-        )
-          .getAllByRole("radio")
-          .map((radio) => radio.closest("label")?.textContent),
-      ).toEqual(["No role", "Goalkeeper", "Defender", "Forward"]);
+        within(dialog).getByLabelText("Short name in English"),
+      ).toHaveAttribute("placeholder", "DEF");
+      expect(
+        within(dialog).getByLabelText("Short name in Spanish"),
+      ).toHaveAttribute("maxLength", "4");
+      expect(stepperValue(dialog)).toHaveTextContent("2");
+      expect(minimumStepper(dialog)).toHaveAccessibleDescription(
+        "How many of this position auto-balance tries to put in every team. 0 means it doesn't matter.",
+      );
+      expect(within(dialog).queryByRole("radio")).toBeNull();
       expect(
         within(dialog).getByRole("button", { name: "Archive" }),
       ).toBeInTheDocument();
@@ -1248,7 +1568,35 @@ describe("en el móvil", () => {
       ).toBeInTheDocument();
     });
 
-    it("en español los campos son Inglés y Español", async () => {
+    it("los botones del paso a paso no bajan de 0", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+
+      expect(stepperValue(dialog)).toHaveTextContent("0");
+      expect(
+        within(minimumStepper(dialog)).getByRole("button", {
+          name: "One fewer per team",
+        }),
+      ).toBeDisabled();
+    });
+
+    it("los botones del paso a paso no pasan de 20", async () => {
+      catalog = [{ ...FORWARD, minPerTeam: 19 }];
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+      await stepMinimum(dialog, "One more");
+
+      expect(stepperValue(dialog)).toHaveTextContent("20");
+      expect(
+        within(minimumStepper(dialog)).getByRole("button", {
+          name: "One more per team",
+        }),
+      ).toBeDisabled();
+    });
+
+    it("en español los campos son Inglés y Español, con su abreviatura", async () => {
       await renderSection("es");
 
       await userEvent.click(
@@ -1260,6 +1608,15 @@ describe("en el móvil", () => {
 
       expect(within(dialog).getByLabelText("Inglés")).toHaveValue("Forward");
       expect(within(dialog).getByLabelText("Español")).toHaveValue("Ataque");
+      expect(
+        within(dialog).getByLabelText("Abreviatura en español"),
+      ).toHaveAttribute("placeholder", "ATA");
+      expect(
+        within(dialog).getByRole("group", { name: "Mínimo por equipo" }),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByRole("button", { name: "Uno más por equipo" }),
+      ).toBeInTheDocument();
     });
 
     it("tocar el asa no abre la hoja", async () => {
@@ -1300,9 +1657,7 @@ describe("en el móvil", () => {
       );
       const dialog = sheet("Ataque");
       await userEvent.click(
-        within(
-          within(dialog).getByRole("group", { name: "Rol en el reparto" }),
-        ).getByRole("radio", { name: "Defensa" }),
+        within(dialog).getByRole("button", { name: "Uno más por equipo" }),
       );
       await userEvent.click(
         within(dialog).getByRole("button", { name: "Guardar" }),
@@ -1311,11 +1666,12 @@ describe("en el móvil", () => {
       expect(await screen.findByText("✓ Guardado")).toBeInTheDocument();
     });
 
-    it("guarda el rol cambiado", async () => {
+    it("guarda el mínimo cambiado", async () => {
       await renderSection();
 
       const dialog = await openSheet("Forward");
-      await userEvent.click(roleOption(dialog, "Defender"));
+      await stepMinimum(dialog, "One more");
+      await stepMinimum(dialog, "One more");
       await saveSheet(dialog);
 
       await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -1323,38 +1679,66 @@ describe("en el móvil", () => {
         {
           method: "PATCH",
           url: `${POSITIONS_PATH}/${FORWARD.id}`,
-          body: { coverage: "defender" },
+          body: { minPerTeam: 2 },
         },
       ]);
-      expect(phoneRow("Forward")).toHaveAccessibleDescription("Defender");
+      expect(phoneRow("Forward")).toHaveAccessibleDescription(
+        "FOR · 2 per team",
+      );
       expect(phoneRow("Forward")).toHaveFocus();
     });
 
-    it("le quita el rol con Sin rol", async () => {
+    it("baja el mínimo a 0", async () => {
       await renderSection();
 
-      const dialog = await openSheet("Forward");
-      await userEvent.click(roleOption(dialog, "No role"));
+      const dialog = await openSheet("Goalkeeper");
+      await stepMinimum(dialog, "One fewer");
       await saveSheet(dialog);
 
       await vi.waitFor(() => expect(requests).toHaveLength(1));
-      expect(requests[0]?.body).toEqual({ coverage: null });
+      expect(requests[0]?.body).toEqual({ minPerTeam: 0 });
     });
 
-    it("guarda el nombre y el rol cuando cambiaron los dos", async () => {
+    it("guarda la abreviatura cambiada", async () => {
+      await renderSection();
+
+      const dialog = await openSheet("Forward");
+      await userEvent.type(
+        within(dialog).getByLabelText("Short name in English"),
+        "ATT",
+      );
+      await saveSheet(dialog);
+
+      await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(requests.map((request) => request.body)).toEqual([
+        { shortNames: { en: "ATT", es: null } },
+      ]);
+      expect(phoneRow("Forward")).toHaveAccessibleDescription(
+        "ATT · No minimum",
+      );
+    });
+
+    it("guarda el nombre, la abreviatura y el mínimo, en ese orden", async () => {
       await renderSection();
 
       const dialog = await openSheet("Forward");
       await userEvent.type(within(dialog).getByLabelText("English"), "s");
-      await userEvent.click(roleOption(dialog, "Goalkeeper"));
+      await userEvent.type(
+        within(dialog).getByLabelText("Short name in English"),
+        "FW",
+      );
+      await stepMinimum(dialog, "One more");
       await saveSheet(dialog);
 
       await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       expect(requests.map((request) => request.body)).toEqual([
         { names: { en: "Forwards", es: "Ataque" } },
-        { coverage: "goalkeeper" },
+        { shortNames: { en: "FW", es: null } },
+        { minPerTeam: 1 },
       ]);
-      expect(phoneRow("Forwards")).toHaveAccessibleDescription("Goalkeeper");
+      expect(phoneRow("Forwards")).toHaveAccessibleDescription(
+        "FW · 1 per team",
+      );
     });
 
     it("sin cambios, Guardar cierra la hoja sin mandar nada", async () => {
@@ -1448,7 +1832,7 @@ describe("en el móvil", () => {
       await renderSection();
 
       const dialog = await openSheet("Forward");
-      await userEvent.click(roleOption(dialog, "Goalkeeper"));
+      await stepMinimum(dialog, "One more");
       fireEvent.mouseDown(document.body);
 
       expect(screen.queryByRole("dialog")).toBeNull();
@@ -1488,14 +1872,14 @@ describe("en el móvil", () => {
       nextWriteResponse = networkFailure;
 
       const dialog = await openSheet("Forward");
-      await userEvent.click(roleOption(dialog, "Defender"));
+      await stepMinimum(dialog, "One more");
       await saveSheet(dialog);
 
       expect(await within(dialog).findByRole("alert")).toHaveTextContent(
         /couldn't reach the server/i,
       );
       expect(sheet("Forward")).toBe(dialog);
-      expect(roleOption(dialog, "Defender")).toBeChecked();
+      expect(stepperValue(dialog)).toHaveTextContent("1");
     });
 
     it("un fallo de red al archivar sale en la hoja y la deja abierta", async () => {
@@ -1520,7 +1904,7 @@ describe("en el móvil", () => {
         errorResponse(409, "conflict", "club_positions_changed");
 
       const dialog = await openSheet("Forward");
-      await userEvent.click(roleOption(dialog, "Defender"));
+      await stepMinimum(dialog, "One more");
       await saveSheet(dialog);
 
       expect(await within(dialog).findByRole("alert")).toHaveTextContent(
@@ -1544,7 +1928,7 @@ describe("en el móvil", () => {
       nextWriteResponse = neverAnswers;
 
       const dialog = await openSheet("Forward");
-      await userEvent.click(roleOption(dialog, "Defender"));
+      await stepMinimum(dialog, "One more");
       await saveSheet(dialog);
 
       expect(
@@ -1553,7 +1937,11 @@ describe("en el móvil", () => {
       expect(
         within(dialog).getByRole("button", { name: "Archive" }),
       ).toBeDisabled();
-      expect(roleOption(dialog, "Goalkeeper")).toBeDisabled();
+      expect(
+        within(minimumStepper(dialog)).getByRole("button", {
+          name: "One fewer per team",
+        }),
+      ).toBeDisabled();
     });
   });
 });

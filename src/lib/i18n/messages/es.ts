@@ -2315,10 +2315,10 @@ export const spanishMessages: MessageCatalog = {
     "Solo un Admin o alguien del Committee puede cambiar los packs de sesiones.",
   "clubSettings.positions.title": "Posiciones",
   "clubSettings.positions.lead":
-    "El orden de aquí es el orden en todas partes: filtros del directorio, equipos y evaluaciones. El rol le dice al reparto automático dónde juega cada posición.",
+    "El orden de aquí es el orden en todas partes: filtros del directorio, equipos y evaluaciones. El mínimo es cuántos de cada posición intenta poner auto-balance en cada equipo; 0 es que no importa.",
   "clubSettings.positions.loading": "Cargando las posiciones…",
   "clubSettings.positions.column.position": "Posición",
-  "clubSettings.positions.column.coverage": "Rol en el reparto",
+  "clubSettings.positions.column.minimum": "Mínimo por equipo",
   "clubSettings.positions.handle.label":
     "Reordenar {name}, puesto {rank} de {total}",
   "clubSettings.reorder.hint":
@@ -2362,17 +2362,25 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.positions.archived":
     "{name} archivada: quien la tiene la conserva",
   "clubSettings.positions.reactivated": "{name} se puede volver a elegir",
-  // La función de cada posición en el auto-balance (#404). Sólo se ve aquí.
-  // Aquí sí va "Portero": es lo que cubre la posición, como pide el ticket.
-  "clubSettings.positions.coverage.control.label": "Función de {name}",
-  "clubSettings.positions.coverage.none": "Sin función",
-  "clubSettings.positions.coverage.goalkeeper": "Portero",
-  "clubSettings.positions.coverage.defender": "Defensa",
-  "clubSettings.positions.coverage.forward": "Ataque",
-  "clubSettings.positions.coverage.saved":
-    "{name} ahora cuenta como {coverage}",
-  "clubSettings.positions.coverage.cleared":
-    "{name} ya no cuenta con ninguna función",
+  // El mínimo por equipo de cada posición en el auto-balance (#887).
+  "clubSettings.positions.minimum.control.label": "Mínimo por equipo de {name}",
+  "clubSettings.positions.minimum.perTeam": "{count} por equipo",
+  "clubSettings.positions.minimum.none": "Sin mínimo",
+  "clubSettings.positions.minimum.saved": "{name}: {count} por equipo",
+  "clubSettings.positions.minimum.cleared": "{name}: sin mínimo",
+  "clubSettings.positions.minimum.hint":
+    "Cuántos de esta posición intenta poner auto-balance en cada equipo. 0 es que no importa.",
+  "clubSettings.positions.minimum.more": "Uno más por equipo",
+  "clubSettings.positions.minimum.fewer": "Uno menos por equipo",
+  // La abreviatura de cada idioma, la de las fichas de los equipos (#887).
+  "clubSettings.positions.shortName.en": "Abreviatura en inglés",
+  "clubSettings.positions.shortName.es": "Abreviatura en español",
+  "clubSettings.positions.shortName.visible": "Abreviatura",
+  "clubSettings.positions.shortName.hint":
+    "Hasta {max} caracteres. Sale en las tarjetas de los equipos.",
+  "clubSettings.positions.shortNames.saved": "{name}: abreviaturas cambiadas",
+  "clubSettings.positions.issue.shortNameWithoutName":
+    "Ponle antes un nombre en este idioma.",
   // El móvil (#724): la lista con su hoja de edición.
   "clubSettings.positions.phone.hint": "Mantén ⋮⋮ y arrastra para reordenar",
   "clubSettings.positions.phone.savedNotice": "✓ Guardado",
