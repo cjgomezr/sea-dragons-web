@@ -7,11 +7,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { usePendingAction } from "@/components/groups/use-pending-action";
 import { useIsPhone } from "@/components/use-is-phone";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
-import {
-  type ClubPosition,
-  type PositionCoverage,
-  positionName,
-} from "@/lib/club/club-positions";
+import { type ClubPosition, positionName } from "@/lib/club/club-positions";
 import type {
   ManagedPosition,
   ManagedPositions,
@@ -28,7 +24,8 @@ import {
   renameManagedPosition,
   reorderManagedPositions,
   setManagedPositionArchived,
-  setManagedPositionCoverage,
+  setManagedPositionMinimum,
+  setManagedPositionShortNames,
 } from "./club-positions-admin-client";
 import { SortableList } from "./SortableRows";
 import {
@@ -47,10 +44,9 @@ import {
   PositionSheet,
 } from "./ClubPositionsPhone";
 import {
-  coverageFocusKey,
-  describeCoverage,
-  PositionCoverageControl,
-} from "./PositionCoverageControl";
+  minimumFocusKey,
+  PositionMinimumControl,
+} from "./PositionMinimumControl";
 import {
   type PositionFormOutcome,
   PositionNamesForm,
@@ -59,13 +55,14 @@ import {
 /**
  * Las posiciones del club dentro de su configuración (#300, RF-7 del PRD de
  * E18a), en una tabla desde #723 (RF-5 del PRD de E26). Cada activa es una
- * fila con su asa, su número, sus nombres, su función en el auto-balance
- * (#404) y sus acciones; la última fila es la de añadir, y las archivadas van
- * plegadas debajo.
+ * fila con su asa, su número, sus nombres con su abreviatura, su mínimo por
+ * equipo (#887) y sus acciones; la última fila es la de añadir, y las
+ * archivadas van plegadas debajo.
  *
- * Todo se guarda al momento: la función al cambiarla, el orden con ↑ y ↓
- * sobre el asa, y renombrar con ✓ en la misma fila. Cada movimiento manda la
- * lista entera en el orden nuevo, y el foco se queda en el asa.
+ * Todo se guarda al momento: el mínimo al cambiarlo, el orden con ↑ y ↓
+ * sobre el asa, y los nombres y las abreviaturas con ✓ en la misma fila.
+ * Cada movimiento manda la lista entera en el orden nuevo, y el foco se
+ * queda en el asa.
  *
  * Nada cambia en la pantalla hasta que el servidor lo confirma: cada
  * respuesta trae el catálogo tal como quedó, y eso es lo que se pinta.
@@ -76,13 +73,14 @@ import {
  * después al nuevo parecería un fallo. Si falla, vuelve al orden de antes.
  *
  * En el móvil (#724, RF-6) la tabla no cabe: cada activa es una fila que abre
- * una hoja con sus nombres y su rol (`ClubPositionsPhone`). Lo que se manda y
+ * una hoja con sus nombres, sus abreviaturas y su mínimo
+ * (`ClubPositionsPhone`). Lo que se manda y
  * lo que se anuncia es lo mismo, y también se arrastra.
  */
 
 type LoadState = { readonly kind: "loading" } | ManagedPositionsRead;
 
-/** Una acción de la lista (mover, el rol, archivar, reactivar) que falló:
+/** Una acción de la lista (mover, el mínimo, archivar, reactivar) que falló:
  * se puede repetir tal cual con el botón de reintentar. */
 type ListFailure = {
   readonly failure: ApiRequestFailure;
@@ -108,11 +106,12 @@ const SAVED_NOTICE_MS = 2500;
 
 const EMPTY_NAMES: PositionNamesInput = { en: null, es: null };
 
-function haveSameNames(
-  position: ClubPosition,
-  names: PositionNamesInput,
+/** Sirve también para las abreviaturas, que tienen la misma forma. */
+function haveSameTexts(
+  saved: PositionNamesInput,
+  sent: PositionNamesInput,
 ): boolean {
-  return position.names.en === names.en && position.names.es === names.es;
+  return saved.en === sent.en && saved.es === sent.es;
 }
 
 function activeOf(positions: ManagedPositions): ManagedPositions {
@@ -202,7 +201,7 @@ function TableHead({
       <span />
       <span className="club-positions-rank">#</span>
       <span>{translate("clubSettings.positions.column.position")}</span>
-      <span>{translate("clubSettings.positions.column.coverage")}</span>
+      <span>{translate("clubSettings.positions.column.minimum")}</span>
       <span />
     </div>
   );
@@ -396,22 +395,49 @@ export function ClubPositionsSection({
     };
   }
 
-  function coverageAction(
+  /** El nombre de la posición en el catálogo que devolvió el servidor: si se
+   * acaba de renombrar, el nuevo. */
+  function savedNameOf(
+    positions: ManagedPositions,
+    positionId: string,
+  ): string {
+    const saved = positions.find(({ id }) => id === positionId);
+    if (saved === undefined) {
+      throw new Error(`El catálogo no trae la posición ${positionId}.`);
+    }
+    return nameOf(saved);
+  }
+
+  function minimumAction(
     position: ManagedPosition,
-    coverage: PositionCoverage | null,
+    minPerTeam: number,
   ): PositionsAction {
     return {
-      key: coverageFocusKey(position.id),
-      send: () => setManagedPositionCoverage(position.id, coverage),
-      describeDone: () =>
-        coverage === null
-          ? translate("clubSettings.positions.coverage.cleared", {
-              name: nameOf(position),
-            })
-          : translate("clubSettings.positions.coverage.saved", {
-              name: nameOf(position),
-              coverage: describeCoverage(translate, coverage),
-            }),
+      key: minimumFocusKey(position.id),
+      send: () => setManagedPositionMinimum(position.id, minPerTeam),
+      describeDone: (positions) => {
+        const name = savedNameOf(positions, position.id);
+        return minPerTeam === 0
+          ? translate("clubSettings.positions.minimum.cleared", { name })
+          : translate("clubSettings.positions.minimum.saved", {
+              name,
+              count: minPerTeam,
+            });
+      },
+    };
+  }
+
+  function shortNamesAction(
+    position: ManagedPosition,
+    shortNames: PositionNamesInput,
+  ): PositionsAction {
+    return {
+      key: `${position.id}:short-names`,
+      send: () => setManagedPositionShortNames(position.id, shortNames),
+      describeDone: (positions) =>
+        translate("clubSettings.positions.shortNames.saved", {
+          name: savedNameOf(positions, position.id),
+        }),
     };
   }
 
@@ -433,13 +459,14 @@ export function ClubPositionsSection({
     void runListAction(archiveAction(position, isArchived));
   }
 
-  function saveCoverage(
+  function saveMinimum(
     position: ManagedPosition,
-    coverage: PositionCoverage | null,
-  ): void {
-    void runListAction(
-      coverageAction(position, coverage),
-      coverageFocusKey(position.id),
+    minPerTeam: number,
+    shouldKeepFocus: boolean,
+  ): Promise<void> {
+    return runListAction(
+      minimumAction(position, minPerTeam),
+      shouldKeepFocus ? minimumFocusKey(position.id) : null,
     );
   }
 
@@ -448,34 +475,48 @@ export function ClubPositionsSection({
     setEditingId(null);
   }
 
-  async function rename(
-    position: ClubPosition,
-    names: PositionNamesInput,
+  /** Lo que cambió, uno detrás de otro: los nombres, las abreviaturas y el
+   * mínimo. Si uno falla, los que siguen no salen; un reintento compara con
+   * lo ya guardado y sólo manda lo que falta. Los nombres van primero: una
+   * abreviatura necesita el nombre de su idioma. */
+  async function saveChanges(
+    position: ManagedPosition,
+    { names, shortNames, minPerTeam }: PositionSheetChanges,
   ): Promise<PositionFormOutcome> {
-    const outcome = await runFormAction(renameAction(position, names));
+    const actions = [
+      haveSameTexts(position.names, names)
+        ? null
+        : renameAction(position, names),
+      haveSameTexts(position.shortNames, shortNames)
+        ? null
+        : shortNamesAction(position, shortNames),
+      minPerTeam === position.minPerTeam
+        ? null
+        : minimumAction(position, minPerTeam),
+    ].filter((action) => action !== null);
+    for (const action of actions) {
+      const outcome = await runFormAction(action);
+      if (outcome?.kind !== "done") {
+        return outcome;
+      }
+    }
+    return { kind: "done" };
+  }
+
+  async function rename(
+    position: ManagedPosition,
+    names: PositionNamesInput,
+    shortNames: PositionNamesInput,
+  ): Promise<PositionFormOutcome> {
+    const outcome = await saveChanges(position, {
+      names,
+      shortNames,
+      minPerTeam: position.minPerTeam,
+    });
     if (outcome?.kind === "done") {
       closeEditor(position.id);
     }
     return outcome;
-  }
-
-  /** Lo que cambió en la hoja, uno detrás de otro: si el nombre falla, el rol
-   * no sale. Un reintento compara con lo ya guardado y sólo manda lo que
-   * falta. */
-  async function saveFromSheet(
-    position: ManagedPosition,
-    { names, coverage }: PositionSheetChanges,
-  ): Promise<PositionFormOutcome> {
-    if (!haveSameNames(position, names)) {
-      const renamed = await runFormAction(renameAction(position, names));
-      if (renamed?.kind !== "done") {
-        return renamed;
-      }
-    }
-    if (coverage !== position.coverage) {
-      return runFormAction(coverageAction(position, coverage));
-    }
-    return { kind: "done" };
   }
 
   function closeSheet(positionId: string): void {
@@ -496,18 +537,17 @@ export function ClubPositionsSection({
 
   const isBusy = pending !== null;
 
-  /** Se monta otra vez cuando cambia la función guardada, y así lo elegido
-   * empieza por la del servidor. */
-  function renderCoverage(position: ManagedPosition): React.JSX.Element {
+  function renderMinimum(position: ManagedPosition): React.JSX.Element {
     return (
-      <PositionCoverageControl
-        key={`${position.id}:${position.coverage ?? "none"}`}
+      <PositionMinimumControl
         translate={translate}
         positionId={position.id}
         name={nameOf(position)}
-        coverage={position.coverage}
+        minPerTeam={position.minPerTeam}
         isBusy={isBusy}
-        onSave={(coverage) => saveCoverage(position, coverage)}
+        onSave={(minPerTeam, shouldKeepFocus) =>
+          saveMinimum(position, minPerTeam, shouldKeepFocus)
+        }
       />
     );
   }
@@ -524,13 +564,14 @@ export function ClubPositionsSection({
           es: translate("clubSettings.positions.name.placeholder.es"),
         }}
         initialNames={position.names}
+        initialShortNames={position.shortNames}
         isDisabled={isBusy}
         shouldFocusOnOpen
-        onSubmit={(names) => rename(position, names)}
+        onSubmit={(names, shortNames) => rename(position, names, shortNames)}
       >
         {() => (
           <>
-            {renderCoverage(position)}
+            {renderMinimum(position)}
             <div className="club-positions-cell club-positions-actions">
               <button
                 type="submit"
@@ -595,7 +636,7 @@ export function ClubPositionsSection({
             total={active.length}
             handleHintId={handleHintId}
             isBusy={isBusy}
-            coverageControl={renderCoverage(position)}
+            minimumControl={renderMinimum(position)}
             renameForm={
               editingId === position.id ? renderRenameForm(position) : null
             }
@@ -705,7 +746,7 @@ export function ClubPositionsSection({
         locale={locale}
         position={position}
         isBusy={isBusy}
-        onSave={(changes) => saveFromSheet(position, changes)}
+        onSave={(changes) => saveChanges(position, changes)}
         onArchive={() => send(archiveAction(position, true))}
         onReloadLatest={reload}
         onClosed={() => closeSheet(position.id)}

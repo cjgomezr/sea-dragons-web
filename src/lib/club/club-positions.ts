@@ -79,21 +79,37 @@ export function positionName(names: PositionNames, locale: Locale): string {
   return name;
 }
 
-/** Cuántas letras del nombre hacen de abreviatura cuando falta (D6). */
-const DEFAULT_SHORT_NAME_LENGTH = 3;
+/** Cuántas letras del nombre hacen la abreviatura que falta (D6 del PRD de
+ * E34). */
+const DEFAULT_SHORT_NAME_LETTERS = 3;
 
-/** La abreviatura de las fichas en el idioma de la pantalla (D6 del PRD de
- * E34); sin ella, las tres primeras letras de su nombre, en mayúsculas. */
+/** La abreviatura tal como se enseña: `isDefault` es que el club no puso
+ * ninguna en ese idioma y sale de su nombre. */
+export type ShownShortName = {
+  readonly text: string;
+  readonly isDefault: boolean;
+};
+
+/** La del club en el idioma pedido o, si falta, las tres primeras letras del
+ * nombre en ese idioma (o en el otro, si tampoco lo hay), en mayúsculas. */
 export function positionShortName(
   position: Pick<ClubPosition, "names" | "shortNames">,
   locale: Locale,
-): string {
-  return (
-    position.shortNames[locale] ??
-    positionName(position.names, locale)
-      .slice(0, DEFAULT_SHORT_NAME_LENGTH)
-      .toLocaleUpperCase(locale)
+): ShownShortName {
+  const shortName = position.shortNames[locale];
+  if (shortName !== null) {
+    return { text: shortName, isDefault: false };
+  }
+  const letters = Array.from(
+    positionName(position.names, locale).replace(/\s/g, ""),
   );
+  return {
+    text: letters
+      .slice(0, DEFAULT_SHORT_NAME_LETTERS)
+      .join("")
+      .toLocaleUpperCase(locale),
+    isDefault: true,
+  };
 }
 
 /** Lo que ofrece el desplegable: las activas, más la archivada de quien ya la

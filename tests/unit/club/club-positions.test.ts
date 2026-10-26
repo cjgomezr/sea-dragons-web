@@ -351,26 +351,44 @@ describe("las posiciones que se pueden elegir", () => {
   });
 });
 
-describe("la abreviatura de una posición (D6 del PRD de E34)", () => {
-  const SWEEPER = {
-    names: { en: "Sweeper", es: "Líbero" },
-    shortNames: { en: "SW", es: null },
-  };
-
-  it("usa la del idioma de la pantalla", () => {
-    expect(positionShortName(SWEEPER, "en")).toBe("SW");
+describe("la abreviatura que se enseña", () => {
+  it("es la del club en el idioma pedido", () => {
+    expect(positionShortName(GOALKEEPER, "es")).toEqual({
+      text: "POR",
+      isDefault: false,
+    });
   });
 
-  it("sin abreviatura en el idioma usa las tres primeras letras de su nombre en mayúsculas", () => {
-    expect(positionShortName(SWEEPER, "es")).toBe("LÍB");
+  it("sin abreviatura, son las tres primeras letras del nombre en mayúsculas", () => {
+    expect(positionShortName(FORWARD, "en")).toEqual({
+      text: "FOR",
+      isDefault: true,
+    });
+    expect(positionShortName(FORWARD, "es")).toEqual({
+      text: "ATA",
+      isDefault: true,
+    });
   });
 
-  it("sin nombre en el idioma usa las tres primeras letras del otro", () => {
-    const position = {
-      names: { en: "Sweeper", es: null },
-      shortNames: { en: null, es: null },
-    };
+  it("con abreviatura en un solo idioma, el otro usa las letras de su nombre", () => {
+    const position = { ...FORWARD, shortNames: { en: "ATT", es: null } };
 
-    expect(positionShortName(position, "es")).toBe("SWE");
+    expect(positionShortName(position, "es")).toEqual({
+      text: "ATA",
+      isDefault: true,
+    });
+  });
+
+  it("sin nombre en el idioma pedido, toma las letras del otro", () => {
+    const position = { ...FORWARD, names: { en: "Forward", es: null } };
+
+    expect(positionShortName(position, "es").text).toBe("FOR");
+  });
+
+  it("salta los espacios y respeta las letras con tilde", () => {
+    const position = { ...FORWARD, names: { en: "Ala pívot", es: "Él a" } };
+
+    expect(positionShortName(position, "en").text).toBe("ALA");
+    expect(positionShortName(position, "es").text).toBe("ÉLA");
   });
 });

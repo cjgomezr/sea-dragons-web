@@ -12063,7 +12063,7 @@ const STUBBED_ACTIVE_POSITIONS: readonly StubbedPosition[] = [
     names: { en: "Defender", es: "Defensa" },
     isArchived: false,
     coverage: "defender",
-    minPerTeam: 1,
+    minPerTeam: 2,
     shortNames: { en: "DEF", es: "DEF" },
   },
   {
@@ -12071,8 +12071,10 @@ const STUBBED_ACTIVE_POSITIONS: readonly StubbedPosition[] = [
     names: { en: "Forward", es: "Ataque" },
     isArchived: false,
     coverage: "forward",
-    minPerTeam: 1,
-    shortNames: { en: "ATT", es: "ATA" },
+    // Sin mínimo ni abreviatura (#887): la tabla enseña la que se usará,
+    // apagada.
+    minPerTeam: 0,
+    shortNames: { en: null, es: null },
   },
 ];
 
@@ -13348,12 +13350,12 @@ async function openForwardSheet(page: Page): Promise<void> {
   await expect(positionSheet(page)).toBeVisible();
 }
 
-/** Cambia el rol y guarda: el servidor fingido dice que otro Admin cambió
+/** Sube el mínimo y guarda: el servidor fingido dice que otro Admin cambió
  * las posiciones, y la hoja lo enseña sin cerrarse. */
 async function saveForwardSheetAgainstConflict(page: Page): Promise<void> {
   await openForwardSheet(page);
   const sheet = positionSheet(page);
-  await sheet.locator("label", { hasText: /^Defender$/ }).click();
+  await sheet.getByRole("button", { name: "One more per team" }).click();
   await sheet.getByRole("button", { name: "Save", exact: true }).click();
   await expect(
     sheet.getByRole("button", { name: "Load the latest positions" }),

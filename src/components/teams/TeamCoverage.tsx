@@ -32,7 +32,7 @@ function CountChip({
   return (
     <li className="team-coverage-chip">
       <span aria-hidden="true">
-        {`${positionShortName(position, translate.locale)} ${count}`}
+        {`${positionShortName(position, translate.locale).text} ${count}`}
       </span>
       <span className="visually-hidden">
         {translate("teams.coverage.position", {
@@ -59,7 +59,7 @@ function MissingChip({
       <span aria-hidden="true">
         {translate("teams.coverage.short", {
           count: missingCount,
-          shortName: positionShortName(position, translate.locale),
+          shortName: positionShortName(position, translate.locale).text,
         })}
       </span>
       <span className="visually-hidden">
