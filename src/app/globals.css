@@ -11607,6 +11607,12 @@ a.groups-icon-button {
   gap: var(--space-3);
 }
 
+/* Un idioma debajo del otro: la base de 200px de la tabla sería aquí la
+   altura. */
+.club-positions-sheet .club-positions-locale-fields {
+  flex: none;
+}
+
 .club-positions-sheet .club-positions-short-field {
   flex-basis: 96px;
 }
