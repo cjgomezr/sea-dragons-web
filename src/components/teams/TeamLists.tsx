@@ -1,7 +1,6 @@
 import { useId } from "react";
 import { formatOverallRating } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
-import { countTeamCoverage } from "@/lib/teams/position-coverage";
 import { TEAM_IDS, type TeamId } from "@/lib/teams/team-ids";
 import type { TeamTotals } from "@/lib/teams/team-totals";
 import {
@@ -172,8 +171,9 @@ export function TeamCard({
       </div>
       <TeamCoverage
         translate={translate}
-        coverage={countTeamCoverage(players)}
-        hasPlayers={players.length > 0}
+        positions={draft.requirements}
+        team={players}
+        squad={draft.roster}
       />
       {players.length === 0 && emptyState !== undefined ? (
         emptyState

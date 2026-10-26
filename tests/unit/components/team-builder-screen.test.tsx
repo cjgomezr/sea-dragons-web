@@ -55,20 +55,26 @@ const FORWARD = {
 const GOALKEEPER_ID = "f0f0f0f0-0000-4000-8000-000000000001";
 const DEFENDER_ID = "f0f0f0f0-0000-4000-8000-000000000002";
 
+type PositionRequirementEntry = TeamBuilder["requirements"][number];
+
+const GOALKEEPER_REQUIREMENT: PositionRequirementEntry = {
+  id: GOALKEEPER_ID,
+  names: { en: "Goalkeeper", es: "Portero" },
+  shortNames: { en: "GK", es: "POR" },
+  minPerTeam: 1,
+};
+
+const DEFENDER_REQUIREMENT: PositionRequirementEntry = {
+  id: DEFENDER_ID,
+  names: { en: "Defender", es: "Defensa" },
+  shortNames: { en: "DEF", es: "DEF" },
+  minPerTeam: 1,
+};
+
 /** Lo que deja la migración de #885: mínimo 1 en las tres con rol. */
 const ROLE_REQUIREMENTS: TeamBuilder["requirements"] = [
-  {
-    id: GOALKEEPER_ID,
-    names: { en: "Goalkeeper", es: "Portero" },
-    shortNames: { en: "GK", es: "POR" },
-    minPerTeam: 1,
-  },
-  {
-    id: DEFENDER_ID,
-    names: { en: "Defender", es: "Defensa" },
-    shortNames: { en: "DEF", es: "DEF" },
-    minPerTeam: 1,
-  },
+  GOALKEEPER_REQUIREMENT,
+  DEFENDER_REQUIREMENT,
   {
     id: FORWARD.id,
     names: FORWARD.names,
@@ -1448,6 +1454,12 @@ describe("las columnas de equipo (#759)", () => {
     coverage: "defender",
     rating: 7.2,
   });
+  /** El segundo portero, en el banco: con él la escuadra permite uno por
+   * equipo. */
+  const KEEPER = entry(8, "Olivia Park", {
+    position: GOALKEEPER,
+    coverage: "goalkeeper",
+  });
 
   /** Kelp con portero, defensa y ataque; Tide con Ethan solo, sin portero. */
   const COVERED = builderFor(SCRIMMAGE, {
@@ -1482,34 +1494,147 @@ describe("las columnas de equipo (#759)", () => {
     expect(within(kelp).getByText("3 players · avg 7.9")).toBeInTheDocument();
   });
 
-  it("cuenta porteros, defensas y atacantes del equipo", async () => {
+  it("enseña una ficha por posición con mínimo, con su abreviatura y su número", async () => {
     stubClub({ builders: [COVERED] });
 
     await openScreen();
 
     const chips = within(coverage("Team Kelp")).getAllByRole("listitem");
     expect(chips.map((chip) => chip.textContent)).toEqual([
-      "GK 11 goalkeeper",
-      "DEF 11 defender",
-      "ATT 11 forward",
+      "GK 1Goalkeeper: 1",
+      "DEF 1Defender: 1",
+      "ATT 1Forward: 1",
+    ]);
+    expect(
+      within(coverage("Team Kelp")).getByText("Goalkeeper: 1"),
+    ).toHaveClass("visually-hidden");
+  });
+
+  it("enseña la ficha de una posición nueva con mínimo, en el orden del club", async () => {
+    const sweeper = {
+      id: "f0f0f0f0-0000-4000-8000-000000000005",
+      names: { en: "Sweeper", es: "Líbero" },
+      shortNames: { en: "SW", es: "LIB" },
+      minPerTeam: 1,
+    };
+    stubClub({
+      builders: [{ ...COVERED, requirements: [...ROLE_REQUIREMENTS, sweeper] }],
+    });
+
+    await openScreen();
+
+    const chips = within(coverage("Team Kelp")).getAllByRole("listitem");
+    expect(chips.map((chip) => chip.textContent)).toEqual([
+      "GK 1Goalkeeper: 1",
+      "DEF 1Defender: 1",
+      "ATT 1Forward: 1",
+      "SW 0Sweeper: 0",
     ]);
   });
 
-  it("dice Sin portero con su aviso cuando el equipo tiene jugadores y ningún portero", async () => {
+  it("usa las tres primeras letras del nombre de la posición que no tiene abreviatura", async () => {
+    stubClub({
+      builders: [
+        {
+          ...COVERED,
+          requirements: [
+            { ...GOALKEEPER_REQUIREMENT, shortNames: { en: null, es: null } },
+          ],
+        },
+      ],
+    });
+
+    await openScreen();
+
+    expect(
+      within(coverage("Team Kelp")).getByRole("listitem"),
+    ).toHaveTextContent("GOA 1Goalkeeper: 1");
+  });
+
+  it("no enseña la fila de cobertura si ninguna posición tiene mínimo", async () => {
+    stubClub({ builders: [{ ...COVERED, requirements: [] }] });
+
+    await openScreen();
+
+    expect(
+      within(region("Team Kelp")).queryByRole("list", {
+        name: "Position coverage",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("avisa de que falta uno cuando la escuadra permitía cumplir el mínimo", async () => {
+    stubClub({
+      builders: [{ ...COVERED, available: [...COVERED.available, KEEPER] }],
+    });
+
+    await openScreen();
+
+    const chips = within(coverage("Team Tide")).getAllByRole("listitem");
+    expect(chips[0]).toHaveTextContent("Missing GK");
+    expect(
+      within(coverage("Team Tide")).getByText("Missing 1 Goalkeeper"),
+    ).toHaveClass("visually-hidden");
+    expect(chips[0]).toHaveClass("team-coverage-missing");
+    expect(
+      within(coverage("Team Kelp")).queryByText(/Missing/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("dice cuántos faltan cuando son dos o más", async () => {
+    const defenders = [11, 12, 13].map((index) =>
+      entry(index, `Defensa ${index}`, { positionId: DEFENDER_ID }),
+    );
+    stubClub({
+      builders: [
+        {
+          ...COVERED,
+          available: [...COVERED.available, ...defenders],
+          requirements: [{ ...DEFENDER_REQUIREMENT, minPerTeam: 2 }],
+        },
+      ],
+    });
+
+    await openScreen();
+
+    const chip = within(coverage("Team Tide")).getByRole("listitem");
+    expect(chip).toHaveTextContent("2 short of DEF");
+    expect(within(chip).getByText("Missing 2 Defender")).toHaveClass(
+      "visually-hidden",
+    );
+  });
+
+  it("no avisa de un mínimo que la escuadra no permitía cumplir", async () => {
     stubClub({ builders: [COVERED] });
 
     await openScreen();
 
     const chips = within(coverage("Team Tide")).getAllByRole("listitem");
-    expect(chips[0]).toHaveTextContent("No goalkeeper");
-    expect(chips[0]).not.toHaveTextContent("GK");
-    expect(chips[0]).toHaveClass("team-coverage-missing");
-    expect(
-      within(coverage("Team Kelp")).queryByText("No goalkeeper"),
-    ).not.toBeInTheDocument();
+    expect(chips[0]).toHaveTextContent("GK 0");
+    expect(chips[0]).not.toHaveClass("team-coverage-missing");
   });
 
-  it("a un equipo vacío no le dice Sin portero y le explica cómo llenarlo", async () => {
+  it("cambia las fichas y el aviso al mover a un jugador", async () => {
+    stubClub({
+      builders: [{ ...COVERED, available: [...COVERED.available, KEEPER] }],
+    });
+    await openScreen();
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Move Valentina Gómez to Team Tide",
+      }),
+    );
+
+    expect(
+      within(coverage("Team Tide")).getAllByRole("listitem")[0],
+    ).toHaveTextContent("GK 1Goalkeeper: 1");
+    expect(
+      within(coverage("Team Kelp")).getAllByRole("listitem")[0],
+    ).toHaveTextContent("Missing GK");
+  });
+
+  it("a un equipo vacío no le avisa de nada y le explica cómo llenarlo", async () => {
     stubClub();
 
     await openScreen();
@@ -1518,7 +1643,7 @@ describe("las columnas de equipo (#759)", () => {
     expect(kelp).toHaveTextContent(
       "Drag players here or use Add on the bench.",
     );
-    expect(within(kelp).queryByText("No goalkeeper")).not.toBeInTheDocument();
+    expect(within(kelp).queryByText(/Missing/)).not.toBeInTheDocument();
     expect(within(kelp).getByText("0 players")).toBeInTheDocument();
   });
 
@@ -1586,11 +1711,10 @@ describe("las columnas de equipo (#759)", () => {
       .getByRole("list", { name: "Cobertura de puestos" })
       .querySelectorAll("li");
     expect(Array.from(chips, (chip) => chip.textContent)).toEqual([
-      "POR 11 portero",
-      "DEF 11 defensa",
-      "ATA 11 atacante",
+      "POR 1Portero: 1",
+      "DEF 1Defensa: 1",
+      "ATA 1Ataque: 1",
     ]);
-    expect(region("Team Tide")).toHaveTextContent("Sin portero");
     expect(
       screen.getByRole("button", {
         name: "Mover a Mateo Restrepo a Team Tide",
@@ -1601,6 +1725,34 @@ describe("las columnas de equipo (#759)", () => {
         name: "Sacar a Mateo Restrepo de Team Kelp",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("avisa en español de uno que falta y de cuántos faltan", async () => {
+    const defenders = [11, 12, 13].map((index) =>
+      entry(index, `Defensa ${index}`, { positionId: DEFENDER_ID }),
+    );
+    stubClub({
+      builders: [
+        {
+          ...COVERED,
+          available: [...COVERED.available, KEEPER, ...defenders],
+          requirements: [
+            GOALKEEPER_REQUIREMENT,
+            { ...DEFENDER_REQUIREMENT, minPerTeam: 2 },
+          ],
+        },
+      ],
+    });
+
+    await openScreen("es");
+
+    const [missingKeeper, missingDefenders] = within(region("Team Tide"))
+      .getByRole("list", { name: "Cobertura de puestos" })
+      .querySelectorAll("li");
+    expect(missingKeeper).toHaveTextContent("Falta POR");
+    expect(missingKeeper).toHaveTextContent("Falta 1 Portero");
+    expect(missingDefenders).toHaveTextContent("Faltan 2 DEF");
+    expect(missingDefenders).toHaveTextContent("Faltan 2 Defensa");
   });
 
   it("le dice al equipo vacío en español cómo llenarlo", async () => {

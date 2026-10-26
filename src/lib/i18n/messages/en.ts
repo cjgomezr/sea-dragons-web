@@ -2884,6 +2884,17 @@ export const englishMessages = {
     other: "{count} forwards",
   },
   "teams.coverage.noGoalkeeper": "No goalkeeper",
+  // Una ficha por posición con mínimo (#888): a la vista la abreviatura,
+  // al lector el nombre que el club le dio.
+  "teams.coverage.position": "{position}: {count}",
+  "teams.coverage.short": {
+    one: "Missing {shortName}",
+    other: "{count} short of {shortName}",
+  },
+  "teams.coverage.missing": {
+    one: "Missing {count} {position}",
+    other: "Missing {count} {position}",
+  },
   "teams.available.title": "Available · Going",
   "teams.available.empty": "Everyone who said yes is on a team.",
   "teams.maybe.title": "Maybe",

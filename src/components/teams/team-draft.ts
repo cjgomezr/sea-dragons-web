@@ -1,9 +1,6 @@
+import type { PositionChoice } from "@/lib/club/club-positions";
 import { toPositionRequirements } from "@/lib/teams/position-coverage";
-import type {
-  PositionRequirement,
-  SquadPlayer,
-  TeamSplit,
-} from "@/lib/teams/squad";
+import type { SquadPlayer, TeamSplit } from "@/lib/teams/squad";
 import { suggestSwap, type SwapImprovement } from "@/lib/teams/swap-suggestion";
 import {
   TEAM_IDS,
@@ -51,8 +48,9 @@ export type TeamDraft = {
   /** Si lo que el servidor tiene está publicado ahora: guardar lo vuelve
    * borrador aunque `publishedAt` siga diciendo que se publicó (#871). */
   readonly isPublished: boolean;
-  /** Los mínimos por posición del club, para sugerir como el servidor. */
-  readonly requirements: readonly PositionRequirement[];
+  /** Las posiciones con mínimo del club, en su orden: para sugerir como el
+   * servidor y para las fichas de cada tarjeta (#888). */
+  readonly requirements: readonly PositionChoice[];
 };
 
 export type DraftSuggestion = {
@@ -85,7 +83,7 @@ export function startDraft(builder: OpenedBuilder): TeamDraft {
     saved: assignments,
     publishedAt: builder.split?.publishedAt ?? null,
     isPublished: (builder.split?.publishedAt ?? null) !== null,
-    requirements: toPositionRequirements(builder.requirements),
+    requirements: builder.requirements,
   };
 }
 
@@ -220,7 +218,10 @@ export function draftTotals(draft: TeamDraft): SplitTotals {
 }
 
 export function draftSuggestion(draft: TeamDraft): DraftSuggestion | null {
-  const swap = suggestSwap(splitOf(draft), draft.requirements);
+  const swap = suggestSwap(
+    splitOf(draft),
+    toPositionRequirements(draft.requirements),
+  );
   return swap === null
     ? null
     : {
