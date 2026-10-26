@@ -26,7 +26,7 @@ import {
   playerId,
   signedPhotoUrl,
 } from "../helpers/team-builder-club";
-import { GOALKEEPER } from "../helpers/seeded-positions";
+import { DEFENDER, FORWARD, GOALKEEPER } from "../helpers/seeded-positions";
 
 /**
  * El team builder del coach (#401, RF-3 a RF-5 del PRD de E10), contado sin
@@ -108,6 +108,7 @@ describe("la escuadra", () => {
           userId: ANA.userId,
           fullName: ANA.fullName,
           position: null,
+          positionId: null,
           coverage: null,
           rating: 8.5,
           isUnrated: false,
@@ -117,6 +118,7 @@ describe("la escuadra", () => {
           userId: BRUNO.userId,
           fullName: BRUNO.fullName,
           position: { id: GOALKEEPER.id, names: GOALKEEPER.names },
+          positionId: GOALKEEPER.id,
           coverage: "goalkeeper",
           rating: 7,
           isUnrated: false,
@@ -607,4 +609,91 @@ describe("balancear", () => {
       await expect(balancing).rejects.toBeInstanceOf(TeamBuilderForbiddenError);
     },
   );
+});
+
+describe("los mínimos por posición del club (E34)", () => {
+  const WINGER = {
+    id: "90000000-0000-4000-8000-000000000004",
+    names: { en: "Winger", es: "Ala" },
+    isArchived: false,
+    minPerTeam: 0,
+    shortNames: { en: "WNG", es: "ALA" },
+  };
+
+  function goalkeeperNamed(index: number, fullName: string): FakePlayer {
+    return {
+      userId: playerId(10 + index),
+      fullName,
+      response: "yes",
+      positionId: GOALKEEPER.id,
+      coverage: "goalkeeper",
+      ratings: [8],
+    };
+  }
+
+  /** Dos porteros de 8 y dos sin posición de 9 y 7: por nivel, los porteros
+   * van juntos; con el mínimo, uno a cada lado. */
+  const TWO_GOALKEEPERS: readonly FakePlayer[] = [
+    goalkeeperNamed(1, "Gala Portero"),
+    goalkeeperNamed(2, "Gus Portero"),
+    { userId: playerId(20), fullName: "Cris", response: "yes", ratings: [9] },
+    { userId: playerId(21), fullName: "Dani", response: "yes", ratings: [7] },
+  ];
+
+  function balanceWith(positions: FakeTeamsClubOptions["positions"]) {
+    return autoBalanceEventTeams(
+      fakeTeamsClub({ players: TWO_GOALKEEPERS, positions }).gateways,
+      { callerId: TEAMS_CALLER_ID, eventId: EVENT_ID, now: TEAMS_NOW },
+    );
+  }
+
+  function goalkeepersIn(team: readonly { positionId: string | null }[]) {
+    return team.filter((entry) => entry.positionId === GOALKEEPER.id).length;
+  }
+
+  it("trae en el builder las posiciones activas con mínimo, en el orden del club", async () => {
+    const archived = { ...DEFENDER, isArchived: true };
+    const twoForwards = { ...FORWARD, minPerTeam: 2 };
+
+    const builder = await open({
+      players: EVERYONE,
+      positions: [GOALKEEPER, archived, WINGER, twoForwards],
+    });
+
+    expect(builder.requirements).toEqual([
+      {
+        id: GOALKEEPER.id,
+        names: GOALKEEPER.names,
+        shortNames: GOALKEEPER.shortNames,
+        minPerTeam: 1,
+      },
+      {
+        id: FORWARD.id,
+        names: FORWARD.names,
+        shortNames: FORWARD.shortNames,
+        minPerTeam: 2,
+      },
+    ]);
+  });
+
+  it("reparte con los mínimos del club: un portero a cada lado", async () => {
+    const balanced = await balanceWith([GOALKEEPER]);
+
+    expect(goalkeepersIn(balanced.a)).toBe(1);
+    expect(goalkeepersIn(balanced.b)).toBe(1);
+  });
+
+  it("no exige una posición archivada aunque tenga mínimo y dos jugadores", async () => {
+    const balanced = await balanceWith([{ ...GOALKEEPER, isArchived: true }]);
+
+    expect(balanced.totals.ratingDifference).toBe(0);
+    expect(goalkeepersIn(balanced.b)).toBe(2);
+  });
+
+  it("no exige una posición con mínimo 0", async () => {
+    const balanced = await balanceWith([{ ...GOALKEEPER, minPerTeam: 0 }]);
+
+    expect(balanced.totals.ratingDifference).toBe(0);
+    expect(goalkeepersIn(balanced.b)).toBe(2);
+  });
 });

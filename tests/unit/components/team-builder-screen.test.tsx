@@ -52,6 +52,31 @@ const FORWARD = {
   names: { en: "Forward", es: "Ataque" },
 };
 
+const GOALKEEPER_ID = "f0f0f0f0-0000-4000-8000-000000000001";
+const DEFENDER_ID = "f0f0f0f0-0000-4000-8000-000000000002";
+
+/** Lo que deja la migración de #885: mínimo 1 en las tres con rol. */
+const ROLE_REQUIREMENTS: TeamBuilder["requirements"] = [
+  {
+    id: GOALKEEPER_ID,
+    names: { en: "Goalkeeper", es: "Portero" },
+    shortNames: { en: "GK", es: "POR" },
+    minPerTeam: 1,
+  },
+  {
+    id: DEFENDER_ID,
+    names: { en: "Defender", es: "Defensa" },
+    shortNames: { en: "DEF", es: "DEF" },
+    minPerTeam: 1,
+  },
+  {
+    id: FORWARD.id,
+    names: FORWARD.names,
+    shortNames: { en: "ATT", es: "ATA" },
+    minPerTeam: 1,
+  },
+];
+
 function entry(
   index: number,
   fullName: string,
@@ -66,6 +91,7 @@ function entry(
     isUnrated: false,
     photoUrl: null,
     ...changes,
+    positionId: changes.positionId ?? changes.position?.id ?? null,
   };
 }
 
@@ -97,6 +123,7 @@ function builderFor(
     available: [DANIELA, ETHAN, MATEO],
     maybe: [RUBY],
     split: null,
+    requirements: ROLE_REQUIREMENTS,
     ...changes,
   };
 }
@@ -849,7 +876,10 @@ describe("sugerencia", () => {
   });
 
   it("dice que el intercambio cubre los puestos cuando cierra un hueco", async () => {
-    const goalkeeper = { coverage: "goalkeeper" as const };
+    const goalkeeper = {
+      coverage: "goalkeeper" as const,
+      positionId: GOALKEEPER_ID,
+    };
     const keeperOne = entry(8, "Olivia Park", { ...goalkeeper, rating: 7 });
     const keeperTwo = entry(9, "Noah Lee", { ...goalkeeper, rating: 7 });
     stubClub({
@@ -1401,11 +1431,11 @@ describe("la cabecera, la barra y los totales (#758)", () => {
 
 describe("las columnas de equipo (#759)", () => {
   const GOALKEEPER = {
-    id: "f0f0f0f0-0000-4000-8000-000000000001",
+    id: GOALKEEPER_ID,
     names: { en: "Goalkeeper", es: "Portero" },
   };
   const FULL_BACK = {
-    id: "f0f0f0f0-0000-4000-8000-000000000002",
+    id: DEFENDER_ID,
     names: { en: "Full back", es: "Defensa" },
   };
   const VALENTINA = entry(6, "Valentina Gómez", {

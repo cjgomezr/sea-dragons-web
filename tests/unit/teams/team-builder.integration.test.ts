@@ -336,6 +336,12 @@ describeRls("el team builder en Supabase", () => {
         expect(builder.maybe.map((entry) => entry.fullName)).toEqual([
           "Maya Quizás",
         ]);
+        const pia = builder.available[1];
+        expect(pia?.positionId).toEqual(expect.any(String));
+        expect(pia?.positionId).toBe(pia?.position?.id);
+        expect(builder.requirements).toContainEqual(
+          expect.objectContaining({ id: pia?.positionId, minPerTeam: 1 }),
+        );
 
         const balanced = await autoBalanceEventTeams(gateways, request);
         expect(balanced.totals.ratingDifference).toBe(3);

@@ -4,8 +4,10 @@ import type { AccountStatus } from "@/lib/auth/account-status";
 import type { RoleRequestGateways } from "@/lib/auth/role-request";
 import { type Role, hasCapability } from "@/lib/auth/roles";
 import {
+  type ClubPositions,
   type ClubPositionsGateway,
   type NamedPosition,
+  type PositionChoice,
   findClubPosition,
 } from "@/lib/club/club-positions";
 import type { EventStatus } from "@/lib/events/event-agenda";
@@ -17,8 +19,10 @@ import type { NotificationBroadcastWriter } from "@/lib/notifications/notify-mem
 import { compareNames } from "@/lib/text/name-order";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
 import { autoBalanceTeams } from "./auto-balance";
+import { toPositionRequirements } from "./position-coverage";
 import {
   type PositionCoverage,
+  type PositionRequirement,
   type SquadPlayer,
   type TeamSplit,
   UNRATED_PLAYER_RATING,
@@ -230,6 +234,9 @@ export type SquadEntry = {
   readonly userId: string;
   readonly fullName: string;
   readonly position: NamedPosition | null;
+  /** El id de su posición, para contarlo en los mínimos (E34). */
+  readonly positionId: string | null;
+  /** La función de su posición; la retira #889 en favor de `positionId`. */
   readonly coverage: PositionCoverage | null;
   readonly rating: number;
   readonly isUnrated: boolean;
@@ -257,6 +264,9 @@ export type TeamBuilder = {
   readonly available: readonly SquadEntry[];
   readonly maybe: readonly SquadEntry[];
   readonly split: BuilderSplit | null;
+  /** Los mínimos por posición del club (RF-3 del PRD de E34): con ellos la
+   * pantalla calcula la sugerencia igual que el servidor. */
+  readonly requirements: readonly PositionChoice[];
 };
 
 export type SuggestedSwap = {
@@ -442,11 +452,37 @@ function distinctPositionIds(
   ].sort();
 }
 
-/** Los jugadores ya leídos, listos para pintar, por id. `photoUrls` va por
- * `userId`: quien no está en él sale sin foto. */
-async function toSquadEntries(
+/** Las posiciones del club, con todas las que tienen esos jugadores. */
+function readPlayerPositions(
   gateways: { readonly positions: ClubPositionsGateway },
   clubId: string,
+  players: readonly PlayerRecord[],
+): Promise<ClubPositions> {
+  return gateways.positions.findClubPositions(
+    clubId,
+    distinctPositionIds(players),
+  );
+}
+
+/** Lo que exige el reparto (D9 del PRD de E34): las activas con mínimo, en
+ * el orden del club. Una archivada conserva su mínimo pero no exige. */
+export function requiredPositions(
+  positions: ClubPositions,
+): readonly PositionChoice[] {
+  return positions
+    .filter((position) => !position.isArchived && position.minPerTeam > 0)
+    .map(({ id, names, shortNames, minPerTeam }) => ({
+      id,
+      names,
+      shortNames,
+      minPerTeam,
+    }));
+}
+
+/** Los jugadores ya leídos, listos para pintar, por id. `photoUrls` va por
+ * `userId`: quien no está en él sale sin foto. */
+function toSquadEntries(
+  positions: ClubPositions,
   {
     players,
     photoUrls,
@@ -454,11 +490,7 @@ async function toSquadEntries(
     readonly players: readonly PlayerRecord[];
     readonly photoUrls: ReadonlyMap<string, string>;
   },
-): Promise<ReadonlyMap<string, SquadEntry>> {
-  const positions = await gateways.positions.findClubPositions(
-    clubId,
-    distinctPositionIds(players),
-  );
+): ReadonlyMap<string, SquadEntry> {
   return new Map(
     players.map((player) => {
       const overall =
@@ -467,6 +499,7 @@ async function toSquadEntries(
         userId: player.userId,
         fullName: player.fullName,
         position: positionOf(positions, player.positionId),
+        positionId: player.positionId,
         coverage: player.coverage,
         rating: overall ?? UNRATED_PLAYER_RATING,
         isUnrated: overall === null,
@@ -520,10 +553,10 @@ export async function readAssignedEntries(
   ]);
   const squadIds = squadIdsOf(responses, players);
   // "Mi equipo" enseña nombres y posiciones, no caras: no firma nada.
-  const entries = await toSquadEntries(gateways, query.clubId, {
-    players,
-    photoUrls: new Map(),
-  });
+  const entries = toSquadEntries(
+    await readPlayerPositions(gateways, query.clubId, players),
+    { players, photoUrls: new Map() },
+  );
   return new Map(
     [...entries].map(([userId, entry]) => [
       userId,
@@ -585,6 +618,7 @@ type Squad = {
   readonly maybe: readonly SquadEntry[];
   /** Todos los que se leyeron: la escuadra y los asignados que salieron. */
   readonly entries: ReadonlyMap<string, SquadEntry>;
+  readonly requirements: readonly PositionChoice[];
 };
 
 function byName(first: SquadEntry, second: SquadEntry): number {
@@ -629,7 +663,8 @@ async function readSquad(
     responses,
     assignedIds,
   });
-  const entries = await toSquadEntries(gateways, event.clubId, {
+  const positions = await readPlayerPositions(gateways, event.clubId, players);
+  const entries = toSquadEntries(positions, {
     players,
     photoUrls: await signVisiblePhotos(gateways, players, viewerRole),
   });
@@ -643,6 +678,7 @@ async function readSquad(
     available: withResponse("yes"),
     maybe: withResponse("maybe"),
     entries,
+    requirements: requiredPositions(positions),
   };
 }
 
@@ -704,6 +740,7 @@ export async function openTeamBuilder(
     available: squad.available,
     maybe: squad.maybe,
     split: split === null ? null : toBuilderSplit(split, squad),
+    requirements: squad.requirements,
   };
 }
 
@@ -788,12 +825,15 @@ function toSquadPlayer(entry: SquadEntry): SquadPlayer {
     userId: entry.userId,
     fullName: entry.fullName,
     rating: entry.isUnrated ? null : entry.rating,
-    coverage: entry.coverage,
+    positionId: entry.positionId,
   };
 }
 
-function toSuggestedSwap(split: TeamSplit): SuggestedSwap | null {
-  const swap = suggestSwap(split);
+function toSuggestedSwap(
+  split: TeamSplit,
+  requirements: readonly PositionRequirement[],
+): SuggestedSwap | null {
+  const swap = suggestSwap(split, requirements);
   return swap === null
     ? null
     : {
@@ -840,7 +880,11 @@ export async function autoBalanceEventTeams(
   if (squad.available.length === 0) {
     throw new TeamSquadEmptyError();
   }
-  const balanced = autoBalanceTeams(squad.available.map(toSquadPlayer));
+  const requirements = toPositionRequirements(squad.requirements);
+  const balanced = autoBalanceTeams(
+    squad.available.map(toSquadPlayer),
+    requirements,
+  );
   const teams =
     stored?.teams ??
     (await gateways.clubTeams.findClubTeamLabels(actor.clubId));
@@ -858,7 +902,7 @@ export async function autoBalanceEventTeams(
     a: entriesOf(squad, balanced.a),
     b: entriesOf(squad, balanced.b),
     totals: calculateSplitTotals(balanced),
-    suggestion: toSuggestedSwap(balanced),
+    suggestion: toSuggestedSwap(balanced, requirements),
     isTimeBudgetExhausted: balanced.isTimeBudgetExhausted,
   };
 }

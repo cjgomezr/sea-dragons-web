@@ -3,13 +3,14 @@
  * el paso de mejora del auto-balance: de todos los intercambios de a un par,
  * el que más mejora el reparto, o ninguno.
  *
- * "Mejorar" tiene prioridad fija (C2): primero cerrar huecos de cobertura,
- * después acercar el puntaje. Un intercambio que abra un hueco nunca sale
+ * "Mejorar" tiene prioridad fija (C2): primero cerrar huecos de los mínimos
+ * por posición (E34), después acercar el puntaje. Un intercambio que abra un hueco nunca sale
  * mejor, por mucho que acerque el puntaje.
  */
 
 import { countCoverageGaps } from "./position-coverage";
 import {
+  type PositionRequirement,
   type SquadPlayer,
   type TeamSplit,
   sortByRanking,
@@ -37,9 +38,12 @@ type ScoredSwap = {
   readonly score: SplitScore;
 };
 
-function scoreSplit(split: TeamSplit): SplitScore {
+function scoreSplit(
+  split: TeamSplit,
+  requirements: readonly PositionRequirement[],
+): SplitScore {
   return {
-    coverageGaps: countCoverageGaps(split),
+    coverageGaps: countCoverageGaps(split, requirements),
     differenceTenths: Math.abs(
       sumRatingTenths(split.a) - sumRatingTenths(split.b),
     ),
@@ -73,13 +77,19 @@ export function swapPlayers(
  * estrictamente mejor: así el empate lo gana siempre el mismo par, llegue
  * como llegue la lista.
  */
-function findBestSwap(split: TeamSplit): ScoredSwap | null {
+function findBestSwap(
+  split: TeamSplit,
+  requirements: readonly PositionRequirement[],
+): ScoredSwap | null {
   let best: ScoredSwap | null = null;
-  let bestScore = scoreSplit(split);
+  let bestScore = scoreSplit(split, requirements);
   const rankedB = sortByRanking(split.b);
   for (const playerFromA of sortByRanking(split.a)) {
     for (const playerFromB of rankedB) {
-      const score = scoreSplit(swapPlayers(split, playerFromA, playerFromB));
+      const score = scoreSplit(
+        swapPlayers(split, playerFromA, playerFromB),
+        requirements,
+      );
       if (isBetterScore(score, bestScore)) {
         best = { playerFromA, playerFromB, score };
         bestScore = score;
@@ -89,12 +99,18 @@ function findBestSwap(split: TeamSplit): ScoredSwap | null {
   return best;
 }
 
-export function suggestSwap(split: TeamSplit): SwapSuggestion | null {
-  const best = findBestSwap(split);
+/** Los requisitos llegan de fuera (los mínimos del club): la sugerencia no
+ * los lee de ningún sitio y sigue siendo pura. */
+export function suggestSwap(
+  split: TeamSplit,
+  requirements: readonly PositionRequirement[],
+): SwapSuggestion | null {
+  const best = findBestSwap(split, requirements);
   if (best === null) {
     return null;
   }
-  const closesCoverageGap = best.score.coverageGaps < countCoverageGaps(split);
+  const closesCoverageGap =
+    best.score.coverageGaps < countCoverageGaps(split, requirements);
   return {
     playerFromA: best.playerFromA,
     playerFromB: best.playerFromB,

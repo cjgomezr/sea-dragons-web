@@ -25,6 +25,7 @@ import {
   fakeTeamsClub,
   playerId,
 } from "../helpers/team-builder-club";
+import { DEFENDER, GOALKEEPER } from "../helpers/seeded-positions";
 
 /**
  * Los endpoints del team builder y de "mi equipo" (#401, RF-3 a RF-8 del PRD
@@ -303,6 +304,31 @@ describe("GET /api/v1/teams/[eventId]", () => {
       ]);
     },
   );
+
+  it("sirve el positionId de cada jugador y los mínimos por posición del club (E34)", async () => {
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
+    givenClub({
+      players: [{ ...ANA, positionId: GOALKEEPER.id, coverage: "goalkeeper" }],
+      positions: [GOALKEEPER, { ...DEFENDER, minPerTeam: 0 }],
+    });
+
+    const response = await openBuilder();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        available: [{ positionId: GOALKEEPER.id, coverage: "goalkeeper" }],
+        requirements: [
+          {
+            id: GOALKEEPER.id,
+            names: GOALKEEPER.names,
+            shortNames: GOALKEEPER.shortNames,
+            minPerTeam: 1,
+          },
+        ],
+      },
+    });
+  });
 
   it("sirve los equipos del club a un evento sin reparto (#755)", async () => {
     givenSession({ kind: "active", role: "Coach", membershipCurrent: true });

@@ -48,19 +48,30 @@ const teamLabelSchema = z.object({ name: z.string(), color: z.string() });
 
 const teamLabelsSchema = z.object({ a: teamLabelSchema, b: teamLabelSchema });
 
+const localizedNamesSchema = z.object({
+  en: z.string().nullable(),
+  es: z.string().nullable(),
+});
+
 const squadEntrySchema = z.object({
   userId: z.uuid(),
   fullName: z.string(),
   position: z
-    .object({
-      id: z.string(),
-      names: z.object({ en: z.string().nullable(), es: z.string().nullable() }),
-    })
+    .object({ id: z.string(), names: localizedNamesSchema })
     .nullable(),
+  positionId: z.string().nullable(),
   coverage: z.enum(["goalkeeper", "defender", "forward"]).nullable(),
   rating: z.number(),
   isUnrated: z.boolean(),
   photoUrl: z.string().nullable(),
+});
+
+/** Una posición activa con mínimo (E34): lo que exige el reparto. */
+const positionRequirementSchema = z.object({
+  id: z.string(),
+  names: localizedNamesSchema,
+  shortNames: localizedNamesSchema,
+  minPerTeam: z.number().int().positive(),
 });
 
 const builderResponseSchema = z.object({
@@ -81,6 +92,7 @@ const builderResponseSchema = z.object({
         ),
       })
       .nullable(),
+    requirements: z.array(positionRequirementSchema),
   }),
 });
 

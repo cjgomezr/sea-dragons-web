@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { suggestSwap, swapPlayers } from "@/lib/teams/swap-suggestion";
-import { namesOf, squadPlayer } from "../helpers/squad-players";
+import {
+  ROLE_REQUIREMENTS,
+  namesOf,
+  squadPlayer,
+} from "../helpers/squad-players";
 
 /**
  * La sugerencia de intercambio (FR-047, RF-6 del PRD de E10): de todos los
@@ -16,7 +20,7 @@ describe("la sugerencia de intercambio", () => {
       b: [squadPlayer("Dani", 6), squadPlayer("Eva", 5), squadPlayer("Fer", 1)],
     };
 
-    const suggestion = suggestSwap(split);
+    const suggestion = suggestSwap(split, ROLE_REQUIREMENTS);
 
     expect(suggestion).toEqual({
       playerFromA: squadPlayer("Cris", 7),
@@ -36,7 +40,7 @@ describe("la sugerencia de intercambio", () => {
       b: [squadPlayer("Dani", 6), squadPlayer("Eva", 5), squadPlayer("Fer", 1)],
     };
 
-    const suggestion = suggestSwap(split);
+    const suggestion = suggestSwap(split, ROLE_REQUIREMENTS);
 
     expect(suggestion).toEqual({
       playerFromA: squadPlayer("Bea", 8, "goalkeeper"),
@@ -52,7 +56,7 @@ describe("la sugerencia de intercambio", () => {
       b: [squadPlayer("Carla", 5, "goalkeeper"), squadPlayer("Dani", 8)],
     };
 
-    expect(suggestSwap(split)).toBeNull();
+    expect(suggestSwap(split, ROLE_REQUIREMENTS)).toBeNull();
   });
 
   it("no sugiere nada cuando ningún par mejora el reparto", () => {
@@ -61,13 +65,13 @@ describe("la sugerencia de intercambio", () => {
       b: [squadPlayer("Bea", 8), squadPlayer("Carla", 7)],
     };
 
-    expect(suggestSwap(split)).toBeNull();
+    expect(suggestSwap(split, ROLE_REQUIREMENTS)).toBeNull();
   });
 
   it("no sugiere nada con un equipo vacío", () => {
     const split = { a: [squadPlayer("Ana", 9)], b: [] };
 
-    expect(suggestSwap(split)).toBeNull();
+    expect(suggestSwap(split, ROLE_REQUIREMENTS)).toBeNull();
   });
 
   it("elige el mismo par sin importar el orden en que llegan los jugadores", () => {
@@ -80,8 +84,12 @@ describe("la sugerencia de intercambio", () => {
       b: [...players.b].reverse(),
     };
 
-    expect(suggestSwap(reversed)).toEqual(suggestSwap(players));
-    expect(suggestSwap(players)?.playerFromB.fullName).toBe("Carla");
+    expect(suggestSwap(reversed, ROLE_REQUIREMENTS)).toEqual(
+      suggestSwap(players, ROLE_REQUIREMENTS),
+    );
+    expect(suggestSwap(players, ROLE_REQUIREMENTS)?.playerFromB.fullName).toBe(
+      "Carla",
+    );
   });
 });
 
@@ -98,5 +106,54 @@ describe("aplicar un intercambio", () => {
 
     expect(namesOf(swapped.a)).toEqual(["Dani", "Bea"]);
     expect(namesOf(swapped.b)).toEqual(["Carla", "Ana"]);
+  });
+});
+
+describe("la sugerencia con mínimos de más de uno (E34)", () => {
+  const twoDefenders = [{ positionId: "defender", minPerTeam: 2 }];
+
+  it("propone el par que cierra un mínimo que la escuadra permite cumplir", () => {
+    const split = {
+      a: [
+        squadPlayer("Ana", 9, "defender"),
+        squadPlayer("Bea", 8, "defender"),
+        squadPlayer("Cris", 7, "defender"),
+      ],
+      b: [
+        squadPlayer("Dani", 6, "defender"),
+        squadPlayer("Eva", 5),
+        squadPlayer("Fer", 1),
+      ],
+    };
+
+    const suggestion = suggestSwap(split, twoDefenders);
+
+    expect(suggestion?.improvement).toBe("coverage");
+    expect(suggestion?.playerFromB.positionId).toBeNull();
+    expect(suggestion?.playerFromA.positionId).toBe("defender");
+  });
+
+  it("con los mínimos cumplidos propone el que más acerca el nivel sin romper ninguno", () => {
+    const split = {
+      a: [
+        squadPlayer("Ana", 9, "defender"),
+        squadPlayer("Bea", 8, "defender"),
+        squadPlayer("Cris", 7),
+      ],
+      b: [
+        squadPlayer("Dani", 6, "defender"),
+        squadPlayer("Eva", 5, "defender"),
+        squadPlayer("Fer", 1),
+      ],
+    };
+
+    const suggestion = suggestSwap(split, twoDefenders);
+
+    expect(suggestion).toEqual({
+      playerFromA: squadPlayer("Cris", 7),
+      playerFromB: squadPlayer("Fer", 1),
+      improvement: "rating-difference",
+      ratingDifferenceAfter: 0,
+    });
   });
 });

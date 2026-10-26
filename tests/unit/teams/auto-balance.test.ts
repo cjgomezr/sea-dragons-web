@@ -4,12 +4,16 @@ import {
   autoBalanceTeams,
 } from "@/lib/teams/auto-balance";
 import type {
-  PositionCoverage,
+  PositionRequirement,
   SquadPlayer,
   TeamSplit,
 } from "@/lib/teams/squad";
 import { calculateSplitTotals } from "@/lib/teams/team-totals";
-import { namesOf, squadPlayer } from "../helpers/squad-players";
+import {
+  ROLE_REQUIREMENTS,
+  namesOf,
+  squadPlayer,
+} from "../helpers/squad-players";
 
 /**
  * El auto-balance de FR-046 (RF-5 del PRD de E10), tal como lo fijó C2 en
@@ -25,12 +29,12 @@ const P95 = 0.95;
 
 function countCoverage(
   team: readonly SquadPlayer[],
-  coverage: PositionCoverage,
+  positionId: string,
 ): number {
-  return team.filter((player) => player.coverage === coverage).length;
+  return team.filter((player) => player.positionId === positionId).length;
 }
 
-function hasCoverage(split: TeamSplit, coverage: PositionCoverage): boolean {
+function hasCoverage(split: TeamSplit, coverage: string): boolean {
   return (
     countCoverage(split.a, coverage) > 0 && countCoverage(split.b, coverage) > 0
   );
@@ -42,7 +46,7 @@ function hasCoverage(split: TeamSplit, coverage: PositionCoverage): boolean {
  */
 function findBetterCoveredSwap(
   split: TeamSplit,
-  requiredCoverage: readonly PositionCoverage[],
+  requiredCoverage: readonly string[],
 ): string | null {
   const currentDifference = calculateSplitTotals(split).ratingDifference;
   for (const fromA of split.a) {
@@ -56,6 +60,27 @@ function findBetterCoveredSwap(
       );
       const difference = calculateSplitTotals(swapped).ratingDifference;
       if (keepsCoverage && difference < currentDifference) {
+        return `${fromA.fullName} <-> ${fromB.fullName}`;
+      }
+    }
+  }
+  return null;
+}
+
+/** Como `findBetterCoveredSwap`, con cualquier regla de mínimos. */
+function findBetterSwapKeeping(
+  split: TeamSplit,
+  meetsMinimums: (split: TeamSplit) => boolean,
+): string | null {
+  const currentDifference = calculateSplitTotals(split).ratingDifference;
+  for (const fromA of split.a) {
+    for (const fromB of split.b) {
+      const swapped = {
+        a: split.a.map((player) => (player === fromA ? fromB : player)),
+        b: split.b.map((player) => (player === fromB ? fromA : player)),
+      };
+      const difference = calculateSplitTotals(swapped).ratingDifference;
+      if (meetsMinimums(swapped) && difference < currentDifference) {
         return `${fromA.fullName} <-> ${fromB.fullName}`;
       }
     }
@@ -94,18 +119,20 @@ describe("reparto en serpiente", () => {
       squadPlayer("Dani", 6),
     ];
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(namesOf(result.a)).toEqual(["Ana", "Dani"]);
     expect(namesOf(result.b)).toEqual(["Bea", "Carla"]);
   });
 
   it("devuelve el modo auto", () => {
-    expect(autoBalanceTeams([squadPlayer("Ana", 9)]).mode).toBe("auto");
+    expect(
+      autoBalanceTeams([squadPlayer("Ana", 9)], ROLE_REQUIREMENTS).mode,
+    ).toBe("auto");
   });
 
   it("devuelve dos equipos vacíos con la escuadra vacía", () => {
-    const result = autoBalanceTeams([]);
+    const result = autoBalanceTeams([], ROLE_REQUIREMENTS);
 
     expect(result.a).toEqual([]);
     expect(result.b).toEqual([]);
@@ -113,7 +140,7 @@ describe("reparto en serpiente", () => {
   });
 
   it("pone en el equipo a al único jugador de una escuadra de uno", () => {
-    const result = autoBalanceTeams([squadPlayer("Ana", 9)]);
+    const result = autoBalanceTeams([squadPlayer("Ana", 9)], ROLE_REQUIREMENTS);
 
     expect(namesOf(result.a)).toEqual(["Ana"]);
     expect(result.b).toEqual([]);
@@ -127,7 +154,7 @@ describe("reparto en serpiente", () => {
       squadPlayer("Dani", 1),
     ];
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(namesOf(result.b)).toEqual(["Bea", "Carla"]);
     expect(calculateSplitTotals(result).ratingDifference).toBe(0);
@@ -138,7 +165,10 @@ describe("reparto en serpiente", () => {
 
 describe("cobertura de posiciones", () => {
   it("con doce y dos porteros da seis y seis con un portero por lado, en un óptimo local (AC-019)", () => {
-    const result = autoBalanceTeams(TWELVE_WITH_TWO_GOALKEEPERS);
+    const result = autoBalanceTeams(
+      TWELVE_WITH_TWO_GOALKEEPERS,
+      ROLE_REQUIREMENTS,
+    );
 
     expect(result.a).toHaveLength(6);
     expect(result.b).toHaveLength(6);
@@ -159,7 +189,7 @@ describe("cobertura de posiciones", () => {
       squadPlayer("Hugo", 5.5),
     ];
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(hasCoverage(result, "defender")).toBe(true);
     expect(hasCoverage(result, "forward")).toBe(true);
@@ -174,7 +204,7 @@ describe("cobertura de posiciones", () => {
       squadPlayer("Dani", 6),
     ];
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(namesOf(result.a)).toEqual(["Ana", "Dani"]);
     expect(calculateSplitTotals(result).ratingDifference).toBe(0);
@@ -188,7 +218,7 @@ describe("cobertura de posiciones", () => {
       squadPlayer("Dani", 6, "forward"),
     ];
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(calculateSplitTotals(result).ratingDifference).toBe(0);
     expect(hasCoverage(result, "defender")).toBe(true);
@@ -202,7 +232,7 @@ describe("cobertura de posiciones", () => {
       squadPlayer("Dani", 7),
     ];
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(hasCoverage(result, "goalkeeper")).toBe(true);
     expect(calculateSplitTotals(result).ratingDifference).toBe(2);
@@ -216,7 +246,7 @@ describe("cobertura de posiciones", () => {
       squadPlayer("Dani", 7),
     ];
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(namesOf(result.b)).toEqual(["Ana", "Bea"]);
     expect(calculateSplitTotals(result).ratingDifference).toBe(0);
@@ -229,14 +259,17 @@ describe("intercambios", () => {
       squadPlayer(`P${rating}`, rating),
     );
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(calculateSplitTotals(result).ratingDifference).toBe(1);
     expect(findBetterCoveredSwap(result, [])).toBeNull();
   });
 
   it("no rompe la cobertura al intercambiar", () => {
-    const result = autoBalanceTeams(TWELVE_WITH_TWO_GOALKEEPERS);
+    const result = autoBalanceTeams(
+      TWELVE_WITH_TWO_GOALKEEPERS,
+      ROLE_REQUIREMENTS,
+    );
 
     expect(hasCoverage(result, "goalkeeper")).toBe(true);
   });
@@ -246,7 +279,7 @@ describe("escuadra impar", () => {
   it("con trece da siete y seis, y el sobrante va al equipo b si a suma más (AC-019b)", () => {
     const squad = [squadPlayer("Top", 9), ...fivePointPlayers(12)];
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(result.a).toHaveLength(6);
     expect(result.b).toHaveLength(7);
@@ -260,7 +293,7 @@ describe("escuadra impar", () => {
       ...fivePointPlayers(10),
     ];
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(result.a).toHaveLength(7);
     expect(result.b).toHaveLength(6);
@@ -271,9 +304,15 @@ describe("determinismo", () => {
   it("da el mismo reparto dos veces y sin importar el orden de entrada", () => {
     const shuffled = [...TWELVE_WITH_TWO_GOALKEEPERS].reverse();
 
-    const first = autoBalanceTeams(TWELVE_WITH_TWO_GOALKEEPERS);
-    const second = autoBalanceTeams(TWELVE_WITH_TWO_GOALKEEPERS);
-    const fromShuffled = autoBalanceTeams(shuffled);
+    const first = autoBalanceTeams(
+      TWELVE_WITH_TWO_GOALKEEPERS,
+      ROLE_REQUIREMENTS,
+    );
+    const second = autoBalanceTeams(
+      TWELVE_WITH_TWO_GOALKEEPERS,
+      ROLE_REQUIREMENTS,
+    );
+    const fromShuffled = autoBalanceTeams(shuffled, ROLE_REQUIREMENTS);
 
     expect(second).toEqual(first);
     expect(fromShuffled).toEqual(first);
@@ -284,7 +323,7 @@ describe("determinismo", () => {
       squadPlayer(name, 5),
     );
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(namesOf(result.a)).toEqual(["Ana", "Dani"]);
     expect(namesOf(result.b)).toEqual(["Bea", "Carla"]);
@@ -292,11 +331,11 @@ describe("determinismo", () => {
 
   it("rompe los empates de OVR y nombre por id", () => {
     const squad: SquadPlayer[] = [
-      { userId: "id-2", fullName: "Sam", rating: 5, coverage: null },
-      { userId: "id-1", fullName: "Sam", rating: 5, coverage: null },
+      { userId: "id-2", fullName: "Sam", rating: 5, positionId: null },
+      { userId: "id-1", fullName: "Sam", rating: 5, positionId: null },
     ];
 
-    const result = autoBalanceTeams(squad);
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
 
     expect(result.a.map((player) => player.userId)).toEqual(["id-1"]);
   });
@@ -312,9 +351,13 @@ describe("presupuesto de tiempo", () => {
     const clockThatJumpsPastBudget = (): number =>
       calls++ === 0 ? 0 : AUTO_BALANCE_TIME_BUDGET_MS;
 
-    const result = autoBalanceTeams(TWELVE_WITH_TWO_GOALKEEPERS, {
-      now: clockThatJumpsPastBudget,
-    });
+    const result = autoBalanceTeams(
+      TWELVE_WITH_TWO_GOALKEEPERS,
+      ROLE_REQUIREMENTS,
+      {
+        now: clockThatJumpsPastBudget,
+      },
+    );
 
     expect(result.isTimeBudgetExhausted).toBe(true);
     expect(result.a).toHaveLength(6);
@@ -325,16 +368,22 @@ describe("presupuesto de tiempo", () => {
   it("no avisa de nada cuando termina dentro del presupuesto", () => {
     const frozenClock = (): number => 0;
 
-    const result = autoBalanceTeams(TWELVE_WITH_TWO_GOALKEEPERS, {
-      now: frozenClock,
-    });
+    const result = autoBalanceTeams(
+      TWELVE_WITH_TWO_GOALKEEPERS,
+      ROLE_REQUIREMENTS,
+      {
+        now: frozenClock,
+      },
+    );
 
     expect(result.isTimeBudgetExhausted).toBe(false);
-    expect(result).toEqual(autoBalanceTeams(TWELVE_WITH_TWO_GOALKEEPERS));
+    expect(result).toEqual(
+      autoBalanceTeams(TWELVE_WITH_TWO_GOALKEEPERS, ROLE_REQUIREMENTS),
+    );
   });
 
   it("reparte treinta jugadores en menos de 2 s en el percentil 95 (AC-019c)", () => {
-    const coverages: (PositionCoverage | null)[] = [
+    const coverages: (string | null)[] = [
       "goalkeeper",
       "defender",
       "forward",
@@ -352,11 +401,119 @@ describe("presupuesto de tiempo", () => {
 
     const durations = Array.from({ length: PERFORMANCE_RUNS }, () => {
       const startedAt = performance.now();
-      autoBalanceTeams(squad);
+      autoBalanceTeams(squad, ROLE_REQUIREMENTS);
       return performance.now() - startedAt;
     }).sort((left, right) => left - right);
     const p95 = durations[Math.ceil(PERFORMANCE_RUNS * P95) - 1];
 
     expect(p95).toBeLessThan(NFR_002_LIMIT_MS);
+  });
+});
+
+describe("mínimos por posición del club (E34)", () => {
+  const defenders = (count: number): SquadPlayer[] =>
+    Array.from({ length: count }, (_, index) =>
+      squadPlayer(`D${index}`, 9 - index, "defender"),
+    );
+  const twoDefenders: readonly PositionRequirement[] = [
+    { positionId: "defender", minPerTeam: 2 },
+  ];
+
+  it("con mínimo 2 y cuatro defensas da al menos dos a cada equipo", () => {
+    const squad = [...defenders(4), ...fivePointPlayers(4)];
+
+    const result = autoBalanceTeams(squad, twoDefenders);
+
+    expect(countCoverage(result.a, "defender")).toBeGreaterThanOrEqual(2);
+    expect(countCoverage(result.b, "defender")).toBeGreaterThanOrEqual(2);
+  });
+
+  it("con mínimo 2 y tres defensas da al menos uno a cada equipo", () => {
+    const squad = [...defenders(3), ...fivePointPlayers(5)];
+
+    const result = autoBalanceTeams(squad, twoDefenders);
+
+    expect(countCoverage(result.a, "defender")).toBeGreaterThanOrEqual(1);
+    expect(countCoverage(result.b, "defender")).toBeGreaterThanOrEqual(1);
+  });
+
+  it("sin requisito para una posición, como la de mínimo 0, sus jugadores sólo cuentan para el nivel", () => {
+    const squad = [
+      squadPlayer("Ana", 8, "goalkeeper"),
+      squadPlayer("Bea", 8, "goalkeeper"),
+      squadPlayer("Cris", 9),
+      squadPlayer("Dani", 7),
+    ];
+
+    const result = autoBalanceTeams(squad, []);
+
+    expect(namesOf(result.b)).toEqual(["Ana", "Bea"]);
+    expect(calculateSplitTotals(result).ratingDifference).toBe(0);
+  });
+
+  it("con escuadra impar da el de más al equipo de menor nivel sin romper un mínimo (AC-019b)", () => {
+    const squad = [
+      squadPlayer("Top", 9),
+      squadPlayer("Gk1", 5, "goalkeeper"),
+      squadPlayer("Gk2", 5, "goalkeeper"),
+      ...fivePointPlayers(10),
+    ];
+
+    const result = autoBalanceTeams(squad, ROLE_REQUIREMENTS);
+
+    expect(result.a).toHaveLength(6);
+    expect(result.b).toHaveLength(7);
+    expect(countCoverage(result.a, "goalkeeper")).toBe(1);
+    expect(countCoverage(result.b, "goalkeeper")).toBe(1);
+  });
+
+  it("con mínimos de más de uno en varias posiciones a la vez reparte sin lanzar y sin un intercambio que deje menos huecos o menos diferencia", () => {
+    const positions = ["gk", "def", "mid", "fwd", "wing"];
+    const squad = Array.from({ length: 14 }, (_, index) =>
+      squadPlayer(
+        `P${String(index).padStart(2, "0")}`,
+        ((index * 37) % 50) / 10 + 5,
+        positions[index % 3],
+      ),
+    );
+    const requirements = positions.map((positionId) => ({
+      positionId,
+      minPerTeam: 3,
+    }));
+
+    const result = autoBalanceTeams(squad, requirements);
+
+    const meetsMinimums = (split: TeamSplit): boolean =>
+      ["gk", "def", "mid"].every(
+        (positionId) =>
+          countCoverage(split.a, positionId) >= 2 &&
+          countCoverage(split.b, positionId) >= 2,
+      );
+    expect(meetsMinimums(result)).toBe(true);
+    expect(findBetterSwapKeeping(result, meetsMinimums)).toBeNull();
+  });
+
+  it("reparte treinta jugadores con cinco posiciones con mínimo dentro del presupuesto de 1,5 s (AC-019c)", () => {
+    const positions = ["gk", "def", "mid", "fwd", "wing", null];
+    const squad = Array.from({ length: 30 }, (_, index) =>
+      squadPlayer(
+        `P${String(index).padStart(2, "0")}`,
+        index % 7 === 0 ? null : ((index * 37) % 50) / 10 + 5,
+        positions[index % positions.length],
+      ),
+    );
+    const requirements = positions.flatMap((positionId, index) =>
+      positionId === null ? [] : [{ positionId, minPerTeam: 1 + (index % 2) }],
+    );
+
+    const durations = Array.from({ length: PERFORMANCE_RUNS }, () => {
+      const startedAt = performance.now();
+      const result = autoBalanceTeams(squad, requirements);
+      expect(result.isTimeBudgetExhausted).toBe(false);
+      return performance.now() - startedAt;
+    }).sort((left, right) => left - right);
+    const p95 = durations[Math.ceil(PERFORMANCE_RUNS * P95) - 1];
+
+    expect(p95).toBeLessThan(AUTO_BALANCE_TIME_BUDGET_MS);
   });
 });
