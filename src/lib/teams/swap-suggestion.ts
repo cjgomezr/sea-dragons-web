@@ -4,8 +4,8 @@
  * el que más mejora el reparto, o ninguno.
  *
  * "Mejorar" tiene prioridad fija (C2): primero cerrar huecos de los mínimos
- * por posición (E34), después acercar el puntaje. Un intercambio que abra un hueco nunca sale
- * mejor, por mucho que acerque el puntaje.
+ * por posición (E34), después acercar el puntaje. Un intercambio que abra
+ * un hueco nunca sale mejor, por mucho que acerque el puntaje.
  */
 
 import { countCoverageGaps } from "./position-coverage";

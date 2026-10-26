@@ -466,7 +466,7 @@ function readPlayerPositions(
 
 /** Lo que exige el reparto (D9 del PRD de E34): las activas con mínimo, en
  * el orden del club. Una archivada conserva su mínimo pero no exige. */
-export function requiredPositions(
+function requiredPositions(
   positions: ClubPositions,
 ): readonly PositionChoice[] {
   return positions
