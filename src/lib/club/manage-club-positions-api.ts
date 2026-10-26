@@ -7,6 +7,7 @@ import {
   type ManagedPositions,
   type ManagedPositionsGateways,
   POSITION_NAME_MAX_LENGTH,
+  POSITION_SHORT_NAME_MAX_LENGTH,
   POSITIONS_CHANGED_REASON,
   PositionNotFoundError,
   PositionValidationError,
@@ -36,6 +37,18 @@ export const positionNamesBodySchema = z
   .object({
     en: z.string().max(NAME_BODY_MAX_LENGTH).nullable(),
     es: z.string().max(NAME_BODY_MAX_LENGTH).nullable(),
+  })
+  .strict();
+
+/** Como los nombres, con su propio tope holgado. */
+const SHORT_NAME_BODY_MAX_LENGTH = POSITION_SHORT_NAME_MAX_LENGTH * 4;
+
+/** Las dos abreviaturas siempre presentes; `null` o en blanco es "sin
+ * abreviatura en éste". */
+export const positionShortNamesBodySchema = z
+  .object({
+    en: z.string().max(SHORT_NAME_BODY_MAX_LENGTH).nullable(),
+    es: z.string().max(SHORT_NAME_BODY_MAX_LENGTH).nullable(),
   })
   .strict();
 

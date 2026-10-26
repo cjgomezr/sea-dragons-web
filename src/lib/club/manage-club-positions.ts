@@ -9,6 +9,7 @@ import type {
   ClubPosition,
   PositionCoverage,
   PositionNames,
+  PositionShortNames,
 } from "./club-positions";
 import { type ClubSettingsGateways, findAdministrator } from "./club-settings";
 
@@ -34,6 +35,12 @@ export type ManagedPositions = readonly ManagedPosition[];
 /** El límite de `club_position_names_name_length` en `0025`. */
 export const POSITION_NAME_MAX_LENGTH = 40;
 
+/** El límite de `club_position_names_short_name_length` en `0081`. */
+export const POSITION_SHORT_NAME_MAX_LENGTH = 4;
+
+/** El `check` de `club_positions_min_per_team_check` en `0081`. */
+export const POSITION_MIN_PER_TEAM_MAX = 20;
+
 export const POSITION_ISSUE_CODES = [
   "name_required",
   "name_en_too_long",
@@ -45,6 +52,23 @@ export const POSITION_ISSUE_CODES = [
 export type PositionIssueCode = (typeof POSITION_ISSUE_CODES)[number];
 
 export type PositionIssue = { readonly code: PositionIssueCode };
+
+/** Los del mínimo y las abreviaturas (#885). Van aparte de los del nombre:
+ * el formulario de nombres no tiene campo donde ponerlos. */
+export const POSITION_SETTING_ISSUE_CODES = [
+  "min_per_team_out_of_range",
+  "short_name_en_too_long",
+  "short_name_es_too_long",
+  "short_name_en_without_name",
+  "short_name_es_without_name",
+] as const;
+
+export type PositionSettingIssueCode =
+  (typeof POSITION_SETTING_ISSUE_CODES)[number];
+
+type PositionValidationIssue = {
+  readonly code: PositionIssueCode | PositionSettingIssueCode;
+};
 
 /** Lo que llega del formulario: un campo por idioma, quizá en blanco. */
 export type PositionNamesInput = {
@@ -77,6 +101,19 @@ export type PositionArchiveResult =
 
 export type PositionCoverageResult = PositionArchiveResult;
 
+/** Lo que devuelve un cambio que la bitácora anota con el valor de antes. */
+export type PositionValueChangeResult<Value> =
+  | { readonly kind: "changed"; readonly previous: Value }
+  | { readonly kind: "unchanged" }
+  | { readonly kind: "not_found" };
+
+export type PositionMinimumResult = PositionValueChangeResult<number>;
+
+/** La abreviatura vive con el nombre: un idioma sin nombre no la admite. */
+export type PositionShortNamesResult =
+  | PositionValueChangeResult<PositionShortNames>
+  | { readonly kind: "name_missing"; readonly locale: Locale };
+
 export type ManagedPositionsGateways = {
   readonly members: ClubSettingsGateways["members"];
   readonly positions: {
@@ -103,16 +140,24 @@ export type ManagedPositionsGateways = {
       target: PositionTarget,
       coverage: PositionCoverage | null,
     ): Promise<PositionCoverageResult>;
+    setPositionMinimum(
+      target: PositionTarget,
+      minPerTeam: number,
+    ): Promise<PositionMinimumResult>;
+    setPositionShortNames(
+      target: PositionTarget,
+      shortNames: PositionShortNames,
+    ): Promise<PositionShortNamesResult>;
   };
   readonly audit: AuditLogWriter;
 };
 
 export class PositionValidationError extends Error {
-  readonly issues: readonly PositionIssue[];
+  readonly issues: readonly PositionValidationIssue[];
 
-  constructor(issues: readonly PositionIssue[]) {
+  constructor(issues: readonly PositionValidationIssue[]) {
     super(
-      `Los nombres de la posición no valen: ${issues
+      `Los datos de la posición no valen: ${issues
         .map((issue) => issue.code)
         .join(", ")}.`,
     );
@@ -145,6 +190,20 @@ const TOO_LONG_ISSUE: Readonly<Record<Locale, PositionIssueCode>> = {
 const TAKEN_ISSUE: Readonly<Record<Locale, PositionIssueCode>> = {
   en: "name_en_taken",
   es: "name_es_taken",
+};
+
+const SHORT_NAME_TOO_LONG_ISSUE: Readonly<
+  Record<Locale, PositionSettingIssueCode>
+> = {
+  en: "short_name_en_too_long",
+  es: "short_name_es_too_long",
+};
+
+const SHORT_NAME_WITHOUT_NAME_ISSUE: Readonly<
+  Record<Locale, PositionSettingIssueCode>
+> = {
+  en: "short_name_en_without_name",
+  es: "short_name_es_without_name",
 };
 
 const LOCALES = ["en", "es"] as const satisfies readonly Locale[];
@@ -196,9 +255,9 @@ function nameTaken(locale: Locale): PositionValidationError {
   return new PositionValidationError([{ code: TAKEN_ISSUE[locale] }]);
 }
 
-/** Sin metadata salvo al reordenar y al cambiar la función: quién, qué y
- * sobre qué ya están en la entrada, y el nombre no hace falta para saber qué
- * pasó. */
+/** Sin metadata salvo al reordenar y al cambiar la función, el mínimo o las
+ * abreviaturas: quién, qué y sobre qué ya están en la entrada, y el nombre no
+ * hace falta para saber qué pasó. */
 function recordPositionEvent(
   gateways: ManagedPositionsGateways,
   event: {
@@ -369,6 +428,101 @@ export async function setPositionCoverage(
       positionId: request.positionId,
       metadata: { coverage },
     });
+  }
+  return gateways.positions.findClubPositions(actor.clubId);
+}
+
+/** Un entero de 0 a 20, como el `check` de `0081`. */
+function validMinimum(minPerTeam: number): number {
+  if (
+    !Number.isInteger(minPerTeam) ||
+    minPerTeam < 0 ||
+    minPerTeam > POSITION_MIN_PER_TEAM_MAX
+  ) {
+    throw new PositionValidationError([{ code: "min_per_team_out_of_range" }]);
+  }
+  return minPerTeam;
+}
+
+/** Cuántos de esta posición necesita cada equipo (D1 del PRD de E34). Una
+ * archivada lo guarda igual (D9). Dejarle el que ya tiene no se anota; el
+ * cambio sí, con el anterior y el nuevo. */
+export async function setPositionMinimum(
+  gateways: ManagedPositionsGateways,
+  request: {
+    readonly callerId: string;
+    readonly positionId: string;
+    readonly minPerTeam: number;
+  },
+): Promise<ManagedPositions> {
+  const minPerTeam = validMinimum(request.minPerTeam);
+  const actor = await findAdministratorActor(gateways, request.callerId);
+  const result = await gateways.positions.setPositionMinimum(
+    { clubId: actor.clubId, positionId: request.positionId },
+    minPerTeam,
+  );
+  if (result.kind === "not_found") {
+    throw new PositionNotFoundError();
+  }
+  if (result.kind === "changed") {
+    await recordPositionEvent(gateways, {
+      actor,
+      action: "club_position.min_per_team_changed",
+      positionId: request.positionId,
+      metadata: { previous: result.previous, minPerTeam },
+    });
+  }
+  return gateways.positions.findClubPositions(actor.clubId);
+}
+
+/** Recortadas, y una en blanco como ninguna, igual que los nombres. */
+function validShortNames(input: PositionNamesInput): PositionShortNames {
+  const shortNames = normalizePositionNames(input);
+  const issues = LOCALES.filter((locale) => {
+    const shortName = shortNames[locale];
+    return (
+      shortName !== null &&
+      countCharacters(shortName) > POSITION_SHORT_NAME_MAX_LENGTH
+    );
+  }).map((locale) => ({ code: SHORT_NAME_TOO_LONG_ISSUE[locale] }));
+  if (issues.length > 0) {
+    throw new PositionValidationError(issues);
+  }
+  return shortNames;
+}
+
+/** Las abreviaturas de las fichas (D6 del PRD de E34), las dos a la vez. */
+export async function setPositionShortNames(
+  gateways: ManagedPositionsGateways,
+  request: {
+    readonly callerId: string;
+    readonly positionId: string;
+    readonly shortNames: PositionNamesInput;
+  },
+): Promise<ManagedPositions> {
+  const shortNames = validShortNames(request.shortNames);
+  const actor = await findAdministratorActor(gateways, request.callerId);
+  const result = await gateways.positions.setPositionShortNames(
+    { clubId: actor.clubId, positionId: request.positionId },
+    shortNames,
+  );
+  switch (result.kind) {
+    case "not_found":
+      throw new PositionNotFoundError();
+    case "name_missing":
+      throw new PositionValidationError([
+        { code: SHORT_NAME_WITHOUT_NAME_ISSUE[result.locale] },
+      ]);
+    case "changed":
+      await recordPositionEvent(gateways, {
+        actor,
+        action: "club_position.short_names_changed",
+        positionId: request.positionId,
+        metadata: { previous: result.previous, shortNames },
+      });
+      break;
+    case "unchanged":
+      break;
   }
   return gateways.positions.findClubPositions(actor.clubId);
 }

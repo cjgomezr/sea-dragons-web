@@ -12037,6 +12037,12 @@ type StubbedPosition = {
   readonly isArchived: boolean;
   /** La función en el auto-balance (#404); `null` es "ninguna". */
   readonly coverage: "goalkeeper" | "defender" | "forward" | null;
+  /** El mínimo por equipo y las abreviaturas (#885). */
+  readonly minPerTeam: number;
+  readonly shortNames: {
+    readonly en: string | null;
+    readonly es: string | null;
+  };
 };
 
 /** Lo que responde el endpoint fingido a cualquier escritura: crear, y
@@ -12049,18 +12055,24 @@ const STUBBED_ACTIVE_POSITIONS: readonly StubbedPosition[] = [
     names: { en: "Goalkeeper", es: "Portería" },
     isArchived: false,
     coverage: "goalkeeper",
+    minPerTeam: 1,
+    shortNames: { en: "GK", es: "POR" },
   },
   {
     id: "90000000-0000-4000-8000-000000000002",
     names: { en: "Defender", es: "Defensa" },
     isArchived: false,
     coverage: "defender",
+    minPerTeam: 1,
+    shortNames: { en: "DEF", es: "DEF" },
   },
   {
     id: "90000000-0000-4000-8000-000000000003",
     names: { en: "Forward", es: "Ataque" },
     isArchived: false,
     coverage: "forward",
+    minPerTeam: 1,
+    shortNames: { en: "ATT", es: "ATA" },
   },
 ];
 
@@ -12074,6 +12086,8 @@ const STUBBED_POSITIONS_WITH_ARCHIVED: readonly StubbedPosition[] = [
     names: { en: "Utility", es: null },
     isArchived: true,
     coverage: null,
+    minPerTeam: 0,
+    shortNames: { en: null, es: null },
   },
   {
     id: "90000000-0000-4000-8000-000000000005",
@@ -12083,6 +12097,8 @@ const STUBBED_POSITIONS_WITH_ARCHIVED: readonly StubbedPosition[] = [
     },
     isArchived: true,
     coverage: "defender",
+    minPerTeam: 0,
+    shortNames: { en: null, es: null },
   },
 ];
 
@@ -13607,6 +13623,8 @@ const SIX_STUBBED_POSITIONS: readonly StubbedPosition[] = [
     names: { en, es },
     isArchived: false,
     coverage: null,
+    minPerTeam: 0,
+    shortNames: { en: null, es: null },
   })),
 ];
 

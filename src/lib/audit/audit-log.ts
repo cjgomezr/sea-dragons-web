@@ -64,6 +64,12 @@ export const AUDIT_ACTIONS = [
   // defensa, ataque o ninguna). La entidad es la posición y la metadata lleva
   // la función nueva (`{ coverage: "goalkeeper" }`, `null` si se la quitó).
   "club_position.coverage_changed",
+  // RF-1 de E34 (#885): un Admin cambia el mínimo por equipo o las
+  // abreviaturas de una posición. La entidad es la posición y la metadata
+  // lleva el valor anterior y el nuevo (`{ previous: 1, minPerTeam: 2 }`,
+  // `{ previous: { en, es }, shortNames: { en, es } }`).
+  "club_position.min_per_team_changed",
+  "club_position.short_names_changed",
   // RF-1 y RF-5 de E9 (#319): un Coach o un Admin crea la evaluación de un
   // miembro o guarda sus valoraciones. La entidad es el `user_id` del miembro
   // evaluado (`member`), sin metadata: ni las notas, ni las categorías, ni el

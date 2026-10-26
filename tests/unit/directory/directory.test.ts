@@ -36,17 +36,23 @@ const FORWARD: ClubPosition = {
   id: "f0f0f0f0-0000-4000-8000-000000000003",
   names: { en: "Forward", es: "Ataque" },
   isArchived: false,
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 const GOALKEEPER: ClubPosition = {
   id: "f0f0f0f0-0000-4000-8000-000000000001",
   names: { en: "Goalkeeper", es: "Portería" },
   isArchived: false,
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 const DEFENDER: ClubPosition = {
   id: "f0f0f0f0-0000-4000-8000-000000000002",
   names: { en: "Defender", es: null },
   // Archivada: quien la tenía la conserva, y el directorio la sigue enseñando.
   isArchived: true,
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 const CLUB_POSITIONS = [FORWARD, GOALKEEPER, DEFENDER] as const;
 const clubsWhosePositionsWereRead: string[] = [];

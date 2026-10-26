@@ -21,16 +21,22 @@ const GOALKEEPER: ClubPosition = {
   id: "00000000-0000-4000-8000-000000000001",
   names: { en: "Goalkeeper", es: "Portería" },
   isArchived: false,
+  minPerTeam: 1,
+  shortNames: { en: "GK", es: "POR" },
 };
 const UTILITY: ClubPosition = {
   id: "00000000-0000-4000-8000-000000000002",
   names: { en: "Utility", es: "Comodín" },
   isArchived: true,
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 const FORWARD: ClubPosition = {
   id: "00000000-0000-4000-8000-000000000003",
   names: { en: "Forward", es: "Ataque" },
   isArchived: false,
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 const OTHER_CLUBS_POSITION_ID = "00000000-0000-4000-8000-000000000099";
 
@@ -317,11 +323,22 @@ describe("las posiciones que se pueden elegir", () => {
 
     const choices = await listPositionChoices(gateways, CALLER_ID);
 
-    expect(choices).toEqual([
-      { id: GOALKEEPER.id, names: GOALKEEPER.names },
-      { id: FORWARD.id, names: FORWARD.names },
-    ]);
+    expect(choices.map(({ id }) => id)).toEqual([GOALKEEPER.id, FORWARD.id]);
+    expect(choices[0]).not.toHaveProperty("isArchived");
     expect(clubsRead).toEqual([CLUB_ID]);
+  });
+
+  it("traen su nombre, su mínimo por equipo y sus abreviaturas", async () => {
+    const { gateways } = choicesGateways({ clubId: CLUB_ID });
+
+    const choices = await listPositionChoices(gateways, CALLER_ID);
+
+    expect(choices[0]).toEqual({
+      id: GOALKEEPER.id,
+      names: { en: "Goalkeeper", es: "Portería" },
+      minPerTeam: 1,
+      shortNames: { en: "GK", es: "POR" },
+    });
   });
 
   it("falla con quien no tiene fila de miembro", async () => {

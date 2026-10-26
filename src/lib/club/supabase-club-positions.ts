@@ -14,6 +14,7 @@ import {
   type ClubPositionsGateway,
   type PositionChoicesGateways,
   type PositionNames,
+  type PositionShortNames,
   createCachedClubPositionsReader,
 } from "./club-positions";
 
@@ -29,12 +30,19 @@ import {
 
 const POSITIONS_TABLE = "club_positions";
 const POSITIONS_COLUMNS =
-  "id, archivedAt:archived_at, names:club_position_names(locale, name)";
+  "id, archivedAt:archived_at, minPerTeam:min_per_team, names:club_position_names(locale, name, shortName:short_name)";
+
+type PositionNameRow = {
+  readonly locale: string;
+  readonly name: string;
+  readonly shortName: string | null;
+};
 
 type PositionRow = {
   readonly id: string;
   readonly archivedAt: string | null;
-  readonly names: readonly { readonly locale: string; readonly name: string }[];
+  readonly minPerTeam: number;
+  readonly names: readonly PositionNameRow[];
 };
 
 type ManagedPositionRow = PositionRow & { readonly coverage: string | null };
@@ -45,9 +53,10 @@ const MANAGED_POSITIONS_COLUMNS = `${POSITIONS_COLUMNS}, coverage`;
 
 /** El `check` de `0025` sólo deja los idiomas de la aplicación. Sin ningún
  * nombre la posición no se puede pintar: se falla en vez de servirla. */
-export function toPositionNames(
-  row: Pick<PositionRow, "id" | "names">,
-): PositionNames {
+export function toPositionNames(row: {
+  readonly id: string;
+  readonly names: readonly Pick<PositionNameRow, "locale" | "name">[];
+}): PositionNames {
   const names: Record<keyof PositionNames, string | null> = {
     en: null,
     es: null,
@@ -66,11 +75,21 @@ export function toPositionNames(
   return names;
 }
 
+/** Cada abreviatura va en la fila del nombre de su idioma; `toPositionNames`
+ * ya rechazó cualquier idioma que la aplicación no habla. */
+function toShortNames(row: PositionRow): PositionShortNames {
+  const shortNameIn = (locale: keyof PositionShortNames): string | null =>
+    row.names.find((name) => name.locale === locale)?.shortName ?? null;
+  return { en: shortNameIn("en"), es: shortNameIn("es") };
+}
+
 function toClubPosition(row: PositionRow): ClubPosition {
   return {
     id: row.id,
     names: toPositionNames(row),
     isArchived: row.archivedAt !== null,
+    minPerTeam: row.minPerTeam,
+    shortNames: toShortNames(row),
   };
 }
 

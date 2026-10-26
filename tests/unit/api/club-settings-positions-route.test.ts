@@ -11,6 +11,7 @@ import type {
   ManagedPosition,
   ManagedPositionsGateways,
   PositionInsertResult,
+  PositionShortNamesResult,
 } from "@/lib/club/manage-club-positions";
 
 /**
@@ -31,12 +32,16 @@ const GOALKEEPER: ManagedPosition = {
   names: { en: "Goalkeeper", es: "Portería" },
   isArchived: false,
   coverage: "goalkeeper",
+  minPerTeam: 1,
+  shortNames: { en: "GK", es: "POR" },
 };
 const DEFENDER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000002",
   names: { en: "Defender", es: "Defensa" },
   isArchived: true,
   coverage: null,
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 const CATALOG = [GOALKEEPER, DEFENDER];
 const NEW_POSITION_ID = "00000000-0000-4000-8000-000000000004";
@@ -46,6 +51,7 @@ const invalidateClubPositions = vi.fn();
 const writes: string[] = [];
 let callerRole: Role = "Admin";
 let insertResult: PositionInsertResult;
+let shortNamesResult: PositionShortNamesResult;
 
 function isOwnPosition(positionId: string): boolean {
   return CATALOG.some((position) => position.id === positionId);
@@ -93,6 +99,20 @@ function managedPositionsGateways(): ManagedPositionsGateways {
         }
         writes.push(`coverage ${coverage ?? "none"}`);
         return { kind: "changed" };
+      },
+      setPositionMinimum: async ({ positionId }, minPerTeam) => {
+        if (!isOwnPosition(positionId)) {
+          return { kind: "not_found" };
+        }
+        writes.push(`minimum ${minPerTeam}`);
+        return { kind: "changed", previous: 1 };
+      },
+      setPositionShortNames: async ({ positionId }, shortNames) => {
+        if (!isOwnPosition(positionId)) {
+          return { kind: "not_found" };
+        }
+        writes.push(`short ${shortNames.en ?? "-"}|${shortNames.es ?? "-"}`);
+        return shortNamesResult;
       },
     },
     audit: {
@@ -212,6 +232,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   writes.length = 0;
   insertResult = { kind: "created", positionId: NEW_POSITION_ID };
+  shortNamesResult = { kind: "changed", previous: { en: null, es: null } };
   givenSession({ kind: "active", role: "Admin", membershipCurrent: true });
 });
 
@@ -359,14 +380,114 @@ describe("endpoints de posiciones", () => {
       ]);
     });
 
-    it("responde 404 con una posición de otro club", async () => {
-      const response = await patchPosition(OTHER_CLUBS_POSITION_ID, {
-        isArchived: true,
+    it("cambia el mínimo, anota e invalida la caché", async () => {
+      const response = await patchPosition(GOALKEEPER.id, { minPerTeam: 2 });
+
+      expect(response.status).toBe(200);
+      expect(writes).toEqual([
+        "minimum 2",
+        "audit club_position.min_per_team_changed",
+      ]);
+      expect(invalidateClubPositions).toHaveBeenCalledOnce();
+    });
+
+    it("responde con cada posición con su mínimo y sus abreviaturas", async () => {
+      const response = await patchPosition(GOALKEEPER.id, { minPerTeam: 2 });
+
+      await expect(response.json()).resolves.toMatchObject({
+        data: {
+          positions: [
+            { minPerTeam: 1, shortNames: { en: "GK", es: "POR" } },
+            { minPerTeam: 0, shortNames: { en: null, es: null } },
+          ],
+        },
+      });
+    });
+
+    it("cambia el mínimo de una posición archivada", async () => {
+      const response = await patchPosition(DEFENDER.id, { minPerTeam: 3 });
+
+      expect(response.status).toBe(200);
+      expect(writes).toEqual([
+        "minimum 3",
+        "audit club_position.min_per_team_changed",
+      ]);
+    });
+
+    it("cambia las abreviaturas, anota e invalida la caché", async () => {
+      const response = await patchPosition(GOALKEEPER.id, {
+        shortNames: { en: "LIB", es: "LÍB" },
       });
 
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(200);
+      expect(writes).toEqual([
+        "short LIB|LÍB",
+        "audit club_position.short_names_changed",
+      ]);
+      expect(invalidateClubPositions).toHaveBeenCalledOnce();
+    });
+
+    it("guarda sin abreviatura el idioma que llega en blanco", async () => {
+      const response = await patchPosition(GOALKEEPER.id, {
+        shortNames: { en: "  ", es: "POR" },
+      });
+
+      expect(response.status).toBe(200);
+      expect(writes[0]).toBe("short -|POR");
+    });
+
+    it.each([
+      ["menor que 0", -1, "min_per_team_out_of_range"],
+      ["mayor que 20", 21, "min_per_team_out_of_range"],
+      ["no entero", 1.5, "min_per_team_out_of_range"],
+    ])("responde 400 a un mínimo %s", async (_case, minPerTeam, reason) => {
+      const response = await patchPosition(GOALKEEPER.id, { minPerTeam });
+
+      expect(response.status).toBe(400);
+      await expect(errorOf(response)).resolves.toMatchObject({ reason });
       expect(writes).toEqual([]);
     });
+
+    it("responde 400 junto al idioma con una abreviatura de 5 caracteres", async () => {
+      const response = await patchPosition(GOALKEEPER.id, {
+        shortNames: { en: "GOALK", es: null },
+      });
+
+      expect(response.status).toBe(400);
+      await expect(errorOf(response)).resolves.toMatchObject({
+        reason: "short_name_en_too_long",
+      });
+      expect(writes).toEqual([]);
+    });
+
+    it("responde 400 junto al idioma con una abreviatura en un idioma sin nombre", async () => {
+      shortNamesResult = { kind: "name_missing", locale: "es" };
+
+      const response = await patchPosition(GOALKEEPER.id, {
+        shortNames: { en: "GK", es: "POR" },
+      });
+
+      expect(response.status).toBe(400);
+      await expect(errorOf(response)).resolves.toMatchObject({
+        reason: "short_name_es_without_name",
+      });
+      expect(writes).toEqual(["short GK|POR"]);
+    });
+
+    it.each([
+      ["el archivo", { isArchived: true }],
+      ["la función", { coverage: "forward" }],
+      ["el mínimo", { minPerTeam: 2 }],
+      ["las abreviaturas", { shortNames: { en: "LIB", es: null } }],
+    ])(
+      "responde 404 al cambiar %s de una posición de otro club",
+      async (_case, body) => {
+        const response = await patchPosition(OTHER_CLUBS_POSITION_ID, body);
+
+        expect(response.status).toBe(404);
+        expect(writes).toEqual([]);
+      },
+    );
 
     it("responde 404 con un id que no es un uuid", async () => {
       const response = await patchPosition("no-es-un-id", { isArchived: true });
@@ -384,6 +505,16 @@ describe("endpoints de posiciones", () => {
         "con la función y el archivo a la vez",
         { coverage: "forward", isArchived: true },
       ],
+      [
+        "con el mínimo y las abreviaturas a la vez",
+        { minPerTeam: 2, shortNames: { en: "LIB", es: null } },
+      ],
+      [
+        "con el mínimo y la función a la vez",
+        { minPerTeam: 2, coverage: null },
+      ],
+      ["con el mínimo como texto", { minPerTeam: "2" }],
+      ["con una abreviatura sin el otro idioma", { shortNames: { en: "LIB" } }],
     ])("responde 400 a un cuerpo %s", async (_case, body) => {
       const response = await patchPosition(GOALKEEPER.id, body);
 
@@ -439,11 +570,15 @@ describe("endpoints de posiciones", () => {
           await patchPosition(GOALKEEPER.id, VALID_NAMES),
           await patchPosition(GOALKEEPER.id, { isArchived: true }),
           await patchPosition(GOALKEEPER.id, { coverage: "forward" }),
+          await patchPosition(GOALKEEPER.id, { minPerTeam: 2 }),
+          await patchPosition(GOALKEEPER.id, {
+            shortNames: { en: "LIB", es: null },
+          }),
           await putOrder({ positionIds: [GOALKEEPER.id] }),
         ];
 
         expect(responses.map((response) => response.status)).toEqual([
-          403, 403, 403, 403, 403, 403,
+          403, 403, 403, 403, 403, 403, 403, 403,
         ]);
         expect(writes).toEqual([]);
       },

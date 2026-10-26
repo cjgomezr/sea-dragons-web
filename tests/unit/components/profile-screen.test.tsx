@@ -123,6 +123,8 @@ const UTILITY: ClubPosition = {
   id: "90000000-0000-4000-8000-000000000004",
   names: { en: "Utility", es: null },
   isArchived: true,
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 
 const SEASON_SESSIONS: readonly AttendedSession[] = [

@@ -6,7 +6,9 @@ import { ClubSettingsForbiddenError } from "@/lib/club/club-settings";
 import {
   type ManagedPosition,
   type ManagedPositionsGateways,
+  POSITION_MIN_PER_TEAM_MAX,
   POSITION_NAME_MAX_LENGTH,
+  POSITION_SHORT_NAME_MAX_LENGTH,
   PositionNotFoundError,
   PositionValidationError,
   PositionsChangedError,
@@ -17,6 +19,8 @@ import {
   reorderPositions,
   setPositionArchived,
   setPositionCoverage,
+  setPositionMinimum,
+  setPositionShortNames,
 } from "@/lib/club/manage-club-positions";
 
 /**
@@ -35,18 +39,24 @@ const GOALKEEPER: ManagedPosition = {
   names: { en: "Goalkeeper", es: "Portería" },
   isArchived: false,
   coverage: "goalkeeper",
+  minPerTeam: 1,
+  shortNames: { en: "GK", es: "POR" },
 };
 const DEFENDER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000002",
   names: { en: "Defender", es: "Defensa" },
   isArchived: false,
   coverage: "defender",
+  minPerTeam: 1,
+  shortNames: { en: "DEF", es: "DEF" },
 };
 const FORWARD: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000003",
   names: { en: "Forward", es: "Ataque" },
   isArchived: false,
   coverage: "forward",
+  minPerTeam: 1,
+  shortNames: { en: "ATT", es: "ATA" },
 };
 
 const NEW_POSITION_ID = "00000000-0000-4000-8000-000000000004";
@@ -96,7 +106,14 @@ function gateways(): ManagedPositionsGateways {
         }
         catalog = [
           ...catalog,
-          { id: NEW_POSITION_ID, names, isArchived: false, coverage: null },
+          {
+            id: NEW_POSITION_ID,
+            names,
+            isArchived: false,
+            coverage: null,
+            minPerTeam: 0,
+            shortNames: { en: null, es: null },
+          },
         ];
         return { kind: "created", positionId: NEW_POSITION_ID };
       },
@@ -157,6 +174,42 @@ function gateways(): ManagedPositionsGateways {
           other === position ? { ...position, coverage } : other,
         );
         return { kind: "changed" };
+      },
+      setPositionMinimum: async ({ positionId }, minPerTeam) => {
+        const position = positionWithId(positionId);
+        if (position === undefined) {
+          return { kind: "not_found" };
+        }
+        if (position.minPerTeam === minPerTeam) {
+          return { kind: "unchanged" };
+        }
+        catalog = catalog.map((other) =>
+          other === position ? { ...position, minPerTeam } : other,
+        );
+        return { kind: "changed", previous: position.minPerTeam };
+      },
+      setPositionShortNames: async ({ positionId }, shortNames) => {
+        const position = positionWithId(positionId);
+        if (position === undefined) {
+          return { kind: "not_found" };
+        }
+        const unnamed = (["en", "es"] as const).find(
+          (locale) =>
+            shortNames[locale] !== null && position.names[locale] === null,
+        );
+        if (unnamed !== undefined) {
+          return { kind: "name_missing", locale: unnamed };
+        }
+        if (
+          position.shortNames.en === shortNames.en &&
+          position.shortNames.es === shortNames.es
+        ) {
+          return { kind: "unchanged" };
+        }
+        catalog = catalog.map((other) =>
+          other === position ? { ...position, shortNames } : other,
+        );
+        return { kind: "changed", previous: position.shortNames };
       },
     },
     audit: {
@@ -382,7 +435,173 @@ describe("administrar posiciones", () => {
     });
   });
 
+  describe("mínimo por equipo", () => {
+    it("guarda el mínimo nuevo de la posición", async () => {
+      const positions = await setPositionMinimum(gateways(), {
+        callerId: ADMIN_ID,
+        positionId: FORWARD.id,
+        minPerTeam: 2,
+      });
+
+      expect(positions.map((position) => position.minPerTeam)).toEqual([
+        1, 1, 2,
+      ]);
+    });
+
+    it.each([0, POSITION_MIN_PER_TEAM_MAX])("admite %s", async (minPerTeam) => {
+      const positions = await setPositionMinimum(gateways(), {
+        callerId: ADMIN_ID,
+        positionId: FORWARD.id,
+        minPerTeam,
+      });
+
+      expect(positions[2]?.minPerTeam).toBe(minPerTeam);
+    });
+
+    it.each([-1, POSITION_MIN_PER_TEAM_MAX + 1, 1.5])(
+      "rechaza %s sin guardar nada",
+      async (minPerTeam) => {
+        await expect(
+          setPositionMinimum(gateways(), {
+            callerId: ADMIN_ID,
+            positionId: FORWARD.id,
+            minPerTeam,
+          }),
+        ).rejects.toMatchObject({
+          issues: [{ code: "min_per_team_out_of_range" }],
+        });
+        expect(catalog).toEqual([GOALKEEPER, DEFENDER, FORWARD]);
+        expect(auditRows).toEqual([]);
+      },
+    );
+
+    it("lo guarda también en una posición archivada", async () => {
+      catalog = [GOALKEEPER, DEFENDER, { ...FORWARD, isArchived: true }];
+
+      const positions = await setPositionMinimum(gateways(), {
+        callerId: ADMIN_ID,
+        positionId: FORWARD.id,
+        minPerTeam: 3,
+      });
+
+      expect(positions[2]).toMatchObject({ isArchived: true, minPerTeam: 3 });
+    });
+
+    it("no encuentra la posición de otro club", async () => {
+      await expect(
+        setPositionMinimum(gateways(), {
+          callerId: ADMIN_ID,
+          positionId: OTHER_CLUBS_POSITION_ID,
+          minPerTeam: 2,
+        }),
+      ).rejects.toBeInstanceOf(PositionNotFoundError);
+    });
+  });
+
+  describe("abreviaturas", () => {
+    it("guarda las dos, recortadas", async () => {
+      const positions = await setPositionShortNames(gateways(), {
+        callerId: ADMIN_ID,
+        positionId: DEFENDER.id,
+        shortNames: { en: " LIB ", es: "LÍB" },
+      });
+
+      expect(positions[1]?.shortNames).toEqual({ en: "LIB", es: "LÍB" });
+    });
+
+    it("deja sin abreviatura el idioma que llega vacío o en blanco", async () => {
+      const positions = await setPositionShortNames(gateways(), {
+        callerId: ADMIN_ID,
+        positionId: DEFENDER.id,
+        shortNames: { en: "", es: "   " },
+      });
+
+      expect(positions[1]?.shortNames).toEqual({ en: null, es: null });
+    });
+
+    it("cuenta un emoji como un carácter", async () => {
+      const positions = await setPositionShortNames(gateways(), {
+        callerId: ADMIN_ID,
+        positionId: DEFENDER.id,
+        shortNames: {
+          en: "🤿".repeat(POSITION_SHORT_NAME_MAX_LENGTH),
+          es: null,
+        },
+      });
+
+      expect(positions[1]?.shortNames.en).toBe(
+        "🤿".repeat(POSITION_SHORT_NAME_MAX_LENGTH),
+      );
+    });
+
+    it("rechaza una de más de 4 caracteres, señalando el idioma", async () => {
+      await expect(
+        setPositionShortNames(gateways(), {
+          callerId: ADMIN_ID,
+          positionId: DEFENDER.id,
+          shortNames: { en: "DEF", es: "DEFEN" },
+        }),
+      ).rejects.toMatchObject({
+        issues: [{ code: "short_name_es_too_long" }],
+      });
+      expect(catalog).toEqual([GOALKEEPER, DEFENDER, FORWARD]);
+      expect(auditRows).toEqual([]);
+    });
+
+    it("rechaza una abreviatura en un idioma sin nombre", async () => {
+      catalog = [
+        GOALKEEPER,
+        { ...DEFENDER, names: { en: "Defender", es: null } },
+      ];
+
+      await expect(
+        setPositionShortNames(gateways(), {
+          callerId: ADMIN_ID,
+          positionId: DEFENDER.id,
+          shortNames: { en: "DEF", es: "DEF" },
+        }),
+      ).rejects.toMatchObject({
+        issues: [{ code: "short_name_es_without_name" }],
+      });
+      expect(auditRows).toEqual([]);
+    });
+
+    it("no encuentra la posición de otro club", async () => {
+      await expect(
+        setPositionShortNames(gateways(), {
+          callerId: ADMIN_ID,
+          positionId: OTHER_CLUBS_POSITION_ID,
+          shortNames: { en: "LIB", es: null },
+        }),
+      ).rejects.toBeInstanceOf(PositionNotFoundError);
+    });
+  });
+
   describe("quién puede", () => {
+    it.each(["Coach", "Committee", "Player"] as const)(
+      "un %s no puede cambiar el mínimo ni las abreviaturas",
+      async (role) => {
+        callerRole = role;
+
+        await expect(
+          setPositionMinimum(gateways(), {
+            callerId: ADMIN_ID,
+            positionId: DEFENDER.id,
+            minPerTeam: 2,
+          }),
+        ).rejects.toBeInstanceOf(ClubSettingsForbiddenError);
+        await expect(
+          setPositionShortNames(gateways(), {
+            callerId: ADMIN_ID,
+            positionId: DEFENDER.id,
+            shortNames: { en: "LIB", es: null },
+          }),
+        ).rejects.toBeInstanceOf(ClubSettingsForbiddenError);
+        expect(catalog).toEqual([GOALKEEPER, DEFENDER, FORWARD]);
+        expect(auditRows).toEqual([]);
+      },
+    );
+
     it.each(["Coach", "Committee", "Player"] as const)(
       "un %s no puede crear, renombrar, reordenar, archivar ni cambiar la función",
       async (role) => {
@@ -547,6 +766,60 @@ describe("bitácora", () => {
         metadata: { coverage: "goalkeeper" },
       }),
     ]);
+  });
+
+  it("anota el cambio de mínimo con el valor anterior y el nuevo", async () => {
+    await setPositionMinimum(gateways(), {
+      callerId: ADMIN_ID,
+      positionId: FORWARD.id,
+      minPerTeam: 2,
+    });
+
+    expect(auditRows).toEqual([
+      expect.objectContaining({
+        actor_id: ADMIN_ID,
+        action: "club_position.min_per_team_changed",
+        entity_type: "club_position",
+        entity_id: FORWARD.id,
+        metadata: { previous: 1, minPerTeam: 2 },
+      }),
+    ]);
+  });
+
+  it("anota el cambio de abreviaturas con las anteriores y las nuevas", async () => {
+    await setPositionShortNames(gateways(), {
+      callerId: ADMIN_ID,
+      positionId: DEFENDER.id,
+      shortNames: { en: "LIB", es: "" },
+    });
+
+    expect(auditRows).toEqual([
+      expect.objectContaining({
+        actor_id: ADMIN_ID,
+        action: "club_position.short_names_changed",
+        entity_type: "club_position",
+        entity_id: DEFENDER.id,
+        metadata: {
+          previous: { en: "DEF", es: "DEF" },
+          shortNames: { en: "LIB", es: null },
+        },
+      }),
+    ]);
+  });
+
+  it("no anota un mínimo ni unas abreviaturas que no cambian", async () => {
+    await setPositionMinimum(gateways(), {
+      callerId: ADMIN_ID,
+      positionId: FORWARD.id,
+      minPerTeam: 1,
+    });
+    await setPositionShortNames(gateways(), {
+      callerId: ADMIN_ID,
+      positionId: FORWARD.id,
+      shortNames: { en: "ATT", es: " ATA " },
+    });
+
+    expect(auditRows).toEqual([]);
   });
 
   it("no lleva los nombres ni ningún otro dato de la posición", async () => {
