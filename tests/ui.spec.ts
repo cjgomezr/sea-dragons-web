@@ -24671,6 +24671,7 @@ const TEAMS_STATES: readonly TeamsState[] = [
     viewports: viewports.filter((vp) => vp.name !== "mobile"),
     ready: async (page) => {
       await waitForTeamBuilder(page);
+      await showTeamsTab(page, /^Tide /);
       await expect(
         teamsRegion(page, "Team Tide").getByText("2 short of DEF"),
       ).toBeVisible();
