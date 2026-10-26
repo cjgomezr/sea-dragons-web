@@ -45,7 +45,6 @@ const BRUNO: FakePlayer = {
   fullName: "Bruno Yáñez",
   response: "yes",
   positionId: GOALKEEPER.id,
-  coverage: "goalkeeper",
   ratings: [7],
 };
 const CARLA: FakePlayer = {
@@ -109,7 +108,6 @@ describe("la escuadra", () => {
           fullName: ANA.fullName,
           position: null,
           positionId: null,
-          coverage: null,
           rating: 8.5,
           isUnrated: false,
           photoUrl: null,
@@ -119,7 +117,6 @@ describe("la escuadra", () => {
           fullName: BRUNO.fullName,
           position: { id: GOALKEEPER.id, names: GOALKEEPER.names },
           positionId: GOALKEEPER.id,
-          coverage: "goalkeeper",
           rating: 7,
           isUnrated: false,
           photoUrl: null,
@@ -626,7 +623,6 @@ describe("los mínimos por posición del club (E34)", () => {
       fullName,
       response: "yes",
       positionId: GOALKEEPER.id,
-      coverage: "goalkeeper",
       ratings: [8],
     };
   }

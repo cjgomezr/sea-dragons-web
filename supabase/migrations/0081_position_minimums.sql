@@ -5,7 +5,7 @@
 -- pintan las fichas del team builder, una por idioma como el nombre.
 --
 -- Todavía no los usa nadie: el auto-balance (#886) y las pantallas (#887,
--- #888) vienen después. El rol se queda hasta #889.
+-- #888) vienen después. El rol se retira en `0082` (#889).
 
 -- La columna, su `check` y el relleno desde el rol van juntos y sólo la
 -- primera vez, como en `0046`: producción reaplica el histórico en cada
@@ -65,7 +65,8 @@ end;
 $$;
 
 -- La siembra de `0046` para los clubes nuevos, ahora con el mínimo y las
--- abreviaturas.
+-- abreviaturas. Sin el rol: `0082` lo retira, y esta es la versión vigente
+-- que queda tras reaplicar el histórico.
 create or replace function public.clubs_seed_default_positions()
   returns trigger
   language plpgsql
@@ -77,17 +78,16 @@ declare
 begin
   for seeded in
     with seed (
-      sort_order, name_en, name_es, coverage, short_name_en, short_name_es
+      sort_order, name_en, name_es, short_name_en, short_name_es
     ) as (
       values
-        (1, 'Goalkeeper', 'Portería', 'goalkeeper', 'GK', 'POR'),
-        (2, 'Defender', 'Defensa', 'defender', 'DEF', 'DEF'),
-        (3, 'Forward', 'Ataque', 'forward', 'ATT', 'ATA')
+        (1, 'Goalkeeper', 'Portería', 'GK', 'POR'),
+        (2, 'Defender', 'Defensa', 'DEF', 'DEF'),
+        (3, 'Forward', 'Ataque', 'ATT', 'ATA')
     ),
     inserted as (
-      insert into public.club_positions
-        (club_id, sort_order, coverage, min_per_team)
-      select new.id, s.sort_order, s.coverage, 1 from seed s
+      insert into public.club_positions (club_id, sort_order, min_per_team)
+      select new.id, s.sort_order, 1 from seed s
       returning id, sort_order
     )
     select i.id, s.name_en, s.name_es, s.short_name_en, s.short_name_es

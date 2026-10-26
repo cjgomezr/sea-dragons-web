@@ -10,7 +10,6 @@ import {
   CLUB_SETTINGS_POSITIONS_API_PATH,
   CLUB_SETTINGS_POSITIONS_ORDER_API_PATH,
 } from "@/lib/auth/routes";
-import { POSITION_COVERAGES } from "@/lib/club/club-positions";
 import {
   type ManagedPositions,
   POSITION_ISSUE_CODES,
@@ -37,7 +36,6 @@ const responseSchema = z.object({
     positions: z.array(
       namedPositionSchema.extend({
         isArchived: z.boolean(),
-        coverage: z.enum(POSITION_COVERAGES).nullable(),
         minPerTeam: z.number().int(),
         shortNames: z.object({
           en: z.string().nullable(),

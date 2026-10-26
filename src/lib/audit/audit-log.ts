@@ -60,10 +60,6 @@ export const AUDIT_ACTIONS = [
   "club_position.reordered",
   "club_position.archived",
   "club_position.reactivated",
-  // RF-2 de E10 (#404): un Admin cambia la función de una posición (portero,
-  // defensa, ataque o ninguna). La entidad es la posición y la metadata lleva
-  // la función nueva (`{ coverage: "goalkeeper" }`, `null` si se la quitó).
-  "club_position.coverage_changed",
   // RF-1 de E34 (#885): un Admin cambia el mínimo por equipo o las
   // abreviaturas de una posición. La entidad es la posición y la metadata
   // lleva el valor anterior y el nuevo (`{ previous: 1, minPerTeam: 2 }`,

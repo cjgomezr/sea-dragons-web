@@ -4,10 +4,6 @@
  * del handler.
  */
 
-import type { PositionCoverage } from "@/lib/club/club-positions";
-
-export type { PositionCoverage };
-
 export type SquadPlayer = {
   readonly userId: string;
   readonly fullName: string;

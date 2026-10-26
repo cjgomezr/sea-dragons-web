@@ -18,7 +18,6 @@ import {
   renamePosition,
   reorderPositions,
   setPositionArchived,
-  setPositionCoverage,
   setPositionMinimum,
   setPositionShortNames,
 } from "@/lib/club/manage-club-positions";
@@ -38,7 +37,6 @@ const GOALKEEPER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000001",
   names: { en: "Goalkeeper", es: "Portería" },
   isArchived: false,
-  coverage: "goalkeeper",
   minPerTeam: 1,
   shortNames: { en: "GK", es: "POR" },
 };
@@ -46,7 +44,6 @@ const DEFENDER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000002",
   names: { en: "Defender", es: "Defensa" },
   isArchived: false,
-  coverage: "defender",
   minPerTeam: 1,
   shortNames: { en: "DEF", es: "DEF" },
 };
@@ -54,7 +51,6 @@ const FORWARD: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000003",
   names: { en: "Forward", es: "Ataque" },
   isArchived: false,
-  coverage: "forward",
   minPerTeam: 1,
   shortNames: { en: "ATT", es: "ATA" },
 };
@@ -110,7 +106,6 @@ function gateways(): ManagedPositionsGateways {
             id: NEW_POSITION_ID,
             names,
             isArchived: false,
-            coverage: null,
             minPerTeam: 0,
             shortNames: { en: null, es: null },
           },
@@ -160,19 +155,6 @@ function gateways(): ManagedPositionsGateways {
           ...catalog.filter((other) => other !== position),
           { ...position, isArchived },
         ];
-        return { kind: "changed" };
-      },
-      setPositionCoverage: async ({ positionId }, coverage) => {
-        const position = positionWithId(positionId);
-        if (position === undefined) {
-          return { kind: "not_found" };
-        }
-        if (position.coverage === coverage) {
-          return { kind: "unchanged" };
-        }
-        catalog = catalog.map((other) =>
-          other === position ? { ...position, coverage } : other,
-        );
         return { kind: "changed" };
       },
       setPositionMinimum: async ({ positionId }, minPerTeam) => {
@@ -385,56 +367,6 @@ describe("administrar posiciones", () => {
     });
   });
 
-  describe("función", () => {
-    it("guarda la función nueva de la posición", async () => {
-      const positions = await setPositionCoverage(gateways(), {
-        callerId: ADMIN_ID,
-        positionId: FORWARD.id,
-        coverage: "defender",
-      });
-
-      expect(positions.map((position) => position.coverage)).toEqual([
-        "goalkeeper",
-        "defender",
-        "defender",
-      ]);
-    });
-
-    it("deja que dos posiciones compartan función", async () => {
-      await setPositionCoverage(gateways(), {
-        callerId: ADMIN_ID,
-        positionId: DEFENDER.id,
-        coverage: "forward",
-      });
-
-      expect(catalog.map((position) => position.coverage)).toEqual([
-        "goalkeeper",
-        "forward",
-        "forward",
-      ]);
-    });
-
-    it("le quita la función con null", async () => {
-      const positions = await setPositionCoverage(gateways(), {
-        callerId: ADMIN_ID,
-        positionId: GOALKEEPER.id,
-        coverage: null,
-      });
-
-      expect(positions[0]?.coverage).toBeNull();
-    });
-
-    it("no encuentra la posición de otro club", async () => {
-      await expect(
-        setPositionCoverage(gateways(), {
-          callerId: ADMIN_ID,
-          positionId: OTHER_CLUBS_POSITION_ID,
-          coverage: "forward",
-        }),
-      ).rejects.toBeInstanceOf(PositionNotFoundError);
-    });
-  });
-
   describe("mínimo por equipo", () => {
     it("guarda el mínimo nuevo de la posición", async () => {
       const positions = await setPositionMinimum(gateways(), {
@@ -634,13 +566,6 @@ describe("administrar posiciones", () => {
             isArchived: true,
           }),
         ).rejects.toBeInstanceOf(ClubSettingsForbiddenError);
-        await expect(
-          setPositionCoverage(gateways(), {
-            ...request,
-            positionId: DEFENDER.id,
-            coverage: "forward",
-          }),
-        ).rejects.toBeInstanceOf(ClubSettingsForbiddenError);
         expect(catalog).toEqual([GOALKEEPER, DEFENDER, FORWARD]);
         expect(auditRows).toEqual([]);
       },
@@ -750,24 +675,6 @@ describe("bitácora", () => {
     ]);
   });
 
-  it("anota el cambio de función con la posición y la función nueva", async () => {
-    await setPositionCoverage(gateways(), {
-      callerId: ADMIN_ID,
-      positionId: FORWARD.id,
-      coverage: "goalkeeper",
-    });
-
-    expect(auditRows).toEqual([
-      expect.objectContaining({
-        actor_id: ADMIN_ID,
-        action: "club_position.coverage_changed",
-        entity_type: "club_position",
-        entity_id: FORWARD.id,
-        metadata: { coverage: "goalkeeper" },
-      }),
-    ]);
-  });
-
   it("anota el cambio de mínimo con el valor anterior y el nuevo", async () => {
     await setPositionMinimum(gateways(), {
       callerId: ADMIN_ID,
@@ -838,10 +745,10 @@ describe("bitácora", () => {
       positionId: GOALKEEPER.id,
       isArchived: false,
     });
-    await setPositionCoverage(gateways(), {
+    await setPositionMinimum(gateways(), {
       callerId: ADMIN_ID,
       positionId: GOALKEEPER.id,
-      coverage: "goalkeeper",
+      minPerTeam: GOALKEEPER.minPerTeam,
     });
     await createPosition(gateways(), {
       callerId: ADMIN_ID,

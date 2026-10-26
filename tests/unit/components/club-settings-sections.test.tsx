@@ -59,7 +59,6 @@ const POSITIONS = POSITION_NAMES.map((name, index) => ({
   id: `00000000-0000-4000-8000-00000000000${index}`,
   names: { en: name, es: null },
   isArchived: index === POSITION_NAMES.length - 1,
-  coverage: null,
   minPerTeam: 0,
   shortNames: { en: null, es: null },
 }));

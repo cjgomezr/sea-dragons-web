@@ -7,7 +7,6 @@ import {
 import type { Locale } from "@/lib/i18n/locale";
 import type {
   ClubPosition,
-  PositionCoverage,
   PositionNames,
   PositionShortNames,
 } from "./club-positions";
@@ -23,11 +22,9 @@ import { type ClubSettingsGateways, findAdministrator } from "./club-settings";
  * que la pantalla vuelve a pintar.
  */
 
-/** Una posición tal como la ve el Admin: con su función (#404), que sólo se
- * enseña en la configuración y la usa el team builder. `null` es "ninguna". */
-export type ManagedPosition = ClubPosition & {
-  readonly coverage: PositionCoverage | null;
-};
+/** Una posición tal como la ve el Admin. Desde #889 no lleva nada más que
+ * la del resto: el rol de juego se retiró en favor del mínimo por equipo. */
+export type ManagedPosition = ClubPosition;
 
 /** Todas las del club, archivadas incluidas, en el orden que decidió. */
 export type ManagedPositions = readonly ManagedPosition[];
@@ -99,8 +96,6 @@ export type PositionArchiveResult =
   | { readonly kind: "unchanged" }
   | { readonly kind: "not_found" };
 
-export type PositionCoverageResult = PositionArchiveResult;
-
 /** Lo que devuelve un cambio que la bitácora anota con el valor de antes. */
 export type PositionValueChangeResult<Value> =
   | { readonly kind: "changed"; readonly previous: Value }
@@ -136,10 +131,6 @@ export type ManagedPositionsGateways = {
       target: PositionTarget,
       isArchived: boolean,
     ): Promise<PositionArchiveResult>;
-    setPositionCoverage(
-      target: PositionTarget,
-      coverage: PositionCoverage | null,
-    ): Promise<PositionCoverageResult>;
     setPositionMinimum(
       target: PositionTarget,
       minPerTeam: number,
@@ -397,36 +388,6 @@ export async function setPositionArchived(
         ? "club_position.archived"
         : "club_position.reactivated",
       positionId: request.positionId,
-    });
-  }
-  return gateways.positions.findClubPositions(actor.clubId);
-}
-
-/** Dos posiciones pueden compartir función. Dejarle la que ya tiene no es un
- * cambio, y no se anota; el cambio sí, con la función nueva. */
-export async function setPositionCoverage(
-  gateways: ManagedPositionsGateways,
-  request: {
-    readonly callerId: string;
-    readonly positionId: string;
-    readonly coverage: PositionCoverage | null;
-  },
-): Promise<ManagedPositions> {
-  const { coverage } = request;
-  const actor = await findAdministratorActor(gateways, request.callerId);
-  const result = await gateways.positions.setPositionCoverage(
-    { clubId: actor.clubId, positionId: request.positionId },
-    coverage,
-  );
-  if (result.kind === "not_found") {
-    throw new PositionNotFoundError();
-  }
-  if (result.kind === "changed") {
-    await recordPositionEvent(gateways, {
-      actor,
-      action: "club_position.coverage_changed",
-      positionId: request.positionId,
-      metadata: { coverage },
     });
   }
   return gateways.positions.findClubPositions(actor.clubId);
