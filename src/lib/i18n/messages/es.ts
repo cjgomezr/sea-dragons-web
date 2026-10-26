@@ -2909,6 +2909,17 @@ export const spanishMessages: MessageCatalog = {
     other: "{count} atacantes",
   },
   "teams.coverage.noGoalkeeper": "Sin portero",
+  // Una ficha por posición con mínimo (#888): a la vista la abreviatura,
+  // al lector el nombre que el club le dio.
+  "teams.coverage.position": "{position}: {count}",
+  "teams.coverage.short": {
+    one: "Falta {shortName}",
+    other: "Faltan {count} {shortName}",
+  },
+  "teams.coverage.missing": {
+    one: "Falta {count} {position}",
+    other: "Faltan {count} {position}",
+  },
   "teams.available.title": "Disponibles · Van",
   "teams.available.empty": "Todos los que van ya tienen equipo.",
   "teams.maybe.title": "Quizás",

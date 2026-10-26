@@ -5,21 +5,25 @@
  * N = 1 es la regla de los tres roles que fijó C2.
  */
 
-import type {
-  PositionCoverage,
-  PositionRequirement,
-  SquadPlayer,
-  TeamSplit,
-} from "./squad";
+import type { PositionRequirement, SquadPlayer, TeamSplit } from "./squad";
 
 /** Lo que se puede dar a cada equipo es la mitad de los que hay. */
 const TEAMS_IN_SPLIT = 2;
 
+/** Lo único que miran las cuentas de un jugador: su posición. */
+export type PositionedPlayer = Pick<SquadPlayer, "positionId">;
+
 function countPosition(
-  team: readonly SquadPlayer[],
+  team: readonly PositionedPlayer[],
   positionId: string,
 ): number {
   return team.filter((player) => player.positionId === positionId).length;
+}
+
+/** Lo que se exige a cada equipo (D5): el mínimo, o la mitad de los que hay
+ * en la escuadra si no llegan. */
+function requiredPerTeam(inSquad: number, minPerTeam: number): number {
+  return Math.min(minPerTeam, Math.floor(inSquad / TEAMS_IN_SPLIT));
 }
 
 function countRequirementGaps(
@@ -28,7 +32,7 @@ function countRequirementGaps(
 ): number {
   const inSquad =
     countPosition(split.a, positionId) + countPosition(split.b, positionId);
-  const required = Math.min(minPerTeam, Math.floor(inSquad / TEAMS_IN_SPLIT));
+  const required = requiredPerTeam(inSquad, minPerTeam);
   return [split.a, split.b].reduce(
     (gaps, team) =>
       gaps + Math.max(0, required - countPosition(team, positionId)),
@@ -61,20 +65,28 @@ export function toPositionRequirements(
   }));
 }
 
-export type TeamCoverage = Readonly<Record<PositionCoverage, number>>;
+/** Una ficha de la tarjeta de un equipo (RF-5 del PRD de E34): cuántos
+ * tiene de la posición y cuántos le faltan para su mínimo. */
+export type PositionTally = {
+  readonly count: number;
+  readonly missingCount: number;
+};
 
 /**
- * Cuántos porteros, defensas y atacantes tiene un equipo (#759, D9 del PRD
- * de E28): lo que enseña su tarjeta. Quien no tiene función no cuenta.
+ * La ficha de una posición en la tarjeta de un equipo. Sólo le falta algo a
+ * un equipo con jugadores, y sólo lo que la escuadra permitía cumplir (D8):
+ * con un portero en toda la escuadra no se le pide a nadie.
  */
-export function countTeamCoverage(
-  team: readonly { readonly coverage: PositionCoverage | null }[],
-): TeamCoverage {
-  const countOf = (coverage: PositionCoverage): number =>
-    team.filter((player) => player.coverage === coverage).length;
-  return {
-    goalkeeper: countOf("goalkeeper"),
-    defender: countOf("defender"),
-    forward: countOf("forward"),
-  };
+export function tallyPosition(
+  team: readonly PositionedPlayer[],
+  squad: readonly PositionedPlayer[],
+  { positionId, minPerTeam }: PositionRequirement,
+): PositionTally {
+  const count = countPosition(team, positionId);
+  const required = requiredPerTeam(
+    countPosition(squad, positionId),
+    minPerTeam,
+  );
+  const missingCount = team.length === 0 ? 0 : Math.max(0, required - count);
+  return { count, missingCount };
 }

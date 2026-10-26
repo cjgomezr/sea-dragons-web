@@ -24307,10 +24307,14 @@ const MANUAL_BUILDER = {
   requirements: TEAMS_REQUIREMENTS,
 };
 
-/** A mano y sin portero en Tide (#759): su ficha de portero dice Sin
- * portero. Tide lleva además el nombre largo, que se corta en su fila. */
+/** A mano y sin portero en Tide (#759): con Valentina y Ruby en la
+ * escuadra, su ficha de portero avisa de que le falta uno (#888). Tide
+ * lleva además el nombre largo, que se corta en su fila. */
 const NO_GOALKEEPER_BUILDER = {
   ...MANUAL_BUILDER,
+  // Ruby pasa de Quizás a Va: un "Quizás" no cuenta para la escuadra.
+  available: [...MANUAL_BUILDER.available, P.ruby],
+  maybe: [P.chloe],
   split: {
     mode: "manual",
     publishedAt: null,
@@ -24329,6 +24333,62 @@ const OPEN_BUILDER = {
   maybe: [P.long],
   split: null,
   requirements: TEAMS_REQUIREMENTS,
+};
+
+/** Dos posiciones más con mínimo (#888): una sin abreviatura, que pinta las
+ * tres primeras letras de su nombre, y otra con la suya. Nadie las juega. */
+const TEAMS_MIDFIELDER_REQUIREMENT = {
+  id: "b0b0b0b0-0000-4000-8000-0000000000b4",
+  names: { en: "Midfielder", es: "Medio" },
+  shortNames: { en: null, es: null },
+  minPerTeam: 1,
+};
+
+const TEAMS_EXTRA_REQUIREMENTS = [
+  {
+    id: "b0b0b0b0-0000-4000-8000-0000000000b5",
+    names: { en: "Sweeper", es: "Líbero" },
+    shortNames: { en: "SW", es: "LIB" },
+    minPerTeam: 1,
+  },
+  {
+    id: "b0b0b0b0-0000-4000-8000-0000000000b6",
+    names: { en: "Winger", es: "Extremo" },
+    shortNames: { en: "WG", es: "EXT" },
+    minPerTeam: 1,
+  },
+];
+
+/** Cuatro posiciones con mínimo y dos defensas por equipo (#888): Kelp
+ * tiene tres, Tide ninguno, y la escuadra trae cuatro, así que a Tide le
+ * faltan 2. */
+const FOUR_POSITIONS_BUILDER = {
+  ...OPEN_BUILDER,
+  requirements: [
+    ...TEAMS_REQUIREMENTS.map((requirement) =>
+      requirement.id === ATTENDANCE_POSITIONS.defender.id
+        ? { ...requirement, minPerTeam: 2 }
+        : requirement,
+    ),
+    TEAMS_MIDFIELDER_REQUIREMENT,
+  ],
+  split: {
+    mode: "manual",
+    publishedAt: null,
+    assignments: [
+      ...assignedTo("a", [P.mateo, P.valentina, P.isabella, P.jack, P.liam]),
+      ...assignedTo("b", [P.camila, P.noah, P.chloe, P.ethan]),
+    ],
+  },
+};
+
+/** Seis posiciones con mínimo: en el móvil las fichas pasan de línea. */
+const SIX_POSITIONS_BUILDER = {
+  ...FOUR_POSITIONS_BUILDER,
+  requirements: [
+    ...FOUR_POSITIONS_BUILDER.requirements,
+    ...TEAMS_EXTRA_REQUIREMENTS,
+  ],
 };
 
 /** El reparto del mockup, guardado en borrador y listo para publicar. */
@@ -24600,7 +24660,36 @@ const TEAMS_STATES: readonly TeamsState[] = [
       await waitForTeamBuilder(page);
       await showTeamsTab(page, /^Tide /);
       await expect(
-        teamsRegion(page, "Team Tide").getByText("No goalkeeper"),
+        teamsRegion(page, "Team Tide").getByText("Missing GK"),
+      ).toBeVisible();
+    },
+  },
+  // Las fichas de los mínimos del club (#888): cuatro posiciones con el
+  // aviso de dos que faltan, y seis en el móvil, que pasan de línea.
+  {
+    name: "equipos-cuatro-posiciones",
+    events: TEAMS_EVENTS,
+    builder: FOUR_POSITIONS_BUILDER,
+    viewports: viewports.filter((vp) => vp.name !== "mobile"),
+    ready: async (page) => {
+      await waitForTeamBuilder(page);
+      await showTeamsTab(page, /^Tide /);
+      await expect(
+        teamsRegion(page, "Team Tide").getByText("2 short of DEF"),
+      ).toBeVisible();
+    },
+  },
+  {
+    name: "equipos-seis-posiciones-movil",
+    events: TEAMS_EVENTS,
+    builder: SIX_POSITIONS_BUILDER,
+    viewports: viewports.filter((vp) => vp.name === "mobile"),
+    narrowWidths: TEAMS_PHONE_WIDTHS,
+    ready: async (page) => {
+      await waitForTeamBuilder(page);
+      await showTeamsTab(page, /^Tide /);
+      await expect(
+        teamsRegion(page, "Team Tide").getByText("2 short of DEF"),
       ).toBeVisible();
     },
   },
