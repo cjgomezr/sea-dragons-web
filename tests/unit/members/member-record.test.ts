@@ -107,7 +107,13 @@ type FakeOptions = {
 const GOALKEEPER_ID = "7e7e7e7e-0000-4000-8000-000000000001";
 const GOALKEEPER_NAMES = { en: "Goalkeeper", es: "Portero" } as const;
 const CLUB_POSITIONS: ClubPositions = [
-  { id: GOALKEEPER_ID, names: GOALKEEPER_NAMES, isArchived: false },
+  {
+    id: GOALKEEPER_ID,
+    names: GOALKEEPER_NAMES,
+    isArchived: false,
+    minPerTeam: 0,
+    shortNames: { en: null, es: null },
+  },
 ];
 const MEMBER_EMAIL = "paula@example.com";
 

@@ -49,24 +49,32 @@ const GOALKEEPER: ManagedPosition = {
   names: { en: "Goalkeeper", es: "Portería" },
   isArchived: false,
   coverage: "goalkeeper",
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 const DEFENDER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000002",
   names: { en: "Defender", es: "Defensa" },
   isArchived: false,
   coverage: "defender",
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 const FORWARD: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000003",
   names: { en: "Forward", es: "Ataque" },
   isArchived: false,
   coverage: "forward",
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 const UTILITY: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000004",
   names: { en: "Utility", es: null },
   isArchived: true,
   coverage: null,
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 const NEW_POSITION_ID = "00000000-0000-4000-8000-000000000005";
 
@@ -116,6 +124,8 @@ function applyWrite(request: Request): Response {
         names: body.names as ManagedPosition["names"],
         isArchived: false,
         coverage: null,
+        minPerTeam: 0,
+        shortNames: { en: null, es: null },
       },
     ];
     return catalogResponse(201);

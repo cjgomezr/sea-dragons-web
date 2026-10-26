@@ -32,15 +32,30 @@ export function isPositionCoverage(value: unknown): value is PositionCoverage {
   return POSITION_COVERAGES.some((coverage) => coverage === value);
 }
 
+/** La abreviatura de las fichas del team builder (D6 del PRD de E34), una
+ * por idioma. `null` es "sin abreviatura en éste". */
+export type PositionShortNames = { readonly [L in Locale]: string | null };
+
 export type ClubPosition = {
   readonly id: string;
   readonly names: PositionNames;
   readonly isArchived: boolean;
+  /** Cuántos de esta posición necesita cada equipo (D1 del PRD de E34), de
+   * 0 a 20. Una archivada lo conserva pero no exige (D9). */
+  readonly minPerTeam: number;
+  readonly shortNames: PositionShortNames;
 };
 
 /** Una posición tal como la pinta quien no decide si está archivada: el
  * directorio y los desplegables que sólo ofrecen activas. */
 export type NamedPosition = Pick<ClubPosition, "id" | "names">;
+
+/** Una del desplegable del alta, con lo que el team builder necesita saber
+ * de ella (#885): su mínimo por equipo y sus abreviaturas. */
+export type PositionChoice = Pick<
+  ClubPosition,
+  "id" | "names" | "minPerTeam" | "shortNames"
+>;
 
 /** Todas las del club, archivadas incluidas, en el orden que decidió. */
 export type ClubPositions = readonly ClubPosition[];
@@ -207,7 +222,7 @@ export type PositionChoicesGateways = {
 export async function listPositionChoices(
   gateways: PositionChoicesGateways,
   callerId: string,
-): Promise<readonly NamedPosition[]> {
+): Promise<readonly PositionChoice[]> {
   const caller = await gateways.members.findRoleRequestMember(callerId);
   if (caller === null) {
     throw new MemberNotFoundError(callerId);
@@ -216,8 +231,12 @@ export async function listPositionChoices(
     caller.clubId,
     [],
   );
-  return offeredPositions(positions, null).map(({ id, names }) => ({
-    id,
-    names,
-  }));
+  return offeredPositions(positions, null).map(
+    ({ id, names, minPerTeam, shortNames }) => ({
+      id,
+      names,
+      minPerTeam,
+      shortNames,
+    }),
+  );
 }

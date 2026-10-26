@@ -9,11 +9,14 @@ import {
   renamePosition,
   setPositionArchived,
   setPositionCoverage,
+  setPositionMinimum,
+  setPositionShortNames,
 } from "@/lib/club/manage-club-positions";
 import {
   type ManagedPositionsResponse,
   asManagedPositionsApiError,
   positionNamesBodySchema,
+  positionShortNamesBodySchema,
   positionsChanged,
   readPositionId,
   requireManagedPositionsGateways,
@@ -21,9 +24,11 @@ import {
 
 /**
  * Renombrar, archivar o reactivar una posición del club (#300), o cambiarle
- * la función (#404). Un PATCH hace una sola cosa: trae `names`, `isArchived`
- * o `coverage`, nunca dos. La función es el código en inglés, o `null` para
- * quitársela.
+ * la función (#404), el mínimo por equipo o las abreviaturas (#885). Un PATCH
+ * hace una sola cosa: trae `names`, `isArchived`, `coverage`, `minPerTeam` o
+ * `shortNames`, nunca dos. La función es el código en inglés, o `null` para
+ * quitársela. El mínimo llega como número y el dominio dice si vale, para
+ * responder con el `reason` que la pantalla pone junto al campo.
  *
  * El `[id]` sólo alcanza a las posiciones del club de quien llama: la de otro
  * club responde 404, como una que no existe. Es sólo del Admin, como todo lo
@@ -37,6 +42,8 @@ const changeBodySchema = z.union([
   z.object({ names: positionNamesBodySchema }).strict(),
   z.object({ isArchived: z.boolean() }).strict(),
   z.object({ coverage: z.enum(POSITION_COVERAGES).nullable() }).strict(),
+  z.object({ minPerTeam: z.number() }).strict(),
+  z.object({ shortNames: positionShortNamesBodySchema }).strict(),
 ]);
 
 type ChangeBody = z.infer<typeof changeBodySchema>;
@@ -64,10 +71,24 @@ function applyChange(
       isArchived: body.isArchived,
     });
   }
-  return setPositionCoverage(gateways, {
+  if ("coverage" in body) {
+    return setPositionCoverage(gateways, {
+      callerId,
+      positionId,
+      coverage: body.coverage,
+    });
+  }
+  if ("minPerTeam" in body) {
+    return setPositionMinimum(gateways, {
+      callerId,
+      positionId,
+      minPerTeam: body.minPerTeam,
+    });
+  }
+  return setPositionShortNames(gateways, {
     callerId,
     positionId,
-    coverage: body.coverage,
+    shortNames: body.shortNames,
   });
 }
 

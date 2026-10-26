@@ -30,7 +30,14 @@ const SETTINGS: ClubSettings = {
 };
 
 function position(id: string, isArchived: boolean): ManagedPosition {
-  return { id, names: { en: id, es: id }, isArchived, coverage: null };
+  return {
+    id,
+    names: { en: id, es: id },
+    isArchived,
+    coverage: null,
+    minPerTeam: 0,
+    shortNames: { en: null, es: null },
+  };
 }
 
 const SIX_ACTIVE_ONE_ARCHIVED: ManagedPositions = [

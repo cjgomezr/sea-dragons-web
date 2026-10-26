@@ -47,6 +47,8 @@ const ARCHIVED_POSITION: ClubPosition = {
   id: "90000000-0000-4000-8000-000000000004",
   names: { en: "Utility", es: "Comodín" },
   isArchived: true,
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 };
 const OTHER_CLUBS_POSITION_ID = "90000000-0000-4000-8000-000000000099";
 

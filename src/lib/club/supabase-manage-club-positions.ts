@@ -4,11 +4,17 @@ import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
-import type { PositionCoverage, PositionNames } from "./club-positions";
+import type {
+  PositionCoverage,
+  PositionNames,
+  PositionShortNames,
+} from "./club-positions";
 import type {
   ManagedPositionsGateways,
   PositionArchiveResult,
   PositionCoverageResult,
+  PositionMinimumResult,
+  PositionShortNamesResult,
   PositionTarget,
   PositionInsertResult,
   PositionRenameResult,
@@ -48,6 +54,25 @@ const reorderResultSchema = z.object({
 const archiveResultSchema = z.object({
   outcome: z.enum(["changed", "unchanged", "not_found"]),
 });
+
+const minimumResultSchema = z.discriminatedUnion("outcome", [
+  z.object({ outcome: z.literal("changed"), previous: z.number().int() }),
+  z.object({ outcome: z.literal("unchanged") }),
+  z.object({ outcome: z.literal("not_found") }),
+]);
+
+const shortNamesResultSchema = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.literal("changed"),
+    previous: z.object({
+      en: z.string().nullable(),
+      es: z.string().nullable(),
+    }),
+  }),
+  z.object({ outcome: z.literal("unchanged") }),
+  z.object({ outcome: z.literal("not_found") }),
+  z.object({ outcome: z.literal("name_missing"), locale: localeSchema }),
+]);
 
 /** Llama a la función y estrecha su respuesta. Un error o una forma que no
  * cuadra no son un resultado del dominio: suben con el nombre de la función. */
@@ -189,6 +214,52 @@ async function setPositionCoverage(
     : { kind: "not_found" };
 }
 
+/** Por `0081`: lee el anterior y escribe bajo el mismo bloqueo, para que la
+ * bitácora anote el valor del que de verdad partió. */
+async function setPositionMinimum(
+  serviceClient: SupabaseClient,
+  target: PositionTarget,
+  minPerTeam: number,
+): Promise<PositionMinimumResult> {
+  const result = await callPositionFunction(serviceClient, {
+    name: "set_club_position_min_per_team",
+    args: {
+      acting_club_id: target.clubId,
+      target_position_id: target.positionId,
+      new_min_per_team: minPerTeam,
+    },
+    schema: minimumResultSchema,
+  });
+  return result.outcome === "changed"
+    ? { kind: "changed", previous: result.previous }
+    : { kind: result.outcome };
+}
+
+async function setPositionShortNames(
+  serviceClient: SupabaseClient,
+  target: PositionTarget,
+  shortNames: PositionShortNames,
+): Promise<PositionShortNamesResult> {
+  const result = await callPositionFunction(serviceClient, {
+    name: "set_club_position_short_names",
+    args: {
+      acting_club_id: target.clubId,
+      target_position_id: target.positionId,
+      short_name_en: shortNames.en,
+      short_name_es: shortNames.es,
+    },
+    schema: shortNamesResultSchema,
+  });
+  switch (result.outcome) {
+    case "changed":
+      return { kind: "changed", previous: result.previous };
+    case "name_missing":
+      return { kind: "name_missing", locale: result.locale };
+    default:
+      return { kind: result.outcome };
+  }
+}
+
 /** Sin caché: el Admin tiene que ver lo que acaba de guardar. */
 export function createManagedPositionsGateways(
   serviceClient: SupabaseClient,
@@ -208,6 +279,10 @@ export function createManagedPositionsGateways(
         setPositionArchived(serviceClient, target, isArchived),
       setPositionCoverage: (target, coverage) =>
         setPositionCoverage(serviceClient, target, coverage),
+      setPositionMinimum: (target, minPerTeam) =>
+        setPositionMinimum(serviceClient, target, minPerTeam),
+      setPositionShortNames: (target, shortNames) =>
+        setPositionShortNames(serviceClient, target, shortNames),
     },
     audit: createSupabaseAuditLogWriter(serviceClient),
   };

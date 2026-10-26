@@ -142,6 +142,8 @@ function fakeGateways(options: FakeOptions = {}): {
           id: POSITION_ID,
           names: { en: "Forward", es: "Delantero" },
           isArchived: false,
+          minPerTeam: 0,
+          shortNames: { en: null, es: null },
         },
       ],
     },

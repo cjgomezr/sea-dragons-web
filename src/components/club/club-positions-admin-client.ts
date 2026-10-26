@@ -38,6 +38,11 @@ const responseSchema = z.object({
       namedPositionSchema.extend({
         isArchived: z.boolean(),
         coverage: z.enum(POSITION_COVERAGES).nullable(),
+        minPerTeam: z.number().int(),
+        shortNames: z.object({
+          en: z.string().nullable(),
+          es: z.string().nullable(),
+        }),
       }),
     ),
   }),

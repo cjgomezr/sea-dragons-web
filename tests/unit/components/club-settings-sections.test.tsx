@@ -60,6 +60,8 @@ const POSITIONS = POSITION_NAMES.map((name, index) => ({
   names: { en: name, es: null },
   isArchived: index === POSITION_NAMES.length - 1,
   coverage: null,
+  minPerTeam: 0,
+  shortNames: { en: null, es: null },
 }));
 
 const SIGN_IN_TEXTS = {
