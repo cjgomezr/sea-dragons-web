@@ -24306,9 +24306,13 @@ const MANUAL_BUILDER = {
 };
 
 /** A mano y sin portero en Tide (#759): con Valentina y Ruby en la
- * escuadra, su ficha de portero avisa de que le falta uno (#888). Tide lleva además el nombre largo, que se corta en su fila. */
+ * escuadra, su ficha de portero avisa de que le falta uno (#888). Tide
+ * lleva además el nombre largo, que se corta en su fila. */
 const NO_GOALKEEPER_BUILDER = {
   ...MANUAL_BUILDER,
+  // Ruby pasa de Quizás a Va: un "Quizás" no cuenta para la escuadra.
+  available: [...MANUAL_BUILDER.available, P.ruby],
+  maybe: [P.chloe],
   split: {
     mode: "manual",
     publishedAt: null,

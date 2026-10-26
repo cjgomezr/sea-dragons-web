@@ -8,9 +8,9 @@ import {
 import type { Translator } from "@/lib/i18n/translator";
 import {
   type PositionTally,
+  type PositionedPlayer,
   tallyPosition,
 } from "@/lib/teams/position-coverage";
-import type { SquadPlayer } from "@/lib/teams/squad";
 
 /**
  * Las fichas de cobertura de una tarjeta de equipo (#888, RF-5 del PRD de
@@ -19,8 +19,6 @@ import type { SquadPlayer } from "@/lib/teams/squad";
  * 1"). La ficha de un mínimo que el equipo no cumple sale en aviso y dice
  * cuántos faltan. Sin iconos por posición (D6): sólo el aviso lleva el suyo.
  */
-
-type PositionedPlayer = Pick<SquadPlayer, "positionId">;
 
 function CountChip({
   translate,

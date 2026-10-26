@@ -8,6 +8,7 @@ import {
   type RosterPlayer,
   type TeamDraft,
   benchPlayers,
+  squadPlayers,
   teamPlayers,
 } from "./team-draft";
 import { TeamCoverage } from "./TeamCoverage";
@@ -173,7 +174,7 @@ export function TeamCard({
         translate={translate}
         positions={draft.requirements}
         team={players}
-        squad={draft.roster}
+        squad={squadPlayers(draft)}
       />
       {players.length === 0 && emptyState !== undefined ? (
         emptyState

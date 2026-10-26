@@ -197,6 +197,16 @@ export function benchPlayers(
   );
 }
 
+/** La escuadra que decide qué mínimo se puede cumplir (D5 del PRD de E34):
+ * la que reparte el auto-balance, los disponibles, más quien ya está en un
+ * equipo. Un "Quizás" en el banco todavía no cuenta. */
+export function squadPlayers(draft: TeamDraft): RosterPlayer[] {
+  return draft.roster.filter(
+    (player) =>
+      player.origin !== "maybe" || teamOf(draft, player.userId) !== null,
+  );
+}
+
 function toSquadPlayer(player: RosterPlayer): SquadPlayer {
   return {
     userId: player.userId,

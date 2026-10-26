@@ -1581,6 +1581,16 @@ describe("las columnas de equipo (#759)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("no cuenta para la escuadra al portero que sigue en Quizás", async () => {
+    stubClub({ builders: [{ ...COVERED, maybe: [KEEPER] }] });
+
+    await openScreen();
+
+    expect(
+      within(coverage("Team Tide")).queryByText(/Missing/),
+    ).not.toBeInTheDocument();
+  });
+
   it("dice cuántos faltan cuando son dos o más", async () => {
     const defenders = [11, 12, 13].map((index) =>
       entry(index, `Defensa ${index}`, { positionId: DEFENDER_ID }),

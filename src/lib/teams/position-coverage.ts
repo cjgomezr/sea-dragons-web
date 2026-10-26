@@ -10,7 +10,8 @@ import type { PositionRequirement, SquadPlayer, TeamSplit } from "./squad";
 /** Lo que se puede dar a cada equipo es la mitad de los que hay. */
 const TEAMS_IN_SPLIT = 2;
 
-type PositionedPlayer = Pick<SquadPlayer, "positionId">;
+/** Lo único que miran las cuentas de un jugador: su posición. */
+export type PositionedPlayer = Pick<SquadPlayer, "positionId">;
 
 function countPosition(
   team: readonly PositionedPlayer[],
