@@ -2893,22 +2893,6 @@ export const spanishMessages: MessageCatalog = {
   "teams.edit.busy":
     "Los equipos aún se están guardando. Vuelve a aplicar cuando terminen.",
   "teams.coverage.label": "Cobertura de puestos",
-  "teams.coverage.goalkeeper": "POR",
-  "teams.coverage.defender": "DEF",
-  "teams.coverage.forward": "ATA",
-  "teams.coverage.goalkeeperCount": {
-    one: "{count} portero",
-    other: "{count} porteros",
-  },
-  "teams.coverage.defenderCount": {
-    one: "{count} defensa",
-    other: "{count} defensas",
-  },
-  "teams.coverage.forwardCount": {
-    one: "{count} atacante",
-    other: "{count} atacantes",
-  },
-  "teams.coverage.noGoalkeeper": "Sin portero",
   // Una ficha por posición con mínimo (#888): a la vista la abreviatura,
   // al lector el nombre que el club le dio.
   "teams.coverage.position": "{position}: {count}",

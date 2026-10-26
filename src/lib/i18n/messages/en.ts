@@ -2878,22 +2878,6 @@ export const englishMessages = {
   "teams.edit.busy":
     "The teams are still saving. Apply again once they finish.",
   "teams.coverage.label": "Position coverage",
-  "teams.coverage.goalkeeper": "GK",
-  "teams.coverage.defender": "DEF",
-  "teams.coverage.forward": "ATT",
-  "teams.coverage.goalkeeperCount": {
-    one: "{count} goalkeeper",
-    other: "{count} goalkeepers",
-  },
-  "teams.coverage.defenderCount": {
-    one: "{count} defender",
-    other: "{count} defenders",
-  },
-  "teams.coverage.forwardCount": {
-    one: "{count} forward",
-    other: "{count} forwards",
-  },
-  "teams.coverage.noGoalkeeper": "No goalkeeper",
   // Una ficha por posición con mínimo (#888): a la vista la abreviatura,
   // al lector el nombre que el club le dio.
   "teams.coverage.position": "{position}: {count}",

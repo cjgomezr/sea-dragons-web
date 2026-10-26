@@ -34,7 +34,6 @@ function position(id: string, isArchived: boolean): ManagedPosition {
     id,
     names: { en: id, es: id },
     isArchived,
-    coverage: null,
     minPerTeam: 0,
     shortNames: { en: null, es: null },
   };

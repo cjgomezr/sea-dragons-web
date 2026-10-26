@@ -92,7 +92,6 @@ function entry(
     userId: `4e4e4e4e-0000-4000-8000-${String(index).padStart(12, "0")}`,
     fullName,
     position: null,
-    coverage: null,
     rating: 7,
     isUnrated: false,
     photoUrl: null,
@@ -103,7 +102,6 @@ function entry(
 
 const MATEO = entry(1, "Mateo Restrepo", {
   position: FORWARD,
-  coverage: "forward",
   rating: 9,
 });
 const DANIELA = entry(2, "Daniela Vargas", { rating: 8 });
@@ -883,7 +881,6 @@ describe("sugerencia", () => {
 
   it("dice que el intercambio cubre los puestos cuando cierra un hueco", async () => {
     const goalkeeper = {
-      coverage: "goalkeeper" as const,
       positionId: GOALKEEPER_ID,
     };
     const keeperOne = entry(8, "Olivia Park", { ...goalkeeper, rating: 7 });
@@ -1446,19 +1443,16 @@ describe("las columnas de equipo (#759)", () => {
   };
   const VALENTINA = entry(6, "Valentina Gómez", {
     position: GOALKEEPER,
-    coverage: "goalkeeper",
     rating: 7.4,
   });
   const ISABELLA = entry(7, "Isabella Muñoz", {
     position: FULL_BACK,
-    coverage: "defender",
     rating: 7.2,
   });
   /** El segundo portero, en el banco: con él la escuadra permite uno por
    * equipo. */
   const KEEPER = entry(8, "Olivia Park", {
     position: GOALKEEPER,
-    coverage: "goalkeeper",
   });
 
   /** Kelp con portero, defensa y ataque; Tide con Ethan solo, sin portero. */

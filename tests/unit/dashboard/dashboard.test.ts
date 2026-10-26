@@ -1142,7 +1142,6 @@ describe("mi equipo en el próximo evento (#745)", () => {
       userId: CALLER_ID,
       fullName: "Alba Ferrer",
       positionId,
-      coverage: null,
       ratings: null,
       membershipCurrent: true,
       accountStatus: "active",

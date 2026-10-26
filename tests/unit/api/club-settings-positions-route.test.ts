@@ -31,7 +31,6 @@ const GOALKEEPER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000001",
   names: { en: "Goalkeeper", es: "Portería" },
   isArchived: false,
-  coverage: "goalkeeper",
   minPerTeam: 1,
   shortNames: { en: "GK", es: "POR" },
 };
@@ -39,7 +38,6 @@ const DEFENDER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000002",
   names: { en: "Defender", es: "Defensa" },
   isArchived: true,
-  coverage: null,
   minPerTeam: 0,
   shortNames: { en: null, es: null },
 };
@@ -91,13 +89,6 @@ function managedPositionsGateways(): ManagedPositionsGateways {
           return { kind: "not_found" };
         }
         writes.push(`archive ${isArchived}`);
-        return { kind: "changed" };
-      },
-      setPositionCoverage: async ({ positionId }, coverage) => {
-        if (!isOwnPosition(positionId)) {
-          return { kind: "not_found" };
-        }
-        writes.push(`coverage ${coverage ?? "none"}`);
         return { kind: "changed" };
       },
       setPositionMinimum: async ({ positionId }, minPerTeam) => {
@@ -325,7 +316,7 @@ describe("endpoints de posiciones", () => {
     });
   });
 
-  describe("PATCH: renombrar, archivar, reactivar y cambiar la función", () => {
+  describe("PATCH: renombrar, archivar, reactivar, mínimo y abreviaturas", () => {
     it("renombra, anota e invalida la caché", async () => {
       const response = await patchPosition(GOALKEEPER.id, {
         names: { en: "Keeper", es: "Portería" },
@@ -354,29 +345,6 @@ describe("endpoints de posiciones", () => {
       expect(writes).toEqual([
         "archive false",
         "audit club_position.reactivated",
-      ]);
-    });
-
-    it("cambia la función, anota e invalida la caché", async () => {
-      const response = await patchPosition(GOALKEEPER.id, {
-        coverage: "defender",
-      });
-
-      expect(response.status).toBe(200);
-      expect(writes).toEqual([
-        "coverage defender",
-        "audit club_position.coverage_changed",
-      ]);
-      expect(invalidateClubPositions).toHaveBeenCalledOnce();
-    });
-
-    it("le quita la función con null", async () => {
-      const response = await patchPosition(GOALKEEPER.id, { coverage: null });
-
-      expect(response.status).toBe(200);
-      expect(writes).toEqual([
-        "coverage none",
-        "audit club_position.coverage_changed",
       ]);
     });
 
@@ -476,7 +444,6 @@ describe("endpoints de posiciones", () => {
 
     it.each([
       ["el archivo", { isArchived: true }],
-      ["la función", { coverage: "forward" }],
       ["el mínimo", { minPerTeam: 2 }],
       ["las abreviaturas", { shortNames: { en: "LIB", es: null } }],
     ])(
@@ -499,19 +466,11 @@ describe("endpoints de posiciones", () => {
       ["vacío", {}],
       ["con nombres y archivo a la vez", { ...VALID_NAMES, isArchived: true }],
       ["con el archivo como texto", { isArchived: "true" }],
-      ["con una función fuera de las tres", { coverage: "midfielder" }],
-      ["con la función en español", { coverage: "Portero" }],
-      [
-        "con la función y el archivo a la vez",
-        { coverage: "forward", isArchived: true },
-      ],
+      ["con el rol de juego, que ya no existe", { coverage: "goalkeeper" }],
+      ["con el rol de juego en null", { coverage: null }],
       [
         "con el mínimo y las abreviaturas a la vez",
         { minPerTeam: 2, shortNames: { en: "LIB", es: null } },
-      ],
-      [
-        "con el mínimo y la función a la vez",
-        { minPerTeam: 2, coverage: null },
       ],
       ["con el mínimo como texto", { minPerTeam: "2" }],
       ["con una abreviatura sin el otro idioma", { shortNames: { en: "LIB" } }],
@@ -569,7 +528,6 @@ describe("endpoints de posiciones", () => {
           await postPosition(VALID_NAMES),
           await patchPosition(GOALKEEPER.id, VALID_NAMES),
           await patchPosition(GOALKEEPER.id, { isArchived: true }),
-          await patchPosition(GOALKEEPER.id, { coverage: "forward" }),
           await patchPosition(GOALKEEPER.id, { minPerTeam: 2 }),
           await patchPosition(GOALKEEPER.id, {
             shortNames: { en: "LIB", es: null },
@@ -578,7 +536,7 @@ describe("endpoints de posiciones", () => {
         ];
 
         expect(responses.map((response) => response.status)).toEqual([
-          403, 403, 403, 403, 403, 403, 403, 403,
+          403, 403, 403, 403, 403, 403, 403,
         ]);
         expect(writes).toEqual([]);
       },

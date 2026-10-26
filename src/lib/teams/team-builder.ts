@@ -21,7 +21,6 @@ import { clubCalendarDate } from "@/lib/time/club-calendar";
 import { autoBalanceTeams } from "./auto-balance";
 import { toPositionRequirements } from "./position-coverage";
 import {
-  type PositionCoverage,
   type PositionRequirement,
   type SquadPlayer,
   type TeamSplit,
@@ -103,8 +102,6 @@ export type PlayerRecord = {
   readonly userId: string;
   readonly fullName: string;
   readonly positionId: string | null;
-  /** La función de su posición (D4), o `null` sin posición o sin función. */
-  readonly coverage: PositionCoverage | null;
   /** `null` sin evaluación; una lista vacía es una evaluación sin notas. */
   readonly ratings: readonly number[] | null;
   /** Si su membresía está al día (#453): sin ella no entra en la escuadra. */
@@ -236,8 +233,6 @@ export type SquadEntry = {
   readonly position: NamedPosition | null;
   /** El id de su posición, para contarlo en los mínimos (E34). */
   readonly positionId: string | null;
-  /** La función de su posición; la retira #889 en favor de `positionId`. */
-  readonly coverage: PositionCoverage | null;
   readonly rating: number;
   readonly isUnrated: boolean;
   /** Null sin foto, sin firma o si quien arma no la ve: la fila enseña
@@ -500,7 +495,6 @@ function toSquadEntries(
         fullName: player.fullName,
         position: positionOf(positions, player.positionId),
         positionId: player.positionId,
-        coverage: player.coverage,
         rating: overall ?? UNRATED_PLAYER_RATING,
         isUnrated: overall === null,
         photoUrl: photoUrls.get(player.userId) ?? null,

@@ -109,39 +109,17 @@ describeRls("administrar posiciones en Supabase", () => {
   );
 
   it(
-    "guarda la función de cada posición y dice cuándo no cambió",
+    "lee las posiciones sin el rol de juego, que se retiró en #889",
     async () => {
       await withThrowawayClub(async (clubId) => {
         const gateway = positionsGateway();
-        const [, defender, forward] = seededThree(
-          await gateway.findClubPositions(clubId),
-        );
-
-        await expect(
-          gateway.setPositionCoverage(
-            { clubId, positionId: forward.id },
-            "defender",
-          ),
-        ).resolves.toEqual({ kind: "changed" });
-        await expect(
-          gateway.setPositionCoverage(
-            { clubId, positionId: forward.id },
-            "defender",
-          ),
-        ).resolves.toEqual({ kind: "unchanged" });
-        await expect(
-          gateway.setPositionCoverage(
-            { clubId, positionId: defender.id },
-            null,
-          ),
-        ).resolves.toEqual({ kind: "changed" });
 
         const positions = await gateway.findClubPositions(clubId);
-        expect(positions.map((position) => position.coverage)).toEqual([
-          "goalkeeper",
-          null,
-          "defender",
-        ]);
+
+        expect(positions).toHaveLength(3);
+        for (const position of positions) {
+          expect(position).not.toHaveProperty("coverage");
+        }
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
@@ -259,9 +237,6 @@ describeRls("administrar posiciones en Supabase", () => {
         ).resolves.toEqual({ kind: "not_found" });
         await expect(
           gateway.setPositionArchived(target, true),
-        ).resolves.toEqual({ kind: "not_found" });
-        await expect(
-          gateway.setPositionCoverage(target, "forward"),
         ).resolves.toEqual({ kind: "not_found" });
         await expect(
           gateway.reorderPositions(clubId, [randomUUID()]),

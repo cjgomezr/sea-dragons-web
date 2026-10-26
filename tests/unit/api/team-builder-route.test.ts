@@ -308,7 +308,7 @@ describe("GET /api/v1/teams/[eventId]", () => {
   it("sirve el positionId de cada jugador y los mínimos por posición del club (E34)", async () => {
     givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
     givenClub({
-      players: [{ ...ANA, positionId: GOALKEEPER.id, coverage: "goalkeeper" }],
+      players: [{ ...ANA, positionId: GOALKEEPER.id }],
       positions: [GOALKEEPER, { ...DEFENDER, minPerTeam: 0 }],
     });
 
@@ -317,7 +317,7 @@ describe("GET /api/v1/teams/[eventId]", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       data: {
-        available: [{ positionId: GOALKEEPER.id, coverage: "goalkeeper" }],
+        available: [{ positionId: GOALKEEPER.id }],
         requirements: [
           {
             id: GOALKEEPER.id,
@@ -328,6 +328,18 @@ describe("GET /api/v1/teams/[eventId]", () => {
         ],
       },
     });
+  });
+
+  it("ya no sirve el rol de juego de cada jugador (#889)", async () => {
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
+    givenClub({ players: [{ ...ANA, positionId: GOALKEEPER.id }] });
+
+    const response = await openBuilder();
+
+    const body = (await response.json()) as {
+      data: { available: readonly Record<string, unknown>[] };
+    };
+    expect(body.data.available[0]).not.toHaveProperty("coverage");
   });
 
   it("sirve los equipos del club a un evento sin reparto (#755)", async () => {

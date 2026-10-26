@@ -2,13 +2,11 @@ import type { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
-import { POSITION_COVERAGES } from "@/lib/club/club-positions";
 import {
   type ManagedPositions,
   type ManagedPositionsGateways,
   renamePosition,
   setPositionArchived,
-  setPositionCoverage,
   setPositionMinimum,
   setPositionShortNames,
 } from "@/lib/club/manage-club-positions";
@@ -24,11 +22,11 @@ import {
 
 /**
  * Renombrar, archivar o reactivar una posición del club (#300), o cambiarle
- * la función (#404), el mínimo por equipo o las abreviaturas (#885). Un PATCH
- * hace una sola cosa: trae `names`, `isArchived`, `coverage`, `minPerTeam` o
- * `shortNames`, nunca dos. La función es el código en inglés, o `null` para
- * quitársela. El mínimo llega como número y el dominio dice si vale, para
- * responder con el `reason` que la pantalla pone junto al campo.
+ * el mínimo por equipo o las abreviaturas (#885). Un PATCH hace una sola
+ * cosa: trae `names`, `isArchived`, `minPerTeam` o `shortNames`, nunca dos.
+ * El rol de juego (`coverage`) se retiró en #889 y ya es un 400. El mínimo
+ * llega como número y el dominio dice si vale, para responder con el
+ * `reason` que la pantalla pone junto al campo.
  *
  * El `[id]` sólo alcanza a las posiciones del club de quien llama: la de otro
  * club responde 404, como una que no existe. Es sólo del Admin, como todo lo
@@ -41,7 +39,6 @@ export const dynamic = "force-dynamic";
 const changeBodySchema = z.union([
   z.object({ names: positionNamesBodySchema }).strict(),
   z.object({ isArchived: z.boolean() }).strict(),
-  z.object({ coverage: z.enum(POSITION_COVERAGES).nullable() }).strict(),
   z.object({ minPerTeam: z.number() }).strict(),
   z.object({ shortNames: positionShortNamesBodySchema }).strict(),
 ]);
@@ -69,13 +66,6 @@ function applyChange(
       callerId,
       positionId,
       isArchived: body.isArchived,
-    });
-  }
-  if ("coverage" in body) {
-    return setPositionCoverage(gateways, {
-      callerId,
-      positionId,
-      coverage: body.coverage,
     });
   }
   if ("minPerTeam" in body) {

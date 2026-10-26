@@ -168,13 +168,15 @@ grant select, insert, update, delete on public.team_split_members
 -- aunque el club la renombre. Nula es "ninguna". La columna, su `check` y el
 -- relleno de las tres sembradas van juntos y sólo la primera vez: al
 -- repetirse, el relleno no debe devolver una función que el club quitó.
+-- `0082` la retira cuando el mínimo de `0081` la sustituye: con
+-- `min_per_team` ya en la tabla, repetir esto la crearía de nuevo vacía.
 do $$
 begin
   if not exists (
     select 1 from information_schema.columns
      where table_schema = 'public'
        and table_name = 'club_positions'
-       and column_name = 'coverage'
+       and column_name in ('coverage', 'min_per_team')
   ) then
     alter table public.club_positions
       add column coverage text
@@ -193,7 +195,10 @@ begin
 end;
 $$;
 
--- La siembra de `0025` para los clubes nuevos, ahora con la función.
+-- La siembra de `0025` para los clubes nuevos. Escribía la función, pero
+-- producción reaplica esto después de que `0082` la retire y una siembra que
+-- nombra una columna que ya no existe tumbaría el alta de un club hasta que
+-- `0081` la reemplace.
 create or replace function public.clubs_seed_default_positions()
   returns trigger
   language plpgsql
@@ -204,15 +209,15 @@ declare
   seeded record;
 begin
   for seeded in
-    with seed (sort_order, name_en, name_es, coverage) as (
+    with seed (sort_order, name_en, name_es) as (
       values
-        (1, 'Goalkeeper', 'Portería', 'goalkeeper'),
-        (2, 'Defender', 'Defensa', 'defender'),
-        (3, 'Forward', 'Ataque', 'forward')
+        (1, 'Goalkeeper', 'Portería'),
+        (2, 'Defender', 'Defensa'),
+        (3, 'Forward', 'Ataque')
     ),
     inserted as (
-      insert into public.club_positions (club_id, sort_order, coverage)
-      select new.id, s.sort_order, s.coverage from seed s
+      insert into public.club_positions (club_id, sort_order)
+      select new.id, s.sort_order from seed s
       returning id, sort_order
     )
     select i.id, s.name_en, s.name_es

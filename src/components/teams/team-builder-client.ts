@@ -60,7 +60,6 @@ const squadEntrySchema = z.object({
     .object({ id: z.string(), names: localizedNamesSchema })
     .nullable(),
   positionId: z.string().nullable(),
-  coverage: z.enum(["goalkeeper", "defender", "forward"]).nullable(),
   rating: z.number(),
   isUnrated: z.boolean(),
   photoUrl: z.string().nullable(),

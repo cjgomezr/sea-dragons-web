@@ -12035,8 +12035,6 @@ type StubbedPosition = {
   readonly id: string;
   readonly names: { readonly en: string | null; readonly es: string | null };
   readonly isArchived: boolean;
-  /** La función en el auto-balance (#404); `null` es "ninguna". */
-  readonly coverage: "goalkeeper" | "defender" | "forward" | null;
   /** El mínimo por equipo y las abreviaturas (#885). */
   readonly minPerTeam: number;
   readonly shortNames: {
@@ -12054,7 +12052,6 @@ const STUBBED_ACTIVE_POSITIONS: readonly StubbedPosition[] = [
     id: "90000000-0000-4000-8000-000000000001",
     names: { en: "Goalkeeper", es: "Portería" },
     isArchived: false,
-    coverage: "goalkeeper",
     minPerTeam: 1,
     shortNames: { en: "GK", es: "POR" },
   },
@@ -12062,7 +12059,6 @@ const STUBBED_ACTIVE_POSITIONS: readonly StubbedPosition[] = [
     id: "90000000-0000-4000-8000-000000000002",
     names: { en: "Defender", es: "Defensa" },
     isArchived: false,
-    coverage: "defender",
     minPerTeam: 2,
     shortNames: { en: "DEF", es: "DEF" },
   },
@@ -12070,7 +12066,6 @@ const STUBBED_ACTIVE_POSITIONS: readonly StubbedPosition[] = [
     id: "90000000-0000-4000-8000-000000000003",
     names: { en: "Forward", es: "Ataque" },
     isArchived: false,
-    coverage: "forward",
     // Sin mínimo ni abreviatura (#887): la tabla enseña la que se usará,
     // apagada.
     minPerTeam: 0,
@@ -12087,7 +12082,6 @@ const STUBBED_POSITIONS_WITH_ARCHIVED: readonly StubbedPosition[] = [
     id: "90000000-0000-4000-8000-000000000004",
     names: { en: "Utility", es: null },
     isArchived: true,
-    coverage: null,
     minPerTeam: 0,
     shortNames: { en: null, es: null },
   },
@@ -12098,7 +12092,6 @@ const STUBBED_POSITIONS_WITH_ARCHIVED: readonly StubbedPosition[] = [
       es: "Apoyo de segunda línea tras la cesta",
     },
     isArchived: true,
-    coverage: "defender",
     minPerTeam: 0,
     shortNames: { en: null, es: null },
   },
@@ -13624,7 +13617,6 @@ const SIX_STUBBED_POSITIONS: readonly StubbedPosition[] = [
     id: `90000000-0000-4000-8000-00000000001${index}`,
     names: { en, es },
     isArchived: false,
-    coverage: null,
     minPerTeam: 0,
     shortNames: { en: null, es: null },
   })),
@@ -13992,16 +13984,16 @@ test.describe("un Admin frente a la configuración de verdad", () => {
 
     expect(read.status()).toBe(200);
     const { data } = (await read.json()) as {
-      data: { positions: { isArchived: boolean; coverage: unknown }[] };
+      data: { positions: { isArchived: boolean }[] };
     };
     expect(data.positions.length).toBeGreaterThan(0);
     expect(typeof data.positions[0]?.isArchived).toBe("boolean");
-    // #404: con su función, sólo en la configuración.
-    expect(data.positions[0]).toHaveProperty("coverage");
+    // #889: el rol de juego se retiró en favor del mínimo por equipo.
+    expect(data.positions[0]).not.toHaveProperty("coverage");
   });
 
-  // #404: una función fuera de las tres no llega a la base.
-  test("el endpoint de posiciones rechaza una función desconocida con 400", async ({
+  // #889: el rol de juego ya no existe, ni siquiera con un valor de los tres.
+  test("el endpoint de posiciones rechaza el rol de juego retirado con 400", async ({
     request,
   }) => {
     const read = await request.get(
@@ -14017,7 +14009,7 @@ test.describe("un Admin frente a la configuración de verdad", () => {
 
     const write = await request.patch(
       `${APP_URL}${CLUB_POSITIONS_ADMIN_ENDPOINT}/${first.id}`,
-      { data: { coverage: "midfielder" } },
+      { data: { coverage: "goalkeeper" } },
     );
 
     expect(write.status()).toBe(400);
@@ -24195,8 +24187,8 @@ const TEAMS_LABELS = {
 
 type TeamsPosition = keyof typeof ATTENDANCE_POSITIONS;
 
-/** Un jugador como lo sirve la API: la posición del club con su función, y
- * el OVR o el 5,0 virtual del no evaluado. */
+/** Un jugador como lo sirve la API: la posición del club, y el OVR o el 5,0
+ * virtual del no evaluado. */
 function teamsPlayer(
   index: number,
   fullName: string,
@@ -24208,7 +24200,6 @@ function teamsPlayer(
     fullName,
     position: ATTENDANCE_POSITIONS[position],
     positionId: ATTENDANCE_POSITIONS[position].id,
-    coverage: position,
     rating: rating ?? 5,
     isUnrated: rating === null,
     photoUrl: null,

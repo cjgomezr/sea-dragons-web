@@ -3,7 +3,6 @@ import { z } from "zod";
 import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
-import { POSITION_COVERAGES } from "@/lib/club/club-positions";
 import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
 import { EVENT_TYPES } from "@/lib/events/event-creation";
 import { toHoursAndMinutes } from "@/lib/events/supabase-event-management-gateways";
@@ -58,11 +57,10 @@ const RESPONSES_FUNCTION = "live_event_rsvps";
 const SAVE_SPLIT_FUNCTION = "save_team_split";
 const PUBLISH_SPLIT_FUNCTION = "publish_team_split";
 
-/** La posición por la clave compuesta que la ata al club (`0025`), y la
- * evaluación por la del evaluado: desde `0078` hay otra, la de quien editó. */
+/** La evaluación por la clave del evaluado: desde `0078` hay otra, la de
+ * quien editó. */
 const PLAYER_COLUMNS = [
   "user_id, full_name, position_id, account_status, photo_path",
-  "position:club_positions!members_position_same_club_fkey(coverage)",
   "member_evaluations!member_evaluations_member_same_club_fkey(member_evaluation_ratings(rating))",
   MEMBERSHIP_STANDING_EMBED,
 ].join(", ");
@@ -102,11 +100,6 @@ const playerRowsSchema = z.array(
     photo_path: z.string().nullable(),
     // La membresía del `left join`; la estrecha `parseMembershipStanding`.
     memberships: z.unknown(),
-    position: z
-      .object({
-        coverage: z.enum(POSITION_COVERAGES).nullable(),
-      })
-      .nullable(),
     member_evaluations: z
       .array(
         z.object({
@@ -296,7 +289,6 @@ async function findPlayers(
       userId: row.user_id,
       fullName: row.full_name,
       positionId: row.position_id,
-      coverage: row.position === null ? null : row.position.coverage,
       ratings:
         evaluation === undefined
           ? null

@@ -7,7 +7,6 @@ import type {
   NotificationBroadcastWriter,
   NotificationInsert,
 } from "@/lib/notifications/notify-member";
-import type { PositionCoverage } from "@/lib/teams/squad";
 import {
   BUILDABLE_EVENT_TYPES,
   type NewTeamSplit,
@@ -58,7 +57,6 @@ export type FakePlayer = {
   /** Sin respuesta si falta. */
   readonly response?: RsvpResponse;
   readonly positionId?: string;
-  readonly coverage?: PositionCoverage;
   /** Sin evaluación si falta. */
   readonly ratings?: readonly number[];
   /** Si su membresía está al día (#453); sin decirlo, lo está. */
@@ -211,7 +209,6 @@ export function fakeTeamsClub(
           userId: player.userId,
           fullName: player.fullName,
           positionId: player.positionId ?? null,
-          coverage: player.coverage ?? null,
           ratings: player.ratings ?? null,
           membershipCurrent: player.membershipCurrent ?? true,
           accountStatus: player.accountStatus ?? "active",

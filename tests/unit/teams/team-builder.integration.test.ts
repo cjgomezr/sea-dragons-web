@@ -49,7 +49,9 @@ const AUDIT_LOG_TABLE = "audit_log";
 const DAY_MS = 86_400_000;
 /** Dos días: sigue en el futuro sea cual sea la hora de Melbourne. */
 const DAYS_AHEAD = 2;
-const GOALKEEPER_COVERAGE = "goalkeeper";
+/** La siembra de `0081` pone la portería la primera. */
+const GOALKEEPER_SORT_ORDER = 1;
+const GOALKEEPER_NAME = "Goalkeeper";
 const PIA_RATING = 8;
 const PHOTO_BYTES = new Uint8Array(
   readFileSync(
@@ -166,7 +168,7 @@ async function seedResponsesAndRatings(squad: Squad): Promise<void> {
     .from("club_positions")
     .select("id")
     .eq("club_id", squad.clubId)
-    .eq("coverage", GOALKEEPER_COVERAGE)
+    .eq("sort_order", GOALKEEPER_SORT_ORDER)
     .single();
   if (positionError) {
     throw new Error(`No se encontró la portería: ${positionError.message}`);
@@ -327,11 +329,11 @@ describeRls("el team builder en Supabase", () => {
             entry.fullName,
             entry.rating,
             entry.isUnrated,
-            entry.coverage,
+            entry.position?.names.en ?? null,
           ]),
         ).toEqual([
           ["Beto Base", 5, true, null],
-          ["Pía Portera", PIA_RATING, false, GOALKEEPER_COVERAGE],
+          ["Pía Portera", PIA_RATING, false, GOALKEEPER_NAME],
         ]);
         expect(builder.maybe.map((entry) => entry.fullName)).toEqual([
           "Maya Quizás",
@@ -339,6 +341,7 @@ describeRls("el team builder en Supabase", () => {
         const pia = builder.available[1];
         expect(pia?.positionId).toEqual(expect.any(String));
         expect(pia?.positionId).toBe(pia?.position?.id);
+        expect(pia).not.toHaveProperty("coverage");
         expect(builder.requirements).toContainEqual(
           expect.objectContaining({ id: pia?.positionId, minPerTeam: 1 }),
         );
