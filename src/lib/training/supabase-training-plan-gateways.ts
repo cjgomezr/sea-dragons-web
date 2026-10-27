@@ -114,7 +114,7 @@ type WeekRow = z.infer<typeof weekRowSchema>;
  * falta, la fila está rota y no se sirve a medias. */
 function requirePresent<T>(value: T | null, context: string): T {
   if (value === null) {
-    throw new Error(`La fila de rutina ${context} está incompleta.`);
+    throw new Error(`${context} está incompleta.`);
   }
   return value;
 }
@@ -124,15 +124,21 @@ function toRoutineLoad(row: ItemRow): RoutineLoad {
     case "none":
       return { kind: "none" };
     case "text":
-      return { kind: "text", text: requirePresent(row.load_text, row.id) };
+      return {
+        kind: "text",
+        text: requirePresent(row.load_text, `La fila de rutina ${row.id}`),
+      };
     case "pct":
       return {
         kind: "pct",
-        mark: requirePresent(row.mark, row.id),
-        pct: requirePresent(row.load_pct, row.id),
+        mark: requirePresent(row.mark, `La fila de rutina ${row.id}`),
+        pct: requirePresent(row.load_pct, `La fila de rutina ${row.id}`),
       };
     case "week":
-      return { kind: "week", mark: requirePresent(row.mark, row.id) };
+      return {
+        kind: "week",
+        mark: requirePresent(row.mark, `La fila de rutina ${row.id}`),
+      };
   }
 }
 
@@ -142,10 +148,10 @@ function toRoutineItem(row: ItemRow): RoutineItemRecord {
       kind: "section",
       id: row.id,
       position: row.position,
-      title: requirePresent(row.section_title, row.id),
+      title: requirePresent(row.section_title, `La fila de rutina ${row.id}`),
     };
   }
-  const exercise = requirePresent(row.exercise, row.id);
+  const exercise = requirePresent(row.exercise, `La fila de rutina ${row.id}`);
   return {
     kind: "exercise",
     id: row.id,
@@ -171,9 +177,15 @@ function toDoseIntensity(row: WeekRow): DoseIntensity {
     case "none":
       return { kind: "none" };
     case "pct":
-      return { kind: "pct", pct: requirePresent(row.dose_pct, "de semana") };
+      return {
+        kind: "pct",
+        pct: requirePresent(row.dose_pct, "La dosis de una semana"),
+      };
     case "text":
-      return { kind: "text", text: requirePresent(row.dose_text, "de semana") };
+      return {
+        kind: "text",
+        text: requirePresent(row.dose_text, "La dosis de una semana"),
+      };
   }
 }
 
