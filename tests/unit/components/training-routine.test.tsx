@@ -559,6 +559,9 @@ describe("escribir la marca en la fila", () => {
     expect(row("Romanian deadlift")).toHaveTextContent("60% of deadlift 100");
     expect(row("Deadlift")).toHaveTextContent("80 kg");
     expect(
+      within(panel).getByRole("textbox", { name: "Your deadlift best lift" }),
+    ).toHaveFocus();
+    expect(
       screen.queryByText("Open the row to add your deadlift, or use My marks."),
     ).not.toBeInTheDocument();
     expect(markWrites).toEqual([
@@ -651,6 +654,40 @@ describe("escribir la marca en la fila", () => {
     );
     expect(row("Back squat")).toHaveTextContent("60 kg");
     expect(field).toHaveValue("80");
+  });
+});
+
+describe("una fila sin series ni repeticiones", () => {
+  it("dice sólo el descanso, sin separador delante", async () => {
+    const plan = week3Plan();
+    const restOnly: TrainingRoutine = {
+      ...POOL,
+      items: [
+        exercise({
+          name: "Recovery swim",
+          sets: null,
+          reps: null,
+          rest: "1:00",
+        }),
+      ],
+    };
+    stubApi({
+      ...plan,
+      week: {
+        ...plan.week,
+        days: plan.week.days.map((day) =>
+          day.weekday === 1 ? { ...day, routines: [restOnly] } : day,
+        ),
+      },
+    });
+
+    await renderScreen();
+
+    expect(
+      within(routinePanel("Pool · Endurance")).getByRole("button", {
+        name: /^Recovery swim/,
+      }),
+    ).toHaveTextContent(/^Recovery swimrest 1:00$/);
   });
 });
 

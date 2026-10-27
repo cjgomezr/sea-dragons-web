@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { formatNumber } from "@/lib/i18n/format";
 import type { MessageKey } from "@/lib/i18n/message";
 import type { Translator } from "@/lib/i18n/translator";
@@ -43,13 +43,21 @@ export function TrainingMarkField({
   const [error, setError] = useState<FieldError | null>(null);
   // Enter guarda y luego el foco sale del campo: el segundo intento no repite
   // la petición.
-  const committedText = useRef(savedText);
+  const [committedText, setCommittedText] = useState(savedText);
+  // La marca guardada desde esta fila o desde otra cambia el valor: el campo
+  // lo sigue sin volver a montarse, para que el foco se quede en él.
+  const [syncedValue, setSyncedValue] = useState(value);
+  if (value !== syncedValue) {
+    setSyncedValue(value);
+    setDraft(savedText);
+    setCommittedText(savedText);
+  }
 
   async function commit(): Promise<void> {
-    if (draft === committedText.current) {
+    if (draft === committedText) {
       return;
     }
-    committedText.current = draft;
+    setCommittedText(draft);
     const input = parseMarkInput(draft);
     if (input.kind === "invalid") {
       showError("training.member.markInvalid");
@@ -71,7 +79,7 @@ export function TrainingMarkField({
   function showError(key: FieldError): void {
     setError(key);
     setDraft(savedText);
-    committedText.current = savedText;
+    setCommittedText(savedText);
   }
 
   return (

@@ -26823,6 +26823,156 @@ const TRAINING_ACTIVE_PLAN = {
   },
 };
 
+/* La rutina del día con sus kilos (#901, RF-4), contra
+   d02-member-exercise-open.png y m02-member-exercise-open.png: una sección,
+   un % con la marca, la dosis de la semana, un % sin la marca, un texto y una
+   fila sin carga. Las fotos son las del handoff, servidas por la prueba. */
+const TRAINING_MARKS_ENDPOINT = "/api/v1/training/marks/me";
+const TRAINING_PHOTOS_PATH = "/__training-photos/";
+const TRAINING_PHOTOS_DIR = path.join(
+  "docs",
+  "design",
+  "design_handoff_training",
+  "training-img",
+);
+
+const TRAINING_SQUAT_MARK = { id: "mark-squat", name: "Back squat" };
+const TRAINING_BENCH_MARK = { id: "mark-bench", name: "Bench press" };
+const TRAINING_DEADLIFT_MARK = { id: "mark-deadlift", name: "Deadlift" };
+
+/** Las marcas del socio: tiene back squat y bench press, no deadlift. */
+const TRAINING_MARKS = {
+  marks: [
+    { ...TRAINING_SQUAT_MARK, unit: "kg", value: 80 },
+    { ...TRAINING_BENCH_MARK, unit: "kg", value: 55 },
+    { ...TRAINING_DEADLIFT_MARK, unit: "kg", value: null },
+  ],
+};
+
+function trainingPhotos(fileStem: string): readonly string[] {
+  return [0, 1].map(
+    (index) => `${TRAINING_PHOTOS_PATH}${fileStem}-${index}.jpg`,
+  );
+}
+
+function detailedTrainingRow(
+  name: string,
+  row: {
+    readonly photos?: readonly string[];
+    readonly tips?: readonly string[];
+    readonly sets: number | null;
+    readonly reps: string;
+    readonly rest: string | null;
+    readonly note?: string;
+    readonly load: unknown;
+  },
+): unknown {
+  return {
+    kind: "exercise",
+    id: `row-${name}`,
+    exercise: {
+      id: `exercise-${name}`,
+      name,
+      tips: row.tips ?? [],
+      photoUrls: row.photos ?? [],
+      youtubeUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(name)}`,
+    },
+    sets: row.sets,
+    reps: row.reps,
+    rest: row.rest,
+    note: row.note ?? null,
+    load: row.load,
+  };
+}
+
+const TRAINING_GYM_A_DETAILED = {
+  id: "routine-gym-a-detailed",
+  name: "Gym A · Strength",
+  colorIndex: 1,
+  items: [
+    { kind: "section", id: "section-main", title: "Main 1" },
+    detailedTrainingRow("Back squat", {
+      photos: trainingPhotos("Barbell_Squat"),
+      tips: [
+        "Bar on your upper back, feet shoulder-width.",
+        "Sit down and back; knees follow your toes.",
+        "Drive up through the whole foot.",
+      ],
+      sets: 4,
+      reps: "6",
+      rest: "2:00",
+      load: { kind: "pct", mark: TRAINING_SQUAT_MARK, pct: 75 },
+    }),
+    detailedTrainingRow("Bench press", {
+      photos: trainingPhotos("Barbell_Bench_Press_-_Medium_Grip"),
+      sets: 3,
+      reps: "8",
+      rest: "2:00",
+      load: { kind: "week", mark: TRAINING_BENCH_MARK },
+    }),
+    detailedTrainingRow("Romanian deadlift", {
+      photos: trainingPhotos("Barbell_Deadlift"),
+      sets: 3,
+      reps: "8",
+      rest: "1:30",
+      note: "Slow on the way down",
+      load: { kind: "pct", mark: TRAINING_DEADLIFT_MARK, pct: 60 },
+    }),
+    { kind: "section", id: "section-accessory", title: "Accessory" },
+    detailedTrainingRow("Pull-up", {
+      photos: trainingPhotos("Pullups"),
+      sets: 3,
+      reps: "max",
+      rest: "1:30",
+      load: { kind: "text", text: "Bodyweight" },
+    }),
+    detailedTrainingRow("Band pull-apart", {
+      sets: 2,
+      reps: "15",
+      rest: "0:45",
+      load: { kind: "none" },
+    }),
+  ],
+};
+
+const TRAINING_DAY_WITH_KILOS_PLAN = {
+  ...TRAINING_ACTIVE_PLAN,
+  week: {
+    ...TRAINING_ACTIVE_PLAN.week,
+    dose: { sets: 4, reps: "5", intensity: { kind: "pct", pct: 80 } },
+    days: TRAINING_ACTIVE_PLAN.week.days.map((day) =>
+      day.weekday === 1
+        ? { ...day, routines: [TRAINING_GYM_A_DETAILED, TRAINING_CORE] }
+        : day,
+    ),
+  },
+};
+
+/** Abre la fila del back squat y espera a que sus fotos carguen, para que
+ * la captura no salga con un hueco donde iba una foto. */
+async function openTrainingSquatRow(page: Page): Promise<void> {
+  await waitForTrainingWeek(page);
+  // Core, la otra rutina del martes, también lleva back squats.
+  await page
+    .getByRole("region", { name: "Gym A · Strength" })
+    .getByRole("button", { name: /^Back squat/ })
+    .click();
+  await expect(
+    page.getByRole("textbox", {
+      name: /^(Your back squat best lift|Tu mejor levantamiento de back squat)$/,
+    }),
+  ).toBeVisible();
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll(".training-panel img")].every(
+      (image) =>
+        image instanceof HTMLImageElement &&
+        image.complete &&
+        image.naturalWidth > 0,
+    ),
+  );
+  await page.mouse.move(0, 0);
+}
+
 type TrainingState = {
   readonly name: string;
   readonly plan: unknown;
@@ -26854,6 +27004,21 @@ const TRAINING_STATES: readonly TrainingState[] = [
     isSpanish: true,
     ready: waitForTrainingWeek,
   },
+  // El martes con dos rutinas, secciones, kilos, una marca que falta y la
+  // fila del back squat abierta (#901).
+  {
+    name: "entrenamiento-dia-kilos",
+    plan: TRAINING_DAY_WITH_KILOS_PLAN,
+    storageState: E2E_STORAGE_STATE_PATH,
+    ready: openTrainingSquatRow,
+  },
+  {
+    name: "entrenamiento-dia-kilos-es",
+    plan: TRAINING_DAY_WITH_KILOS_PLAN,
+    storageState: E2E_STORAGE_STATE_PATH,
+    isSpanish: true,
+    ready: openTrainingSquatRow,
+  },
   // Sin ciclo activo, como lo ve quien planifica: con el enlace a
   // Planificar.
   {
@@ -26868,11 +27033,33 @@ const TRAINING_STATES: readonly TrainingState[] = [
   },
 ];
 
+/** Las marcas del socio y las fotos de los ejercicios, que la pantalla pide
+ * junto al plan (#901). Las marcas reales dependen de la membresía de la
+ * cuenta de pruebas, que aquí no se prueba. */
+async function stubTrainingMarksAndPhotos(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === TRAINING_MARKS_ENDPOINT,
+    (route) => route.fulfill(jsonBody(TRAINING_MARKS)),
+  );
+  await page.route(
+    (url) => url.pathname.startsWith(TRAINING_PHOTOS_PATH),
+    (route, request) =>
+      route.fulfill({
+        contentType: "image/jpeg",
+        path: path.join(
+          TRAINING_PHOTOS_DIR,
+          path.basename(new URL(request.url()).pathname),
+        ),
+      }),
+  );
+}
+
 async function goToTraining(
   page: Page,
   state: TrainingState,
   theme?: (typeof themes)[number],
 ): Promise<void> {
+  await stubTrainingMarksAndPhotos(page);
   await page.route(
     (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
     (route) => route.fulfill(jsonBody(state.plan)),
@@ -26946,6 +27133,7 @@ test.describe("entrenamiento en el navegador", () => {
 
   test("pide otra semana a la API y vuelve a la de hoy", async ({ page }) => {
     const requestedWeeks: (string | null)[] = [];
+    await stubTrainingMarksAndPhotos(page);
     await page.route(
       (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
       (route, request) => {
@@ -26981,6 +27169,7 @@ test.describe("entrenamiento en el navegador", () => {
 
   test("el menú lleva a Entrenamiento", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
+    await stubTrainingMarksAndPhotos(page);
     await page.route(
       (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
       (route) => route.fulfill(jsonBody(TRAINING_ACTIVE_PLAN)),
@@ -26996,5 +27185,73 @@ test.describe("entrenamiento en el navegador", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Road to Nationals 2027" }),
     ).toBeVisible();
+  });
+
+  // §4.2 del handoff: filas de 64 px, el campo de la marca de 44 px con texto
+  // de 16 px y "Watch on YouTube" a todo el ancho de la fila abierta.
+  test("en el móvil, las filas y la fila abierta tienen su tamaño", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await stubTrainingMarksAndPhotos(page);
+    await page.route(
+      (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
+      (route) => route.fulfill(jsonBody(TRAINING_DAY_WITH_KILOS_PLAN)),
+    );
+    await page.goto(`${APP_URL}${TRAINING_SCREEN_PATH}`);
+    await openTrainingSquatRow(page);
+
+    for (const row of await page.locator(".training-exercise-row").all()) {
+      expect((await row.boundingBox())?.height).toBeGreaterThanOrEqual(64);
+    }
+    const field = page.getByRole("textbox", {
+      name: "Your back squat best lift",
+    });
+    expect((await field.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    await expect(field).toHaveCSS("font-size", "16px");
+    const youtube = await page
+      .getByRole("link", { name: /Watch on YouTube/ })
+      .boundingBox();
+    // Los consejos ocupan todo el ancho de la fila abierta.
+    const tips = await page.locator(".training-tips").boundingBox();
+    expect(youtube?.height).toBeGreaterThanOrEqual(44);
+    expect(youtube?.x).toBe(tips?.x);
+    expect(youtube?.width).toBeGreaterThanOrEqual(tips?.width ?? Infinity);
+  });
+
+  test("la marca escrita en la fila cambia los kilos al momento", async ({
+    page,
+  }) => {
+    await stubTrainingMarksAndPhotos(page);
+    await page.route(
+      (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
+      (route) => route.fulfill(jsonBody(TRAINING_DAY_WITH_KILOS_PLAN)),
+    );
+    await page.route(
+      (url) => url.pathname === "/api/v1/training/marks/mark-deadlift/me",
+      (route) =>
+        route.fulfill(
+          jsonBody({
+            marks: TRAINING_MARKS.marks.map((mark) =>
+              mark.id === TRAINING_DEADLIFT_MARK.id
+                ? { ...mark, value: 100 }
+                : mark,
+            ),
+          }),
+        ),
+    );
+    await page.goto(`${APP_URL}${TRAINING_SCREEN_PATH}`);
+    await waitForTrainingWeek(page);
+    const deadlift = page.getByRole("button", { name: /^Romanian deadlift/ });
+    await expect(deadlift).toContainText("of deadlift · add your mark");
+
+    await deadlift.click();
+    await page
+      .getByRole("textbox", { name: "Your deadlift best lift" })
+      .fill("100");
+    await page.keyboard.press("Enter");
+
+    await expect(deadlift).toContainText("60 kg");
+    await expect(deadlift).toContainText("60% of deadlift 100");
   });
 });

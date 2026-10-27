@@ -25102,7 +25102,8 @@ a.dashboard-club-cell-body:focus-visible {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: var(--color-text-secondary);
+  /* Sobre el tinte del aviso, el secundario no llega a AA. */
+  color: var(--color-text-soft);
 }
 
 .training-mark-input input {

@@ -180,7 +180,6 @@ function RowDetails({
     <div id={id} className="training-exercise-details">
       {mark === null ? null : (
         <TrainingMarkField
-          key={context.markValues.get(mark.id) ?? "none"}
           translate={translate}
           mark={mark}
           value={context.markValues.get(mark.id) ?? null}
@@ -242,7 +241,7 @@ export function TrainingExerciseRow({
             {dose}
             {row.rest === null ? null : (
               <span className="training-exercise-rest">
-                {" · "}
+                {dose === "" ? null : " · "}
                 {translate("training.member.doseRest", { rest: row.rest })}
               </span>
             )}
