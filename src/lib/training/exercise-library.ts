@@ -60,11 +60,13 @@ export type LibraryLoadPlan = {
 
 /** La foto de inicio y la de final (D12); el origen trae dos casi siempre. */
 const PHOTOS_PER_EXERCISE = 2;
+/** `training_exercises_name_length`: de 1 a 80 sin los bordes. */
+const MAX_EXERCISE_NAME_LENGTH = 80;
 const STORAGE_PREFIX = "library";
 
 const sourceEntrySchema = z.object({
   id: z.string().min(1),
-  name: z.string(),
+  name: z.string().trim().min(1).max(MAX_EXERCISE_NAME_LENGTH),
   instructions: z.array(z.string()),
   images: z.array(z.string()),
 });

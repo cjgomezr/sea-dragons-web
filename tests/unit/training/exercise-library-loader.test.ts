@@ -219,6 +219,37 @@ describe("loadExerciseLibrary", () => {
     expect(store.rows.size).toBe(0);
   });
 
+  it("vuelve a subir la foto que cambió aunque la fila siga igual", async () => {
+    const store = fakeStore();
+    const source = fakeSource([entry("Barbell_Squat")]);
+    await loadExerciseLibrary({ source, store, ...silentLog() });
+    store.uploads.length = 0;
+    source.photos.set("Barbell_Squat/0.jpg", bytesOf("a sharper photo"));
+
+    const report = await loadExerciseLibrary({ source, store, ...silentLog() });
+
+    expect(store.uploads).toEqual(["library/Barbell_Squat/0.jpg"]);
+    expect(report).toMatchObject({ unchanged: 1, photosUploaded: 1 });
+  });
+
+  it("si falla la subida de una foto, termina con error y no guarda la fila", async () => {
+    const store: FakeStore = {
+      ...fakeStore(),
+      uploadPhoto: async ({ storagePath }) => {
+        throw new Error(`No se pudo subir la foto ${storagePath}: 413`);
+      },
+    };
+
+    const load = loadExerciseLibrary({
+      source: fakeSource([entry("Barbell_Squat")]),
+      store,
+      ...silentLog(),
+    });
+
+    await expect(load).rejects.toThrow("library/Barbell_Squat/0.jpg");
+    expect(store.rows.size).toBe(0);
+  });
+
   it("si falla la descarga del origen, termina con error sin tocar la base", async () => {
     const store = fakeStore();
     const source: LibrarySource = {

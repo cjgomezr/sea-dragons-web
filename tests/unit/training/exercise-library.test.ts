@@ -87,6 +87,23 @@ describe("parseLibrarySource", () => {
     expect(() => parseLibrarySource(broken)).toThrow(/1.*name/);
   });
 
+  it("falla antes de escribir nada si un nombre no cabe en la base", () => {
+    const tooLong = {
+      id: "Long",
+      name: "x".repeat(81),
+      instructions: [],
+      images: [],
+    };
+
+    expect(() => parseLibrarySource([tooLong])).toThrow(/0.*name/);
+  });
+
+  it("falla si un nombre está vacío", () => {
+    const blank = { id: "Blank", name: "   ", instructions: [], images: [] };
+
+    expect(() => parseLibrarySource([blank])).toThrow(/0.*name/);
+  });
+
   it("falla si el origen no es una lista", () => {
     expect(() => parseLibrarySource({ exercises: SOURCE })).toThrow(
       /free-exercise-db/,
