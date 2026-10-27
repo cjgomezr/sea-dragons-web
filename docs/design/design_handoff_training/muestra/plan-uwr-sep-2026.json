@@ -1,0 +1,5951 @@
+{
+ "weeks": [
+  {
+   "n": 16,
+   "start": "2026-09-14",
+   "end": "2026-09-20",
+   "phase": "Transmutation",
+   "vol": "4x 4",
+   "intensity": 0.8,
+   "event": "",
+   "focus": "Strength-Power · prioridad al anaerobico y a la explosividad en el gym",
+   "planned": {
+    "endurance": 1,
+    "anaerobic": 2,
+    "alactic": 1,
+    "inwater": 0,
+    "gym": 3,
+    "esc": 2
+   },
+   "days": [
+    {
+     "date": "2026-09-14",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 0,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-09-15",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-09-16",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 1
+      },
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-09-17",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 0,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-09-18",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 2
+      }
+     ]
+    },
+    {
+     "date": "2026-09-19",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 1,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-09-20",
+     "dow": "Domingo",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 1
+      }
+     ]
+    }
+   ],
+   "extra": [
+    {
+     "kind": "swim",
+     "sub": "endurance",
+     "idx": 0,
+     "optional": true
+    }
+   ]
+  },
+  {
+   "n": 17,
+   "start": "2026-09-21",
+   "end": "2026-09-27",
+   "phase": "Transmutation",
+   "vol": "4x 5",
+   "intensity": 0.8,
+   "event": "",
+   "focus": "Strength-Power · prioridad al anaerobico y a la explosividad en el gym",
+   "planned": {
+    "endurance": 1,
+    "anaerobic": 2,
+    "alactic": 1,
+    "inwater": 0,
+    "gym": 3,
+    "esc": 2
+   },
+   "days": [
+    {
+     "date": "2026-09-21",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 2,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-09-22",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-09-23",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 1
+      },
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 2
+      }
+     ]
+    },
+    {
+     "date": "2026-09-24",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 1,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-09-25",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 2
+      }
+     ]
+    },
+    {
+     "date": "2026-09-26",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 3,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-09-27",
+     "dow": "Domingo",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 3
+      }
+     ]
+    }
+   ],
+   "extra": [
+    {
+     "kind": "swim",
+     "sub": "endurance",
+     "idx": 1,
+     "optional": true
+    }
+   ]
+  },
+  {
+   "n": 18,
+   "start": "2026-09-28",
+   "end": "2026-10-04",
+   "phase": "Transmutation",
+   "vol": "4x 5",
+   "intensity": 0.8,
+   "event": "",
+   "focus": "Strength-Power · prioridad al anaerobico y a la explosividad en el gym",
+   "planned": {
+    "endurance": 0,
+    "anaerobic": 3,
+    "alactic": 1,
+    "inwater": 0,
+    "gym": 3,
+    "esc": 2
+   },
+   "days": [
+    {
+     "date": "2026-09-28",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 4,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-09-29",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-09-30",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 1
+      },
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 4
+      }
+     ]
+    },
+    {
+     "date": "2026-10-01",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 2,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-02",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 2
+      }
+     ]
+    },
+    {
+     "date": "2026-10-03",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 5,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-04",
+     "dow": "Domingo",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 5
+      }
+     ]
+    }
+   ],
+   "extra": [
+    {
+     "kind": "swim",
+     "sub": "anaerobic",
+     "idx": 6,
+     "optional": true
+    }
+   ]
+  },
+  {
+   "n": 19,
+   "start": "2026-10-05",
+   "end": "2026-10-11",
+   "phase": "Transmutation",
+   "vol": "4x 4",
+   "intensity": 0.8,
+   "event": "",
+   "focus": "Strength-Power · prioridad al anaerobico y a la explosividad en el gym",
+   "planned": {
+    "endurance": 0,
+    "anaerobic": 2,
+    "alactic": 1,
+    "inwater": 1,
+    "gym": 3,
+    "esc": 2
+   },
+   "days": [
+    {
+     "date": "2026-10-05",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 7,
+       "rugby": true,
+       "test": "Test en agua 25uw/25fs antes del entrenamiento principal (define los PB para las series anaerobicas)"
+      }
+     ]
+    },
+    {
+     "date": "2026-10-06",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-10-07",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 1
+      },
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 6
+      }
+     ]
+    },
+    {
+     "date": "2026-10-08",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 3,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-09",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 2
+      }
+     ]
+    },
+    {
+     "date": "2026-10-10",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 8,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-11",
+     "dow": "Domingo",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 0
+      }
+     ]
+    }
+   ],
+   "extra": []
+  },
+  {
+   "n": 20,
+   "start": "2026-10-12",
+   "end": "2026-10-18",
+   "phase": "Transmutation",
+   "vol": "4x 4",
+   "intensity": 0.8,
+   "event": "Training Camp 3",
+   "focus": "Strength-Power · prioridad al anaerobico y a la explosividad en el gym",
+   "planned": {
+    "endurance": 0,
+    "anaerobic": 2,
+    "alactic": 1,
+    "inwater": 0,
+    "gym": 2,
+    "esc": 2
+   },
+   "days": [
+    {
+     "date": "2026-10-12",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 9,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-13",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-10-14",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-10-15",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 4,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-16",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-10-17",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 10,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-18",
+     "dow": "Domingo",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 2
+      }
+     ]
+    }
+   ],
+   "extra": []
+  },
+  {
+   "n": 21,
+   "start": "2026-10-19",
+   "end": "2026-10-25",
+   "phase": "Transmutation",
+   "vol": "4x 5",
+   "intensity": 0.7,
+   "event": "",
+   "focus": "Strength-Power · prioridad al anaerobico y a la explosividad en el gym",
+   "planned": {
+    "endurance": 0,
+    "anaerobic": 3,
+    "alactic": 1,
+    "inwater": 0,
+    "gym": 3,
+    "esc": 2
+   },
+   "days": [
+    {
+     "date": "2026-10-19",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 0,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-20",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-10-21",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 1
+      },
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 3
+      }
+     ]
+    },
+    {
+     "date": "2026-10-22",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 5,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-23",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "transmutation",
+       "day": 2
+      }
+     ]
+    },
+    {
+     "date": "2026-10-24",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 1,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-25",
+     "dow": "Domingo",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "anaerobic",
+       "idx": 4
+      }
+     ]
+    }
+   ],
+   "extra": [
+    {
+     "kind": "swim",
+     "sub": "anaerobic",
+     "idx": 2,
+     "optional": true
+    }
+   ]
+  },
+  {
+   "n": 22,
+   "start": "2026-10-26",
+   "end": "2026-11-01",
+   "phase": "Realization",
+   "vol": "4x 5",
+   "intensity": 0.7,
+   "event": "Test 3RM",
+   "focus": "Power-Speed · prioridad al alactico en agua",
+   "planned": {
+    "endurance": 0,
+    "anaerobic": 2,
+    "alactic": 2,
+    "inwater": 0,
+    "gym": 2,
+    "esc": 1
+   },
+   "days": [
+    {
+     "date": "2026-10-26",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 0,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-27",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "realization",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-10-28",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "alactic",
+       "idx": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-10-29",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 3,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-10-30",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "realization",
+       "day": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-10-31",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 1,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-11-01",
+     "dow": "Domingo",
+     "items": []
+    }
+   ],
+   "extra": [
+    {
+     "kind": "swim",
+     "sub": "anaerobic",
+     "idx": 4,
+     "optional": true
+    }
+   ]
+  },
+  {
+   "n": 23,
+   "start": "2026-11-02",
+   "end": "2026-11-08",
+   "phase": "Realization",
+   "vol": "4x 4",
+   "intensity": 0.65,
+   "event": "",
+   "focus": "Power-Speed · prioridad al alactico en agua",
+   "planned": {
+    "endurance": 0,
+    "anaerobic": 1,
+    "alactic": 3,
+    "inwater": 0,
+    "gym": 2,
+    "esc": 1
+   },
+   "days": [
+    {
+     "date": "2026-11-02",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 2,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-11-03",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "realization",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-11-04",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "alactic",
+       "idx": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-11-05",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 5,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-11-06",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "realization",
+       "day": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-11-07",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 3,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-11-08",
+     "dow": "Domingo",
+     "items": []
+    }
+   ],
+   "extra": [
+    {
+     "kind": "swim",
+     "sub": "alactic",
+     "idx": 4,
+     "optional": true
+    }
+   ]
+  },
+  {
+   "n": 24,
+   "start": "2026-11-09",
+   "end": "2026-11-15",
+   "phase": "Realization",
+   "vol": "4x 4",
+   "intensity": 0.6,
+   "event": "",
+   "focus": "Power-Speed · prioridad al alactico en agua",
+   "planned": {
+    "endurance": 0,
+    "anaerobic": 1,
+    "alactic": 1,
+    "inwater": 1,
+    "gym": 2,
+    "esc": 1
+   },
+   "days": [
+    {
+     "date": "2026-11-09",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 5,
+       "rugby": true,
+       "test": "Test en agua 25uw/25fs antes del entrenamiento principal (define los PB para las series anaerobicas)"
+      }
+     ]
+    },
+    {
+     "date": "2026-11-10",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "realization",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-11-11",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "alactic",
+       "idx": 2
+      }
+     ]
+    },
+    {
+     "date": "2026-11-12",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 6,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-11-13",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "realization",
+       "day": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-11-14",
+     "dow": "Sabado",
+     "items": []
+    },
+    {
+     "date": "2026-11-15",
+     "dow": "Domingo",
+     "items": []
+    }
+   ],
+   "extra": []
+  },
+  {
+   "n": 25,
+   "start": "2026-11-16",
+   "end": "2026-11-22",
+   "phase": "Realization",
+   "vol": "4x 4",
+   "intensity": 0.6,
+   "event": "",
+   "focus": "Power-Speed · prioridad al alactico en agua",
+   "planned": {
+    "endurance": 0,
+    "anaerobic": 1,
+    "alactic": 2,
+    "inwater": 0,
+    "gym": 2,
+    "esc": 1
+   },
+   "days": [
+    {
+     "date": "2026-11-16",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 0,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-11-17",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "realization",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-11-18",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "alactic",
+       "idx": 3
+      }
+     ]
+    },
+    {
+     "date": "2026-11-19",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 7,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-11-20",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "realization",
+       "day": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-11-21",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 1,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-11-22",
+     "dow": "Domingo",
+     "items": []
+    }
+   ],
+   "extra": []
+  },
+  {
+   "n": 26,
+   "start": "2026-11-30",
+   "end": "2026-12-06",
+   "phase": "Realization",
+   "vol": "4x 4",
+   "intensity": 0.6,
+   "event": "Champion Cup",
+   "focus": "Power-Speed · prioridad al alactico en agua",
+   "planned": {
+    "endurance": 0,
+    "anaerobic": 1,
+    "alactic": 2,
+    "inwater": 0,
+    "gym": 2,
+    "esc": 1
+   },
+   "days": [
+    {
+     "date": "2026-11-30",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 2,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-01",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "realization",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-12-02",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "alactic",
+       "idx": 4
+      }
+     ]
+    },
+    {
+     "date": "2026-12-03",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 8,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-04",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "realization",
+       "day": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-12-05",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "alactic",
+       "idx": 3,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-06",
+     "dow": "Domingo",
+     "items": []
+    }
+   ],
+   "extra": []
+  },
+  {
+   "n": 27,
+   "start": "2026-12-07",
+   "end": "2026-12-13",
+   "phase": "Maintenance",
+   "vol": "3x 10",
+   "intensity": "RPE 7",
+   "event": "",
+   "focus": "Mantener fuerza",
+   "planned": {
+    "endurance": 2,
+    "anaerobic": 1,
+    "alactic": 0,
+    "inwater": 0,
+    "gym": 2,
+    "esc": 1
+   },
+   "days": [
+    {
+     "date": "2026-12-07",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "endurance",
+       "idx": 2,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-08",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "maintenance",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-12-09",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "aerobic",
+       "idx": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-12-10",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 9,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-11",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "maintenance",
+       "day": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-12-12",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "endurance",
+       "idx": 3,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-13",
+     "dow": "Domingo",
+     "items": []
+    }
+   ],
+   "extra": []
+  },
+  {
+   "n": 29,
+   "start": "2026-12-14",
+   "end": "2026-12-20",
+   "phase": "Maintenance",
+   "vol": "3x 10",
+   "intensity": "RPE 7",
+   "event": "",
+   "focus": "Mantener fuerza",
+   "planned": {
+    "endurance": 2,
+    "anaerobic": 1,
+    "alactic": 0,
+    "inwater": 0,
+    "gym": 2,
+    "esc": 1
+   },
+   "days": [
+    {
+     "date": "2026-12-14",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "endurance",
+       "idx": 4,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-15",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "maintenance",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-12-16",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "aerobic",
+       "idx": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-12-17",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 10,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-18",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "maintenance",
+       "day": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-12-19",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "endurance",
+       "idx": 5,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-20",
+     "dow": "Domingo",
+     "items": []
+    }
+   ],
+   "extra": []
+  },
+  {
+   "n": 30,
+   "start": "2026-12-21",
+   "end": "2026-12-27",
+   "phase": "Maintenance",
+   "vol": "3x 8",
+   "intensity": "RPE 8",
+   "event": "",
+   "focus": "Mantener fuerza",
+   "planned": {
+    "endurance": 2,
+    "anaerobic": 1,
+    "alactic": 0,
+    "inwater": 1,
+    "gym": 2,
+    "esc": 1
+   },
+   "days": [
+    {
+     "date": "2026-12-21",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "endurance",
+       "idx": 6,
+       "rugby": true,
+       "test": "Test en agua 25uw/25fs antes del entrenamiento principal (define los PB para las series anaerobicas)"
+      }
+     ]
+    },
+    {
+     "date": "2026-12-22",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "maintenance",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-12-23",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "aerobic",
+       "idx": 2
+      }
+     ]
+    },
+    {
+     "date": "2026-12-24",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 0,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-25",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "maintenance",
+       "day": 1
+      }
+     ]
+    },
+    {
+     "date": "2026-12-26",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "endurance",
+       "idx": 7,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-27",
+     "dow": "Domingo",
+     "items": []
+    }
+   ],
+   "extra": []
+  },
+  {
+   "n": 31,
+   "start": "2026-12-28",
+   "end": "2027-01-03",
+   "phase": "Maintenance",
+   "vol": "3x 8",
+   "intensity": "RPE 8",
+   "event": "",
+   "focus": "Mantener fuerza",
+   "planned": {
+    "endurance": 2,
+    "anaerobic": 1,
+    "alactic": 0,
+    "inwater": 0,
+    "gym": 2,
+    "esc": 1
+   },
+   "days": [
+    {
+     "date": "2026-12-28",
+     "dow": "Lunes",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "endurance",
+       "idx": 8,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2026-12-29",
+     "dow": "Martes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "maintenance",
+       "day": 0
+      }
+     ]
+    },
+    {
+     "date": "2026-12-30",
+     "dow": "Miercoles",
+     "items": [
+      {
+       "kind": "esc",
+       "sub": "aerobic",
+       "idx": 3
+      }
+     ]
+    },
+    {
+     "date": "2026-12-31",
+     "dow": "Jueves",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "anaerobic",
+       "idx": 1,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2027-01-01",
+     "dow": "Viernes",
+     "items": [
+      {
+       "kind": "gym",
+       "phase": "maintenance",
+       "day": 1
+      }
+     ]
+    },
+    {
+     "date": "2027-01-02",
+     "dow": "Sabado",
+     "items": [
+      {
+       "kind": "swim",
+       "sub": "endurance",
+       "idx": 0,
+       "rugby": true
+      }
+     ]
+    },
+    {
+     "date": "2027-01-03",
+     "dow": "Domingo",
+     "items": []
+    }
+   ],
+   "extra": []
+  }
+ ],
+ "lib": {
+  "endurance": [
+   {
+    "title": "Endurance Swim 1",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "50 Flutter / 50 Bounce (up & down)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Dolphin / 50 Quarters (uw/sf by 12.5's)",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "4x 150",
+      "desc": "50 Fs / 50 Bounce / 50 Quarters",
+      "cycle": "find a :15 rest cycle",
+      "int": "At @75%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "x4 Rounds back to back:",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "3x 50",
+      "desc": "x3 Fs / x3 Quarters / x3 Dolphin on back",
+      "cycle": "on 1:00 cycle",
+      "int": "x1 easy/x1 medium/x1 hard",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "finish 50 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "12x 25",
+      "desc": "Underwater",
+      "cycle": "on 35sec cycle",
+      "int": "medium pace",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Choice",
+      "cycle": "",
+      "int": "2.3K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Endurance Swim 2",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "50 Flutter / 50 Bounce (up & down)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Dolphin / 50 Quarters (uw/sf by 12.5's)",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "8x 100 Alternating:",
+      "desc": "x1 50 Dolphin / 50 Fs",
+      "cycle": "find a :10 rest cycle",
+      "int": "At @75%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x1 50 Bounce / 50 Quarters",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "10x 50 Alternating",
+      "desc": "50 Fs",
+      "cycle": "on 1:10 cycle",
+      "int": "at 80%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "25 Quarters  / 25  Flutter",
+      "cycle": "",
+      "int": "Quarters at 95% / Flutter easy",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "12x 25",
+      "desc": "Underwater",
+      "cycle": "x6 on 35sec / x6 on 30sec",
+      "int": "medium pace",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Choice",
+      "cycle": "",
+      "int": "2.4K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Endurance Swim 3",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "50 Flutter / 50 Bounce (up & down)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Dolphin / 50 Quarters (uw/sf by 12.5's)",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "10x 100 Alternating:",
+      "desc": "x2 100 Dolphin ok back",
+      "cycle": "on 1:40/1:45 cycle",
+      "int": "x1 at 70% / x1 at 90%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x2 100 Fs",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "10x 50",
+      "desc": "35 Fs / 15 Uw",
+      "cycle": "on 1:00 cycle",
+      "int": "Fs at 70% / Uw at 95%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "12x 25",
+      "desc": "Underwater",
+      "cycle": "x4 on 35sec/ x8 on 30sec",
+      "int": "medium pace",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Choice",
+      "cycle": "",
+      "int": "2.5K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Endurance Swim 4",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "50 Flutter / 50 Bounce (up & down)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Dolphin / 50 Quarters (uw/sf by 12.5's)",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "6x 150",
+      "desc": "25uw-25Fs / 50 Dolphin / 50 Bounce",
+      "cycle": "find a :20 rest cycle",
+      "int": "at 80%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "8x 75",
+      "desc": "Quarters",
+      "cycle": "on 1:20 cycle",
+      "int": "50 at 70% / 25 at 95%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "12x 25",
+      "desc": "Underwater",
+      "cycle": "on 30 sec cycle",
+      "int": "medium pace",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Choice",
+      "cycle": "",
+      "int": "2.6K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Endurance Swim 5",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "50 Flutter / 50 Bounce (up & down)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Dolphin / 50 Quarters (uw/sf by 12.5's)",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "10x 100",
+      "desc": "87.5 Fs / 12.5 Uw",
+      "cycle": "find :10 rest cycle",
+      "int": "at 80%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "12x 50 Alternating:",
+      "desc": "x1 Bounce / x1 Dolphin on back",
+      "cycle": "1:00 cycle",
+      "int": "Bounce at 95% / Kick at 70%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "16x 25",
+      "desc": "Underwater",
+      "cycle": "on 35 sec cycle",
+      "int": "medium pace",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Choice",
+      "cycle": "",
+      "int": "2.8K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Endurance Swim 6",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "50 Flutter / 50 Bounce (up & down)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Dolphin / 50 Quarters (uw/sf by 12.5's)",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "12x 100",
+      "desc": "37.5 Fs / 12.5 Uw",
+      "cycle": "on 1:45/1:50",
+      "int": "x1 at 70% / x1 80% / x1 90%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "12x 50",
+      "desc": "15 uw / 35 Fs",
+      "cycle": "on 1:00",
+      "int": "Uw at 95% / Fs at 80%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "12x 25",
+      "desc": "Underwater",
+      "cycle": "on 35 sec cycle",
+      "int": "at 90%",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Choice",
+      "cycle": "",
+      "int": "2.9K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Endurance Swim 7",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "50 Flutter / 50 Bounce (up & down)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Dolphin / 50 Quarters (uw/sf by 12.5's)",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "10x 100 Alternating:",
+      "desc": "x1 Dolphin (alt front/back)",
+      "cycle": "on 1:45",
+      "int": "Dolphin at 70%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x1 Bounce",
+      "cycle": "",
+      "int": "Bounce at 90%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "8x 75",
+      "desc": "25 uw / 25 Fs / 25 Quarters",
+      "cycle": "find a :15 rest cycle",
+      "int": "at 80%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "16x 25",
+      "desc": "Underwater",
+      "cycle": "x8 on 35 / x8 on 30",
+      "int": "medium pace",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Choice",
+      "cycle": "",
+      "int": "2.8K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Endurance Swim 8",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "50 Flutter / 50 Bounce (up & down)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Dolphin / 50 Quarters (uw/sf by 12.5's)",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "5x 200",
+      "desc": "as 37.5 Fs / 12.5 Uw",
+      "cycle": "find :25 rest cycle",
+      "int": "Fs at 70% / Uw at 90%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "12x 50",
+      "desc": "12.5 uw Dolphin / 25 Fs / 12.5 uw Dolphin",
+      "cycle": "on 1:10",
+      "int": "Uw at 95% / Fs at 80%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "16x 25",
+      "desc": "Underwater",
+      "cycle": "x6 on 35 / x10 on 30",
+      "int": "Medium pace",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Choice",
+      "cycle": "",
+      "int": "2.8K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Endurance Swim 9",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "50 Flutter / 50 Bounce (up & down)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Dolphin / 50 Quarters (uw/sf by 12.5's)",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "100 / 200 / 300",
+      "desc": "as 50 Bounce / 50 Quarters",
+      "cycle": "10 / 20 / 30 sec rest",
+      "int": "at 90/80/70%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "300 / 200 / 100",
+      "desc": "",
+      "cycle": "40 / 30 / 20 sec rest",
+      "int": "at 70/80/90%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "8x 75",
+      "desc": "12.5 uw / 35 Fs / 25 Quarters",
+      "cycle": "find :20 rest cycle",
+      "int": "50 at 80% / 25 at 90%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "16x 25",
+      "desc": "Underwater",
+      "cycle": "on 30 sec cycle",
+      "int": "Medium pace",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Choice",
+      "cycle": "",
+      "int": "3K Total",
+      "note": ""
+     }
+    ]
+   }
+  ],
+  "anaerobic": [
+   {
+    "title": "Anaerobic Swim 1",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "Kick / Bounce (up & down)/ Fs  / Quarters (uw/fs by 12.5) by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "Uw / Fs / Quarters / Kick by 25",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "4x 25",
+      "desc": "Underwater slow on 30/40/50/60sec",
+      "cycle": "rest at will",
+      "int": "don't push limits alone",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "4x Rounds back to back:",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100",
+      "desc": "50 Fs / 50 Bounce",
+      "cycle": "on 1:30/1:40",
+      "int": "At @75%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "50",
+      "desc": "Quarters",
+      "cycle": "on 1:30",
+      "int": "Max",
+      "note": "PB +3"
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "10x 50 Alternating:",
+      "desc": "x1 Fs",
+      "cycle": "on 1:10",
+      "int": "At 70%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x1 15 Uw / 35 Dolphin",
+      "cycle": "",
+      "int": "At 95%",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "8x 25",
+      "desc": "12.5 Uw  / 12.5 Fs",
+      "cycle": "on 1:00",
+      "int": "Max",
+      "note": "PB /2"
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "",
+      "note": "2.1K Total"
+     }
+    ]
+   },
+   {
+    "title": "Anaerobic Swim 2",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "Kick / Bounce (up & down)/ Fs  / Quarters (uw/fs by 12.5) by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "Uw / Fs / Quarters / Kick by 25",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "4x 25",
+      "desc": "Underwater slow on 30/40/50/60sec",
+      "cycle": "rest at will",
+      "int": "don't push limits alone",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "9x 100",
+      "desc": "as x1 Dolphin (front or back) / x1 Fs / x1 Quarters",
+      "cycle": "on 2:00 cycle",
+      "int": "Dolphin & Fs at 80%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "",
+      "cycle": "",
+      "int": "Quarters at 95%",
+      "note": "PB +6 x2 or better"
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "8x 50",
+      "desc": "as :10 uw static / 12.5uw-12.5Fs max / :5uw static / 25 Fs easy",
+      "cycle": "on 1:20",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "6x 25",
+      "desc": "Underwater",
+      "cycle": "on 1:10",
+      "int": "Max",
+      "note": "PB /2 or better"
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "",
+      "note": "2.25K Total"
+     }
+    ]
+   },
+   {
+    "title": "Anaerobic Swim 3",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "Kick / Bounce (up & down)/ Fs  / Quarters (uw/fs by 12.5) by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "Uw / Fs / Quarters / Kick by 25",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "4x 25",
+      "desc": "Underwater slow on 30/40/50/60sec",
+      "cycle": "rest at will",
+      "int": "don't push limits alone",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "16x50 Alternating:",
+      "desc": "x3 Quarters",
+      "cycle": "on 1:10 cycle",
+      "int": "Quarters at 80%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x1 25uw/25Fs",
+      "cycle": "",
+      "int": "25uw/25Fs max",
+      "note": "PB +2"
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "8x 50",
+      "desc": "35 uw / 15 Fs easy",
+      "cycle": "on 1:20",
+      "int": "alt: x1 at 70% / x1 at 80%",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "8x 25 as",
+      "desc": "12.5 Fs / :10 uw static / 12.5 uw",
+      "cycle": "rest at will",
+      "int": "Max",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "",
+      "note": "2.2K Total"
+     }
+    ]
+   },
+   {
+    "title": "Anaerobic Swim 4",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "Kick / Bounce (up & down)/ Fs  / Quarters (uw/fs by 12.5) by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "Uw / Fs / Quarters / Kick by 25",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "4x 25",
+      "desc": "Underwater slow on 30/40/50/60sec",
+      "cycle": "rest at will",
+      "int": "don't push limits alone",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "8x 75 as",
+      "desc": "25 uw / 25 Fs / :10 uw static / 12.5 uw max - 12.5 Fs",
+      "cycle": "find :30 rest cycle",
+      "int": "at 80%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "10x 50 Alternating:",
+      "desc": "x1 Fs",
+      "cycle": "on 1:30",
+      "int": "at 80%",
+      "note": "PB + 6"
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x1 12.5 uw / 25 Fs / 12.5 uw",
+      "cycle": "",
+      "int": "Max",
+      "note": "PB + 1"
+     },
+     {
+      "sec": "Main 3",
+      "vol": "8x 25 as",
+      "desc": ":10 uw static / 12.5 uw + :5 uw static / 3 Breaths / 12.5 uw + :5 uw static",
+      "cycle": "on :50 cycle",
+      "int": "at 80%",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "",
+      "note": "2.1K Total"
+     }
+    ]
+   },
+   {
+    "title": "Anaerobic Swim 5",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "Kick / Bounce (up & down)/ Fs  / Quarters (uw/fs by 12.5) by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "Uw / Fs / Quarters / Kick by 25",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "4x 25",
+      "desc": "Underwater slow on 30/40/50/60sec",
+      "cycle": "rest at will",
+      "int": "don't push limits alone",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "8x 100 as",
+      "desc": "50 Dolphin max / 25 Fs easy / 25 uw at 90%",
+      "cycle": "find :30 rest cycle",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "24x 25 Alternating:",
+      "desc": "x1 uw at 70% / x1 at 80% / x1 at 90% / x1 Fs easy",
+      "cycle": "on :50",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "3 Rounds: 6x 12.5",
+      "desc": "6m Fs out / :5 uw static / 6m uw back / :5 uw static",
+      "cycle": "relay in pairs or",
+      "int": "Max",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "",
+      "cycle": "1:1 work/rest ratio",
+      "int": "1:00 rest between rounds",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "",
+      "note": "2.4K Total"
+     }
+    ]
+   },
+   {
+    "title": "Anaerobic Swim 6",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "Kick / Bounce (up & down)/ Fs  / Quarters (uw/fs by 12.5) by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "Uw / Fs / Quarters / Kick by 25",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "4x 25",
+      "desc": "Underwater slow on 30/40/50/60sec",
+      "cycle": "rest at will",
+      "int": "don't push limits alone",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "8x 50",
+      "desc": "37.5 uw max / 12.5 Fs easy",
+      "cycle": "on 1:30",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "20x 25 Alternating:",
+      "desc": "x1 Fs / x1 uw",
+      "cycle": "on :40",
+      "int": "at 95%",
+      "note": "PB /2"
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x1 Dolphin / x1 uw-Fs by 12.5",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "4 Rounds: 6x 12.5",
+      "desc": "6m uw out / :5 uw static / 6m uw back / :5 uw static",
+      "cycle": "relay in 3's or",
+      "int": "Max",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "",
+      "cycle": "1:2 work/rest ratio",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "",
+      "note": "2.0K Total"
+     }
+    ]
+   },
+   {
+    "title": "Anaerobic Swim 7",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "Kick / Bounce (up & down)/ Fs  / Quarters (uw/fs by 12.5) by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "Uw / Fs / Quarters / Kick by 25",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "4x 25",
+      "desc": "Underwater slow on 30/40/50/60sec",
+      "cycle": "rest at will",
+      "int": "don't push limits alone",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "4x Rounds back to back:",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100",
+      "desc": "50 Fs / 50 Bounce",
+      "cycle": "on 1:30/1:40",
+      "int": "At @75%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "50",
+      "desc": "25 uw / 25 Fs",
+      "cycle": "on 1:30",
+      "int": "Max",
+      "note": "PB +2"
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "10x 50 Alternating:",
+      "desc": "x1 Fs",
+      "cycle": "on 1:10",
+      "int": "At 70%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x1 15 uw / 20 Fs / 15 uw",
+      "cycle": "",
+      "int": "At 95%",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "8x 25",
+      "desc": "12.5 Uw  / 12.5 Fs",
+      "cycle": "on 1:00",
+      "int": "Max",
+      "note": "PB /2"
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "",
+      "note": "2.1K Total"
+     }
+    ]
+   },
+   {
+    "title": "Anaerobic Swim 8",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "Kick / Bounce (up & down)/ Fs  / Quarters (uw/fs by 12.5) by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "Uw / Fs / Quarters / Kick by 25",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "4x 25",
+      "desc": "Underwater slow on 30/40/50/60sec",
+      "cycle": "rest at will",
+      "int": "don't push limits alone",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "10x 100 Alternating:",
+      "desc": "x1 50 Dolphin / 50 Fs",
+      "cycle": "on 1:10 cycle",
+      "int": "at 70%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x1 50 Bounce / 50 Quarters",
+      "cycle": "",
+      "int": "at 95%",
+      "note": "PB +6 x2 or better"
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "8x 50  as",
+      "desc": "12.5 uw at 70% / :5 uw static / 25 Fs  / 12.5 uw / :5 uw static",
+      "cycle": "1:10 cycle",
+      "int": "Fs to 12.5 uw at 95%",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "6x 25 as",
+      "desc": "25 uw + :10 uw static",
+      "cycle": "rest at will",
+      "int": "Max",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "",
+      "note": "2.35K Total"
+     }
+    ]
+   },
+   {
+    "title": "Anaerobic Swim 9",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "Kick / Bounce (up & down)/ Fs  / Quarters (uw/fs by 12.5) by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "Uw / Fs / Quarters / Kick by 25",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "4x 25",
+      "desc": "Underwater slow on 30/40/50/60sec",
+      "cycle": "rest at will",
+      "int": "don't push limits alone",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "9x 100 Quarters as",
+      "desc": "x1 at 70% / x1 at 85% / x1 at 95%",
+      "cycle": "on 2:00 cycle",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "8x 50  as",
+      "desc": "12.5 uw at 70% / :5 uw static / 12.5 uw max  / :5 uw static / 25 Fs easy",
+      "cycle": "1:10 cycle",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "8x 25 as",
+      "desc": "x1 uw max / x1 uw easy",
+      "cycle": "on :50 cycle",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "",
+      "note": "2.3K Total"
+     }
+    ]
+   },
+   {
+    "title": "Anaerobic Swim 10",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "Kick / Bounce (up & down)/ Fs  / Quarters (uw/fs by 12.5) by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "Uw / Fs / Quarters / Kick by 25",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "4x 25",
+      "desc": "Underwater slow on 30/40/50/60sec",
+      "cycle": "rest at will",
+      "int": "don't push limits alone",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "8x 75 as",
+      "desc": "25 Dolphin / 25 Fs",
+      "cycle": "on :45",
+      "int": "at 80%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "12.5 uw / 1 breath / 12.5 uw",
+      "cycle": "on :45",
+      "int": "Max",
+      "note": "PB /2"
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "16x 25  as",
+      "desc": "x1 uw / x1 Quarters / x1 uw / x1 Dolhphin",
+      "cycle": "on :45 cycle",
+      "int": "at 90%",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "8x 25",
+      "desc": ":10 static + 25 uw",
+      "cycle": "rest at will",
+      "int": "Max",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "",
+      "note": "2.0K Total"
+     }
+    ]
+   },
+   {
+    "title": "Anaerobic Swim 11",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100 Alternating:",
+      "desc": "Kick / Bounce (up & down)/ Fs  / Quarters (uw/fs by 12.5) by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "Uw / Fs / Quarters / Kick by 25",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "4x 25",
+      "desc": "Underwater slow on 30/40/50/60sec",
+      "cycle": "rest at will",
+      "int": "don't push limits alone",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "10x 50  Alternating:",
+      "desc": "37.5 uw max / 12.5 Fs easy",
+      "cycle": "on 1:30",
+      "int": "Max",
+      "note": "PB +1"
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "37.5 Fs max / 12.5 uw easy",
+      "cycle": "",
+      "int": "Max",
+      "note": "PB +2"
+     },
+     {
+      "sec": "",
+      "vol": "100 easy",
+      "desc": "",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "2x 200 as",
+      "desc": "100 Fs / 100 uw-Fs by 25",
+      "cycle": "rest at will",
+      "int": "Max efforts",
+      "note": ""
+     },
+     {
+      "sec": "Main 3",
+      "vol": "4 Rounds: 6x 12.5",
+      "desc": "6m uw out / :5 uw static / 6m uw back / :5 uw static",
+      "cycle": "relay in 3's or",
+      "int": "Max",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "",
+      "cycle": "1:2 work/rest ratio",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "200",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "",
+      "note": "2.0K Total"
+     }
+    ]
+   }
+  ],
+  "alactic": [
+   {
+    "title": "Alactic Swim 1",
+    "rows": [
+     {
+      "sec": "No fins",
+      "vol": "3x 100",
+      "desc": "Fs / Kick by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "10 x 25 Alternating:",
+      "desc": "x1 Dolphin",
+      "cycle": "on :50 cycle",
+      "int": "Build*",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x1 Kick",
+      "cycle": "",
+      "int": "*(start at 60% and build to 100%, hold last 8m at max effort)",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Fs easy",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Fins",
+      "vol": "3x 100",
+      "desc": "Quarters (uw/fs by 12.5)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "x2 Rounds:",
+      "desc": "Rest 1-2min between rounds",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "16x 12.5 as:",
+      "desc": "6m out / turn 180° / 6m in. Dead start (no wall push) All dolphin uw",
+      "cycle": "3 ppl relay or 1:3 work/rest ratio",
+      "int": "Max efforts",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "",
+      "cycle": "rest extra :30 every 4",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "8x 25 as:",
+      "desc": "12.5 Fs / :10 uw static / 12.5 uw Dolphin",
+      "cycle": "on 1:00 cycle",
+      "int": "Max efforts",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 easy",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "400",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "2.2K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Alactic Swim 2",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100",
+      "desc": "50 Kick - 50 Quarters (uw/fs by 12.5)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "x2 Rounds:",
+      "desc": "Rest 1-2min between rounds",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "8x 50 as:",
+      "desc": ":5 uw static / 12.5 dead start uw dolphin max / 37.5 easy fs",
+      "cycle": "on 1:10 cycle",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "8x 25 as:",
+      "desc": "12.5 Fs out /  uw turn 180° / 12.5 uw Dolphin in",
+      "cycle": "on 1:00 cycle",
+      "int": "Max efforts",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "400",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "2.0K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Alactic Swim 3",
+    "rows": [
+     {
+      "sec": "No fins",
+      "vol": "3x 100",
+      "desc": "Fs / Kick by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "10 x 25 Alternating:",
+      "desc": "x1 Dolphin uw",
+      "cycle": "on :45 cycle",
+      "int": "15m Explosions*",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x1 Freestyle",
+      "cycle": "",
+      "int": "*(15 max - 10 easy fs)",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Fs easy",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Fins",
+      "vol": "3x 100",
+      "desc": "Quarters (uw/fs by 12.5)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "x2 Rounds:",
+      "desc": "Rest 1-2min between rounds",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "8x 18 as:",
+      "desc": "6m out / turn 180° / 6m in / turn 180° / 6m out",
+      "cycle": "3 ppl relay or 1:3 work/rest ratio",
+      "int": "Max efforts",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "",
+      "cycle": "rest extra :30 every 4",
+      "int": "All dolphin uw",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "6x 50 as:",
+      "desc": "35 uw dolphin build* / 15 easy fs",
+      "cycle": "1:00 rest",
+      "int": "Max efforts",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "",
+      "cycle": "",
+      "int": "*(start at 60% and build to 100%, hold last 12m at max effort)",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 easy",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "400",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "2.0K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Alactic Swim 4",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100",
+      "desc": "50 Kick - 50 Quarters (uw/fs by 12.5)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "x2 Rounds:",
+      "desc": "Rest 1-2min between rounds",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "8x 25 as:",
+      "desc": ":5 uw static / 12.5 uw dolphin max / :10 uw static / 12.5 easy fs",
+      "cycle": "on 1:00 cycle",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "8x 50 alt:",
+      "desc": "50 by 12.5 Fs  / 12.5 uw dolphin",
+      "cycle": "on 1:10 cycle",
+      "int": "25 Max / 25 easy",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Freestyle",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "400",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "2.0K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Alactic Swim 5",
+    "rows": [
+     {
+      "sec": "No fins",
+      "vol": "3x 100",
+      "desc": "Fs / Kick by 25",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "Main 1",
+      "vol": "10 x 25 Alternating:",
+      "desc": "x1 Dolphin",
+      "cycle": "on :50 cycle",
+      "int": "Build*",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "x1 Freestyle",
+      "cycle": "",
+      "int": "*(start at 60% and build to 100%, hold last 8m at max effort)",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 Fs easy",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Fins",
+      "vol": "3x 100",
+      "desc": "Quarters (uw/fs by 12.5)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "x2 Rounds:",
+      "desc": "Rest 1-2min between rounds",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "8x 18 as:",
+      "desc": "6m out fs / uw turn 180° / 6m in uw / turn 180° / 6m out uw",
+      "cycle": "3 ppl relay or 1:3 work/rest ratio",
+      "int": "Max efforts",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "",
+      "cycle": "rest extra :30 every 4",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "6x 50 as:",
+      "desc": "12.5 max / 12.5 slow / 12.5 max / 12.5 fs easy",
+      "cycle": "rest at will",
+      "int": "37.5 uw dolphin / 12.5 fs",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "",
+      "desc": "50 easy",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "400",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "2.0K Total",
+      "note": ""
+     }
+    ]
+   },
+   {
+    "title": "Alactic Swim 6",
+    "rows": [
+     {
+      "sec": "Warm up",
+      "vol": "4x 100",
+      "desc": "50 Kick - 50 Quarters (uw/fs by 12.5)",
+      "cycle": "20-30 sec rest",
+      "int": "Easy Pace",
+      "note": ""
+     },
+     {
+      "sec": "Main 2",
+      "vol": "x2 Rounds:",
+      "desc": "Rest 1-2min between rounds",
+      "cycle": "",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "8x 50 as:",
+      "desc": ":5 uw static / 12.5 dead start uw dolphin max / 37.5 easy fs",
+      "cycle": "on 1:10 cycle",
+      "int": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "vol": "8x 25 as:",
+      "desc": "12.5 Fs out /  uw turn 180° / 12.5 uw Dolphin in",
+      "cycle": "on 1:00 cycle",
+      "int": "Max efforts",
+      "note": ""
+     },
+     {
+      "sec": "Cool Down",
+      "vol": "400",
+      "desc": "Alt backstroke / easy flutter",
+      "cycle": "",
+      "int": "2.0K Total",
+      "note": ""
+     }
+    ]
+   }
+  ],
+  "esc": {
+   "aerobic": [
+    {
+     "title": "Aerobic Session 1",
+     "rows": [
+      {
+       "rounds": "5 Rounds",
+       "work": "1min at 60%, 3min at 80%, 1min at 90%"
+      }
+     ]
+    },
+    {
+     "title": "Aerobic Session 2",
+     "rows": [
+      {
+       "rounds": "2 Rounds",
+       "work": "1min at 90%, 2min at 80%, 3min at 70%, 30sec rest,"
+      },
+      {
+       "rounds": "",
+       "work": "3min at 70%, 2min at 80%, 1min at 90%, 1min rest"
+      }
+     ]
+    },
+    {
+     "title": "Aerobic Session 3",
+     "rows": [
+      {
+       "rounds": "3 Rounds",
+       "work": "1min at 60%, 3min at 80%, 1min at 70%, 2min at 80%, 1min at 70%, 1min at 90%"
+      }
+     ]
+    },
+    {
+     "title": "Aerobic Session 4",
+     "rows": [
+      {
+       "rounds": "4 Rounds",
+       "work": "1min at 60%, 2min at 70%, 3min at 80%, 1min at 90%"
+      }
+     ]
+    },
+    {
+     "title": "Aerobic Session 5",
+     "rows": [
+      {
+       "rounds": "4 Rounds",
+       "work": "3min at 70%, 2min at 80%, 1min at 90%, 1min rest"
+      }
+     ]
+    },
+    {
+     "title": "Aerobic Session 6",
+     "rows": [
+      {
+       "rounds": "5 Rounds",
+       "work": "3min at 80%, 1min at 90%, 1min rest"
+      }
+     ]
+    },
+    {
+     "title": "Aerobic Session 7",
+     "rows": [
+      {
+       "rounds": "3 Rounds",
+       "work": "3min at 70%, 4min at 80%, 1min at 90%, 1min rest"
+      },
+      {
+       "rounds": "Technique Basics and Tips",
+       "work": ""
+      },
+      {
+       "rounds": "Running",
+       "work": "https://youtu.be/brFHyOtTwH4"
+      },
+      {
+       "rounds": "Rower",
+       "work": "https://youtu.be/VE663Kg0c00"
+      },
+      {
+       "rounds": "Spin",
+       "work": "https://youtu.be/P1j1j0ttVPU"
+      },
+      {
+       "rounds": "Air Bike",
+       "work": "https://youtu.be/Fv8tIEJhcsc"
+      }
+     ]
+    }
+   ],
+   "anaerobic": [
+    {
+     "title": "Anaerobic Session 1",
+     "rows": [
+      {
+       "rounds": "10 Rounds",
+       "work": "1min at 95%, 1min rest"
+      }
+     ]
+    },
+    {
+     "title": "Anaerobic Session 2",
+     "rows": [
+      {
+       "rounds": "5 Rounds",
+       "work": "30sec at 95%, 30sec at 60%, 30sec at 95%, 90sec rest"
+      }
+     ]
+    },
+    {
+     "title": "Anaerobic Session 3",
+     "rows": [
+      {
+       "rounds": "4 Rounds",
+       "work": "2min at 95%, 2min at 60%, 1min rest"
+      }
+     ]
+    },
+    {
+     "title": "Anaerobic Session 4",
+     "rows": [
+      {
+       "rounds": "8 Rounds",
+       "work": "20sec at 95%, 100sec at 60%"
+      }
+     ]
+    },
+    {
+     "title": "Anaerobic Session 5",
+     "rows": [
+      {
+       "rounds": "4 Rounds",
+       "work": "1min at 95%, 2min at 60%, 1min rest"
+      }
+     ]
+    },
+    {
+     "title": "Anaerobic Session 6",
+     "rows": [
+      {
+       "rounds": "8 Rounds",
+       "work": "30sec at 95%, 90sec at 60%"
+      }
+     ]
+    },
+    {
+     "title": "Anaerobic Session 7",
+     "rows": [
+      {
+       "rounds": "4 Rounds",
+       "work": "x3 20sec at 95%, 20sec at 60%"
+      },
+      {
+       "rounds": "",
+       "work": "2min rest"
+      }
+     ]
+    }
+   ],
+   "alactic": [
+    {
+     "title": "Alactic Session 1",
+     "rows": [
+      {
+       "rounds": "6 Rounds",
+       "work": "10sec at 100%, 1min rest."
+      },
+      {
+       "rounds": "",
+       "work": "3min rest"
+      },
+      {
+       "rounds": "6 Rounds",
+       "work": "10sec at 100%, 1min rest."
+      }
+     ]
+    },
+    {
+     "title": "Alactic Session 2",
+     "rows": [
+      {
+       "rounds": "4 Rounds",
+       "work": "10sec at 100%, 30sec at 60%, 10sec at 100%, 30sec at 60%"
+      },
+      {
+       "rounds": "",
+       "work": "2min rest"
+      }
+     ]
+    },
+    {
+     "title": "Alactic Session 3",
+     "rows": [
+      {
+       "rounds": "5 Rounds",
+       "work": "10sec at 100%, 10sec rest, 10sec at 100%, 20sec rest, 10sec at 100%, 2min rest"
+      },
+      {
+       "rounds": "",
+       "work": "2min extra rest"
+      },
+      {
+       "rounds": "5 Rounds",
+       "work": "10sec at 100%, 10sec rest, 10sec at 100%, 20sec rest, 10sec at 100%, 2min rest"
+      }
+     ]
+    },
+    {
+     "title": "Alactic Session 4",
+     "rows": [
+      {
+       "rounds": "3 Rounds",
+       "work": "10sec at 100%, 60sec at 60%, 10sec at 100%, 60sec at 60%"
+      },
+      {
+       "rounds": "",
+       "work": "3min rest"
+      }
+     ]
+    },
+    {
+     "title": "Alactic Session 5",
+     "rows": [
+      {
+       "rounds": "6 Rounds",
+       "work": "10sec at 100%, 110sec at 60%"
+      }
+     ]
+    },
+    {
+     "title": "Alactic Session 6",
+     "rows": [
+      {
+       "rounds": "3 Rounds",
+       "work": "x3 10sec at 100%, 90sec at 60%"
+      },
+      {
+       "rounds": "",
+       "work": "2min rest"
+      }
+     ]
+    },
+    {
+     "title": "Alactic Session 7",
+     "rows": [
+      {
+       "rounds": "5 Rounds",
+       "work": "10sec at 100%, 20sec rest, 10sec at 100%, 10sec rest, 10sec at 100%, 2min rest"
+      },
+      {
+       "rounds": "",
+       "work": "2min extra rest"
+      },
+      {
+       "rounds": "5 Rounds",
+       "work": "10sec at 100%, 20sec rest, 10sec at 100%, 10sec rest, 10sec at 100%, 2min rest"
+      }
+     ]
+    }
+   ]
+  },
+  "gym": {
+   "transmutation": [
+    [
+     {
+      "sec": "A",
+      "group": "Mobility and Strength Prep drills",
+      "ex": "",
+      "sets": "",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Deep squat hold to Thoracic rotations",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Banded Side Steps",
+      "sets": "3x 3x4 steps e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Extended Cat-Camell",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "B",
+      "group": "Plyo",
+      "ex": "Max Height box jumps",
+      "sets": "4x 4",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "C",
+      "group": "Oly 1",
+      "ex": "Clean Pulls from the hang",
+      "sets": "4x 3",
+      "load": "RPE 7",
+      "note": ""
+     },
+     {
+      "sec": "D",
+      "group": "Main 1 Prep",
+      "ex": "1 and a half Back Squat",
+      "sets": "3x 4",
+      "load": "@30/40/50%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 1",
+      "ex": "Back Squat",
+      "sets": "Macro Vol",
+      "load": "Macro %",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Accessory 1",
+      "ex": "Weighted step ups",
+      "sets": "3x 8 e.l.",
+      "load": "RPE 7",
+      "note": ""
+     },
+     {
+      "sec": "E",
+      "group": "Main 2 Prep",
+      "ex": "Hanging Active Hold",
+      "sets": "3x 30sec",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 2",
+      "ex": "Supinated Pull Up",
+      "sets": "Macro Vol",
+      "load": "RPE 9",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Accessory 1",
+      "ex": "Incline Bench Press w/ DB",
+      "sets": "3x 8",
+      "load": "RPE 8",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Accessory 2",
+      "ex": "Seated DB Bicep Curl",
+      "sets": "3x 10",
+      "load": "RPE 8",
+      "note": ""
+     },
+     {
+      "sec": "F",
+      "group": "Core",
+      "ex": "Dragon Flag slow eccentric",
+      "sets": "3x 5",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Alternating Supermans",
+      "sets": "3x 40",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Side Plank Rotations",
+      "sets": "3x 12 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "G",
+      "group": "Prehab",
+      "ex": "Rotator cuff Row, Rotate, Press",
+      "sets": "3x 6",
+      "load": "",
+      "note": ""
+     }
+    ],
+    [
+     {
+      "sec": "A",
+      "group": "Mobility and Strength Prep drills",
+      "ex": "",
+      "sets": "",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Standing Pancakes",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "OH Press w/ band (5sec up/ 5sec down)",
+      "sets": "3x 5 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Arm Circles w/ plates",
+      "sets": "3x 10 e.d.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "B",
+      "group": "Plyo",
+      "ex": "Bungee Push Up",
+      "sets": "4x 6",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "C",
+      "group": "Oly 1",
+      "ex": "Push Press w/ BB",
+      "sets": "4x 4",
+      "load": "RPE 7",
+      "note": ""
+     },
+     {
+      "sec": "D",
+      "group": "Main 1 Prep",
+      "ex": "Paused Deadlift",
+      "sets": "3x 5",
+      "load": "@50%",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 1",
+      "ex": "RDL",
+      "sets": "3x 8",
+      "load": "@60% deadlift",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Accessory 1",
+      "ex": "Hip Thrust",
+      "sets": "3x 10",
+      "load": "2rir",
+      "note": ""
+     },
+     {
+      "sec": "E",
+      "group": "Main 2 Prep",
+      "ex": "Half Hindu Push Up",
+      "sets": "3x 6",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 2",
+      "ex": "Bench Press",
+      "sets": "Macro Vol",
+      "load": "Macro %",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Accessory 1",
+      "ex": "Inverted Row",
+      "sets": "3x 12",
+      "load": "RPE 7",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Accessory 2",
+      "ex": "Rear Delt Flys",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Core",
+      "ex": "Reverse Hyper",
+      "sets": "3x 20",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Hollow Body Kicks",
+      "sets": "3x 40",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "BB Kayak (8-10Kg)",
+      "sets": "3x 20",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Prehab",
+      "ex": "Jefferson Curl",
+      "sets": "6x 30sec hold",
+      "load": "",
+      "note": ""
+     }
+    ],
+    [
+     {
+      "sec": "A",
+      "group": "Mobility and Strength Prep drills",
+      "ex": "",
+      "sets": "",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "World's Greates stretch",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Plate around head",
+      "sets": "3x 20",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Pronated IYTW's",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "B",
+      "group": "Plyo 1",
+      "ex": "Med Ball Fwd Throw (8-10Kg)",
+      "sets": "4x 5",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "C",
+      "group": "Plyo 2",
+      "ex": "Single Leg Box Jump (land 2 feet)",
+      "sets": "4x 8",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "D",
+      "group": "Main 1 Prep",
+      "ex": "Deep Goblet Squat Hold",
+      "sets": "3x 30sec",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 1",
+      "ex": "Zercher Squat",
+      "sets": "5-4-3-3",
+      "load": "RPE 8",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Accessory 1",
+      "ex": "Cossac Squat",
+      "sets": "4x 10 e.s.",
+      "load": "RPE 7",
+      "note": ""
+     },
+     {
+      "sec": "E",
+      "group": "Main 2",
+      "ex": "Weighted Push Up",
+      "sets": "3x 5",
+      "load": "RPE 8",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Accessory 1",
+      "ex": "Bench Pull",
+      "sets": "3x 10",
+      "load": "RPE 8",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Accessory 2",
+      "ex": "Bicep curl to Arnold Press",
+      "sets": "3x 10",
+      "load": "RPE 8",
+      "note": ""
+     },
+     {
+      "sec": "F",
+      "group": "Core",
+      "ex": "L Sit Hold",
+      "sets": "3x (3x max holds)",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Straddle Leg Passes",
+      "sets": "3x 20 e.l.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Back Extensions",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "G",
+      "group": "Prehab",
+      "ex": "Dorsiflexion against wall",
+      "sets": "3x 15",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Single Leg Calf Raises",
+      "sets": "3x 15",
+      "load": "",
+      "note": ""
+     }
+    ]
+   ],
+   "realization": [
+    [
+     {
+      "sec": "A",
+      "group": "Mobility and Strength Prep drills",
+      "ex": "",
+      "sets": "",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Downdward to Upward dog",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Shoulder Taps",
+      "sets": "3x 16 alt",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Deep Squat Hold + Rocks",
+      "sets": "3x 30sec",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "B",
+      "group": "Oly 1",
+      "ex": "Single Arm DB Push Press",
+      "sets": "3x 5 e.s.",
+      "load": "RPE 6",
+      "note": "90sec rest"
+     },
+     {
+      "sec": "C",
+      "group": "Main 1 Prep",
+      "ex": "Banded Side Steps",
+      "sets": "2x 8 e.d.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 1",
+      "ex": "Half Back Squat (fast concentric)",
+      "sets": "Macro Vol",
+      "load": "Macro %",
+      "note": "2min rest"
+     },
+     {
+      "sec": "",
+      "group": "Accessory 1",
+      "ex": "DB Bulgarian Split Squat + Jumps",
+      "sets": "3x 4+4",
+      "load": "",
+      "note": "2min rest"
+     },
+     {
+      "sec": "D",
+      "group": "Main 2 Prep",
+      "ex": "Scapular Pull Ups",
+      "sets": "3x 6",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 2",
+      "ex": "Explosive Inverted Rows",
+      "sets": "4x 5",
+      "load": "Slow Eccentric",
+      "note": "90sec rest"
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Pronated Pull Up",
+      "sets": "3x 5",
+      "load": "RPE 6-7",
+      "note": "2min rest"
+     },
+     {
+      "sec": "E",
+      "group": "Accessory 1",
+      "ex": "Cable punch w/ Rotation",
+      "sets": "3x 10 e.s.",
+      "load": "",
+      "note": "90sec rest"
+     },
+     {
+      "sec": "F",
+      "group": "Core Circuit x3",
+      "ex": "Hollow Body Hold",
+      "sets": "30/40/50sec",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Supermans",
+      "sets": "x20",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "G",
+      "group": "Prehab",
+      "ex": "Rotator cuff Row, Rotate, Press",
+      "sets": "3x 6",
+      "load": "Slow tempo",
+      "note": ""
+     }
+    ],
+    [
+     {
+      "sec": "A",
+      "group": "Mobility and Strength Prep drills",
+      "ex": "",
+      "sets": "",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "World's greatest stretch",
+      "sets": "3x 10 alternating",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Banded Good Mornings",
+      "sets": "3x 10 alternating",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Shoulders around wrists from plank",
+      "sets": "3x 10 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "B",
+      "group": "Oly 1",
+      "ex": "DB Hang Snatch",
+      "sets": "3x 5 e.s.",
+      "load": "RPE 6",
+      "note": ""
+     },
+     {
+      "sec": "C",
+      "group": "Main 1 Prep",
+      "ex": "KB Single leg RDL",
+      "sets": "3x 8 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 1",
+      "ex": "Deadlift",
+      "sets": "Macro Vol",
+      "load": "Macro %",
+      "note": ""
+     },
+     {
+      "sec": "D",
+      "group": "Main 2",
+      "ex": "Bungee Push Up",
+      "sets": "3x 5",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Bench Press (fast concentric)",
+      "sets": "Macro Vol",
+      "load": "Macro %",
+      "note": ""
+     },
+     {
+      "sec": "E",
+      "group": "Accessory 1",
+      "ex": "Rear Delt Flys",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "F",
+      "group": "Core Circuit x3",
+      "ex": "Weighted Sit Up (10Kg)",
+      "sets": "x12",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Superman Hold",
+      "sets": "40/50/60sec",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "G",
+      "group": "Prehab",
+      "ex": "Dorsiflexion against wall",
+      "sets": "3x 15",
+      "load": "",
+      "note": ""
+     }
+    ]
+   ],
+   "maintenance": [
+    [
+     {
+      "sec": "A",
+      "group": "Mobility and Strength Prep drills",
+      "ex": "",
+      "sets": "",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Deep squat hold to Thoracic rotations",
+      "sets": "3x 10 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Banded Side Steps",
+      "sets": "3x 8out/8back",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Extended Cat-Cow (elbows or hands on bench)",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "B",
+      "group": "Lower Prep",
+      "ex": "Body Weight Squat 3-2-0",
+      "sets": "3x 5",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Lower Circuit x3",
+      "ex": "Back Squat",
+      "sets": "x8",
+      "load": "RPE 7-8",
+      "note": "10 sec btw exercises / 1min btw rounds"
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Weighted step ups",
+      "sets": "x16 alternating",
+      "load": "RPE 7-8",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Banded Good Mornings",
+      "sets": "x10",
+      "load": "Light band",
+      "note": ""
+     },
+     {
+      "sec": "C",
+      "group": "Upper Prep",
+      "ex": "Scapular Pull ups",
+      "sets": "3x 8",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Upper Circuit x3",
+      "ex": "Pronated Pull Up",
+      "sets": "3x 6",
+      "load": "RPE 7-8",
+      "note": "10 sec btw exercises / 1min btw rounds"
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Eccentric Push Up",
+      "sets": "3x 6",
+      "load": "5sec descent",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Inverted Rows",
+      "sets": "3x 12",
+      "load": "RPE 7-8",
+      "note": ""
+     },
+     {
+      "sec": "D",
+      "group": "Core Circuit x3",
+      "ex": "Hollow Body Hold",
+      "sets": "30sec",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Supermans",
+      "sets": "x20",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "E",
+      "group": "Prehab",
+      "ex": "Rotator cuff Row, Rotate, Press",
+      "sets": "3x 6",
+      "load": "Slow tempo",
+      "note": ""
+     }
+    ],
+    [
+     {
+      "sec": "A",
+      "group": "Mobility and Strength Prep drills",
+      "ex": "",
+      "sets": "",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Standing Pancakes",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Plate Overhead Press (10kg)",
+      "sets": "3x 8 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Spread Aparts w/ band non. pp",
+      "sets": "3x 10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Lower Prep",
+      "ex": "Banded Deadlift",
+      "sets": "2x 8",
+      "load": "w/ stick or empty BB",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Lower Circuit x3",
+      "ex": "RDL",
+      "sets": "x8",
+      "load": "RPE 7-8",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "BB Hip Thrust",
+      "sets": "x10",
+      "load": "RPE 7-8",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Calf Raise",
+      "sets": "x15 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "C",
+      "group": "Upper Prep",
+      "ex": "Half Hindu Push Up",
+      "sets": "3x 6",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Upper Circuit x3",
+      "ex": "Incline Bench Press w/ DB",
+      "sets": "x8",
+      "load": "RPE 7-8",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Bent Over Row w/ DB",
+      "sets": "x10 e.s.",
+      "load": "RPE 7",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Rear Delt Flys",
+      "sets": "x10",
+      "load": "2.5Kg",
+      "note": ""
+     },
+     {
+      "sec": "D",
+      "group": "Core Circuit x3",
+      "ex": "Weighted Sit Up (5Kg)",
+      "sets": "x12",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Superman Hold",
+      "sets": "40sec",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "F",
+      "group": "Prehab",
+      "ex": "Dorsiflexion against wall",
+      "sets": "3x 15",
+      "load": "",
+      "note": ""
+     }
+    ]
+   ],
+   "accumulation": [
+    [
+     {
+      "sec": "A",
+      "group": "Mobility and Strength Prep drills",
+      "ex": "",
+      "sets": "3 Rounds:",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Downward dog to Runner Lunges",
+      "sets": "x10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Deep squat with thoracic rotations",
+      "sets": "x10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Child Pose and side reaches",
+      "sets": "x10 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "B",
+      "group": "Main 1 Prep",
+      "ex": "5 sec Squat Hold",
+      "sets": "3x 4",
+      "load": "20/30/40kg",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 1",
+      "ex": "Back Squat",
+      "sets": "Macro Vol",
+      "load": "Macro %",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Accessory 1",
+      "ex": "DB Bulgarian Split Squat",
+      "sets": "3x 10",
+      "load": "RPE 8",
+      "note": ""
+     },
+     {
+      "sec": "C",
+      "group": "Main 2 Prep",
+      "ex": "Scapular Pull Ups",
+      "sets": "3x 6",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 2",
+      "ex": "Pronated Pull Up",
+      "sets": "Macro Vol",
+      "load": "RPE 10",
+      "note": ""
+     },
+     {
+      "sec": "D",
+      "group": "Accessories Circuit x3",
+      "ex": "Cable Row",
+      "sets": "x12",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Incline DB Bench",
+      "sets": "x12",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Alt DB Bicep Curls",
+      "sets": "x20",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "F",
+      "group": "Core x3",
+      "ex": "Hanging Leg raises",
+      "sets": "x10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Superman Holds",
+      "sets": "x45sec",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Boxers Sit Ups",
+      "sets": "x15",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "G",
+      "group": "Prehab",
+      "ex": "Rotator cuff Ext rotation Horizontal",
+      "sets": "3x 12",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Myofascial Release",
+      "ex": "Glutes",
+      "sets": "",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Lats",
+      "sets": "",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Scaps",
+      "sets": "",
+      "load": "",
+      "note": ""
+     }
+    ],
+    [
+     {
+      "sec": "A",
+      "group": "Mobility and Strength Prep drills",
+      "ex": "",
+      "sets": "3 Rounds:",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Standing Pancakes",
+      "sets": "x10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Surfer's Lunges",
+      "sets": "x10 e s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Plate around head (10kg)",
+      "sets": "x10 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "C",
+      "group": "Main 1 Prep",
+      "ex": "Single Leg RDL w/ KB",
+      "sets": "3x 6 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 1",
+      "ex": "Deadlift",
+      "sets": "Macro Vol",
+      "load": "Macro %",
+      "note": ""
+     },
+     {
+      "sec": "D",
+      "group": "Main 2 Prep",
+      "ex": "Hindu Push Up",
+      "sets": "3x 6",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 2",
+      "ex": "BB Shoulder Press",
+      "sets": "3x 6",
+      "load": "RPE 8",
+      "note": ""
+     },
+     {
+      "sec": "D",
+      "group": "Accessories Circuit x3",
+      "ex": "Weighted Chest to Floor Strict Push Up",
+      "sets": "x10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Lat Pull Down",
+      "sets": "x10",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Rear Delt Flys",
+      "sets": "x12",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "F",
+      "group": "Core x3",
+      "ex": "Hollow Body Holds",
+      "sets": "x 60sec",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Standing Knee Raise w/ band",
+      "sets": "x 20",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Back Extension with Rotation",
+      "sets": "x 15 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "G",
+      "group": "Prehab",
+      "ex": "Rotator cuff Ext rotation Vertical",
+      "sets": "3x 12",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Banded Spead aparts",
+      "sets": "3x 12",
+      "load": "",
+      "note": ""
+     }
+    ],
+    [
+     {
+      "sec": "A",
+      "group": "Mobility and Strength Prep drills",
+      "ex": "",
+      "sets": "3 Rounds:",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Banded side steps",
+      "sets": "4x 8 steps e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Single arm A frames",
+      "sets": "x10 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Rotator cuff Row, Rotate, Press",
+      "sets": "x10 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "B",
+      "group": "Main 1 Prep",
+      "ex": "3 sec eccentric + 2sec hold Front Squat drill",
+      "sets": "3x 4",
+      "load": "20/30/40kg",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 1",
+      "ex": "Front Squat",
+      "sets": "3x 8",
+      "load": "RPE 8",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Accessory 1",
+      "ex": "Leg Curl",
+      "sets": "3x 10",
+      "load": "RPE 8",
+      "note": ""
+     },
+     {
+      "sec": "C",
+      "group": "Main 2 Prep",
+      "ex": "5 sec Eccentric Push Up",
+      "sets": "3x 6",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "Main 2",
+      "ex": "Bench Press",
+      "sets": "Macro Vol",
+      "load": "Macro %",
+      "note": ""
+     },
+     {
+      "sec": "D",
+      "group": "Accessories Circuit x3",
+      "ex": "Single arm Push Press w/ DB",
+      "sets": "x8 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "DB Bent over Row",
+      "sets": "x12 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "DB Skull Crusher",
+      "sets": "x15",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "F",
+      "group": "Core x3",
+      "ex": "Hollow Body Rocks",
+      "sets": "x 25",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Reverse Hypers",
+      "sets": "x 20",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Cable Chops",
+      "sets": "x 10 e.s.",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "G",
+      "group": "Prehab",
+      "ex": "Butchers Block",
+      "sets": "",
+      "load": "",
+      "note": ""
+     },
+     {
+      "sec": "",
+      "group": "",
+      "ex": "Myofascial Release",
+      "sets": "Glutes",
+      "load": "",
+      "note": ""
+     }
+    ]
+   ]
+  }
+ },
+ "guide": {
+  "back-squat": {
+   "img": [
+    "img/Barbell_Squat-0.jpg",
+    "img/Barbell_Squat-1.jpg"
+   ],
+   "yt": "barbell back squat technique",
+   "cues": [
+    "Barra sobre los trapecios, pies a ancho de hombros, rodillas siguiendo la punta de los pies.",
+    "Baja con el pecho alto hasta que la cadera pase la altura de la rodilla.",
+    "Sube empujando el suelo: la cadera y el pecho suben juntos, sin que la cadera se adelante."
+   ]
+  },
+  "half-squat": {
+   "img": [],
+   "yt": "half squat explosive concentric",
+   "cues": [
+    "Media sentadilla: baja hasta que el muslo quede a unos 45°, no a paralelo.",
+    "Baja controlado y sube lo mas rapido posible: la velocidad es el objetivo, no el peso.",
+    "Si la barra se frena en la subida, la carga es demasiada."
+   ]
+  },
+  "one-half-squat": {
+   "img": [],
+   "yt": "1 and a half back squat",
+   "cues": [
+    "Una repeticion = bajar completo, subir hasta la mitad, bajar completo otra vez, subir arriba.",
+    "Carga ligera (30/40/50%): es preparacion para la sentadilla, no esfuerzo.",
+    "Mantén la tension en el fondo, sin rebotar."
+   ]
+  },
+  "deadlift": {
+   "img": [
+    "img/Barbell_Deadlift-0.jpg",
+    "img/Barbell_Deadlift-1.jpg"
+   ],
+   "yt": "conventional deadlift technique",
+   "cues": [
+    "Barra sobre el medio del pie, pegada a las espinillas.",
+    "Antes de tirar: espalda neutra y dorsales apretados (\"esconde las axilas\").",
+    "Empuja el suelo con las piernas; la barra sube rozando las piernas y terminas con la cadera, sin echarte atras."
+   ]
+  },
+  "paused-deadlift": {
+   "img": [
+    "img/Barbell_Deadlift-0.jpg",
+    "img/Barbell_Deadlift-1.jpg"
+   ],
+   "yt": "paused deadlift below knee",
+   "cues": [
+    "Peso muerto normal con una pausa de 2 s justo debajo de la rodilla.",
+    "En la pausa no pierdas la posicion: espalda neutra, barra pegada a las piernas.",
+    "Al 50%: se trata de controlar la posicion, no de mover peso."
+   ]
+  },
+  "banded-deadlift": {
+   "img": [],
+   "yt": "hip hinge warm up band dowel",
+   "cues": [
+    "Ensayo del patron con palo o barra vacia, y la banda para sentir la tension.",
+    "Bisagra de cadera: la cadera va atras y la espalda queda recta.",
+    "Siente estirarse los isquios antes de subir."
+   ]
+  },
+  "rdl": {
+   "img": [
+    "img/Romanian_Deadlift-0.jpg",
+    "img/Romanian_Deadlift-1.jpg"
+   ],
+   "yt": "romanian deadlift technique",
+   "cues": [
+    "Empiezas de pie. Rodillas un poco flexionadas y fijas todo el recorrido.",
+    "Lleva la cadera atras deslizando la barra por los muslos hasta sentir tension en los isquios, normalmente bajo la rodilla.",
+    "Espalda neutra siempre; sube apretando gluteos."
+   ]
+  },
+  "kb-sl-rdl": {
+   "img": [
+    "img/Kettlebell_One-Legged_Deadlift-0.jpg",
+    "img/Kettlebell_One-Legged_Deadlift-1.jpg"
+   ],
+   "yt": "kettlebell single leg rdl",
+   "cues": [
+    "Pesa en la mano contraria a la pierna de apoyo.",
+    "Cadera cuadrada al suelo: no la abras hacia el lado de la pierna que sube.",
+    "Pierna de atras y torso forman una sola linea."
+   ]
+  },
+  "bench": {
+   "img": [
+    "img/Barbell_Bench_Press_-_Medium_Grip-0.jpg",
+    "img/Barbell_Bench_Press_-_Medium_Grip-1.jpg"
+   ],
+   "yt": "bench press technique",
+   "cues": [
+    "Escapulas juntas y abajo, pies firmes en el suelo.",
+    "Baja la barra a la parte baja del pecho con los codos a unos 45° del cuerpo.",
+    "Empuja hacia arriba y un poco hacia atras, sin despegar la cadera del banco."
+   ]
+  },
+  "bench-fast": {
+   "img": [
+    "img/Barbell_Bench_Press_-_Medium_Grip-0.jpg",
+    "img/Barbell_Bench_Press_-_Medium_Grip-1.jpg"
+   ],
+   "yt": "speed bench press dynamic effort",
+   "cues": [
+    "Misma tecnica del press de banca.",
+    "Baja en unos 2 s, pausa breve en el pecho y sube lo mas rapido posible.",
+    "Al 60-70% la barra debe volar; si se frena, baja la carga."
+   ]
+  },
+  "incline-db": {
+   "img": [
+    "img/Incline_Dumbbell_Press-0.jpg",
+    "img/Incline_Dumbbell_Press-1.jpg"
+   ],
+   "yt": "incline dumbbell press technique",
+   "cues": [
+    "Banco a 30-45°.",
+    "Mancuernas a la altura del pecho alto, codos un poco por debajo de los hombros.",
+    "Sube juntandolas arriba sin chocarlas."
+   ]
+  },
+  "hip-thrust": {
+   "img": [
+    "img/Barbell_Hip_Thrust-0.jpg",
+    "img/Barbell_Hip_Thrust-1.jpg"
+   ],
+   "yt": "barbell hip thrust technique",
+   "cues": [
+    "Borde del banco bajo las escapulas, barra sobre la cadera con almohadilla.",
+    "Pies a ancho de cadera; arriba, las espinillas quedan verticales.",
+    "Menton hacia el pecho. Sube apretando gluteos hasta que el torso quede paralelo al suelo, sin arquear la zona lumbar."
+   ]
+  },
+  "step-up": {
+   "img": [
+    "img/Dumbbell_Step_Ups-0.jpg",
+    "img/Dumbbell_Step_Ups-1.jpg"
+   ],
+   "yt": "weighted step ups technique",
+   "cues": [
+    "Cajon a la altura de la rodilla o un poco menos.",
+    "Sube empujando con el talon de la pierna de arriba; la de abajo casi no ayuda.",
+    "Baja controlado. e.l. = cada pierna."
+   ]
+  },
+  "bss-jump": {
+   "img": [],
+   "yt": "bulgarian split squat jump contrast",
+   "cues": [
+    "Pie de atras sobre un banco. 4 repeticiones con mancuernas: baja hasta que la rodilla de atras casi toque el suelo.",
+    "Sueltas las mancuernas y haces 4 saltos en la misma posicion, aterrizando suave. Eso es el \"4+4\".",
+    "Torso un poco inclinado adelante; la rodilla de adelante no colapsa hacia adentro."
+   ]
+  },
+  "box-jump": {
+   "img": [
+    "img/Front_Box_Jump-0.jpg",
+    "img/Front_Box_Jump-1.jpg"
+   ],
+   "yt": "box jump technique landing",
+   "cues": [
+    "Desde parado, contramovimiento rapido con los brazos.",
+    "Salta lo mas alto posible y aterriza suave, en cuclillas, con los dos pies.",
+    "Baja del cajon caminando. Descansa completo: es potencia, no condicion."
+   ]
+  },
+  "sl-box-jump": {
+   "img": [],
+   "yt": "single leg box jump two foot landing",
+   "cues": [
+    "Despega con una pierna, aterriza con las dos.",
+    "Cajon bajo: importa la calidad del despegue, no la altura.",
+    "Aterriza estable antes de la siguiente repeticion."
+   ]
+  },
+  "clean-pull-hang": {
+   "img": [
+    "img/Clean_Pull-0.jpg",
+    "img/Clean_Pull-1.jpg"
+   ],
+   "yt": "hang clean pull technique",
+   "cues": [
+    "Arranca con la barra a mitad del muslo, torso inclinado, brazos estirados.",
+    "Extiende de golpe cadera, rodillas y tobillos, como un salto, y encoge los hombros al final.",
+    "Los brazos no tiran, solo guian. No hay recepcion de la barra."
+   ]
+  },
+  "push-press": {
+   "img": [
+    "img/Push_Press-0.jpg",
+    "img/Push_Press-1.jpg"
+   ],
+   "yt": "barbell push press technique",
+   "cues": [
+    "Barra sobre los hombros, codos un poco adelante.",
+    "Flexion corta de rodillas (5-10 cm) con el torso vertical, y extiende de golpe.",
+    "Usa ese impulso para subir la barra; termina con los brazos bloqueados y la cabeza entre los brazos."
+   ]
+  },
+  "sa-db-push-press": {
+   "img": [
+    "img/One-Arm_Kettlebell_Push_Press-0.jpg",
+    "img/One-Arm_Kettlebell_Push_Press-1.jpg"
+   ],
+   "yt": "single arm dumbbell push press",
+   "cues": [
+    "Mancuerna al hombro; la otra mano libre.",
+    "Flexion corta de rodillas, extension explosiva, bloqueo arriba.",
+    "No inclines el torso hacia el lado."
+   ]
+  },
+  "db-hang-snatch": {
+   "img": [],
+   "yt": "dumbbell hang snatch technique",
+   "cues": [
+    "Mancuerna entre las rodillas, cadera atras, brazo estirado.",
+    "Extension explosiva de cadera; la mancuerna sube pegada al cuerpo con el codo alto.",
+    "La recibes arriba con el brazo bloqueado, en un solo movimiento. RPE 6: tecnica limpia antes que peso."
+   ]
+  },
+  "zercher": {
+   "img": [
+    "img/Zercher_Squats-0.jpg",
+    "img/Zercher_Squats-1.jpg"
+   ],
+   "yt": "zercher squat technique",
+   "cues": [
+    "Barra en el pliegue de los codos, manos juntas. Usa almohadilla o toalla.",
+    "Torso muy vertical; baja entre las rodillas.",
+    "Codos pegados: si se abren, la barra cae y la espalda se redondea. 5-4-3-3 = series de 5, 4, 3 y 3."
+   ]
+  },
+  "goblet-hold": {
+   "img": [
+    "img/Goblet_Squat-0.jpg",
+    "img/Goblet_Squat-1.jpg"
+   ],
+   "yt": "deep goblet squat hold",
+   "cues": [
+    "Pesa al pecho; baja lo mas profundo que puedas con el pecho alto.",
+    "Usa los codos para empujar las rodillas hacia afuera.",
+    "Quedate 30 s respirando, talones en el suelo."
+   ]
+  },
+  "inverted-row": {
+   "img": [
+    "img/Inverted_Row-0.jpg",
+    "img/Inverted_Row-1.jpg"
+   ],
+   "yt": "inverted row technique",
+   "cues": [
+    "Cuerpo en tabla bajo la barra, talones en el suelo.",
+    "Lleva el pecho a la barra juntando las escapulas.",
+    "Mas horizontal = mas dificil."
+   ]
+  },
+  "inverted-row-explosive": {
+   "img": [
+    "img/Inverted_Row-0.jpg",
+    "img/Inverted_Row-1.jpg"
+   ],
+   "yt": "explosive inverted row",
+   "cues": [
+    "Sube lo mas rapido posible, baja lento (3 s).",
+    "Cuerpo rigido: que la cadera no se caiga.",
+    "4x 5 con 90 s de descanso: calidad, no fatiga."
+   ]
+  },
+  "pull-up-pron": {
+   "img": [
+    "img/Pullups-0.jpg",
+    "img/Pullups-1.jpg"
+   ],
+   "yt": "strict pull up technique",
+   "cues": [
+    "Agarre por encima, un poco mas ancho que los hombros.",
+    "Empieza colgando con los hombros activos, no sueltos.",
+    "Menton por encima de la barra, baja completo y controlado. Sin balanceo."
+   ]
+  },
+  "pull-up-sup": {
+   "img": [
+    "img/Chin-Up-0.jpg",
+    "img/Chin-Up-1.jpg"
+   ],
+   "yt": "chin up technique",
+   "cues": [
+    "Agarre por debajo, a ancho de hombros.",
+    "Pecho hacia la barra, codos hacia las costillas.",
+    "RPE 9: si hace falta, lastre para que la ultima repeticion cueste."
+   ]
+  },
+  "scap-pull": {
+   "img": [
+    "img/Scapular_Pull-Up-0.jpg",
+    "img/Scapular_Pull-Up-1.jpg"
+   ],
+   "yt": "scapular pull ups",
+   "cues": [
+    "Colgado con los brazos estirados.",
+    "Sin doblar los codos, baja los hombros lejos de las orejas: el cuerpo sube unos centimetros.",
+    "Aguanta 1 s y suelta controlado."
+   ]
+  },
+  "hang-active": {
+   "img": [],
+   "yt": "active hang shoulders",
+   "cues": [
+    "Colgado de la barra, hombros tirados hacia abajo, lejos de las orejas.",
+    "Codos estirados, costillas cerradas, piernas juntas.",
+    "30 s sin columpiarte."
+   ]
+  },
+  "calf-raise": {
+   "img": [],
+   "yt": "single leg calf raise on step",
+   "cues": [
+    "Sobre un escalon, talon colgando.",
+    "Baja lento hasta estirar completo y sube lo mas alto posible; pausa 1 s arriba.",
+    "Una pierna a la vez."
+   ]
+  },
+  "good-morning-band": {
+   "img": [
+    "img/Band_Good_Morning-0.jpg",
+    "img/Band_Good_Morning-1.jpg"
+   ],
+   "yt": "banded good morning",
+   "cues": [
+    "Banda bajo los pies y por detras del cuello.",
+    "Bisagra de cadera con rodillas suaves y espalda recta, hasta que el torso quede casi paralelo.",
+    "Sube apretando gluteos. Banda ligera: es preparacion."
+   ]
+  },
+  "back-ext": {
+   "img": [
+    "img/Hyperextensions_Back_Extensions-0.jpg",
+    "img/Hyperextensions_Back_Extensions-1.jpg"
+   ],
+   "yt": "back extension technique",
+   "cues": [
+    "Cadera apoyada en el borde del cojin.",
+    "Baja con la espalda neutra y sube hasta alinear torso y piernas, no mas.",
+    "Aprieta gluteos arriba."
+   ]
+  },
+  "reverse-hyper": {
+   "img": [
+    "img/Reverse_Hyperextension-0.jpg",
+    "img/Reverse_Hyperextension-1.jpg"
+   ],
+   "yt": "reverse hyper exercise",
+   "cues": [
+    "Torso sobre el banco, cadera en el borde, piernas colgando.",
+    "Sube las piernas juntas y estiradas hasta la horizontal apretando gluteos.",
+    "Baja controlado, sin impulso."
+   ]
+  },
+  "superman": {
+   "img": [],
+   "yt": "superman exercise",
+   "cues": [
+    "Boca abajo, brazos estirados adelante.",
+    "Levanta brazos, pecho y piernas a la vez, mirando al suelo.",
+    "Aprieta gluteos; no subas el cuello."
+   ]
+  },
+  "superman-hold": {
+   "img": [],
+   "yt": "superman hold",
+   "cues": [
+    "La misma posicion del superman, sostenida.",
+    "Respira normal durante los 40-60 s.",
+    "Mirada al suelo, gluteos apretados."
+   ]
+  },
+  "superman-alt": {
+   "img": [],
+   "yt": "alternating superman",
+   "cues": [
+    "Boca abajo; levanta el brazo derecho y la pierna izquierda, luego al reves.",
+    "Cuenta las 40 repeticiones alternando.",
+    "Mirada al suelo, sin girar la cadera."
+   ]
+  },
+  "rear-delt": {
+   "img": [
+    "img/Reverse_Flyes-0.jpg",
+    "img/Reverse_Flyes-1.jpg"
+   ],
+   "yt": "dumbbell rear delt fly",
+   "cues": [
+    "Torso inclinado casi paralelo al suelo, mancuernas livianas, codos apenas doblados.",
+    "Abre los brazos hacia los lados juntando las escapulas.",
+    "Sin impulso: el peso bajo es a proposito."
+   ]
+  },
+  "db-row": {
+   "img": [
+    "img/One-Arm_Dumbbell_Row-0.jpg",
+    "img/One-Arm_Dumbbell_Row-1.jpg"
+   ],
+   "yt": "one arm dumbbell row technique",
+   "cues": [
+    "Mano y rodilla sobre un banco, espalda plana.",
+    "Lleva la mancuerna hacia la cadera, no hacia el hombro.",
+    "Baja estirando completo."
+   ]
+  },
+  "seated-curl": {
+   "img": [
+    "img/Seated_Dumbbell_Curl-0.jpg",
+    "img/Seated_Dumbbell_Curl-1.jpg"
+   ],
+   "yt": "seated dumbbell curl",
+   "cues": [
+    "Sentado con la espalda apoyada, codos pegados al cuerpo.",
+    "Sube girando la palma hacia arriba; baja lento.",
+    "No balancees el torso."
+   ]
+  },
+  "curl-arnold": {
+   "img": [],
+   "yt": "bicep curl to arnold press",
+   "cues": [
+    "Curl de biceps con mancuernas, y desde arriba encadenas un press Arnold.",
+    "En el press, gira las palmas hacia afuera mientras empujas sobre la cabeza.",
+    "Bajas deshaciendo el mismo camino. Una repeticion = curl + press."
+   ]
+  },
+  "weighted-pushup": {
+   "img": [
+    "img/Pushups-0.jpg",
+    "img/Pushups-1.jpg"
+   ],
+   "yt": "weighted push up",
+   "cues": [
+    "Disco en la espalda o chaleco.",
+    "Cuerpo en tabla, manos a ancho de hombros, codos a unos 45°.",
+    "Pecho al suelo y arriba."
+   ]
+  },
+  "eccentric-pushup": {
+   "img": [
+    "img/Pushups-0.jpg",
+    "img/Pushups-1.jpg"
+   ],
+   "yt": "eccentric push up",
+   "cues": [
+    "Baja en 5 s contados, cuerpo rigido.",
+    "Al tocar el pecho puedes apoyar rodillas para subir.",
+    "Lo que entrena es la bajada."
+   ]
+  },
+  "hindu-half": {
+   "img": [],
+   "yt": "hindu push up",
+   "cues": [
+    "El hindu push up va de perro boca abajo (cadera alta) a cobra, pasando el pecho cerca del suelo entre las manos, y vuelve.",
+    "La version \"half\" recorta el recorrido: bajar el pecho y volver, sin llegar a la cobra completa.",
+    "La hoja no detalla el \"half\"; si no esta claro, confirmalo con el preparador."
+   ]
+  },
+  "bungee-pushup": {
+   "img": [],
+   "yt": "band resisted explosive push up",
+   "cues": [
+    "Banda elastica por la espalda, sujeta bajo las manos: empujas contra ella.",
+    "La banda carga mas arriba, asi que empuja explosivo hasta el final.",
+    "Cuerpo en tabla; pocas repeticiones rapidas."
+   ]
+  },
+  "hollow-hold": {
+   "img": [],
+   "yt": "hollow body hold",
+   "cues": [
+    "Boca arriba, zona lumbar pegada al suelo.",
+    "Brazos sobre la cabeza y piernas estiradas, ambos a unos centimetros del suelo.",
+    "Si la espalda se despega, sube las piernas o dobla las rodillas."
+   ]
+  },
+  "hollow-kicks": {
+   "img": [],
+   "yt": "hollow body flutter kicks",
+   "cues": [
+    "En posicion hollow, patada alternada tipo crol con las piernas estiradas.",
+    "La zona lumbar no se despega del suelo en ningun momento.",
+    "40 patadas por serie."
+   ]
+  },
+  "l-sit": {
+   "img": [],
+   "yt": "l sit hold progression",
+   "cues": [
+    "Entre dos cajones o paralelas, brazos estirados y hombros abajo.",
+    "Piernas juntas y estiradas, paralelas al suelo.",
+    "3x (3x max holds) = 3 series de 3 sostenidas al maximo. Si no llegas, dobla las rodillas."
+   ]
+  },
+  "dragon-flag": {
+   "img": [],
+   "yt": "dragon flag slow eccentric",
+   "cues": [
+    "Boca arriba en un banco, agarra el banco detras de la cabeza.",
+    "Sube el cuerpo recto hasta vertical, apoyado en los hombros, y baja en bloque lo mas lento posible.",
+    "Si la cadera se dobla, dobla las rodillas para facilitarlo."
+   ]
+  },
+  "side-plank-rot": {
+   "img": [],
+   "yt": "side plank rotation thread the needle",
+   "cues": [
+    "Plancha lateral sobre el antebrazo.",
+    "Pasa el brazo de arriba por debajo del cuerpo rotando el torso, y vuelve a abrir.",
+    "La cadera no baja. 12 por lado."
+   ]
+  },
+  "straddle-pass": {
+   "img": [],
+   "yt": "straddle leg lifts compression gymnastics",
+   "cues": [
+    "Ejercicio de compresion de gimnasia: sentado con las piernas abiertas y estiradas, levantas las piernas del suelo sin ayuda de las manos.",
+    "Rodillas bloqueadas y puntas estiradas.",
+    "La variante exacta no esta en la hoja: mira el video y confirma con el preparador."
+   ]
+  },
+  "bb-kayak": {
+   "img": [],
+   "yt": "barbell kayak rotation core",
+   "cues": [
+    "Sentado en V, sujeta una barra o disco de 8-10 kg.",
+    "Rota de lado a lado bajando cada extremo hacia el suelo, como remando en kayak.",
+    "Gira el torso, no solo los brazos. 20 por serie."
+   ]
+  },
+  "jefferson-curl": {
+   "img": [],
+   "yt": "jefferson curl technique",
+   "cues": [
+    "De pie sobre un cajon, peso muy ligero.",
+    "Enrolla la columna vertebra por vertebra desde el menton hacia abajo; sube desenrollando.",
+    "En el plan: 6x 30 s sosteniendo abajo. Es movilidad con carga, no fuerza."
+   ]
+  },
+  "cossack": {
+   "img": [],
+   "yt": "cossack squat",
+   "cues": [
+    "Piernas muy abiertas.",
+    "Baja hacia un lado sentandote sobre esa pierna; la otra queda estirada con la punta hacia arriba.",
+    "Talon de apoyo en el suelo. 10 por lado."
+   ]
+  },
+  "medball-throw": {
+   "img": [],
+   "yt": "medicine ball forward throw underhand",
+   "cues": [
+    "Balon entre las piernas, en semisentadilla.",
+    "Extiende la cadera de golpe y lanza hacia adelante y arriba lo mas lejos posible.",
+    "Todo el cuerpo, no solo los brazos. Descanso completo entre lanzamientos."
+   ]
+  },
+  "standing-pancake": {
+   "img": [],
+   "yt": "standing pancake stretch",
+   "cues": [
+    "De pie, piernas muy abiertas y estiradas.",
+    "Bisagra de cadera llevando el torso hacia el suelo con la espalda larga.",
+    "Relaja y respira en el fondo."
+   ]
+  },
+  "oh-band-press": {
+   "img": [],
+   "yt": "single arm band overhead press",
+   "cues": [
+    "Banda bajo los pies; press sobre la cabeza con un brazo.",
+    "5 s subiendo, 5 s bajando: el tempo es el ejercicio.",
+    "Costillas cerradas, sin arquear la espalda."
+   ]
+  },
+  "arm-circles-plates": {
+   "img": [],
+   "yt": "arm circles with plates",
+   "cues": [
+    "Disco liviano en cada mano, brazos estirados a los lados.",
+    "Circulos grandes y controlados.",
+    "10 en cada direccion (e.d.)."
+   ]
+  },
+  "plate-halo": {
+   "img": [],
+   "yt": "plate halo exercise",
+   "cues": [
+    "Disco frente al pecho; rodealo alrededor de la cabeza, pegado al craneo.",
+    "Costillas cerradas y cadera quieta.",
+    "Alterna la direccion."
+   ]
+  },
+  "plate-oh-press": {
+   "img": [],
+   "yt": "plate overhead press",
+   "cues": [
+    "Disco de 10 kg; press sobre la cabeza hasta bloquear.",
+    "Biceps junto a la oreja arriba, costillas cerradas.",
+    "e.s. = cada lado."
+   ]
+  },
+  "iytw": {
+   "img": [],
+   "yt": "prone IYTW shoulder exercise",
+   "cues": [
+    "Boca abajo en un banco inclinado, pulgares arriba.",
+    "Con los brazos estirados dibuja la I (arriba), la Y, la T (a los lados) y la W (codos doblados atras).",
+    "Sin peso o muy poco: que trabajen las escapulas. 10 de cada letra."
+   ]
+  },
+  "worlds-greatest": {
+   "img": [
+    "img/Worlds_Greatest_Stretch-0.jpg",
+    "img/Worlds_Greatest_Stretch-1.jpg"
+   ],
+   "yt": "worlds greatest stretch",
+   "cues": [
+    "Zancada larga, mano del lado de la pierna adelantada en el suelo, por dentro del pie.",
+    "Codo hacia el tobillo; luego rota el torso abriendo el brazo al techo.",
+    "Alterna lados."
+   ]
+  },
+  "down-up-dog": {
+   "img": [],
+   "yt": "downward dog to upward dog flow",
+   "cues": [
+    "Desde perro boca abajo (cadera arriba, talones hacia el suelo)...",
+    "...baja la cadera y abre el pecho hasta perro boca arriba: brazos estirados, piernas despegadas.",
+    "Vuelve. Fluido, con la respiracion."
+   ]
+  },
+  "shoulder-taps": {
+   "img": [],
+   "yt": "plank shoulder taps",
+   "cues": [
+    "Plancha alta; toca el hombro contrario con una mano.",
+    "La cadera no se mueve. Pies separados para estabilidad.",
+    "16 alternados."
+   ]
+  },
+  "deep-squat-rocks": {
+   "img": [],
+   "yt": "deep squat hold rocking mobility",
+   "cues": [
+    "Sentadilla profunda con los talones en el suelo.",
+    "Balancea el peso suave de lado a lado y adelante-atras.",
+    "30 s."
+   ]
+  },
+  "deep-squat-tspine": {
+   "img": [],
+   "yt": "deep squat thoracic rotation",
+   "cues": [
+    "En sentadilla profunda, una mano en el suelo.",
+    "La otra rota hacia el techo y la mirada la sigue.",
+    "Alterna. Talones en el suelo."
+   ]
+  },
+  "cat-cow-ext": {
+   "img": [
+    "img/Cat_Stretch-0.jpg",
+    "img/Cat_Stretch-1.jpg"
+   ],
+   "yt": "extended cat cow on bench",
+   "cues": [
+    "Codos o manos sobre un banco, rodillas en el suelo lejos del banco.",
+    "Redondea la espalda completa (gato) y luego abrela bajando el pecho (vaca).",
+    "Lento, con la respiracion."
+   ]
+  },
+  "band-side-steps": {
+   "img": [],
+   "yt": "banded lateral walk",
+   "cues": [
+    "Banda alrededor de las rodillas o tobillos, en semisentadilla.",
+    "Pasos laterales sin juntar los pies y sin que las rodillas caigan hacia adentro.",
+    "Cuenta los pasos a cada lado."
+   ]
+  },
+  "shoulders-wrists": {
+   "img": [],
+   "yt": "plank shoulder circles wrist warm up",
+   "cues": [
+    "Plancha alta.",
+    "Mueve los hombros en circulos alrededor de las munecas: adelante, a un lado, atras, al otro.",
+    "10 por lado."
+   ]
+  },
+  "dorsiflexion-wall": {
+   "img": [],
+   "yt": "knee to wall ankle dorsiflexion",
+   "cues": [
+    "Pie a un palmo de la pared; lleva la rodilla a tocarla sin despegar el talon.",
+    "Si toca facil, aleja el pie.",
+    "Rodilla en linea con el segundo dedo."
+   ]
+  },
+  "rc-row-rotate-press": {
+   "img": [],
+   "yt": "row rotate press rotator cuff",
+   "cues": [
+    "Con banda o mancuerna liviana: rema hasta que el codo quede a la altura del hombro.",
+    "Rota el antebrazo hacia arriba y empuja sobre la cabeza.",
+    "Deshaz en orden inverso. Tempo lento, peso minimo."
+   ]
+  },
+  "band-pull-apart": {
+   "img": [
+    "img/Band_Pull_Apart-0.jpg",
+    "img/Band_Pull_Apart-1.jpg"
+   ],
+   "yt": "band pull apart",
+   "cues": [
+    "Banda al frente a la altura del pecho, brazos estirados.",
+    "Abre hasta que la banda toque el pecho, juntando escapulas.",
+    "Hombros abajo, lejos de las orejas."
+   ]
+  },
+  "weighted-situp": {
+   "img": [
+    "img/Sit-Up-0.jpg",
+    "img/Sit-Up-1.jpg"
+   ],
+   "yt": "weighted sit up plate",
+   "cues": [
+    "Disco al pecho, pies anclados.",
+    "Sube hasta sentado.",
+    "Baja controlado, sin dejarte caer."
+   ]
+  },
+  "cable-punch": {
+   "img": [],
+   "yt": "cable punch with rotation",
+   "cues": [
+    "Polea a la altura del pecho, de espaldas a ella.",
+    "Golpe hacia adelante rotando cadera y tronco, como un directo.",
+    "Controla el regreso. 10 por lado."
+   ]
+  },
+  "bench-pull": {
+   "img": [],
+   "yt": "barbell bench pull",
+   "cues": [
+    "Boca abajo en un banco alto, barra colgando debajo.",
+    "Tira la barra hasta tocar el banco juntando escapulas; baja estirado.",
+    "El banco elimina el impulso: todo es espalda."
+   ]
+  },
+  "bw-squat-tempo": {
+   "img": [],
+   "yt": "tempo bodyweight squat",
+   "cues": [
+    "Tempo 3-2-0: 3 s bajando, 2 s de pausa abajo, subida sin pausa.",
+    "Talones en el suelo, pecho alto.",
+    "Es preparacion: busca la posicion, no el cansancio."
+   ]
+  }
+ },
+ "gmap": {
+  "Back Squat": "back-squat",
+  "Half Back Squat (fast concentric)": "half-squat",
+  "1 and a half Back Squat": "one-half-squat",
+  "Deadlift": "deadlift",
+  "Paused Deadlift": "paused-deadlift",
+  "Banded Deadlift": "banded-deadlift",
+  "RDL": "rdl",
+  "KB Single leg RDL": "kb-sl-rdl",
+  "Bench Press": "bench",
+  "Bench Press (fast concentric)": "bench-fast",
+  "Incline Bench Press w/ DB": "incline-db",
+  "Hip Thrust": "hip-thrust",
+  "BB Hip Thrust": "hip-thrust",
+  "Weighted step ups": "step-up",
+  "DB Bulgarian Split Squat + Jumps": "bss-jump",
+  "Max Height box jumps": "box-jump",
+  "Single Leg Box Jump (land 2 feet)": "sl-box-jump",
+  "Clean Pulls from the hang": "clean-pull-hang",
+  "Push Press w/ BB": "push-press",
+  "Single Arm DB Push Press": "sa-db-push-press",
+  "DB Hang Snatch": "db-hang-snatch",
+  "Zercher Squat": "zercher",
+  "Deep Goblet Squat Hold": "goblet-hold",
+  "Inverted Row": "inverted-row",
+  "Inverted Rows": "inverted-row",
+  "Explosive Inverted Rows": "inverted-row-explosive",
+  "Pronated Pull Up": "pull-up-pron",
+  "Supinated Pull Up": "pull-up-sup",
+  "Scapular Pull Ups": "scap-pull",
+  "Scapular Pull ups": "scap-pull",
+  "Hanging Active Hold": "hang-active",
+  "Calf Raise": "calf-raise",
+  "Single Leg Calf Raises": "calf-raise",
+  "Banded Good Mornings": "good-morning-band",
+  "Back Extensions": "back-ext",
+  "Reverse Hyper": "reverse-hyper",
+  "Supermans": "superman",
+  "Superman Hold": "superman-hold",
+  "Alternating Supermans": "superman-alt",
+  "Rear Delt Flys": "rear-delt",
+  "Bent Over Row w/ DB": "db-row",
+  "Seated DB Bicep Curl": "seated-curl",
+  "Bicep curl to Arnold Press": "curl-arnold",
+  "Weighted Push Up": "weighted-pushup",
+  "Eccentric Push Up": "eccentric-pushup",
+  "Half Hindu Push Up": "hindu-half",
+  "Bungee Push Up": "bungee-pushup",
+  "Hollow Body Hold": "hollow-hold",
+  "Hollow Body Kicks": "hollow-kicks",
+  "L Sit Hold": "l-sit",
+  "Dragon Flag slow eccentric": "dragon-flag",
+  "Side Plank Rotations": "side-plank-rot",
+  "Straddle Leg Passes": "straddle-pass",
+  "BB Kayak (8-10Kg)": "bb-kayak",
+  "Jefferson Curl": "jefferson-curl",
+  "Cossac Squat": "cossack",
+  "Med Ball Fwd Throw (8-10Kg)": "medball-throw",
+  "Standing Pancakes": "standing-pancake",
+  "OH Press w/ band (5sec up/ 5sec down)": "oh-band-press",
+  "Arm Circles w/ plates": "arm-circles-plates",
+  "Plate around head": "plate-halo",
+  "Plate Overhead Press (10kg)": "plate-oh-press",
+  "Pronated IYTW's": "iytw",
+  "World's Greates stretch": "worlds-greatest",
+  "World's greatest stretch": "worlds-greatest",
+  "Downdward to Upward dog": "down-up-dog",
+  "Shoulder Taps": "shoulder-taps",
+  "Deep Squat Hold + Rocks": "deep-squat-rocks",
+  "Deep squat hold to Thoracic rotations": "deep-squat-tspine",
+  "Extended Cat-Camell": "cat-cow-ext",
+  "Extended Cat-Cow (elbows or hands on bench)": "cat-cow-ext",
+  "Banded Side Steps": "band-side-steps",
+  "Shoulders around wrists from plank": "shoulders-wrists",
+  "Dorsiflexion against wall": "dorsiflexion-wall",
+  "Rotator cuff Row, Rotate, Press": "rc-row-rotate-press",
+  "Spread Aparts w/ band non. pp": "band-pull-apart",
+  "Weighted Sit Up (10Kg)": "weighted-situp",
+  "Weighted Sit Up (5Kg)": "weighted-situp",
+  "Cable punch w/ Rotation": "cable-punch",
+  "Bench Pull": "bench-pull",
+  "Body Weight Squat 3-2-0": "bw-squat-tempo"
+ }
+}

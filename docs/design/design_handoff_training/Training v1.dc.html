@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+body{margin:0;background:#070f16;color:#e8f0f7;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+a{color:#33a1e0}a:hover{color:#5ab4e8}
+input::placeholder,textarea::placeholder{color:#5a7086}
+input[type=date]{color-scheme:dark}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #33a1e0;outline-offset:2px}
+</style>
+</helmet>
+
+<section id="t1" style="padding:48px 56px 80px;display:flex;flex-direction:column;gap:28px;width:max-content;min-height:100vh;box-sizing:border-box;background:#070f16;color:#e8f0f7">
+<div style="display:flex;flex-direction:column;gap:10px;max-width:1080px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t1" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">1</a><span style="font-size:20px;font-weight:700">Training v1: rutinas + ciclo, nada más</span></div>
+<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14.5px;line-height:1.5;color:#cfdeea">
+<li><strong>Rutina</strong> = nombre y una lista de ejercicios con series × reps o distancia, descanso, carga y nota.</li>
+<li><strong>Ciclo</strong> = una grilla semanas × días; en cada casilla va una rutina o descanso. Se arma en la app o con la plantilla de Excel.</li>
+<li><strong>Ejercicios</strong> = la biblioteca gratis (free-exercise-db, con fotos) + los que crea el club, como los de pileta. Los nuevos salen en el buscador al instante y en la próxima plantilla que se descarga.</li>
+<li><strong>Sirve para cualquier deporte</strong>: no hay tipos fijos (gym, pileta…); el nombre de la rutina dice qué es. La app le da un color sola para distinguirla en el calendario.</li>
+<li><strong>Varios ciclos</strong>: cada rutina pertenece a un ciclo o es "Shared" (sirve en todos). En Routines se elige el ciclo en un desplegable; duplicar un ciclo copia sus rutinas; archivar lo saca de la lista.</li>
+<li><strong>Kilos</strong>: la carga puede ser "% de una marca". Cada jugador carga sus marcas si quiere (privadas) y ve sus kilos, redondeados a 2,5 kg.</li>
+</ul>
+<div style="display:flex;gap:10px;align-items:center"><span style="font-size:14px;font-weight:600;color:#cfdeea">Probar con</span><div style="display:flex;padding:3px;gap:2px;border:1px solid #274055;border-radius:10px;background:#13283a"><button onClick="{{ demo3 }}" style="all:unset;cursor:pointer;white-space:nowrap;height:30px;padding:0 14px;border-radius:7px;font-size:13.5px;font-weight:600;background:{{ d3bg }}">3 marcas</button><button onClick="{{ demo10 }}" style="all:unset;cursor:pointer;white-space:nowrap;height:30px;padding:0 14px;border-radius:7px;font-size:13.5px;font-weight:600;background:{{ d10bg }}">10 marcas</button></div><span style="font-size:13px;color:#8aa1b5">Con muchas, My marks muestra primero las de las rutinas de esa semana.</span></div>
+<p style="margin:0;font-size:14px;color:#8aa1b5">Todo comparte datos: creá un ejercicio en <a href="#1b">1b</a> › Exercises, agregalo a una rutina y míralo en <a href="#1a">1a</a> y <a href="#2a">2a</a>.</p>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:12px"><span style="font:700 12px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">ESCRITORIO</span><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+<div id="1a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1a</a><span style="font-size:13.5px;color:#8aa1b5">Escritorio · miembro (Sofia)</span></div>
+<div style="width:1180px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;padding:24px 28px 28px;display:flex;flex-direction:column;gap:16px">
+<header style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">TRAINING</span><h1 style="margin:0;font-size:28px;line-height:1.15;font-weight:700">{{ cy.name }}</h1><span style="display:flex;gap:7px;align-items:center;font-size:14px;color:#cfdeea"><i class="ph ph-trophy" style="color:#f2ce78"></i>{{ cy.eventLine }}</span></div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><span style="font:700 30px ui-monospace,Menlo,monospace;line-height:1">{{ cy.toGo }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ cy.nowText }}</span></div>
+</header>
+<div style="display:flex;gap:3px;padding-top:10px">
+<sc-for list="{{ weekChips }}" as="w"><button onClick="{{ w.pick }}" aria-label="{{ w.aria }}" aria-pressed="{{ w.on }}" style="all:unset;cursor:pointer;position:relative;flex:1;min-width:0;height:34px;border-radius:6px;background:{{ w.bg }};border:1px solid {{ w.border }};display:grid;place-items:center;font:600 11.5px ui-monospace,Menlo,monospace;color:{{ w.color }};opacity:{{ w.op }}"><sc-if value="{{ w.now }}"><span style="position:absolute;top:-9px;padding:0 4px;border-radius:4px;background:#33a1e0;color:#0c1a26;font:700 8.5px ui-monospace,Menlo,monospace">NOW</span></sc-if>{{ w.label }}</button></sc-for>
+</div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 520px;gap:18px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:8px;align-items:center">
+<button onClick="{{ prevWeek }}" aria-label="Previous week" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:8px;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-caret-left"></i></button>
+<span style="display:flex;flex-direction:column"><span style="font-size:16px;font-weight:700">Week {{ wk.n }} of {{ cy.weeks }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ wk.range }}</span></span>
+<button onClick="{{ nextWeek }}" aria-label="Next week" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:8px;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-caret-right"></i></button>
+<sc-if value="{{ wk.notNow }}"><button onClick="{{ toNow }}" style="all:unset;cursor:pointer;font-size:13px;font-weight:600;color:#5ab4e8">Back to this week</button></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ days }}" as="d">
+<button onClick="{{ d.pick }}" aria-pressed="{{ d.on }}" style="all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:4px 64px 36px minmax(0,1fr) auto;gap:12px;align-items:center;min-height:56px;padding:6px 12px 6px 0;border-radius:10px;background:{{ d.bg }};border:1px {{ d.borderStyle }} {{ d.border }};overflow:hidden" style-hover="background:#16304a">
+<span style="align-self:stretch;margin:-6px 0;background:{{ d.color }}"></span>
+<span style="display:flex;flex-direction:column;gap:1px"><span style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:{{ d.dowColor }}">{{ d.dow }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ d.date }}</span></span>
+<span style="width:36px;height:36px;border-radius:9px;background:{{ d.tile }};display:grid;place-items:center"><i class="ph {{ d.icon }}" style="font-size:18px;color:{{ d.color }}"></i></span>
+<span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ d.titleColor }}">{{ d.title }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ d.sub }}</span></span>
+<span style="display:flex;gap:8px;align-items:center"><sc-if value="{{ d.today }}"><span style="padding:2px 7px;border-radius:999px;background:#33a1e0;color:#0c1a26;font:700 10px ui-monospace,Menlo,monospace">TODAY</span></sc-if><sc-if value="{{ d.hasRoutine }}"><i class="ph ph-caret-right" style="color:#5a7086"></i></sc-if></span>
+</button>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;padding:14px 16px;border:1px solid #274055;border-radius:12px;background:#13283a">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:15px;font-weight:700">My marks <span style="font:400 12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ markSet }}</span></span><span style="display:flex;gap:5px;align-items:center;font-size:12px;color:#8aa1b5"><i class="ph ph-lock-simple"></i>Only you see these</span></div>
+<span style="font-size:12.5px;color:#8aa1b5">Your best single lift (1RM). Routines with "% of" use it to show your kilos.</span>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px">
+<sc-for list="{{ markRows }}" as="m"><label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}<sc-if value="{{ m.used }}"><span style="flex:none;padding:0 6px;border-radius:999px;background:#1d4869;font-size:10.5px;font-weight:600;color:#cfdeea">this week</span></sc-if></span><span style="display:flex;align-items:center;gap:6px;height:38px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26"><input value="{{ m.value }}" onChange="{{ m.set }}" inputMode="decimal" placeholder="—" aria-label="{{ m.aria }}" style="all:unset;flex:1;min-width:0;font:600 15px ui-monospace,Menlo,monospace;text-align:right"><span style="font-size:12.5px;color:#8aa1b5">kg</span></span></label></sc-for>
+</div>
+<sc-if value="{{ markToggle }}"><button onClick="{{ toggleMarks }}" style="all:unset;cursor:pointer;align-self:flex-start;font-size:13px;font-weight:600;color:#5ab4e8">{{ markToggleLabel }}</button></sc-if>
+</div>
+</div>
+
+<aside style="border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-if value="{{ hasDay }}">
+<div style="height:4px;background:{{ rt.color }}"></div>
+<div style="display:flex;gap:12px;align-items:center;padding:14px 16px 12px">
+<span style="flex:none;width:42px;height:42px;border-radius:10px;background:{{ rt.tile }};display:grid;place-items:center"><i class="ph {{ rt.icon }}" style="font-size:21px;color:{{ rt.color }}"></i></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:18px;font-weight:700">{{ rt.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ rt.meta }}</span></span>
+</div>
+<div style="border-top:1px solid #22394d">
+<sc-for list="{{ rt.items }}" as="x">
+<div style="border-bottom:1px solid #22394d">
+<button onClick="{{ x.toggle }}" aria-expanded="{{ x.open }}" style="all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:grid;grid-template-columns:48px minmax(0,1fr) auto 18px;gap:12px;align-items:center;min-height:60px;padding:6px 14px" style-hover="background:#16304a">
+<span style="width:48px;height:48px;border-radius:8px;overflow:hidden;background:{{ x.tile }};display:grid;place-items:center"><sc-if value="{{ x.hasImg }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="display:block;width:100%;height:100%;;background-image:url({{ x.img0 }});background-size:cover;background-position:center"></span></sc-if><sc-if value="{{ x.noImg }}"><i class="ph {{ x.icon }}" style="font-size:22px;color:{{ x.color }}"></i></sc-if></span>
+<span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:14.5px;font-weight:600">{{ x.name }}</span><span style="font:12.5px ui-monospace,Menlo,monospace;color:#cfdeea">{{ x.dose }}<span style="color:#8aa1b5">{{ x.rest }}</span></span><sc-if value="{{ x.note }}"><span style="font-size:12px;color:#8aa1b5">{{ x.note }}</span></sc-if></span>
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px"><span style="font:700 14.5px ui-monospace,Menlo,monospace;color:{{ x.loadColor }}">{{ x.load }}</span><span style="font-size:11.5px;color:#8aa1b5;text-align:right">{{ x.loadSub }}</span></span>
+<i class="ph-bold {{ x.caret }}" style="font-size:13px;color:#5a7086"></i>
+</button>
+<sc-if value="{{ x.open }}">
+<div style="display:flex;flex-direction:column;gap:10px;padding:2px 14px 14px 74px">
+<sc-if value="{{ x.needMark }}"><label style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,#f2ce78 12%,#13283a)"><span style="flex:1;font-size:13px">Your {{ x.markName }} best lift</span><span style="display:flex;align-items:center;gap:6px;height:34px;width:120px;box-sizing:border-box;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26"><input value="{{ x.markVal }}" onChange="{{ x.setMark }}" inputMode="decimal" placeholder="—" aria-label="{{ x.markAria }}" style="all:unset;flex:1;min-width:0;font:600 14px ui-monospace,Menlo,monospace;text-align:right"><span style="font-size:12px;color:#8aa1b5">kg</span></span></label></sc-if>
+<sc-if value="{{ x.hasImg }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><figure style="margin:0;position:relative;border-radius:8px;overflow:hidden;aspect-ratio:4/3;background:#0c1a26"><span role="img" aria-label="{{ x.alt0 }}" style="display:block;width:100%;height:100%;;background-image:url({{ x.img0 }});background-size:cover;background-position:center"></span><figcaption style="position:absolute;top:6px;left:6px;padding:1px 6px;border-radius:4px;background:rgba(12,26,38,.8);font:600 10.5px ui-monospace,Menlo,monospace">START</figcaption></figure><figure style="margin:0;position:relative;border-radius:8px;overflow:hidden;aspect-ratio:4/3;background:#0c1a26"><span role="img" aria-label="{{ x.alt1 }}" style="display:block;width:100%;height:100%;;background-image:url({{ x.img1 }});background-size:cover;background-position:center"></span><figcaption style="position:absolute;top:6px;left:6px;padding:1px 6px;border-radius:4px;background:rgba(12,26,38,.8);font:600 10.5px ui-monospace,Menlo,monospace">END</figcaption></figure></div></sc-if>
+<sc-if value="{{ x.hasTips }}"><ul style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:3px;font-size:13.5px;line-height:1.45;color:#cfdeea"><sc-for list="{{ x.tips }}" as="t"><li>{{ t }}</li></sc-for></ul></sc-if>
+<a href="{{ x.yt }}" target="_blank" rel="noopener noreferrer" style="align-self:flex-start;display:flex;gap:7px;align-items:center;height:34px;padding:0 12px;border-radius:8px;border:1px solid #274055;font-size:13px;font-weight:600;color:#e8f0f7;text-decoration:none"><i class="ph-fill ph-youtube-logo" style="color:#f2887a;font-size:16px"></i>Watch on YouTube</a>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{ rt.missingMark }}"><div style="display:flex;gap:8px;align-items:center;padding:10px 16px;font-size:13px;color:#f2ce78"><i class="ph ph-info"></i>Open the row to add your {{ rt.missingMark }}, or use My marks.</div></sc-if>
+</sc-if>
+<sc-if value="{{ isRest }}"><div style="padding:40px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center"><i class="ph ph-moon-stars" style="font-size:30px;color:#5a7086"></i><span style="font-size:15px;font-weight:600">{{ restTitle }}</span><span style="font-size:13.5px;color:#8aa1b5">{{ restSub }}</span></div></sc-if>
+</aside>
+</div>
+</div>
+</div>
+
+
+<div id="1b" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1b" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1b</a><span style="font-size:13.5px;color:#8aa1b5">Escritorio · Coach / Admin</span></div>
+<div style="width:1180px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;padding:24px 28px 28px;display:flex;flex-direction:column;gap:16px">
+<header style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px"><div style="display:flex;flex-direction:column;gap:4px"><span style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">TRAINING · MANAGE</span><h1 style="margin:0;font-size:28px;line-height:1.15;font-weight:700">Plan training</h1></div><span style="font-size:13px;color:#8aa1b5">Members with an active membership see it.</span></div>
+<div role="tablist" style="display:flex;gap:22px;border-bottom:1px solid #274055">
+<sc-for list="{{ cTabs }}" as="x"><button onClick="{{ x.pick }}" role="tab" aria-selected="{{ x.on }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center;height:40px;margin-bottom:-1px;border-bottom:2px solid {{ x.line }};font-size:14px;font-weight:600;color:{{ x.color }}"><i class="ph {{ x.icon }}" style="font-size:16px"></i>{{ x.label }}<span style="font:12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ x.n }}</span></button></sc-for>
+</div>
+</header>
+<sc-if value="{{ notice }}"><div role="status" style="display:flex;gap:8px;align-items:center;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+
+<sc-if value="{{ tCycle }}">
+<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+<div style="display:flex;gap:8px;align-items:stretch;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px">
+<sc-for list="{{ cycleCards }}" as="c"><button onClick="{{ c.pick }}" aria-pressed="{{ c.on }}" style="all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:270px;display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;border:1px solid {{ c.border }};background:{{ c.bg }}" style-hover="border-color:#33a1e0"><span style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span style="font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span><span style="flex:none;padding:1px 8px;border-radius:999px;background:{{ c.stBg }};color:{{ c.stColor }};font-size:11.5px;font-weight:600">{{ c.status }}</span></span><span style="font-size:12px;line-height:1.4;color:#8aa1b5">{{ c.meta }}</span></button></sc-for>
+<button onClick="{{ newCycle }}" style="all:unset;cursor:pointer;flex:none;width:150px;min-height:62px;box-sizing:border-box;display:flex;gap:7px;align-items:center;justify-content:center;border-radius:10px;border:1px dashed #274055;font-size:13.5px;font-weight:600;color:#5ab4e8"><i class="ph-bold ph-plus"></i>New cycle</button>
+</div>
+<sc-if value="{{ archCount }}"><button onClick="{{ toggleArch }}" style="all:unset;cursor:pointer;align-self:flex-start;font-size:12.5px;font-weight:600;color:#8aa1b5">{{ archLabel }} · {{ archCount }}</button></sc-if>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 8px 8px 14px;border-radius:10px;background:#0f2131">
+<span style="flex:1;font-size:13.5px;color:#cfdeea">Editing <strong style="color:#e8f0f7">{{ cc.name }}</strong></span>
+<sc-if value="{{ curIsDraft }}"><button onClick="{{ activate }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:34px;padding:0 14px;border-radius:8px;border:1px solid #6fd6b4;color:#6fd6b4;font-size:13.5px;font-weight:700"><i class="ph-bold ph-play"></i>Make active</button></sc-if>
+<button onClick="{{ duplicate }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:34px;padding:0 12px;border-radius:8px;border:1px solid #274055;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0"><i class="ph ph-copy"></i>Duplicate</button>
+<sc-if value="{{ curNotArch }}"><button onClick="{{ archive }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:34px;padding:0 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:#cfdeea" style-hover="background:#1a3349"><i class="ph ph-archive"></i>Archive</button></sc-if>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:18px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+<div style="display:grid;grid-template-columns:1.4fr 1fr 170px 100px;gap:12px">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">Cycle name</span><input value="{{ cc.name }}" onChange="{{ set.name }}" style="all:unset;box-sizing:border-box;height:40px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:14.5px"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">Target event · optional</span><input value="{{ cc.event }}" onChange="{{ set.event }}" style="all:unset;box-sizing:border-box;height:40px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:14.5px"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">Event first day</span><input type="date" value="{{ cc.eventDate }}" onChange="{{ set.eventDate }}" style="all:unset;box-sizing:border-box;height:40px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:14px"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">Weeks</span><input value="{{ cc.weeks }}" onChange="{{ set.weeks }}" inputMode="numeric" style="all:unset;box-sizing:border-box;height:40px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font:600 14.5px ui-monospace,Menlo,monospace"></label>
+</div>
+<span style="display:flex;gap:8px;align-items:center;font-size:13.5px;color:#cfdeea"><i class="ph ph-calendar-check" style="color:#5ab4e8;font-size:17px"></i>{{ cc.calc }}</span>
+<div style="border:1px solid #274055;border-radius:12px;overflow:hidden">
+<div style="display:grid;grid-template-columns:44px 92px repeat(7,minmax(0,1fr));gap:4px;align-items:center;height:34px;padding:0 10px;background:#0f2131;border-bottom:1px solid #274055;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5"><span>WK</span><span>DATES</span><sc-for list="{{ dowHead }}" as="h"><span>{{ h }}</span></sc-for></div>
+<div style="max-height:460px;overflow-y:auto;scrollbar-width:thin">
+<sc-for list="{{ grid }}" as="r">
+<div style="display:grid;grid-template-columns:44px 92px repeat(7,minmax(0,1fr));gap:4px;align-items:center;min-height:40px;padding:3px 10px;border-bottom:1px solid #22394d;background:{{ r.bg }}">
+<span style="font:700 12.5px ui-monospace,Menlo,monospace;color:{{ r.nColor }}">{{ r.n }}</span>
+<span style="font-size:12px;color:#8aa1b5">{{ r.dates }}</span>
+<sc-for list="{{ r.cells }}" as="c"><select value="{{ c.value }}" onChange="{{ c.set }}" aria-label="{{ c.aria }}" style="box-sizing:border-box;width:100%;min-width:0;height:32px;padding:0 4px;border-radius:6px;border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.color }};font-size:12px"><option value="">Rest</option><sc-for list="{{ routineOptions }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select></sc-for>
+</div>
+</sc-for>
+</div>
+</div>
+<span style="font-size:12.5px;color:#8aa1b5">Changes save right away. Tip: fill week 1, then "Copy week 1 to all" and adjust the last weeks.</span>
+<button onClick="{{ copyWeek1 }}" style="all:unset;cursor:pointer;align-self:flex-start;display:flex;gap:7px;align-items:center;height:36px;padding:0 14px;border-radius:8px;border:1px solid #274055;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0"><i class="ph ph-copy"></i>Copy week 1 to all weeks</button>
+</div>
+<aside style="display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid #274055;border-radius:12px;background:#13283a">
+<span style="display:flex;gap:8px;align-items:center;font-size:15px;font-weight:700"><i class="ph ph-microsoft-excel-logo" style="font-size:20px;color:#6fd6b4"></i>Plan it in Excel</span>
+<span style="font-size:13px;line-height:1.5;color:#cfdeea">Download the template, fill the white cells, upload it. The app checks it before anything changes.</span>
+<button onClick="{{ download }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;justify-content:center;height:40px;border-radius:8px;border:1px solid #33a1e0;color:#5ab4e8;font-size:14px;font-weight:700"><i class="ph-bold ph-download-simple"></i>Download template</button>
+<span style="font-size:12px;color:#8aa1b5;text-align:center">{{ tplNote }}</span>
+<div style="display:flex;flex-direction:column;border:1px solid #22394d;border-radius:10px;overflow:hidden">
+<sc-for list="{{ sheets }}" as="s"><div style="display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-top:{{ s.sep }}"><i class="ph {{ s.icon }}" style="font-size:16px;color:{{ s.color }};margin-top:1px"></i><span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:13px;font-weight:600">{{ s.name }}</span><span style="font-size:12px;line-height:1.4;color:#8aa1b5">{{ s.sub }}</span></span></div></sc-for>
+</div>
+<button onClick="{{ importX }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;justify-content:center;height:40px;border-radius:8px;border:1px dashed #274055;font-size:14px;font-weight:600" style-hover="border-color:#33a1e0"><i class="ph ph-upload-simple"></i>Upload filled template</button>
+</aside>
+</div>
+</sc-if>
+
+<sc-if value="{{ tRoutines }}">
+<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px"><label style="display:flex;gap:8px;align-items:center;font-size:13.5px;font-weight:600;white-space:nowrap">Routines of<select value="{{ rF }}" onChange="{{ onRF }}" style="height:38px;min-width:280px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#13283a;color:#e8f0f7;font-size:14px"><sc-for list="{{ rfOpen }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for><option value="shared">Shared routines only</option><optgroup label="Archived cycles"><sc-for list="{{ rfArch }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></optgroup></select></label><span style="font-size:12.5px;color:#8aa1b5">A cycle shows its own routines plus the shared ones.</span></div>
+<div style="display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ rList }}" as="r"><button onClick="{{ r.pick }}" aria-pressed="{{ r.on }}" style="all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:10px;align-items:center;min-height:54px;padding:8px 12px;border-radius:10px;border:1px solid {{ r.border }};background:{{ r.bg }}" style-hover="border-color:#33a1e0"><span style="flex:none;width:34px;height:34px;border-radius:8px;background:{{ r.tile }};display:grid;place-items:center"><i class="ph {{ r.icon }}" style="color:{{ r.color }};font-size:17px"></i></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span><span style="font-size:12px;color:#8aa1b5">{{ r.meta }}</span></span><sc-if value="{{ r.hasTag }}"><span style="flex:none;max-width:110px;display:flex;gap:4px;align-items:center;padding:2px 7px;border-radius:999px;background:#0f2131;font-size:11px;color:#cfdeea;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><i class="ph {{ r.tagIcon }}"></i>{{ r.tag }}</span></sc-if></button></sc-for>
+<button onClick="{{ newRoutine }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;justify-content:center;height:42px;border-radius:10px;border:1px dashed #274055;font-size:14px;font-weight:600;color:#5ab4e8"><i class="ph-bold ph-plus"></i>{{ newRoutineLabel }}</button>
+</div>
+<sc-if value="{{ noR }}"><div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:40px 20px;border:1px dashed #274055;border-radius:12px;text-align:center"><i class="ph ph-list-checks" style="font-size:28px;color:#5a7086"></i><span style="font-size:15px;font-weight:600">No routines here yet</span><span style="font-size:13.5px;color:#8aa1b5">Create one, or import the Excel template for this cycle.</span></div></sc-if>
+<sc-if value="{{ hasR }}"><div style="display:flex;flex-direction:column;gap:14px;padding:16px;border:1px solid #274055;border-radius:12px;background:#13283a">
+<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:end">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">Routine name</span><input value="{{ ed.name }}" onChange="{{ ed.setName }}" style="all:unset;box-sizing:border-box;height:40px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:15px;font-weight:600"></label>
+
+
+</div>
+<div style="border:1px solid #274055;border-radius:10px">
+<div style="display:grid;grid-template-columns:28px minmax(0,1fr) 54px 88px 70px 180px 32px;gap:8px;align-items:center;height:32px;padding:0 10px;background:#0f2131;border-bottom:1px solid #274055;border-radius:10px 10px 0 0;font:700 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5"><span></span><span>EXERCISE</span><span>SETS</span><span>REPS / DIST.</span><span>REST</span><span>LOAD</span><span></span></div>
+<sc-for list="{{ ed.items }}" as="x">
+<div draggable="true" onDragStart="{{ x.dragStart }}" onDragOver="{{ x.dragOver }}" onDrop="{{ x.drop }}" onDragEnd="{{ x.dragEnd }}" style="display:grid;grid-template-columns:28px minmax(0,1fr) 54px 88px 70px 180px 32px;gap:8px;align-items:center;min-height:50px;padding:5px 10px;border-bottom:1px solid #22394d;border-top:{{ x.dropLine }};opacity:{{ x.op }}">
+<span title="Drag to reorder" style="cursor:grab;color:#8aa1b5;display:grid;place-items:center"><i class="ph-bold ph-dots-six-vertical" style="font-size:16px"></i></span>
+<span style="display:flex;gap:10px;align-items:center;min-width:0"><span style="flex:none;width:36px;height:36px;border-radius:7px;overflow:hidden;background:{{ x.tile }};display:grid;place-items:center"><sc-if value="{{ x.hasImg }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="display:block;width:100%;height:100%;;background-image:url({{ x.img0 }});background-size:cover;background-position:center"></span></sc-if><sc-if value="{{ x.noImg }}"><i class="ph {{ x.icon }}" style="color:{{ x.color }}"></i></sc-if></span><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ x.name }}</span><input value="{{ x.note }}" onChange="{{ x.setNote }}" placeholder="Note (optional)" aria-label="Note" style="all:unset;font-size:12px;color:#cfdeea;min-width:0"></span></span>
+<input value="{{ x.sets }}" onChange="{{ x.setSets }}" inputMode="numeric" placeholder="—" aria-label="Sets" style="all:unset;box-sizing:border-box;height:32px;padding:0 8px;border-radius:6px;border:1px solid #274055;background:#0c1a26;font:13px ui-monospace,Menlo,monospace;text-align:center">
+<input value="{{ x.reps }}" onChange="{{ x.setReps }}" placeholder="8 or 50 m" aria-label="Reps or distance" style="all:unset;box-sizing:border-box;height:32px;padding:0 8px;border-radius:6px;border:1px solid #274055;background:#0c1a26;font:13px ui-monospace,Menlo,monospace">
+<input value="{{ x.rest }}" onChange="{{ x.setRest }}" placeholder="1:30" aria-label="Rest" style="all:unset;box-sizing:border-box;height:32px;padding:0 8px;border-radius:6px;border:1px solid #274055;background:#0c1a26;font:13px ui-monospace,Menlo,monospace">
+<span style="display:flex;gap:4px"><select value="{{ x.loadSel }}" onChange="{{ x.setLoadSel }}" aria-label="Load type" style="flex:1;min-width:0;height:32px;padding:0 4px;border-radius:6px;border:1px solid #274055;background:#0c1a26;color:#e8f0f7;font-size:12px"><option value="">No load</option><sc-for list="{{ markOptions }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for><option value="text">Text…</option></select><sc-if value="{{ x.showVal }}"><input value="{{ x.loadVal }}" onChange="{{ x.setLoadVal }}" placeholder="{{ x.valPh }}" aria-label="Load value" style="all:unset;box-sizing:border-box;width:{{ x.valW }};height:32px;padding:0 6px;border-radius:6px;border:1px solid #274055;background:#0c1a26;font:12.5px ui-monospace,Menlo,monospace"></sc-if></span>
+<button onClick="{{ x.remove }}" aria-label="{{ x.removeLabel }}" style="all:unset;cursor:pointer;width:30px;height:30px;border-radius:7px;display:grid;place-items:center;color:#8aa1b5" style-hover="background:#1a3349;color:#f2887a"><i class="ph ph-trash"></i></button>
+</div>
+</sc-for>
+<div style="position:relative;display:flex;gap:10px;align-items:center;min-height:48px;padding:6px 10px;background:#0f2131;border-radius:0 0 10px 10px">
+<i class="ph ph-plus" style="color:#8aa1b5;margin-left:6px"></i>
+<input value="{{ addQ }}" onChange="{{ onAddQ }}" placeholder="Add exercise — search the library or your club's" aria-label="Add exercise" style="all:unset;flex:1;box-sizing:border-box;height:34px;padding:0 10px;border-radius:7px;border:1px solid #274055;background:#0c1a26;font-size:14px">
+<sc-if value="{{ addOpen }}">
+<div role="listbox" style="position:absolute;z-index:10;left:36px;right:10px;top:46px;border:1px solid #274055;border-radius:10px;background:#13283a;box-shadow:0 12px 32px rgba(0,0,0,.45);overflow:hidden">
+<sc-for list="{{ addResults }}" as="a"><button role="option" onClick="{{ a.add }}" style="all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;gap:10px;align-items:center;min-height:46px;padding:5px 12px;border-bottom:1px solid #22394d" style-hover="background:#1a3349"><span style="flex:none;width:34px;height:34px;border-radius:7px;overflow:hidden;background:{{ a.tile }};display:grid;place-items:center"><sc-if value="{{ a.hasImg }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="display:block;width:100%;height:100%;;background-image:url({{ a.img0 }});background-size:cover;background-position:center"></span></sc-if><sc-if value="{{ a.noImg }}"><i class="ph {{ a.icon }}" style="color:{{ a.color }}"></i></sc-if></span><span style="flex:1;font-size:14px">{{ a.name }}</span><span style="font-size:11.5px;padding:2px 7px;border-radius:999px;background:{{ a.srcBg }};color:#cfdeea">{{ a.src }}</span></button></sc-for>
+<sc-if value="{{ addNone }}"><div style="display:flex;gap:10px;align-items:center;padding:10px 12px"><span style="flex:1;font-size:13.5px;color:#8aa1b5">No exercise called "{{ addQ }}".</span><button onClick="{{ createFromSearch }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:32px;padding:0 12px;border-radius:7px;border:1px solid #33a1e0;color:#5ab4e8;font-size:13px;font-weight:700"><i class="ph-bold ph-plus"></i>Create "{{ addQ }}"</button></div></sc-if>
+</div>
+</sc-if>
+</div>
+</div>
+<span style="font-size:12.5px;color:#8aa1b5">"% of" a mark shows each member their own kilos. Members without that mark see the %.</span>
+</div></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ tExercises }}">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+<label style="flex:1;min-width:200px;display:flex;gap:8px;align-items:center;height:38px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a"><i class="ph ph-magnifying-glass" style="color:#8aa1b5"></i><input value="{{ exQ }}" onChange="{{ onExQ }}" type="search" placeholder="Search exercises" aria-label="Search exercises" style="all:unset;flex:1;font-size:14px"></label>
+<sc-for list="{{ exChips }}" as="c"><button onClick="{{ c.pick }}" aria-pressed="{{ c.on }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:34px;padding:0 12px;border-radius:999px;border:1px solid {{ c.border }};background:{{ c.bg }};font-size:13px;font-weight:600">{{ c.label }}<span style="font:11.5px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ c.n }}</span></button></sc-for>
+</div>
+<div style="border:1px solid #274055;border-radius:12px;overflow:hidden;max-height:520px;overflow-y:auto;scrollbar-width:thin">
+<sc-for list="{{ exList }}" as="e"><div style="display:flex;gap:12px;align-items:center;min-height:54px;padding:6px 12px;border-bottom:1px solid #22394d;background:#13283a"><span style="flex:none;width:40px;height:40px;border-radius:8px;overflow:hidden;background:{{ e.tile }};display:grid;place-items:center"><sc-if value="{{ e.hasImg }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="display:block;width:100%;height:100%;;background-image:url({{ e.img0 }});background-size:cover;background-position:center"></span></sc-if><sc-if value="{{ e.noImg }}"><i class="ph {{ e.icon }}" style="font-size:19px;color:{{ e.color }}"></i></sc-if></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:14px;font-weight:600">{{ e.name }}</span><span style="font-size:12px;color:#8aa1b5">{{ e.meta }}</span></span><span style="font-size:11.5px;padding:2px 8px;border-radius:999px;background:{{ e.srcBg }};color:#cfdeea">{{ e.src }}</span></div></sc-for>
+</div>
+<span style="font-size:12px;color:#8aa1b5">Library photos: free-exercise-db (public domain). The full library has about 800 exercises; this mock shows a few.</span>
+</div>
+<aside style="display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid {{ nx.border }};border-radius:12px;background:#13283a">
+<span style="font-size:15px;font-weight:700">New club exercise</span>
+<span style="font-size:13px;line-height:1.45;color:#8aa1b5">For what the library doesn't have: your sport's drills, sets and warm-ups.</span>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">Name</span><input ref="{{ nx.ref }}" value="{{ nx.name }}" onChange="{{ nx.setName }}" placeholder="e.g. Turn and push-off" style="all:unset;box-sizing:border-box;height:40px;padding:0 12px;border-radius:8px;border:1px solid {{ nx.nameBorder }};background:#0c1a26;font-size:14.5px"></label>
+<sc-if value="{{ nx.dup }}"><span style="font-size:12.5px;color:#f2887a;margin-top:-6px">{{ nx.dup }}</span></sc-if>
+
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">How to do it · optional</span><textarea value="{{ nx.tips }}" onChange="{{ nx.setTips }}" rows="3" placeholder="One tip per line" style="all:unset;box-sizing:border-box;padding:8px 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;line-height:1.45;white-space:pre-wrap"></textarea></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">YouTube link or search · optional</span><input value="{{ nx.yt }}" onChange="{{ nx.setYt }}" placeholder="Paste a link, or words to search" style="all:unset;box-sizing:border-box;height:40px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px"></label>
+<div style="display:flex;gap:10px;align-items:center;min-height:56px;padding:8px 12px;border-radius:8px;border:1px dashed #274055"><i class="ph ph-image" style="font-size:22px;color:#8aa1b5"></i><span style="flex:1;font-size:13px;color:#8aa1b5">Photo · optional. Without one, a generic icon shows.</span><span style="font-size:13px;font-weight:600;color:#5ab4e8">Upload</span></div>
+<button onClick="{{ nx.save }}" disabled="{{ nx.cant }}" style="all:unset;cursor:pointer;display:flex;gap:7px;align-items:center;justify-content:center;height:40px;border-radius:8px;border:1px solid #33a1e0;color:#5ab4e8;font-size:14px;font-weight:700;opacity:{{ nx.op }}"><i class="ph-bold ph-plus"></i>Add to club exercises</button>
+<span style="font-size:12px;line-height:1.45;color:#8aa1b5">It shows up in routine search right away and in the next Excel template you download.</span>
+</aside>
+</div>
+</sc-if>
+<sc-if value="{{ tMarks }}">
+<div style="max-width:620px;display:flex;flex-direction:column;gap:12px">
+<section style="display:flex;flex-direction:column;gap:12px">
+
+<p style="margin:0;font-size:14px;line-height:1.5;color:#8aa1b5">The lifts your members can record (their best single lift, in kg). Routines use "% of" a mark to show each person their own kilos. Members only see marks you list here.</p>
+<div style="border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ mkRows }}" as="m"><div style="border-top:{{ m.sep }}">
+<div style="display:flex;gap:6px;align-items:center;min-height:50px;padding:4px 8px 4px 16px">
+<sc-if value="{{ m.reading }}"><span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-size:14.5px;font-weight:600">{{ m.name }}</span><span style="font-size:12.5px;line-height:1.35;color:#8aa1b5">{{ m.meta }}</span></span><button onClick="{{ m.startRen }}" aria-label="{{ m.renLabel }}" title="Rename" style="all:unset;cursor:pointer;flex:none;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph ph-pencil-simple" style="font-size:16px"></i></button><button onClick="{{ m.askDel }}" disabled="{{ m.locked }}" aria-label="{{ m.removeLabel }}" title="{{ m.title }}" style="all:unset;cursor:pointer;flex:none;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:#8aa1b5;opacity:{{ m.op }}" style-hover="background:#1a3349;color:#f2887a"><i class="ph ph-trash" style="font-size:16px"></i></button></sc-if>
+<sc-if value="{{ m.renaming }}"><input value="{{ mkRenVal }}" onChange="{{ onMkRen }}" onKeyDown="{{ mkRenKey }}" aria-label="New name" autofocus="true" style="all:unset;flex:1;min-width:0;box-sizing:border-box;height:36px;padding:0 10px;border-radius:8px;border:1px solid #33a1e0;background:#0c1a26;font-size:14.5px"><button onClick="{{ saveMkRen }}" aria-label="Save name" style="all:unset;cursor:pointer;flex:none;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;background:#33a1e0;color:#0c1a26"><i class="ph-bold ph-check"></i></button><button onClick="{{ cancelMkRen }}" aria-label="Cancel rename" style="all:unset;cursor:pointer;flex:none;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-x"></i></button></sc-if>
+</div>
+<sc-if value="{{ m.renaming }}"><span style="display:block;padding:0 16px 10px;font-size:12.5px;color:#8aa1b5">Routines and members' values follow the new name.</span></sc-if>
+<sc-if value="{{ m.confirming }}"><div role="alert" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 8px 8px;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,#f2887a 12%,#13283a);border:1px solid color-mix(in srgb,#f2887a 45%,transparent)"><span style="flex:1 1 200px;font-size:13.5px;line-height:1.4">{{ m.confirmText }}</span><span style="display:flex;gap:6px;"><button onClick="{{ cancelMkDel }}" style="all:unset;cursor:pointer;height:32px;line-height:32px;padding:0 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:#cfdeea">Cancel</button><button onClick="{{ m.doDel }}" style="all:unset;cursor:pointer;height:32px;line-height:30px;box-sizing:border-box;padding:0 14px;border-radius:8px;border:1px solid #f2887a;color:#f2887a;font-size:13.5px;font-weight:700">Delete mark</button></span></div></sc-if>
+</div></sc-for>
+</div>
+<div style="display:flex;gap:8px"><input value="{{ newMark }}" onChange="{{ onNewMark }}" onKeyDown="{{ newMarkKey }}" placeholder="New mark, e.g. Power clean" aria-label="New mark" style="all:unset;flex:1;box-sizing:border-box;height:40px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:14.5px"><button onClick="{{ addMark }}" disabled="{{ cantMark }}" style="all:unset;cursor:pointer;height:40px;padding:0 16px;display:flex;align-items:center;border-radius:8px;border:1px solid #33a1e0;color:#5ab4e8;font-size:13.5px;font-weight:700;opacity:{{ markOp }}">Add</button></div>
+</section>
+<span style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:#8aa1b5"><i class="ph ph-lock-simple"></i>Coaches and admins never see members' values — only each member does.</span>
+</div>
+</sc-if>
+
+</div>
+</div>
+
+<div id="1c" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1c" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1c</a><span style="font-size:13.5px;color:#8aa1b5">Escritorio · membresía vencida</span></div>
+<div style="width:1180px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;padding:24px 28px 28px;display:flex;flex-direction:column;gap:16px">
+<header style="display:flex;flex-direction:column;gap:4px"><span style="font:700 11.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">TRAINING</span><h1 style="margin:0;font-size:28px;line-height:1.15;font-weight:700">{{ cy.name }}</h1><span style="display:flex;gap:7px;align-items:center;font-size:14px;color:#cfdeea"><i class="ph ph-trophy" style="color:#f2ce78"></i>{{ cy.eventLine }}</span></header>
+<div style="display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:24px 24px;border:1px solid #274055;border-radius:12px;background:#13283a"><span style="width:44px;height:44px;border-radius:50%;background:color-mix(in srgb,#f2ce78 18%,#13283a);display:grid;place-items:center"><i class="ph-fill ph-lock-simple" style="font-size:20px;color:#f2ce78"></i></span><span style="font-size:18px;font-weight:700">Renew to see your plan</span><span style="font-size:14px;line-height:1.5;color:#cfdeea;max-width:520px">Training is for members with an active membership. Yours expired on 30 Sep 2026. Renew and you'll pick up the cycle where the club is now.</span><a href="#" style="display:flex;gap:8px;align-items:center;justify-content:center;align-self:stretch;max-width:280px;height:46px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700;text-decoration:none"><i class="ph-bold ph-identification-badge"></i>Renew membership</a></div>
+</div>
+</div>
+</div></div>
+<div style="display:flex;flex-direction:column;gap:12px"><span style="font:700 12px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">CELULAR</span><div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+<div id="2a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#2a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2a</a><span style="font-size:13.5px;color:#8aa1b5">Celular · miembro</span></div>
+<div style="width:390px;height:844px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;display:flex;flex-direction:column">
+<div style="padding:16px 14px 10px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #22394d">
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">TRAINING</span><span style="font-size:21px;font-weight:700">{{ cy.name }}</span><span style="font-size:13px;color:#cfdeea">{{ cy.toGo }} weeks to go · {{ cy.nowText }}</span></span>
+<div style="display:flex;gap:8px;align-items:center">
+<button onClick="{{ prevWeek }}" aria-label="Previous week" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:10px;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-caret-left" style="font-size:18px"></i></button>
+<span style="flex:1;text-align:center;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">Week {{ wk.n }}</span><span style="font-size:12px;color:#8aa1b5">{{ wk.range }}</span></span>
+<button onClick="{{ nextWeek }}" aria-label="Next week" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:10px;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-caret-right" style="font-size:18px"></i></button>
+</div>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+<sc-for list="{{ days }}" as="d"><button onClick="{{ d.pick }}" aria-pressed="{{ d.on }}" aria-label="{{ d.aria }}" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:56px;border-radius:10px;background:{{ d.mBg }};border:1px {{ d.borderStyle }} {{ d.mBorder }}"><span style="font:700 11px ui-monospace,Menlo,monospace;color:{{ d.dowColor }}">{{ d.ini }}</span><span style="font-size:15px;font-weight:600">{{ d.num }}</span><span style="width:7px;height:7px;border-radius:50%;background:{{ d.dot }}"></span></button></sc-for>
+</div>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:12px 12px 20px;display:flex;flex-direction:column;gap:10px">
+<sc-if value="{{ hasDay }}">
+<div style="display:flex;gap:12px;align-items:center;padding:2px 2px 4px">
+<span style="flex:none;width:44px;height:44px;border-radius:10px;background:{{ rt.tile }};display:grid;place-items:center"><i class="ph {{ rt.icon }}" style="font-size:22px;color:{{ rt.color }}"></i></span>
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:18px;font-weight:700">{{ rt.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ rt.meta }}</span></span>
+</div>
+<div style="flex:none;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden">
+<sc-for list="{{ rt.items }}" as="x">
+<div style="border-bottom:1px solid #22394d">
+<button onClick="{{ x.toggle }}" aria-expanded="{{ x.open }}" style="all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;gap:12px;align-items:center;min-height:64px;padding:8px 12px">
+<span style="flex:none;width:48px;height:48px;border-radius:8px;overflow:hidden;background:{{ x.tile }};display:grid;place-items:center"><sc-if value="{{ x.hasImg }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="display:block;width:100%;height:100%;;background-image:url({{ x.img0 }});background-size:cover;background-position:center"></span></sc-if><sc-if value="{{ x.noImg }}"><i class="ph {{ x.icon }}" style="font-size:22px;color:{{ x.color }}"></i></sc-if></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600">{{ x.name }}</span><span style="font:12.5px ui-monospace,Menlo,monospace;color:#cfdeea">{{ x.dose }}<span style="color:#8aa1b5">{{ x.rest }}</span></span></span>
+<span style="flex:none;display:flex;flex-direction:column;align-items:flex-end"><span style="font:700 15px ui-monospace,Menlo,monospace;color:{{ x.loadColor }}">{{ x.load }}</span><span style="font-size:11px;color:#8aa1b5">{{ x.loadShort }}</span></span>
+</button>
+<sc-if value="{{ x.open }}"><div style="display:flex;flex-direction:column;gap:10px;padding:0 12px 14px">
+<sc-if value="{{ x.needMark }}"><label style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,#f2ce78 12%,#13283a)"><span style="flex:1;font-size:14px">Your {{ x.markName }} best lift</span><span style="display:flex;align-items:center;gap:6px;height:44px;width:120px;box-sizing:border-box;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26"><input value="{{ x.markVal }}" onChange="{{ x.setMark }}" inputMode="decimal" placeholder="—" aria-label="{{ x.markAria }}" style="all:unset;flex:1;min-width:0;font:600 16px ui-monospace,Menlo,monospace;text-align:right"><span style="font-size:12.5px;color:#8aa1b5">kg</span></span></label></sc-if>
+<sc-if value="{{ x.hasImg }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><span role="img" aria-label="{{ x.alt0 }}" style="display:block;width:100%;aspect-ratio:4/3;border-radius:8px;background-image:url({{ x.img0 }});background-size:cover;background-position:center"></span><span role="img" aria-label="{{ x.alt1 }}" style="display:block;width:100%;aspect-ratio:4/3;border-radius:8px;background-image:url({{ x.img1 }});background-size:cover;background-position:center"></span></div></sc-if>
+<sc-if value="{{ x.hasTips }}"><ul style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:3px;font-size:14px;line-height:1.45;color:#cfdeea"><sc-for list="{{ x.tips }}" as="t"><li>{{ t }}</li></sc-for></ul></sc-if>
+<a href="{{ x.yt }}" target="_blank" rel="noopener noreferrer" style="display:flex;gap:8px;align-items:center;justify-content:center;height:44px;border-radius:10px;border:1px solid #274055;font-size:14px;font-weight:600;color:#e8f0f7;text-decoration:none"><i class="ph-fill ph-youtube-logo" style="color:#f2887a;font-size:18px"></i>Watch on YouTube</a>
+</div></sc-if>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{ rt.missingMark }}"><span style="display:flex;gap:8px;align-items:center;padding:0 4px;font-size:13px;color:#f2ce78"><i class="ph ph-info"></i>Open the row to add your {{ rt.missingMark }}, or use My marks below.</span></sc-if>
+</sc-if>
+<div style="flex:none;display:flex;flex-direction:column;gap:8px;margin-top:6px;padding:12px 14px;border:1px solid #274055;border-radius:12px;background:#13283a"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:15px;font-weight:700">My marks <span style="font:400 12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ markSet }}</span></span><span style="display:flex;gap:5px;align-items:center;font-size:12px;color:#8aa1b5"><i class="ph ph-lock-simple"></i>Only you</span></div><sc-for list="{{ markRows }}" as="m"><label style="display:flex;gap:10px;align-items:center;min-height:48px;border-top:1px solid #22394d"><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;font-size:14.5px">{{ m.name }}<sc-if value="{{ m.used }}"><span style="font-size:11.5px;color:#5ab4e8">In this week's routines</span></sc-if></span><span style="display:flex;align-items:center;gap:6px;height:44px;width:120px;box-sizing:border-box;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26"><input value="{{ m.value }}" onChange="{{ m.set }}" inputMode="decimal" placeholder="—" aria-label="{{ m.aria }}" style="all:unset;flex:1;min-width:0;font:600 16px ui-monospace,Menlo,monospace;text-align:right"><span style="font-size:12.5px;color:#8aa1b5">kg</span></span></label></sc-for><sc-if value="{{ markToggle }}"><button onClick="{{ toggleMarks }}" style="all:unset;cursor:pointer;min-height:44px;display:flex;align-items:center;border-top:1px solid #22394d;font-size:14px;font-weight:600;color:#5ab4e8">{{ markToggleLabel }}</button></sc-if></div>
+<sc-if value="{{ isRest }}"><div style="padding:48px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center"><i class="ph ph-moon-stars" style="font-size:30px;color:#5a7086"></i><span style="font-size:16px;font-weight:600">{{ restTitle }}</span><span style="font-size:14px;color:#8aa1b5">{{ restSub }}</span></div></sc-if>
+</div>
+</div>
+</div>
+
+
+
+<div id="2b" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#2b" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2b</a><span style="font-size:13.5px;color:#8aa1b5">Celular · Coach / Admin</span></div>
+<div style="width:390px;height:844px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;display:flex;flex-direction:column">
+<div style="flex:none;padding:16px 14px 10px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #22394d">
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">TRAINING · MANAGE</span><span style="font-size:21px;font-weight:700">Plan training</span></span>
+<div role="tablist" style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;padding:3px;border-radius:10px;background:#13283a;border:1px solid #274055"><sc-for list="{{ cmTabs }}" as="t"><button role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="all:unset;cursor:pointer;text-align:center;height:40px;line-height:40px;border-radius:7px;font-size:13px;font-weight:{{ t.w }};background:{{ t.bg }};color:{{ t.color }}">{{ t.label }}</button></sc-for></div>
+</div>
+<div style="flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding:12px 12px 22px;display:flex;flex-direction:column;gap:12px">
+<sc-if value="{{ notice }}"><div role="status" style="flex:none;display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 12%,#13283a);font-size:13.5px;line-height:1.4"><i class="ph ph-check-circle" style="color:#6fd6b4;font-size:17px"></i>{{ notice }}</div></sc-if>
+
+<sc-if value="{{ cmCycle }}">
+<div style="flex:none;display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid #274055;border-radius:12px;background:#13283a">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#cfdeea">Cycle</span><select value="{{ cySel }}" onChange="{{ onCySel }}" style="height:48px;padding:0 10px;border-radius:10px;border:1px solid #274055;background:#0c1a26;color:#e8f0f7;font-size:16px;font-weight:600"><sc-for list="{{ cyOpen }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for><optgroup label="Archived"><sc-for list="{{ cyArch }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></optgroup></select></label>
+<span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="padding:1px 9px;border-radius:999px;background:{{ cmCur.stBg }};color:{{ cmCur.stColor }};font-size:12px;font-weight:600">{{ cmCur.status }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ cmCur.meta }}</span></span>
+<sc-if value="{{ cmShowDet }}"><div style="display:flex;flex-direction:column;gap:10px;padding-top:10px;border-top:1px solid #22394d">
+<label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:12.5px;font-weight:600;color:#cfdeea">Cycle name</span><input value="{{ cc.name }}" onChange="{{ set.name }}"  style="all:unset;box-sizing:border-box;width:100%;height:46px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:16px"></label>
+<label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:12.5px;font-weight:600;color:#cfdeea">Target event · optional</span><input value="{{ cc.event }}" onChange="{{ set.event }}"  style="all:unset;box-sizing:border-box;width:100%;height:46px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:16px"></label>
+<div style="display:grid;grid-template-columns:1fr 90px;gap:8px"><label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:12.5px;font-weight:600;color:#cfdeea">Event first day</span><input value="{{ cc.eventDate }}" onChange="{{ set.eventDate }}" type="date" style="all:unset;box-sizing:border-box;width:100%;height:46px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:16px"></label><label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:12.5px;font-weight:600;color:#cfdeea">Weeks</span><input value="{{ cc.weeks }}" onChange="{{ set.weeks }}" inputMode="numeric" style="all:unset;box-sizing:border-box;width:100%;height:46px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:16px"></label></div>
+</div></sc-if>
+<sc-if value="{{ cmCanToggle }}"><button onClick="{{ cmToggleDet }}" aria-expanded="{{ cmShowDet }}" style="all:unset;cursor:pointer;align-self:flex-start;display:flex;gap:6px;align-items:center;min-height:36px;font-size:13.5px;font-weight:600;color:#5ab4e8"><i class="ph ph-pencil-simple"></i>{{ cmDetLabel }}</button></sc-if>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<sc-if value="{{ curIsDraft }}"><button onClick="{{ activate }}" style="all:unset;cursor:pointer;flex:1;display:flex;gap:6px;align-items:center;justify-content:center;height:44px;padding:0 12px;border-radius:10px;border:1px solid #6fd6b4;color:#6fd6b4;font-size:14px;font-weight:700"><i class="ph-bold ph-play"></i>Make active</button></sc-if>
+<button onClick="{{ duplicate }}" style="all:unset;cursor:pointer;flex:1;display:flex;gap:6px;align-items:center;justify-content:center;height:44px;padding:0 12px;border-radius:10px;border:1px solid #274055;font-size:14px;font-weight:600"><i class="ph ph-copy"></i>Duplicate</button>
+<sc-if value="{{ curNotArch }}"><button onClick="{{ archive }}" aria-label="Archive cycle" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:10px;border:1px solid #274055;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-archive" style="font-size:18px"></i></button></sc-if>
+<button onClick="{{ newCycle }}" aria-label="New cycle" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:10px;border:1px dashed #274055;display:grid;place-items:center;color:#5ab4e8"><i class="ph-bold ph-plus" style="font-size:18px"></i></button>
+</div>
+</div>
+<span style="flex:none;font-size:13px;line-height:1.45;color:#cfdeea">{{ cc.calc }}</span>
+<div style="flex:none;display:flex;gap:8px;align-items:center"><button onClick="{{ cmPrev }}" aria-label="Previous week" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:10px;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-caret-left" style="font-size:18px"></i></button><span style="flex:1;text-align:center;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">Week {{ cmWk.n }} of {{ cmWk.of }}</span><span style="font-size:12px;color:#8aa1b5">{{ cmWk.dates }}</span></span><button onClick="{{ cmNext }}" aria-label="Next week" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:10px;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-caret-right" style="font-size:18px"></i></button></div>
+<div style="flex:none;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden"><sc-for list="{{ cmDays }}" as="d"><label style="display:grid;grid-template-columns:48px minmax(0,1fr);gap:10px;align-items:center;min-height:56px;padding:6px 10px 6px 14px;border-bottom:1px solid #22394d"><span style="font:700 12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ d.dow }}</span><select value="{{ d.value }}" onChange="{{ d.set }}" aria-label="{{ d.aria }}" style="box-sizing:border-box;width:100%;height:44px;padding:0 10px;border-radius:8px;border:1px solid {{ d.border }};background:{{ d.bg }};color:{{ d.color }};font-size:16px"><option value="">Rest</option><sc-for list="{{ routineOptions }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select></label></sc-for></div>
+<button onClick="{{ copyWeek1 }}" style="all:unset;cursor:pointer;flex:none;display:flex;gap:8px;align-items:center;justify-content:center;height:46px;border-radius:10px;border:1px solid #274055;font-size:14.5px;font-weight:600"><i class="ph ph-copy"></i>Copy week 1 to all weeks</button>
+<div style="flex:none;display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;background:#0f2131"><span style="display:flex;gap:8px;align-items:center;font-size:14px;font-weight:650"><i class="ph ph-microsoft-excel-logo" style="font-size:19px;color:#6fd6b4"></i>Planning a whole cycle?</span><span style="font-size:13px;line-height:1.45;color:#8aa1b5">The Excel template is faster on a computer. You can still download it here.</span><button onClick="{{ download }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;justify-content:center;height:44px;border-radius:10px;border:1px solid #33a1e0;color:#5ab4e8;font-size:14.5px;font-weight:700"><i class="ph-bold ph-download-simple"></i>Download template</button></div>
+</sc-if>
+
+<sc-if value="{{ cmRoutines }}">
+<label style="flex:none;display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#cfdeea">Routines of</span><select value="{{ rF }}" onChange="{{ onRF }}" style="height:46px;padding:0 10px;border-radius:10px;border:1px solid #274055;background:#13283a;color:#e8f0f7;font-size:16px"><sc-for list="{{ rfOpen }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for><option value="shared">Shared routines only</option><optgroup label="Archived cycles"><sc-for list="{{ rfArch }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></optgroup></select></label>
+<div style="flex:none;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden"><sc-for list="{{ rList }}" as="r"><button onClick="{{ r.mPick }}" style="all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;gap:12px;align-items:center;min-height:64px;padding:8px 12px;border-bottom:1px solid #22394d"><span style="flex:none;width:8px;align-self:stretch;margin:-8px 0 -8px -12px;background:{{ r.color }}"></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600">{{ r.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ r.meta }}</span></span><sc-if value="{{ r.hasTag }}"><span style="flex:none;padding:2px 8px;border-radius:999px;background:#0f2131;font-size:11.5px;color:#cfdeea">{{ r.tag }}</span></sc-if><i class="ph ph-caret-right" style="color:#5a7086"></i></button></sc-for></div>
+<button onClick="{{ cmNewRoutine }}" style="all:unset;cursor:pointer;flex:none;display:flex;gap:8px;align-items:center;justify-content:center;height:48px;border-radius:10px;border:1px dashed #274055;font-size:15px;font-weight:600;color:#5ab4e8"><i class="ph-bold ph-plus"></i>{{ newRoutineLabel }}</button>
+</sc-if>
+
+<sc-if value="{{ cmEditor }}">
+<button onClick="{{ cmBack }}" style="all:unset;cursor:pointer;flex:none;align-self:flex-start;display:flex;gap:6px;align-items:center;height:44px;font-size:14.5px;font-weight:600;color:#5ab4e8"><i class="ph ph-caret-left"></i>Routines</button>
+<label style="flex:none;display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">Routine name</span><input value="{{ ed.name }}" onChange="{{ ed.setName }}" style="all:unset;box-sizing:border-box;height:48px;padding:0 12px;border-radius:10px;border:1px solid #274055;background:#13283a;font-size:16px;font-weight:600"></label>
+<sc-for list="{{ ed.items }}" as="x"><div style="flex:none;display:flex;flex-direction:column;gap:8px;padding:10px 12px 12px;border:1px solid #274055;border-radius:12px;background:#13283a">
+<div style="display:flex;gap:10px;align-items:center"><span style="flex:none;width:40px;height:40px;border-radius:8px;overflow:hidden;background:{{ x.tile }};display:grid;place-items:center"><sc-if value="{{ x.hasImg }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="display:block;width:100%;height:100%;background-image:url({{ x.img0 }});background-size:cover;background-position:center"></span></sc-if><sc-if value="{{ x.noImg }}"><i class="ph {{ x.icon }}" style="color:{{ x.color }}"></i></sc-if></span><span style="flex:1;min-width:0;font-size:15px;font-weight:600">{{ x.name }}</span><button onClick="{{ x.remove }}" aria-label="{{ x.removeLabel }}" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-trash" style="font-size:18px"></i></button></div>
+<div style="display:grid;grid-template-columns:70px 1fr 80px;gap:8px"><label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:11.5px;color:#8aa1b5">Sets</span><input value="{{ x.sets }}" onChange="{{ x.setSets }}" placeholder="—" inputMode="numeric" aria-label="Sets" style="all:unset;box-sizing:border-box;width:100%;height:44px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font:16px ui-monospace,Menlo,monospace"></label><label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:11.5px;color:#8aa1b5">Reps / distance</span><input value="{{ x.reps }}" onChange="{{ x.setReps }}" placeholder="8 or 50 m" aria-label="Reps or distance" style="all:unset;box-sizing:border-box;width:100%;height:44px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font:16px ui-monospace,Menlo,monospace"></label><label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:11.5px;color:#8aa1b5">Rest</span><input value="{{ x.rest }}" onChange="{{ x.setRest }}" placeholder="1:30" aria-label="Rest" style="all:unset;box-sizing:border-box;width:100%;height:44px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font:16px ui-monospace,Menlo,monospace"></label></div>
+<div style="display:flex;gap:8px"><select value="{{ x.loadSel }}" onChange="{{ x.setLoadSel }}" aria-label="Load type" style="flex:1;min-width:0;height:44px;padding:0 8px;border-radius:8px;border:1px solid #274055;background:#0c1a26;color:#e8f0f7;font-size:16px"><option value="">No load</option><sc-for list="{{ markOptions }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for><option value="text">Text…</option></select><sc-if value="{{ x.showVal }}"><input value="{{ x.loadVal }}" onChange="{{ x.setLoadVal }}" placeholder="{{ x.valPh }}" aria-label="Load value" style="all:unset;box-sizing:border-box;width:110px;height:44px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font:16px ui-monospace,Menlo,monospace"></sc-if></div>
+<input value="{{ x.note }}" onChange="{{ x.setNote }}" placeholder="Note (optional)" aria-label="Note" style="all:unset;box-sizing:border-box;height:40px;padding:0 10px;border-radius:8px;border:1px dashed #274055;font-size:15px">
+</div></sc-for>
+<div style="flex:none;display:flex;flex-direction:column;gap:8px"><input value="{{ addQ }}" onChange="{{ onAddQ }}" placeholder="Add exercise — search" aria-label="Add exercise" style="all:unset;box-sizing:border-box;height:48px;padding:0 12px;border-radius:10px;border:1px solid #274055;background:#13283a;font-size:16px">
+<sc-if value="{{ addOpen }}"><div style="border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden"><sc-for list="{{ addResults }}" as="a"><button onClick="{{ a.add }}" style="all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;gap:10px;align-items:center;min-height:56px;padding:6px 12px;border-bottom:1px solid #22394d"><span style="flex:1;font-size:15px">{{ a.name }}</span><span style="font-size:11.5px;padding:2px 7px;border-radius:999px;background:{{ a.srcBg }};color:#cfdeea">{{ a.src }}</span><i class="ph-bold ph-plus" style="color:#5ab4e8"></i></button></sc-for><sc-if value="{{ addNone }}"><button onClick="{{ createFromSearch }}" style="all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;gap:8px;align-items:center;min-height:56px;padding:6px 12px;font-size:15px;font-weight:600;color:#5ab4e8"><i class="ph-bold ph-plus"></i>Create "{{ addQ }}"</button></sc-if></div></sc-if></div>
+</sc-if>
+
+<sc-if value="{{ cmExercises }}">
+<label style="flex:none;display:flex;gap:8px;align-items:center;height:46px;padding:0 12px;border-radius:10px;border:1px solid #274055;background:#13283a"><i class="ph ph-magnifying-glass" style="color:#8aa1b5;font-size:18px"></i><input value="{{ exQ }}" onChange="{{ onExQ }}" type="search" placeholder="Search exercises" aria-label="Search exercises" style="all:unset;flex:1;font-size:16px"></label>
+<div style="flex:none;display:flex;gap:6px"><sc-for list="{{ exChips }}" as="c"><button onClick="{{ c.pick }}" aria-pressed="{{ c.on }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center;height:36px;padding:0 12px;border-radius:999px;border:1px solid {{ c.border }};background:{{ c.bg }};font-size:13.5px;font-weight:600">{{ c.label }}<span style="font:11.5px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ c.n }}</span></button></sc-for></div>
+<div style="flex:none;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden;max-height:330px;overflow-y:auto"><sc-for list="{{ exList }}" as="e"><div style="display:flex;gap:12px;align-items:center;min-height:58px;padding:6px 12px;border-bottom:1px solid #22394d"><span style="flex:none;width:42px;height:42px;border-radius:8px;overflow:hidden;background:{{ e.tile }};display:grid;place-items:center"><sc-if value="{{ e.hasImg }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="display:block;width:100%;height:100%;background-image:url({{ e.img0 }});background-size:cover;background-position:center"></span></sc-if><sc-if value="{{ e.noImg }}"><i class="ph {{ e.icon }}" style="font-size:19px;color:{{ e.color }}"></i></sc-if></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:15px;font-weight:600">{{ e.name }}</span><span style="font-size:12px;color:#8aa1b5">{{ e.meta }}</span></span><span style="font-size:11.5px;padding:2px 8px;border-radius:999px;background:{{ e.srcBg }};color:#cfdeea">{{ e.src }}</span></div></sc-for></div>
+<div style="flex:none;display:flex;flex-direction:column;gap:10px;padding:14px 12px;border:1px solid #274055;border-radius:12px;background:#13283a">
+<span style="font-size:15px;font-weight:700">New club exercise</span>
+<input value="{{ nx.name }}" onChange="{{ nx.setName }}" placeholder="Name" aria-label="Exercise name" style="all:unset;box-sizing:border-box;height:48px;padding:0 12px;border-radius:8px;border:1px solid {{ nx.nameBorder }};background:#0c1a26;font-size:16px">
+<sc-if value="{{ nx.dup }}"><span style="font-size:13px;color:#f2887a">{{ nx.dup }}</span></sc-if>
+<textarea value="{{ nx.tips }}" onChange="{{ nx.setTips }}" rows="3" placeholder="How to do it · one tip per line (optional)" aria-label="Tips" style="all:unset;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:16px;line-height:1.45;white-space:pre-wrap"></textarea>
+<input value="{{ nx.yt }}" onChange="{{ nx.setYt }}" placeholder="YouTube link or search (optional)" aria-label="YouTube" style="all:unset;box-sizing:border-box;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:16px">
+<button onClick="{{ nx.save }}" disabled="{{ nx.cant }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;justify-content:center;height:48px;border-radius:10px;border:1px solid #33a1e0;color:#5ab4e8;font-size:15px;font-weight:700;opacity:{{ nx.op }}"><i class="ph-bold ph-plus"></i>Add to club exercises</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ cmMarks }}">
+<p style="flex:none;margin:0;font-size:14px;line-height:1.5;color:#8aa1b5">The lifts members can record (best single lift, kg). Routines use "% of" a mark to show each person's kilos.</p>
+<div style="flex:none;border:1px solid #274055;border-radius:12px;background:#13283a;overflow:hidden"><sc-for list="{{ mkRows }}" as="m"><div style="border-top:{{ m.sep }}">
+<div style="display:flex;gap:6px;align-items:center;min-height:58px;padding:4px 6px 4px 14px">
+<sc-if value="{{ m.reading }}"><span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:600">{{ m.name }}</span><span style="font-size:12.5px;line-height:1.35;color:#8aa1b5">{{ m.meta }}</span></span><button onClick="{{ m.startRen }}" aria-label="{{ m.renLabel }}" title="Rename" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:8px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph ph-pencil-simple" style="font-size:18px"></i></button><button onClick="{{ m.askDel }}" disabled="{{ m.locked }}" aria-label="{{ m.removeLabel }}" title="{{ m.title }}" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:8px;display:grid;place-items:center;color:#8aa1b5;opacity:{{ m.op }}" style-hover="background:#1a3349;color:#f2887a"><i class="ph ph-trash" style="font-size:18px"></i></button></sc-if>
+<sc-if value="{{ m.renaming }}"><input value="{{ mkRenVal }}" onChange="{{ onMkRen }}" onKeyDown="{{ mkRenKey }}" aria-label="New name" autofocus="true" style="all:unset;flex:1;min-width:0;box-sizing:border-box;height:44px;padding:0 10px;border-radius:8px;border:1px solid #33a1e0;background:#0c1a26;font-size:16px"><button onClick="{{ saveMkRen }}" aria-label="Save name" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:8px;display:grid;place-items:center;background:#33a1e0;color:#0c1a26"><i class="ph-bold ph-check"></i></button><button onClick="{{ cancelMkRen }}" aria-label="Cancel rename" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:8px;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-x"></i></button></sc-if>
+</div>
+<sc-if value="{{ m.renaming }}"><span style="display:block;padding:0 14px 10px;font-size:12.5px;color:#8aa1b5">Routines and members' values follow the new name.</span></sc-if>
+<sc-if value="{{ m.confirming }}"><div role="alert" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 8px 8px;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,#f2887a 12%,#13283a);border:1px solid color-mix(in srgb,#f2887a 45%,transparent)"><span style="flex:1 1 200px;font-size:13.5px;line-height:1.4">{{ m.confirmText }}</span><span style="display:flex;gap:6px;flex:1 1 100%;"><button onClick="{{ cancelMkDel }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:44px;line-height:44px;padding:0 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:#cfdeea">Cancel</button><button onClick="{{ m.doDel }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:44px;line-height:42px;box-sizing:border-box;padding:0 14px;border-radius:8px;border:1px solid #f2887a;color:#f2887a;font-size:13.5px;font-weight:700">Delete mark</button></span></div></sc-if>
+</div></sc-for></div>
+<div style="flex:none;display:flex;gap:8px"><input value="{{ newMark }}" onChange="{{ onNewMark }}" onKeyDown="{{ newMarkKey }}" placeholder="New mark" aria-label="New mark" style="all:unset;flex:1;box-sizing:border-box;height:48px;padding:0 12px;border-radius:10px;border:1px solid #274055;background:#13283a;font-size:16px"><button onClick="{{ addMark }}" disabled="{{ cantMark }}" style="all:unset;cursor:pointer;height:48px;padding:0 18px;display:flex;align-items:center;border-radius:10px;border:1px solid #33a1e0;color:#5ab4e8;font-size:15px;font-weight:700;opacity:{{ markOp }}">Add</button></div>
+<span style="flex:none;display:flex;gap:6px;align-items:center;font-size:12.5px;color:#8aa1b5"><i class="ph ph-lock-simple"></i>Only each member sees their own values.</span>
+</sc-if>
+</div>
+</div>
+</div>
+<div id="2c" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#2c" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2c</a><span style="font-size:13.5px;color:#8aa1b5">Celular · membresía vencida</span></div>
+<div style="width:390px;height:844px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;display:flex;flex-direction:column;gap:14px;padding:16px 14px">
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">TRAINING</span><span style="font-size:21px;font-weight:700">{{ cy.name }}</span><span style="font-size:13px;color:#cfdeea">{{ cy.eventLine }}</span></span>
+<div style="display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:18px 16px;border:1px solid #274055;border-radius:12px;background:#13283a"><span style="width:44px;height:44px;border-radius:50%;background:color-mix(in srgb,#f2ce78 18%,#13283a);display:grid;place-items:center"><i class="ph-fill ph-lock-simple" style="font-size:20px;color:#f2ce78"></i></span><span style="font-size:18px;font-weight:700">Renew to see your plan</span><span style="font-size:14px;line-height:1.5;color:#cfdeea;max-width:520px">Training is for members with an active membership. Yours expired on 30 Sep 2026. Renew and you'll pick up the cycle where the club is now.</span><a href="#" style="display:flex;gap:8px;align-items:center;justify-content:center;align-self:stretch;max-width:280px;height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700;text-decoration:none"><i class="ph-bold ph-identification-badge"></i>Renew membership</a></div>
+</div>
+</div>
+</div></div>
+
+<ul style="margin:0;padding-left:18px;max-width:1080px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+<li><strong>Fuera de la v1</strong>: objetivos de tiempo calculados, pulso, estimar 1RM desde 3RM, rotación automática y configuración por deporte. Todo se puede sumar después sin rehacer tablas.</li>
+<li><strong>Membresía vencida</strong>: igual que en el diseño anterior, ve el encabezado del ciclo y un aviso para renovar.</li>
+<li><strong>Siguiente paso</strong>: la plantilla de Excel real, con celdas bloqueadas y listas desplegables.</li>
+</ul>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const IMG = (n,i) => `training-img/${n}-${i}.jpg`;
+const TYPES = { c1:{label:'Blue', icon:'ph-list-checks', color:'#33a1e0'}, c2:{label:'Green', icon:'ph-list-checks', color:'#6fd6b4'}, c3:{label:'Amber', icon:'ph-list-checks', color:'#f2ce78'}, c4:{label:'Coral', icon:'ph-list-checks', color:'#f2887a'}, c5:{label:'Grey', icon:'ph-list-checks', color:'#b7c7d6'}, c6:{label:'Violet', icon:'ph-list-checks', color:'#9e9ddc'} };
+const EXV = { icon:'ph-person-simple-run', color:'#8aa1b5' };
+const tint = c => `color-mix(in srgb, ${c} 20%, #13283a)`;
+const LIB = [
+  ['squat','Back squat','gym','Barbell_Squat',['Bar on your upper back, feet shoulder-width.','Sit down and back; knees follow your toes.','Drive up through the whole foot.']],
+  ['bench','Bench press','gym','Barbell_Bench_Press_-_Medium_Grip',['Shoulder blades squeezed, feet flat.','Lower to mid-chest, press up and slightly back.']],
+  ['deadlift','Deadlift','gym','Barbell_Deadlift',['Bar over mid-foot, back flat.','Push the floor away; hips and shoulders rise together.']],
+  ['rdl','Romanian deadlift','gym','Romanian_Deadlift',['Soft knees, push the hips back.','Stop when you feel the hamstrings; keep the bar close.']],
+  ['pullup','Pull-up','gym','Pullups',['Start from a dead hang.','Pull your chest to the bar, control the way down.']],
+  ['row','One-arm dumbbell row','gym','One-Arm_Dumbbell_Row',['Flat back, pull the elbow to your hip.']],
+  ['pushpress','Push press','gym','Push_Press',['Short dip with the legs, then drive the bar overhead.']],
+  ['goblet','Goblet squat','gym','Goblet_Squat',['Hold the weight at your chest, elbows inside the knees.']],
+  ['hipthrust','Hip thrust','gym','Barbell_Hip_Thrust',['Upper back on the bench, squeeze the glutes at the top.']],
+  ['stepup','Dumbbell step-up','gym','Dumbbell_Step_Ups',['Whole foot on the box; drive through the front leg.']],
+  ['boxjump','Box jump','gym','Front_Box_Jump',['Swing the arms, land softly, step down.']],
+  ['pushup','Push-up','gym','Pushups',['Body in one line, chest to the floor.']],
+  ['situp','Sit-up','gym','Sit-Up',[]],
+  ['pullapart','Band pull-apart','gym','Band_Pull_Apart',['Arms straight, pull the band to your chest.']],
+  ['invrow','Inverted row','gym','Inverted_Row',[]],
+  ['wgs',"World's greatest stretch",'other','Worlds_Greatest_Stretch',['Lunge, elbow to the instep, rotate and reach up.']],
+  ['cat','Cat stretch','other','Cat_Stretch',[]]
+].map(([id,name,type,img,tips])=>({id,name,type,img,tips,src:'lib',yt:name+' technique'}));
+const CLUB0 = [
+  {id:'c-crawl', name:'Front crawl', type:'pool', tips:['Long strokes, breathe every 3.'], yt:'front crawl technique drills'},
+  {id:'c-dyn', name:'Dynamic apnea', type:'pool', tips:['Relax before you go; slow, long kicks.','Never alone: always with a buddy watching.'], yt:'dynamic apnea monofin technique'},
+  {id:'c-fins', name:'Fin kick', type:'pool', tips:['Kick from the hips, knees almost straight.'], yt:'fin kick technique swimming'},
+  {id:'c-sprint', name:'25 m sprint', type:'pool', tips:[], yt:'underwater rugby sprint training'},
+  {id:'c-easy', name:'Easy swim', type:'pool', tips:[], yt:''}
+].map(e=>({...e, src:'club', img:null}));
+const MARKS3 = [['squat','Back squat'],['bench','Bench press'],['deadlift','Deadlift']].map(([id,name])=>({id,name}));
+const RECORDED = { squat:12, bench:10, deadlift:9, frontsq:4, ohp:3, clean:2 };
+const MARKS10 = [...MARKS3, ...[['frontsq','Front squat'],['ohp','Overhead press'],['clean','Power clean'],['wpull','Weighted pull-up'],['hipthrust','Hip thrust'],['row','Bent-over row'],['trapdl','Trap bar deadlift']].map(([id,name])=>({id,name}))];
+let uid = 100; const it = (ex, sets, reps, rest, load = '', loadVal = '', note = '') => ({ id:'i'+(uid++), ex, sets, reps, rest, load, loadVal, note });
+const ROUTINES0 = [
+  { id:'r1', name:'Gym A · Strength', type:'c2', cycleId:'cy1', items:[ it('squat','4','6','2:00','squat','75'), it('bench','4','6','2:00','bench','75'), it('rdl','3','8','1:30','deadlift','60'), it('pullup','3','max','1:30','text','Bodyweight'), it('pullapart','2','15','0:45') ] },
+  { id:'r2', name:'Gym B · Power', type:'c2', cycleId:'cy1', items:[ it('pushpress','4','5','2:00','text','Moderate'), it('boxjump','4','5','1:30'), it('deadlift','3','5','2:30','deadlift','80'), it('invrow','3','10','1:00'), it('situp','3','15','0:45') ] },
+  { id:'r3', name:'Pool · Endurance', type:'c1', cycleId:'cy1', items:[ it('c-easy','','400 m','','','','Warm-up'), it('c-dyn','8','25 m','1:00'), it('c-fins','6','50 m','0:45'), it('c-sprint','6','25 m','0:30'), it('c-easy','','200 m','','','','Cool-down') ] },
+  { id:'r4', name:'Pool · Speed', type:'c1', cycleId:'cy1', items:[ it('c-crawl','','300 m',''), it('c-sprint','10','25 m','0:40','text','Max'), it('c-dyn','4','25 m','1:30') ] },
+  { id:'r6', name:'Pre-season · Gym', type:'c2', cycleId:'cy0', items:[ it('goblet','3','10','1:00'), it('pushup','3','12','0:45'), it('row','3','10','1:00') ] },
+  { id:'r7', name:'Pre-season · Pool', type:'c1', cycleId:'cy0', items:[ it('c-easy','','600 m',''), it('c-fins','8','50 m','0:30') ] },
+  { id:'r8', name:'Summer · Swim base', type:'c1', cycleId:'cy2', items:[ it('c-crawl','','1000 m',''), it('c-dyn','6','25 m','1:00') ] },
+  { id:'r5', name:'Mobility', type:'c5', cycleId:null, items:[ it('wgs','2','5 each side',''), it('cat','2','10','') ] }
+];
+const DAY = 864e5, DOW = ['MON','TUE','WED','THU','FRI','SAT','SUN'], INI = ['M','T','W','T','F','S','S'];
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const parse = s => { const [y,m,d] = s.split('-').map(Number); return Date.UTC(y,m-1,d); };
+const fmt = t => { const d = new Date(t); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}`; };
+const fmtY = t => { const d = new Date(t); return `${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()]} ${d.getUTCDate()} ${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+const TODAY = parse('2026-10-27');
+const PATTERN = ['r3','r1','r5','r4','r2','r3',''];
+const makeGrid = n => Array.from({length:n}, (_,w) => w===n-1 ? ['r4','r5','','','','',''] : w===n-2 ? ['r3','r1','','r4','r5','',''] : [...PATTERN]);
+const CYCLES0 = [
+  { id:'cy1', name:'Road to Nationals 2027', event:'UWR Nationals', eventDate:'2027-04-22', weeks:28, status:'active', grid: makeGrid(28) },
+  { id:'cy2', name:'Summer base 2027', event:'', eventDate:'2027-07-30', weeks:8, status:'draft', grid: Array.from({length:8},()=>['r8','r5','r8','','r8','','']) },
+  { id:'cy0', name:'Pre-season 2026', event:'State League', eventDate:'2026-09-12', weeks:10, status:'archived', grid: Array.from({length:10},()=>['r7','r6','','r7','r6','r5','']) }
+];
+const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const round25 = x => Math.round(x/2.5)*2.5;
+
+class Component extends DCLogic {
+  state = { mkRen:null, mkRenVal:'', mkDel:null, cmDet:false, cmTab:'cycle', cmW:null, cmEdit:false, markDefs: MARKS3, allMarks:false, newMark:'', cycles: CYCLES0, selC:'cy1', rF:'cy1', showArch:false,
+    routines: ROUTINES0, club: CLUB0, marks:{ squat:'80', bench:'55', deadlift:'' },
+    week:null, day:null, openEx:null, cTab:'routines', selR:'r1', addQ:'', exQ:'', exF:'all',
+    nx:{ name:'', type:'pool', tips:'', yt:'' }, notice:null, drag:null, dropAt:null };
+  nxRef = React.createRef();
+  componentWillUnmount(){ clearTimeout(this._t); }
+  flash(t){ clearTimeout(this._t); this.setState({notice:t}); this._t = setTimeout(()=>this.setState({notice:null}), 3200); }
+  updR(id, fn){ this.setState(st=>({ routines: st.routines.map(r=>r.id===id ? fn(r) : r) })); }
+  renderVals(){
+    const s = this.state;
+    const calc = c => { const weeks = Math.max(1, Math.min(52, parseInt(c.weeks)||1)); const evT = c.eventDate ? parse(c.eventDate) : TODAY + 20*7*DAY;
+      const evMon = evT - ((new Date(evT).getUTCDay()+6)%7)*DAY, start = evMon - (weeks-1)*7*DAY, nowW = Math.floor((TODAY - start)/(7*DAY)) + 1;
+      const grid = c.grid.length >= weeks ? c.grid : [...c.grid, ...Array.from({length:weeks-c.grid.length},()=>['','','','','','',''])];
+      return { weeks, evT, start, nowW, curW: Math.min(weeks, Math.max(1, nowW)), grid }; };
+    const act = s.cycles.find(c=>c.status==='active') || s.cycles[0], cy = act;
+    const { weeks, evT, start, nowW, curW, grid } = calc(act);
+    const cur = s.cycles.find(c=>c.id===s.selC) || act, CC = calc(cur);
+    const updC = (id, fn) => this.setState(st=>({ cycles: st.cycles.map(c=>c.id===id ? fn(c) : c) }));
+    const all = [...LIB, ...s.club], exById = id => all.find(e=>e.id===id);
+    const w = Math.min(s.week ?? curW, weeks), todayIdx = (new Date(TODAY).getUTCDay()+6)%7;
+    const rById = id => s.routines.find(r=>r.id===id);
+    const wStart = start + (w-1)*7*DAY;
+    const defaultDay = () => { if (w===curW && grid[w-1][todayIdx]) return todayIdx; const i = grid[w-1].findIndex(x=>x); return i<0 ? 0 : i; };
+    const dSel = s.day ?? defaultDay();
+    const isTourn = (wi, di) => wi===weeks && wStartOf(wi)+di*DAY >= evT;
+    const wStartOf = wi => start + (wi-1)*7*DAY;
+    const markName = k => (s.markDefs.find(m=>m.id===k)||{name:k}).name;
+    const view = x => { const e = exById(x.ex) || {name:'(removed)', tips:[]}; const T = EXV;
+      let load = '', loadSub = '', loadShort = '', loadColor = '#e8f0f7';
+      if (x.load === 'text') { load = x.loadVal; }
+      else if (x.load) { const m = parseFloat(s.marks[x.load]), p = parseFloat(x.loadVal);
+        if (m && p) { load = round25(m*p/100) + ' kg'; loadSub = `${p}% of ${markName(x.load).toLowerCase()} ${m}`; loadShort = `${p}%`; }
+        else { load = p ? p + '%' : ''; loadSub = `of ${markName(x.load).toLowerCase()} · add your mark`; loadShort = 'add mark'; loadColor = '#f2ce78'; } }
+      const open = s.openEx === x.id, needMark = !!x.load && x.load!=='text';
+      return { id:x.id, name:e.name, dose: x.sets ? `${x.sets} × ${x.reps}` : x.reps, rest: x.rest ? ` · rest ${x.rest}` : '', note:x.note,
+        load, loadSub, loadShort, loadColor, hasImg:!!e.img, noImg:!e.img, img0: e.img ? IMG(e.img,0) : '', img1: e.img ? IMG(e.img,1) : '',
+        alt0:`${e.name}, start position`, alt1:`${e.name}, end position`, tile:tint(T.color), icon:T.icon, color:T.color,
+        tips:e.tips||[], hasTips:(e.tips||[]).length>0, yt: /^https?:/.test(e.yt||'') ? e.yt : `https://www.youtube.com/results?search_query=${encodeURIComponent(e.yt || e.name)}`,
+        open, needMark, markName: x.load && x.load!=='text' ? markName(x.load).toLowerCase() : '', markVal: x.load ? (s.marks[x.load] || '') : '', markAria: `Your ${x.load && x.load!=="text" ? markName(x.load) : ''} best lift in kg`,
+        setMark: e=>{ const v = e.target.value.replace(/[^\d.,]/g,'').replace(',','.'); this.setState(st=>({ marks:{ ...st.marks, [x.load]:v } })); },
+        caret: open ? 'ph-caret-up' : 'ph-caret-down', toggle: ()=>this.setState({ openEx: open ? null : x.id }) }; };
+    const days = DOW.map((dw,i)=>{ const r = rById(grid[w-1][i]), t = wStart + i*DAY, tourn = w===weeks && t >= evT, T = r ? TYPES[r.type] : null, on = i===dSel, today = t===TODAY;
+      return { dow:dw, ini:INI[i], num:new Date(t).getUTCDate(), date:fmt(t), today, on, hasRoutine:!!r, aria:`${dw} ${fmt(t)}: ${r ? r.name : tourn ? cy.event : 'rest'}`,
+        title: r ? r.name : tourn ? (cy.event || 'Event') : 'Rest', sub: r ? `${r.items.length} exercises` : tourn ? 'Event day' : 'Nothing planned',
+        titleColor: r || tourn ? '#e8f0f7' : '#8aa1b5', color: T ? T.color : tourn ? '#f2ce78' : 'transparent', icon: T ? T.icon : tourn ? 'ph-trophy' : 'ph-moon-stars',
+        tile: T ? tint(T.color) : tourn ? tint('#f2ce78') : '#0f2131', bg: on ? '#16304a' : r ? '#13283a' : 'transparent', border: on ? '#33a1e0' : '#274055', borderStyle: r || tourn ? 'solid' : 'dashed',
+        dowColor: today ? '#5ab4e8' : '#8aa1b5', mBg: on ? '#1d4869' : '#13283a', mBorder: on ? '#33a1e0' : '#274055', dot: T ? T.color : tourn ? '#f2ce78' : 'transparent',
+        pick: ()=>this.setState({ day:i, openEx:null }) }; });
+    const r = rById(grid[w-1][dSel]), dT = wStart + dSel*DAY;
+    const rtItems = r ? r.items.map(view) : [];
+    const missing = r ? [...new Set(r.items.filter(x=>x.load && x.load!=='text' && !parseFloat(s.marks[x.load])).map(x=>markName(x.load).toLowerCase()))] : [];
+    const goW = n => this.setState({ week: Math.max(1, Math.min(weeks, n)), day:null, openEx:null });
+    // coach
+    const routineOptions = s.routines.filter(x=>x.cycleId===cur.id || !x.cycleId).map(x=>({ v:x.id, l: x.cycleId ? x.name : x.name + ' (shared)' }));
+    const showNow = cur.status==='active';
+    const gridRows = Array.from({length:CC.weeks}, (_,wi)=>{ const ws = CC.start + wi*7*DAY;
+      return { n:wi+1, dates:`${fmt(ws)} – ${fmt(ws+6*DAY)}`, bg: showNow && wi+1===CC.curW ? 'color-mix(in srgb,#33a1e0 10%,#0c1a26)' : 'transparent', nColor: wi+1===CC.weeks ? '#f2ce78' : showNow && wi+1===CC.curW ? '#5ab4e8' : '#e8f0f7',
+        cells: DOW.map((dw,di)=>{ const v = CC.grid[wi][di], rr = rById(v), c = rr ? TYPES[rr.type].color : null;
+          return { value:v, aria:`Week ${wi+1} ${dw}`, bg: c ? tint(c) : '#0c1a26', border: c ? `color-mix(in srgb, ${c} 45%, #274055)` : '#22394d', color: rr ? '#e8f0f7' : '#5a7086',
+            set: e=>{ const val = e.target.value; updC(cur.id, c=>{ const g = c.grid.map(row=>[...row]); while (g.length < CC.weeks) g.push(['','','','','','','']); g[wi][di] = val; return { ...c, grid:g }; }); } }; }) }; });
+    const visibleR = s.routines.filter(r=> s.rF==='all' ? true : s.rF==='shared' ? !r.cycleId : (r.cycleId===s.rF || !r.cycleId)).sort((a,b)=>(!a.cycleId)-(!b.cycleId));
+    const R = visibleR.find(r=>r.id===s.selR) || visibleR[0] || { id:'__none', name:'', type:'c1', cycleId:null, items:[] };
+    const nq = norm(s.addQ.trim());
+    const addResults = nq ? all.filter(e=>norm(e.name).includes(nq)).slice(0,6) : [];
+    const exV = e => ({ ...e, hasImg:!!e.img, noImg:!e.img, img0: e.img ? IMG(e.img,0) : '', tile:'#0f2131', icon:EXV.icon, color:EXV.color, src: e.src==='club' ? 'Club' : 'Library', srcBg: e.src==='club' ? '#1d4869' : '#0f2131' });
+    const used = id => s.routines.filter(rr=>rr.items.some(x=>x.ex===id)).map(rr=>rr.name);
+    const eq = norm(s.exQ.trim());
+    const exFiltered = all.filter(e=>(!eq || norm(e.name).includes(eq)) && (s.exF==='all' || (s.exF==='club' ? e.src==='club' : e.src==='lib')));
+    const nxDup = s.nx.name.trim() && all.some(e=>norm(e.name)===norm(s.nx.name.trim())) ? 'There is already an exercise with that name.' : '';
+    const addEx = (name, type, tips, yt) => { const id = 'c-'+Date.now(); this.setState(st=>({ club:[...st.club, { id, name, type, tips, yt, src:'club', img:null }] })); return id; };
+    const typeSeg = (cur, pick) => Object.entries(TYPES).map(([k,T])=>({ label:T.label, color:T.color, on:cur===k, ring: cur===k ? '0 0 0 2px #13283a, 0 0 0 4px #e8f0f7' : 'none', pick:()=>pick(k) }));
+    return {
+      cy:{ ...cy, weeks, toGo: Math.max(0, weeks - curW), eventLine: cy.event ? `${cy.event} · ${fmtY(evT)}` : `Ends ${fmtY(start + (weeks*7-1)*DAY)}`,
+        nowText: nowW < 1 ? `starts ${fmt(start)}` : nowW > weeks ? 'cycle finished' : `week ${curW} of ${weeks}`,
+        calc: `Week 1 starts Mon ${fmt(start)} · week ${weeks} is event week. Members are in week ${curW} today.` },
+      weekChips: Array.from({length:weeks}, (_,i)=>({ label:i+1, on:i+1===w, now:i+1===curW, aria:`Week ${i+1}${i+1===curW?', this week':''}`, bg: i+1===w ? '#1d4869' : '#13283a', border: i+1===w ? '#33a1e0' : i+1===weeks ? 'color-mix(in srgb,#f2ce78 55%,#274055)' : '#274055', color: i+1===weeks ? '#f2ce78' : '#e8f0f7', op: i+1 < curW && i+1!==w ? .5 : 1, pick:()=>goW(i+1) })),
+      wk:{ n:w, range:`${fmt(wStart)} – ${fmt(wStart+6*DAY)}`, notNow: w!==curW },
+      prevWeek: ()=>goW(w-1), nextWeek: ()=>goW(w+1), toNow: ()=>goW(curW),
+      days, hasDay: !!r, isRest: !r,
+      restTitle: w===weeks && dT >= evT ? (cy.event || 'Event day') : 'Rest day', restSub: w===weeks && dT >= evT ? 'Good luck out there.' : 'Nothing planned. Recover well.',
+      rt: r ? { name:r.name, color:TYPES[r.type].color, tile:tint(TYPES[r.type].color), icon:TYPES[r.type].icon, meta:`${DOW[dSel].charAt(0)+DOW[dSel].slice(1).toLowerCase()} ${fmt(dT)} · ${r.items.length} exercises`, items:rtItems, missingMark: missing.join(' and ') } : { items:[] },
+      markRows: (()=>{ const wk = new Set(grid[w-1].map(rById).filter(Boolean).flatMap(rr=>rr.items).map(x=>x.load).filter(l=>l && l!=='text'));
+        const defs = [...s.markDefs].sort((a,b)=>(wk.has(b.id)?1:0)-(wk.has(a.id)?1:0)); const many = defs.length > 4;
+        const shown = !many || s.allMarks ? defs : (wk.size ? defs.filter(m=>wk.has(m.id)) : defs.slice(0,3));
+        return shown.map(m=>({ name:m.name, used: wk.has(m.id) && many, value:s.marks[m.id] || '', aria:`${m.name} best lift in kg`, set:e=>{ const v = e.target.value.replace(/[^\d.,]/g,'').replace(',','.'); this.setState(st=>({ marks:{ ...st.marks, [m.id]:v } })); } })); })(),
+      markToggle: s.markDefs.length > 4, markToggleLabel: s.allMarks ? 'Show only this week\'s marks' : `Show all ${s.markDefs.length} marks`, markSet: `${s.markDefs.filter(m=>parseFloat(s.marks[m.id])).length} of ${s.markDefs.length} set`,
+      toggleMarks: ()=>this.setState(st=>({ allMarks:!st.allMarks })),
+      mkCount: s.markDefs.length,
+      mkRows: s.markDefs.map((m,i)=>{ const n = s.routines.flatMap(rr=>rr.items).filter(x=>x.load===m.id).length, rec = RECORDED[m.id] || 0;
+        const del = ()=>{ this.setState(st=>({ markDefs: st.markDefs.filter(x=>x.id!==m.id), mkDel:null })); this.flash(`"${m.name}" deleted${rec ? ` · ${rec} members' values removed` : ''}`); };
+        return { name:m.name, sep: i ? '1px solid #22394d' : 'none', reading: s.mkRen!==m.id, renaming: s.mkRen===m.id, confirming: s.mkDel===m.id,
+          meta: [n ? `Used in ${n} exercise${n>1?'s':''}` : 'Not in any routine', rec ? `${rec} members recorded it` : 'Nobody recorded it yet'].join(' · '),
+          locked: n>0, op: n ? .35 : 1, title: n ? 'In use — change those routine rows first' : 'Delete', removeLabel:`Delete ${m.name}`, renLabel:`Rename ${m.name}`,
+          startRen: ()=>this.setState({ mkRen:m.id, mkRenVal:m.name, mkDel:null }),
+          askDel: ()=>{ if (n) return; if (rec) this.setState({ mkDel:m.id, mkRen:null }); else del(); },
+          confirmText: `${rec} members recorded "${m.name}". Their values will be deleted too. This can't be undone.`, doDel: del }; }),
+      mkRenVal: s.mkRenVal, onMkRen: e=>this.setState({ mkRenVal:e.target.value }),
+      saveMkRen: ()=>{ const v = s.mkRenVal.trim(); if (!v) return; const old = (s.markDefs.find(x=>x.id===s.mkRen)||{}).name; this.setState(st=>({ markDefs: st.markDefs.map(x=>x.id===st.mkRen ? { ...x, name:v } : x), mkRen:null })); this.flash(`"${old}" renamed to "${v}" · routines and members' values updated`); },
+      cancelMkRen: ()=>this.setState({ mkRen:null }), cancelMkDel: ()=>this.setState({ mkDel:null }),
+      mkRenKey: e=>{ if (e.key==='Escape') this.setState({ mkRen:null }); if (e.key==='Enter') { const v = s.mkRenVal.trim(); if (v) this.setState(st=>({ markDefs: st.markDefs.map(x=>x.id===st.mkRen ? { ...x, name:v } : x), mkRen:null })); } },
+      newMark: s.newMark, onNewMark: e=>this.setState({ newMark:e.target.value }),
+      newMarkKey: e=>{ if (e.key==='Enter') { const n = s.newMark.trim(); if (n && !s.markDefs.some(m=>norm(m.name)===norm(n))) this.setState(st=>({ markDefs:[...st.markDefs, { id:'m'+Date.now(), name:n }], newMark:'' })); } },
+      addMark: ()=>{ const n = s.newMark.trim(); if (!n || s.markDefs.some(m=>norm(m.name)===norm(n))) return; this.setState(st=>({ markDefs:[...st.markDefs, { id:'m'+Date.now(), name:n }], newMark:'' })); this.flash(`"${n}" added · members see it in My marks`); },
+      cantMark: !s.newMark.trim() || s.markDefs.some(m=>norm(m.name)===norm(s.newMark.trim())), markOp: !s.newMark.trim() || s.markDefs.some(m=>norm(m.name)===norm(s.newMark.trim())) ? .4 : 1,
+      demo3: ()=>this.setState({ markDefs:MARKS3, allMarks:false }), demo10: ()=>this.setState({ markDefs:MARKS10, allMarks:false, marks:{ ...s.marks, frontsq:'70', ohp:'40', clean:'' } }),
+      d3bg: s.markDefs.length <= 3 ? '#1d4869' : 'transparent', d10bg: s.markDefs.length > 3 ? '#1d4869' : 'transparent',
+      cTabs: [['cycle','Cycle','ph-calendar-dots',weeks+' wk'],['routines','Routines','ph-list-checks',s.routines.length],['exercises','Exercises','ph-barbell',all.length],['marks','Marks','ph-trophy',s.markDefs.length]].map(([k,l,ic,n])=>({ label:l, icon:ic, n, on:s.cTab===k, line:s.cTab===k?'#33a1e0':'transparent', color:s.cTab===k?'#e8f0f7':'#8aa1b5', pick:()=>this.setState({ cTab:k }) })),
+      tCycle: s.cTab==='cycle', tRoutines: s.cTab==='routines', tExercises: s.cTab==='exercises', tMarks: s.cTab==='marks', notice: s.notice,
+      set: { name:e=>{ const v = e.target.value; updC(cur.id, c=>({ ...c, name:v })); }, event:e=>{ const v = e.target.value; updC(cur.id, c=>({ ...c, event:v })); },
+        eventDate:e=>{ const v = e.target.value; updC(cur.id, c=>({ ...c, eventDate:v })); this.setState({ week:null }); }, weeks:e=>{ const v = e.target.value.replace(/\D/g,''); updC(cur.id, c=>({ ...c, weeks:v })); this.setState({ week:null }); } },
+      cc: { name:cur.name, event:cur.event, eventDate:cur.eventDate, weeks:cur.weeks,
+        calc: cur.status==='active' ? `Week 1 starts Mon ${fmt(CC.start)} · week ${CC.weeks} is event week. Members are in week ${CC.curW} today.` : cur.status==='draft' ? `Week 1 would start Mon ${fmt(CC.start)} · draft: members don't see it until you make it active.` : `Ran ${fmt(CC.start)} – ${fmt(CC.start + (CC.weeks*7-1)*DAY)} · archived. Duplicate it to reuse it.` },
+      cycleCards: s.cycles.filter(c=>s.showArch || c.status!=='archived' || c.id===cur.id).map(c=>{ const k = calc(c), on = c.id===cur.id, nR = s.routines.filter(r=>r.cycleId===c.id).length;
+        const st = { active:['Active','#6fd6b4'], draft:['Draft','#f2ce78'], archived:['Archived','#8aa1b5'] }[c.status];
+        return { name:c.name, meta:`${k.weeks} weeks · ${fmt(k.start)} – ${fmt(k.start + (k.weeks*7-1)*DAY)} · ${nR} routines`, status:st[0], stColor:st[1], stBg:`color-mix(in srgb, ${st[1]} 16%, #13283a)`,
+          on, bg: on ? '#16304a' : '#13283a', border: on ? '#33a1e0' : '#274055', pick:()=>this.setState({ selC:c.id }) }; }),
+      archCount: s.cycles.filter(c=>c.status==='archived').length, toggleArch: ()=>this.setState(st=>({ showArch:!st.showArch })), archLabel: s.showArch ? 'Hide archived' : 'Show archived',
+      curIsDraft: cur.status==='draft', curNotArch: cur.status!=='archived',
+      activate: ()=>{ this.setState(st=>({ cycles: st.cycles.map(c=>c.id===cur.id ? { ...c, status:'active' } : c.status==='active' ? { ...c, status:'archived' } : c), week:null, day:null })); this.flash(`"${cur.name}" is now the active cycle · the previous one was archived`); },
+      archive: ()=>{ updC(cur.id, c=>({ ...c, status:'archived' })); this.flash(`"${cur.name}" archived · its routines leave the list but are kept`); },
+      duplicate: ()=>{ const id = 'cy'+Date.now(), map = {}; const copies = s.routines.filter(r=>r.cycleId===cur.id).map((r,i)=>{ const nid = 'r'+Date.now()+'-'+i; map[r.id] = nid; return { ...r, id:nid, cycleId:id, items: r.items.map(x=>({ ...x, id:'i'+(uid++) })) }; });
+        const grid2 = CC.grid.map(row=>row.map(v=>map[v] || v));
+        this.setState(st=>({ cycles:[...st.cycles, { ...cur, id, name:cur.name+' (copy)', status:'draft', grid:grid2 }], routines:[...st.routines, ...copies], selC:id, rF:id })); this.flash(`Duplicated as a draft · rename it and set the dates · ${copies.length} routines copied`); },
+      newCycle: ()=>{ const id = 'cy'+Date.now(); this.setState(st=>({ cycles:[...st.cycles, { id, name:'New cycle', event:'', eventDate:'2027-09-10', weeks:8, status:'draft', grid: Array.from({length:8},()=>['','','','','','','']) }], selC:id, rF:id })); },
+      dowHead: DOW, grid: gridRows, routineOptions,
+      copyWeek1: ()=>{ updC(cur.id, c=>({ ...c, grid: CC.grid.map((row,i)=> i===0 || i>=CC.weeks-2 ? row : [...CC.grid[0]]) })); this.flash('Week 1 copied to weeks 2–'+(CC.weeks-2)+' · the last 2 weeks were kept'); },
+      download: ()=>this.flash(`Template downloaded · ${all.length} exercises, ${s.routines.length} routines and your ${s.markDefs.length} marks are in the lists`),
+      tplNote: `${all.length} exercises · ${s.routines.length} routines · ${s.markDefs.length} marks in its lists`,
+      importX: ()=>this.flash('Mock: the app would check the file and show a summary before publishing'),
+      sheets: [['ph-info','Instructions','How to fill it, with an example.','#8aa1b5'],['ph-pencil-simple-line','Cycle','3 white cells: name, event date, weeks.','#5ab4e8'],['ph-list-checks','Routines','One row per exercise. Exercise and load are dropdowns.','#6fd6b4'],['ph-calendar-dots','Calendar','Weeks × days, dates filled in. Each cell: a routine or Rest.','#33a1e0'],['ph-lock-simple','Exercises (hidden)','Feeds the dropdown. Locked.','#8aa1b5']].map(([icon,name,sub,color],i)=>({ icon, name, sub, color, sep: i ? '1px solid #22394d' : 'none' })),
+      rF: s.rF, onRF: e=>this.setState({ rF:e.target.value }),
+      rfOpen: s.cycles.filter(c=>c.status!=='archived').map(c=>({ v:c.id, l: c.name + (c.status==='active' ? ' · active' : ' · draft') })),
+      rfArch: s.cycles.filter(c=>c.status==='archived').map(c=>({ v:c.id, l:c.name })),
+      hasR: R.id!=='__none', noR: R.id==='__none',
+      rList: visibleR.map(x=>{ const T = TYPES[x.type], cyc = s.cycles.find(c=>c.id===x.cycleId), n = s.cycles.reduce((a,c)=>a + calc(c).grid.flat().filter(v=>v===x.id).length, 0);
+        const tag = x.cycleId ? '' : 'Shared';
+        return { name:x.name, icon:T.icon, color:T.color, tile:tint(T.color), meta:`${x.items.length} exercises · used ${n}×`, tag, hasTag: !!tag, tagIcon: x.cycleId ? 'ph-calendar-dots' : 'ph-share-network', on:x.id===R.id, bg: x.id===R.id ? '#16304a' : '#13283a', border: x.id===R.id ? '#33a1e0' : '#274055', pick:()=>this.setState({ selR:x.id, addQ:'' }), mPick:()=>this.setState({ selR:x.id, addQ:'', cmEdit:true }) }; }),
+      newRoutine: ()=>{ const id = 'r'+Date.now(), cid = s.rF==='shared' ? null : s.rF, keys = Object.keys(TYPES), type = keys[visibleR.length % keys.length]; this.setState(st=>({ routines:[...st.routines, { id, name:'New routine', type, cycleId:cid, items:[] }], selR:id })); },
+      newRoutineLabel: s.rF==='shared' ? 'New shared routine' : 'New routine in this cycle',
+      ed: { name:R.name, setName:e=>{ const v = e.target.value; this.updR(R.id, x=>({ ...x, name:v })); }, types: typeSeg(R.type, k=>this.updR(R.id, x=>({ ...x, type:k }))),
+        belongs: R.cycleId || '', setBelongs: e=>{ const v = e.target.value || null; this.updR(R.id, x=>({ ...x, cycleId:v })); }, belongOptions: s.cycles.filter(c=>c.status!=='archived' || c.id===R.cycleId).map(c=>({ v:c.id, l:c.name })),
+        items: R.items.map((x,i)=>{ const v = view(x), upd = (k, val) => this.updR(R.id, rr=>({ ...rr, items: rr.items.map(y=>y.id===x.id ? { ...y, [k]:val } : y) }));
+          return { ...v, sets:x.sets, reps:x.reps, rest:x.rest, note:x.note, loadSel:x.load, loadVal:x.loadVal, showVal: !!x.load, valPh: x.load==='text' ? 'Bodyweight' : '%', valW: x.load==='text' ? '86px' : '48px',
+            setSets:e=>upd('sets', e.target.value.replace(/\D/g,'')), setReps:e=>upd('reps', e.target.value), setRest:e=>upd('rest', e.target.value), setNote:e=>upd('note', e.target.value),
+            setLoadSel:e=>{ const val = e.target.value; this.updR(R.id, rr=>({ ...rr, items: rr.items.map(y=>y.id===x.id ? { ...y, load:val, loadVal: val==='text' ? '' : (y.load && y.load!=='text' ? y.loadVal : '') } : y) })); },
+            setLoadVal:e=>upd('loadVal', x.load==='text' ? e.target.value : e.target.value.replace(/[^\d]/g,'')),
+            remove:()=>this.updR(R.id, rr=>({ ...rr, items: rr.items.filter(y=>y.id!==x.id) })), removeLabel:`Remove ${v.name}`,
+            op: s.drag===i ? .45 : 1, dropLine: s.dropAt===i && s.drag!==null && s.drag!==i ? '2px solid #33a1e0' : 'none',
+            dragStart:e=>{ try{ e.dataTransfer.setData('text/plain', x.id); }catch(_){} this.setState({ drag:i }); }, dragOver:e=>{ e.preventDefault(); if (s.dropAt!==i) this.setState({ dropAt:i }); },
+            drop:e=>{ e.preventDefault(); const from = s.drag; if (from!==null && from!==i) this.updR(R.id, rr=>{ const a = [...rr.items]; const [m] = a.splice(from,1); a.splice(i,0,m); return { ...rr, items:a }; }); this.setState({ drag:null, dropAt:null }); },
+            dragEnd:()=>this.setState({ drag:null, dropAt:null }) }; }) },
+      markOptions: s.markDefs.map(m=>({ v:m.id, l:`% of ${m.name}` })),
+      addQ: s.addQ, onAddQ: e=>this.setState({ addQ:e.target.value }), addOpen: !!nq, addNone: !!nq && addResults.length===0,
+      addResults: addResults.map(e=>({ ...exV(e), add:()=>{ const last = s.routines.flatMap(rr=>rr.items).filter(y=>y.ex===e.id).pop(); this.updR(R.id, rr=>({ ...rr, items:[...rr.items, last ? it(e.id, last.sets, last.reps, last.rest, last.load, last.loadVal) : it(e.id, '', '', '')] })); this.setState({ addQ:'' }); } })),
+      createFromSearch: ()=>{ const name = s.addQ.trim(); const id = addEx(name, R.type, [], name); this.updR(R.id, rr=>({ ...rr, items:[...rr.items, it(id, '', '', '')] })); this.setState({ addQ:'' }); this.flash(`"${name}" created as a club exercise and added. Add tips or a photo in Exercises.`); },
+      exQ: s.exQ, onExQ: e=>this.setState({ exQ:e.target.value }),
+      exChips: [['all','All',all.length],['lib','Library',LIB.length],['club',"Club's own",s.club.length]].map(([k,l,n])=>({ label:l, n, on:s.exF===k, bg: s.exF===k ? '#1d4869' : 'transparent', border: s.exF===k ? '#33a1e0' : '#274055', pick:()=>this.setState({ exF:k }) })),
+      exList: exFiltered.map(e=>{ const u = used(e.id); return { ...exV(e), meta: `${u.length ? 'In ' + u.join(', ') : 'Not in any routine yet'}${(e.tips||[]).length ? '' : e.src==='club' ? ' · no tips yet' : ''}` }; }),
+      nx: { ref:this.nxRef, name:s.nx.name, tips:s.nx.tips, yt:s.nx.yt, dup:nxDup, nameBorder: nxDup ? '#f2887a' : '#274055', border:'#274055',
+        setName:e=>{ const v = e.target.value; this.setState(st=>({ nx:{ ...st.nx, name:v } })); }, setTips:e=>{ const v = e.target.value; this.setState(st=>({ nx:{ ...st.nx, tips:v } })); }, setYt:e=>{ const v = e.target.value; this.setState(st=>({ nx:{ ...st.nx, yt:v } })); },
+        types: typeSeg(s.nx.type, k=>this.setState(st=>({ nx:{ ...st.nx, type:k } }))), cant: !s.nx.name.trim() || !!nxDup, op: !s.nx.name.trim() || nxDup ? .4 : 1,
+        save: ()=>{ const n = s.nx.name.trim(); if (!n || nxDup) return; addEx(n, s.nx.type, s.nx.tips.split('\n').map(t=>t.trim()).filter(Boolean), s.nx.yt.trim() || n); this.setState({ nx:{ name:'', type:s.nx.type, tips:'', yt:'' }, exF:'club' }); this.flash(`"${n}" added to club exercises`); } },
+      cmTabs: [['cycle','Cycle'],['routines','Routines'],['exercises','Exercises'],['marks','Marks']].map(([k,l])=>({ label:l, on:s.cmTab===k, bg: s.cmTab===k ? '#1d4869' : 'transparent', w: s.cmTab===k ? 650 : 500, color: s.cmTab===k ? '#e8f0f7' : '#cfdeea', pick:()=>this.setState({ cmTab:k, cmEdit:false }) })),
+      cmCycle: s.cmTab==='cycle', cmRoutines: s.cmTab==='routines' && !s.cmEdit, cmEditor: s.cmTab==='routines' && s.cmEdit && R.id!=='__none', cmExercises: s.cmTab==='exercises', cmMarks: s.cmTab==='marks',
+      cmWk: (()=>{ const n = Math.min(s.cmW ?? CC.curW, CC.weeks), ws = CC.start + (n-1)*7*DAY; return { n, of:CC.weeks, dates:`${fmt(ws)} – ${fmt(ws+6*DAY)}` }; })(),
+      cmPrev: ()=>this.setState({ cmW: Math.max(1, Math.min(s.cmW ?? CC.curW, CC.weeks) - 1) }), cmNext: ()=>this.setState({ cmW: Math.min(CC.weeks, Math.min(s.cmW ?? CC.curW, CC.weeks) + 1) }),
+      cmDays: gridRows[Math.min(s.cmW ?? CC.curW, CC.weeks) - 1].cells.map((c,i)=>({ ...c, dow:DOW[i] })),
+      cmBack: ()=>this.setState({ cmEdit:false, addQ:'' }),
+      cmNewRoutine: ()=>{ const id = 'r'+Date.now(), cid = s.rF==='shared' ? null : s.rF, keys = Object.keys(TYPES), type = keys[visibleR.length % keys.length]; this.setState(st=>({ routines:[...st.routines, { id, name:'New routine', type, cycleId:cid, items:[] }], selR:id, cmEdit:true })); },
+      cySel: cur.id, onCySel: e=>this.setState({ selC:e.target.value, cmW:null }),
+      cyOpen: s.cycles.filter(c=>c.status!=='archived').map(c=>({ v:c.id, l: c.name + (c.status==='active' ? ' · active' : ' · draft') })),
+      cyArch: s.cycles.filter(c=>c.status==='archived').map(c=>({ v:c.id, l:c.name })),
+      cmCur: (()=>{ const st = { active:['Active','#6fd6b4'], draft:['Draft','#f2ce78'], archived:['Archived','#8aa1b5'] }[cur.status]; const nR = s.routines.filter(r=>r.cycleId===cur.id).length;
+        return { status:st[0], stColor:st[1], stBg:`color-mix(in srgb, ${st[1]} 16%, #13283a)`, meta:`${CC.weeks} weeks · ${fmt(CC.start)} – ${fmt(CC.start + (CC.weeks*7-1)*DAY)} · ${nR} routines` }; })(),
+      cmShowDet: cur.status==='draft' || (cur.status==='active' && s.cmDet), cmCanToggle: cur.status==='active',
+      cmDetLabel: s.cmDet ? 'Hide details' : 'Edit name and dates', cmToggleDet: ()=>this.setState(st=>({ cmDet:!st.cmDet }))
+    };
+  }
+}
+</script>
+</body>
+</html>
