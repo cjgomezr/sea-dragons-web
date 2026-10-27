@@ -114,6 +114,14 @@ const colorRoleToCssVariable: Record<string, string> = {
   "Segment selected": "color-segment-selected",
   "Border dashed": "color-border-dashed",
   "Type meeting": "color-type-meeting",
+  "Row selected": "color-row-selected",
+  "Row rule": "color-row-rule",
+  "Routine 0": "color-routine-0",
+  "Routine 1": "color-routine-1",
+  "Routine 2": "color-routine-2",
+  "Routine 3": "color-routine-3",
+  "Routine 4": "color-routine-4",
+  "Routine 5": "color-routine-5",
 };
 
 describe("tokens de color: tema claro", () => {
@@ -419,6 +427,49 @@ describe.each([
       ),
     ).toBeGreaterThanOrEqual(AA_NON_TEXT);
   });
+});
+
+// #900 (D15 del PRD de E35): la fila elegida y la línea entre filas del
+// handoff de entrenamiento, y la paleta de las rutinas. El color de una
+// rutina sólo pinta barras, puntos y baldosas (3:1), nunca texto; la
+// baldosa lo lleva al 20 % sobre el panel.
+const ROUTINE_COLORS = [0, 1, 2, 3, 4, 5].map(
+  (index) => `color-routine-${index}`,
+);
+const ROUTINE_TILE_WEIGHT = 0.2;
+
+describe.each([
+  ["claro", rootCss],
+  ["oscuro", darkCss],
+] as const)("contraste del entrenamiento en tema %s", (_, tokens) => {
+  it("el texto cumple AA sobre la fila elegida", () => {
+    expect(
+      contrastRatio(
+        token(tokens, "color-text"),
+        token(tokens, "color-row-selected"),
+      ),
+    ).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
+  it.each(ROUTINE_COLORS)("%s se distingue del panel (3:1 o más)", (color) => {
+    expect(
+      contrastRatio(token(tokens, color), token(tokens, "color-panel")),
+    ).toBeGreaterThanOrEqual(AA_NON_TEXT);
+  });
+
+  it.each(ROUTINE_COLORS)(
+    "el icono de %s se distingue de su baldosa (3:1 o más)",
+    (color) => {
+      const tile = tintOver(
+        token(tokens, color),
+        token(tokens, "color-panel"),
+        ROUTINE_TILE_WEIGHT,
+      );
+      expect(contrastRatio(token(tokens, color), tile)).toBeGreaterThanOrEqual(
+        AA_NON_TEXT,
+      );
+    },
+  );
 });
 
 // #581: el hover claro de #547 (#E6EDF3) se quedaba en 1.18:1 sobre el panel

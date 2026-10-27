@@ -46,6 +46,7 @@ describe("navegación", () => {
         ["/equipos", "equipos"],
         ["/evaluaciones", "evaluaciones"],
         ["/noticias", "noticias"],
+        ["/entrenamiento", "entrenamiento"],
         ["/pagos", "pagos"],
         ["/grupos", "grupos"],
       ],
@@ -74,7 +75,7 @@ describe("navegación", () => {
 // E17 RF-5: los nombres en inglés son los del mockup de escritorio
 // (docs/mockups/dashboard-light.png).
 describe("navegación traducida", () => {
-  it("nombra las nueve secciones en inglés", () => {
+  it("nombra las diez secciones en inglés", () => {
     expect(
       NAV_SECTIONS.map((section) => getSectionLabel(section, english)),
     ).toEqual([
@@ -85,12 +86,13 @@ describe("navegación traducida", () => {
       "Teams",
       "Evaluations",
       "News",
+      "Training",
       "Payments",
       "Groups",
     ]);
   });
 
-  it("nombra las nueve secciones en español igual que antes de traducirlas", () => {
+  it("nombra las diez secciones en español", () => {
     expect(
       NAV_SECTIONS.map((section) => getSectionLabel(section, spanish)),
     ).toEqual([
@@ -101,6 +103,7 @@ describe("navegación traducida", () => {
       "Equipos",
       "Evaluaciones",
       "Noticias",
+      "Entrenamiento",
       "Pagos",
       "Grupos",
     ]);
@@ -116,6 +119,7 @@ const MEMBER_SECTIONS = [
   "/directorio",
   "/calendario",
   "/noticias",
+  "/entrenamiento",
   "/pagos",
 ];
 
@@ -140,7 +144,7 @@ describe("navegación", () => {
 
 // FR-013 (#213): la navegación ofrece sólo lo que la frontera deja abrir.
 describe("secciones por rol", () => {
-  it("un Player ve Panel, Directorio, Calendario, Noticias y Pagos", () => {
+  it("un Player ve Panel, Directorio, Calendario, Noticias, Entrenamiento y Pagos", () => {
     expect(hrefsOf(getVisibleSections(currentAs("Player")))).toEqual(
       MEMBER_SECTIONS,
     );
@@ -177,6 +181,7 @@ describe("secciones por rol", () => {
       "/equipos",
       "/evaluaciones",
       "/noticias",
+      "/entrenamiento",
       "/pagos",
       "/grupos",
     ]);
@@ -191,8 +196,8 @@ describe("secciones por rol", () => {
 
 describe("barra móvil por rol", () => {
   it.each([
-    ["Player", ["/pagos"]],
-    ["Committee", ["/pagos", "/grupos"]],
+    ["Player", ["/entrenamiento", "/pagos"]],
+    ["Committee", ["/entrenamiento", "/pagos", "/grupos"]],
   ] as const)(
     "un %s tiene fijas Inicio, Eventos, Directorio y Noticias, y el resto en Más",
     (role, overflowHrefs) => {
@@ -208,7 +213,7 @@ describe("barra móvil por rol", () => {
     },
   );
 
-  it("un Coach tiene fijas Inicio, Eventos, Equipos y Noticias, y en Más Directorio, Asistencia, Evaluaciones, Pagos y Grupos", () => {
+  it("un Coach tiene fijas Inicio, Eventos, Equipos y Noticias, y en Más Directorio, Asistencia, Evaluaciones, Entrenamiento, Pagos y Grupos", () => {
     const { primary, overflow } = getMobileSections(currentAs("Coach"));
 
     expect(hrefsOf(primary)).toEqual([
@@ -221,6 +226,7 @@ describe("barra móvil por rol", () => {
       "/directorio",
       "/asistencia",
       "/evaluaciones",
+      "/entrenamiento",
       "/pagos",
       "/grupos",
     ]);
@@ -236,6 +242,7 @@ describe("barra móvil por rol", () => {
       "/directorio",
       "/asistencia",
       "/evaluaciones",
+      "/entrenamiento",
       "/pagos",
       "/grupos",
     ]);
@@ -328,10 +335,11 @@ describe("etiqueta corta para la barra móvil (#85)", () => {
 });
 
 describe("navegación de quien no tiene la membresía al día (#453)", () => {
-  it("a un Player le deja Inicio, Calendario y Pagos, y nada más", () => {
+  it("a un Player le deja Inicio, Calendario, Entrenamiento y Pagos, y nada más", () => {
     expect(hrefsOf(getVisibleSections(notCurrentAs("Player")))).toEqual([
       "/dashboard",
       "/calendario",
+      "/entrenamiento",
       "/pagos",
     ]);
   });
@@ -343,6 +351,7 @@ describe("navegación de quien no tiene la membresía al día (#453)", () => {
       "/asistencia",
       "/equipos",
       "/evaluaciones",
+      "/entrenamiento",
       "/pagos",
       "/grupos",
     ]);
@@ -353,6 +362,7 @@ describe("navegación de quien no tiene la membresía al día (#453)", () => {
       "/dashboard",
       "/calendario",
       "/noticias",
+      "/entrenamiento",
       "/pagos",
       "/grupos",
     ]);
@@ -364,11 +374,11 @@ describe("navegación de quien no tiene la membresía al día (#453)", () => {
     );
   });
 
-  it("pone Pagos como pestaña fija del Player, sin nada en Más", () => {
+  it("pone Pagos como pestaña fija del Player, y Entrenamiento en Más", () => {
     const { primary, overflow } = getMobileSections(notCurrentAs("Player"));
 
     expect(hrefsOf(primary)).toEqual(["/dashboard", "/calendario", "/pagos"]);
-    expect(overflow).toEqual([]);
+    expect(hrefsOf(overflow)).toEqual(["/entrenamiento"]);
   });
 
   it.each(ROLES)(

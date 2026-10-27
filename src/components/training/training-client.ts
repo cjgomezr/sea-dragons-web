@@ -1,0 +1,119 @@
+import { z } from "zod";
+import { MEMBERSHIP_NOT_CURRENT_REASON } from "@/lib/api/error-codes";
+import { readApiPayload, requestApi } from "@/lib/api/request-api";
+import { TRAINING_PLAN_API_PATH } from "@/lib/auth/routes";
+import type { TrainingPlan } from "@/lib/training/training-plan";
+
+/**
+ * Lo que la pantalla de Entrenamiento (#900) le pide a la API v1 (#898) y
+ * cómo reduce la respuesta a algo que pintar. Nada habla con la base: la
+ * aplicación nativa de Release 2 va a usar este mismo camino (CON-002).
+ */
+
+const markRefSchema = z.object({ id: z.string(), name: z.string() });
+
+const loadSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none") }),
+  z.object({ kind: z.literal("pct"), mark: markRefSchema, pct: z.number() }),
+  z.object({ kind: z.literal("week"), mark: markRefSchema }),
+  z.object({ kind: z.literal("text"), text: z.string() }),
+]);
+
+const doseSchema = z.object({
+  sets: z.number().nullable(),
+  reps: z.string().nullable(),
+  intensity: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("none") }),
+    z.object({ kind: z.literal("pct"), pct: z.number() }),
+    z.object({ kind: z.literal("text"), text: z.string() }),
+  ]),
+});
+
+const routineItemSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("section"), id: z.string(), title: z.string() }),
+  z.object({
+    kind: z.literal("exercise"),
+    id: z.string(),
+    exercise: z.object({
+      id: z.string(),
+      name: z.string(),
+      tips: z.array(z.string()),
+      photoUrls: z.array(z.string()),
+      youtubeUrl: z.string(),
+    }),
+    sets: z.number().nullable(),
+    reps: z.string().nullable(),
+    rest: z.string().nullable(),
+    note: z.string().nullable(),
+    load: loadSchema,
+  }),
+]);
+
+const routineSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  colorIndex: z.number().int(),
+  items: z.array(routineItemSchema),
+});
+
+const cycleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  event: z
+    .object({ name: z.string(), date: z.iso.date().nullable() })
+    .nullable(),
+  startDate: z.iso.date(),
+  endDate: z.iso.date(),
+  weeks: z.number().int().positive(),
+});
+
+const activePlanSchema = z.object({
+  cycle: cycleSchema,
+  current: z.object({
+    week: z.number().int().positive(),
+    phase: z.enum(["not_started", "running", "finished"]),
+    today: z.iso.date(),
+  }),
+  week: z.object({
+    number: z.number().int().positive(),
+    note: z.string().nullable(),
+    dose: doseSchema.nullable(),
+    days: z.array(
+      z.object({
+        weekday: z.number().int(),
+        date: z.iso.date(),
+        routines: z.array(routineSchema),
+      }),
+    ),
+  }),
+});
+
+const planResponseSchema: z.ZodType<{ readonly data: TrainingPlan }> = z.object(
+  {
+    data: z.union([z.object({ cycle: z.null() }), activePlanSchema]),
+  },
+);
+
+/** El plan, la puerta cerrada de quien no está al día, o un fallo. */
+export type TrainingPlanOutcome =
+  | { readonly kind: "loaded"; readonly plan: TrainingPlan }
+  | { readonly kind: "blocked" }
+  | { readonly kind: "failed" };
+
+/** La semana `week` del ciclo activo, o la de hoy si es nula. */
+export async function loadTrainingPlan(
+  week: number | null,
+): Promise<TrainingPlanOutcome> {
+  const path =
+    week === null
+      ? TRAINING_PLAN_API_PATH
+      : `${TRAINING_PLAN_API_PATH}?week=${week}`;
+  const outcome = readApiPayload(await requestApi(path), planResponseSchema);
+  if (outcome.kind === "ok") {
+    return { kind: "loaded", plan: outcome.value.data };
+  }
+  return outcome.failure === "forbidden" &&
+    outcome.reason === MEMBERSHIP_NOT_CURRENT_REASON
+    ? { kind: "blocked" }
+    : { kind: "failed" };
+}

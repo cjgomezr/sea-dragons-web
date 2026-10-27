@@ -51,6 +51,20 @@
      aviso y el éxito. El claro es un gris azulado que pasa 3:1 sobre el panel,
      como la barra y el punto del tipo piden. */
   --color-type-meeting: #6e859b;
+  /* Entrenamiento (#900, D15 del PRD de E35): la fila elegida y la línea
+     entre filas del handoff, y una paleta de seis colores de rutina. El de
+     una rutina pinta barras, puntos y baldosas, nunca texto. */
+  --color-row-selected: #e3eef7;
+  --color-row-rule: #e9eff4;
+  --color-routine-0: #1c6ea4;
+  --color-routine-1: #22806c;
+  --color-routine-2: #9a6e14;
+  --color-routine-3: #bc3b2e;
+  --color-routine-4: #6e859b;
+  --color-routine-5: #6b69b8;
+  /* El color de la rutina de una fila, una baldosa o un punto: el componente
+     lo pone en línea con el de su rutina. */
+  --routine-color: var(--color-routine-0);
   /* El enlace de ejemplo junto al acento que el Admin elige (#346). La
      muestra pone los de cada tema en línea; aquí están porque toda variable
      que la hoja lee tiene su valor en :root (tests/unit/theme-css.test.ts). */
@@ -149,6 +163,14 @@
     --color-segment-selected: #1d4869;
     --color-border-dashed: #3a5670;
     --color-type-meeting: #b7c7d6;
+    --color-row-selected: #16304a;
+    --color-row-rule: #22394d;
+    --color-routine-0: #33a1e0;
+    --color-routine-1: #6fd6b4;
+    --color-routine-2: #f2ce78;
+    --color-routine-3: #f2887a;
+    --color-routine-4: #b7c7d6;
+    --color-routine-5: #9e9ddc;
     --color-hero-gradient-start: #163a55;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -180,6 +202,14 @@
   --color-segment-selected: #1d4869;
   --color-border-dashed: #3a5670;
   --color-type-meeting: #b7c7d6;
+  --color-row-selected: #16304a;
+  --color-row-rule: #22394d;
+  --color-routine-0: #33a1e0;
+  --color-routine-1: #6fd6b4;
+  --color-routine-2: #f2ce78;
+  --color-routine-3: #f2887a;
+  --color-routine-4: #b7c7d6;
+  --color-routine-5: #9e9ddc;
   --color-hero-gradient-start: #163a55;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -24409,5 +24439,555 @@ a.dashboard-club-cell-body:focus-visible {
 @container dashboard-news (min-width: 900px) {
   .dashboard-news-grid:has(.dashboard-news-minis) {
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  }
+}
+/* Entrenamiento (#900), siguiendo docs/design/design_handoff_training/ (§4.1
+   y §4.2): la cabecera del ciclo, la franja de semanas, los días de la
+   semana que se mira y el día elegido al lado. Por debajo de 1280 px el
+   panel baja bajo los días; en el móvil los días son píldoras. */
+.training {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.training-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.training-heading {
+  min-width: 0;
+}
+
+.training-header h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+.training-eyebrow {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-family-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.training-target,
+.training-compact-position {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: var(--space-1) 0 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.training-target-icon {
+  display: inline-flex;
+  font-size: 16px;
+  color: var(--color-warning);
+}
+
+.training-header-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.training-countdown {
+  text-align: right;
+}
+
+.training-countdown p {
+  margin: 0;
+}
+
+.training-countdown-remaining {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.training-countdown-number {
+  font-family: var(--font-family-mono);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.training-countdown-label,
+.training-countdown-week {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* El hueco de arriba es el de la marca NOW, que asoma sobre su semana. */
+.training-strip {
+  display: flex;
+  gap: 6px;
+  padding-top: 10px;
+  overflow-x: auto;
+}
+
+.training-strip-week {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-panel);
+  cursor: pointer;
+}
+
+/* Apagadas sin opacidad: el texto secundario ya cumple AA sobre el fondo. */
+.training-strip-week-past {
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+/* El aviso, mezclado con el texto para que el número siga cumpliendo AA
+   también en el tema claro. */
+.training-strip-week-event {
+  border-color: color-mix(in srgb, var(--color-warning) 55%, transparent);
+  color: color-mix(in srgb, var(--color-warning) 60%, var(--color-text));
+}
+
+.training-strip-week[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-segment-selected);
+}
+
+.training-strip-now {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  transform: translateX(-50%);
+}
+
+.training-layout {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.training-week {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.training-week-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.training-week-step {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 16px;
+  color: var(--color-text);
+  background: var(--color-panel);
+  cursor: pointer;
+}
+
+.training-week-step:disabled {
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: default;
+}
+
+.training-week-title h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.training-week-range {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.training-back-to-week {
+  margin-left: auto;
+  padding: var(--space-1) 0;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  background: none;
+  cursor: pointer;
+}
+
+.training-week-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.training-days,
+.training-pills {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.training-days {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.training-day {
+  display: grid;
+  grid-template-columns: 4px 64px 36px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: 0 var(--space-3) 0 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font: inherit;
+  text-align: left;
+  color: var(--color-text);
+  background: var(--color-panel);
+  cursor: pointer;
+}
+
+.training-day-rest {
+  border-style: dashed;
+  background: transparent;
+}
+
+.training-day[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-row-selected);
+}
+
+.training-day-bar {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+
+.training-day-bar-segment {
+  flex: 1;
+  background: var(--routine-color);
+}
+
+.training-day-event .training-day-bar {
+  background: var(--color-warning);
+}
+
+.training-day-date {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.training-day-weekday {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.training-day-weekday-today {
+  color: var(--color-accent-text);
+}
+
+.training-day-tile,
+.training-panel-tile {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  color: var(--routine-color);
+  background: color-mix(in srgb, var(--routine-color) 20%, var(--color-panel));
+}
+
+.training-day-tile {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+}
+
+.training-day-rest .training-day-tile,
+.training-panel-rest .training-panel-tile {
+  color: var(--color-text-secondary);
+  background: var(--color-editor-bar);
+}
+
+.training-day-event .training-day-tile,
+.training-panel-event .training-panel-tile {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 20%, var(--color-panel));
+}
+
+.training-day-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.training-day-title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.training-day-rest .training-day-title,
+.training-day-subtitle {
+  color: var(--color-text-secondary);
+}
+
+.training-day-subtitle {
+  font-size: 12px;
+}
+
+.training-today {
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: var(--font-family-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.training-day-caret {
+  display: inline-flex;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.training-day:focus-visible,
+.training-pill:focus-visible,
+.training-strip-week:focus-visible,
+.training-week-step:focus-visible,
+.training-back-to-week:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.training-pills {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.training-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-1) 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-panel);
+  cursor: pointer;
+}
+
+.training-pill-rest {
+  border-style: dashed;
+  background: transparent;
+}
+
+.training-pill[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-segment-selected);
+}
+
+.training-pill-initial {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.training-pill-initial-today {
+  color: var(--color-accent-text);
+}
+
+.training-pill-number {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.training-pill-dots {
+  display: flex;
+  gap: 3px;
+  height: 7px;
+}
+
+.training-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--routine-color);
+}
+
+.training-pill-dot-event {
+  background: var(--color-warning);
+}
+
+.training-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.training-panel-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-top: 4px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-panel);
+}
+
+.training-panel-routine {
+  border-top-color: var(--routine-color);
+}
+
+.training-panel-event {
+  border-top-color: var(--color-warning);
+}
+
+.training-panel-tile {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  font-size: 22px;
+}
+
+.training-panel-heading {
+  min-width: 0;
+}
+
+.training-panel-heading h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+  overflow-wrap: break-word;
+}
+
+.training-panel-meta {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.training-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border: 1px dashed var(--color-border-dashed);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.training-empty-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.training-empty .admin-empty {
+  margin: 0;
+}
+
+@media (width >= 1280px) {
+  .training-layout {
+    grid-template-columns: minmax(0, 1fr) 520px;
+  }
+
+  .training-panel {
+    position: sticky;
+    top: var(--space-4);
+  }
+}
+
+/* En el móvil, ‹ › de 44 px y la semana entre ellos (§4.2 del handoff). */
+@media (width < 768px) {
+  .training-header h1 {
+    font-size: 21px;
+  }
+
+  .training-compact-position {
+    font-size: 13px;
+  }
+
+  .training-week-nav {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
+
+  .training-week-step {
+    width: 44px;
+    height: 44px;
+  }
+
+  .training-week-title {
+    text-align: center;
+  }
+
+  .training-back-to-week {
+    grid-column: 1 / -1;
+    justify-self: center;
+    min-height: 44px;
+    margin-left: 0;
   }
 }

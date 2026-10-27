@@ -26,6 +26,11 @@ import type { RoutineLoad, WeekDose } from "./training-load";
 /** Los que planifican ven el plan aunque su membresía no esté al día (D3). */
 const PLANNER_ROLES: ReadonlySet<Role> = new Set(["Admin", "Coach"]);
 
+/** Si el rol planifica el entrenamiento (D3): Admin y Coach. */
+export function canPlanTraining(role: Role): boolean {
+  return PLANNER_ROLES.has(role);
+}
+
 const FIRST_WEEK = 1;
 const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 
@@ -307,7 +312,7 @@ async function readBlock(
   gateways: TrainingPlanGateways,
   request: TrainingPlanRequest & { readonly role: Role },
 ): Promise<MembershipBlock | null> {
-  if (PLANNER_ROLES.has(request.role)) {
+  if (canPlanTraining(request.role)) {
     return null;
   }
   return membershipBlockOf(
