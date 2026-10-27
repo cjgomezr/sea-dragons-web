@@ -56,8 +56,10 @@ export const PRODUCTION_ONLY_ENV_VARS = [
 // invitaría a poner un valor de PATH en .env.local, y eso rompería el shell
 // de quien lo intentara. No entra en PLATFORM_INJECTED_ENV_VARS porque no la
 // inyecta ningún despliegue: no es de esta aplicación en absoluto.
+// SYSTEMROOT es lo mismo en Windows: Node no arranca un subproceso sin ella.
 export const IGNORED_ENV_VARS = new Set<string>([
   "PATH",
+  "SYSTEMROOT",
   ...PLATFORM_INJECTED_ENV_VARS,
   ...PRODUCTION_ONLY_ENV_VARS,
 ]);

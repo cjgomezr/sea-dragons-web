@@ -47,6 +47,7 @@ describe(".env.example", () => {
   it("excluye exactamente las variables declaradas, ni una más", () => {
     expect([...IGNORED_ENV_VARS]).toEqual([
       "PATH",
+      "SYSTEMROOT",
       ...PLATFORM_INJECTED_ENV_VARS,
       ...PRODUCTION_ONLY_ENV_VARS,
     ]);
