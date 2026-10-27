@@ -1,0 +1,28 @@
+Proprietary License
+
+Copyright (c) 2026 Camilo Gómez Restrepo. All rights reserved.
+
+This repository and everything in it (source code, database migrations,
+tests, scripts, documentation, designs and other assets), except the
+third-party material described below, is proprietary.
+
+The code is published only so that it can be viewed. Being able to see it
+does not grant any license to it.
+
+No permission is granted to use, copy, modify, merge, publish, distribute,
+sublicense, sell or deploy this software, in whole or in part, without the
+prior written permission of the copyright holder.
+
+Third-party material
+
+Third-party content keeps its own license and is not covered by this notice:
+
+- free-exercise-db (https://github.com/yuhonas/free-exercise-db): public
+  domain, released under The Unlicense.
+- npm dependencies (listed in package.json and package-lock.json): each under
+  the license stated by its own package.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR ITS USE.
