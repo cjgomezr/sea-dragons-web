@@ -237,6 +237,11 @@ export const ACCOUNT_NEWS_SEEN_API_PATH = "/api/v1/account/news-seen";
  * decide cada fuente, así que no aparece en `RESTRICTED_ROUTES`. */
 export const DASHBOARD_API_PATH = "/api/v1/dashboard";
 
+/** Las marcas del socio de la sesión (#899, RF-5 del PRD de E35). No aparece
+ * en `MEMBER_ONLY_ROUTES` aunque pida estar al día: la puerta la cierra el
+ * handler, que deja pasar al Admin y al Coach sin pagar (D3), como el plan. */
+export const TRAINING_MY_MARKS_API_PATH = "/api/v1/training/marks/me";
+
 /** La búsqueda global (#425, RF-7 del PRD de E14). La alcanza cualquier
  * cuenta activa: qué encuentra cada rol lo decide cada sección (D3), así que
  * no aparece en `RESTRICTED_ROUTES`. */
