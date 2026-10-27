@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Plataforma web del club Victoria Seadragons (rugby subacuático, Melbourne).",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "next dev -p 3417",
     "build": "next build",

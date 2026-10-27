@@ -223,3 +223,8 @@ then `bash scripts/project-setup.sh OWNER N`, enable the built-in workflows
 (Item added → Todo, Item closed → Done, PR merged → Done) and group the view
 by Parent issue. The agent only ever writes "In Progress" via
 `scripts/task-status.sh`; GitHub handles Done.
+
+## Licencia
+
+El código es propietario: todos los derechos reservados. Se publica solo para
+que se pueda ver; los términos están en [LICENSE](./LICENSE).
