@@ -116,6 +116,44 @@ function seedRoutine(
   );
 }
 
+/** Una rutina del ciclo con una fila, un día y la nota de la semana 1. */
+async function seedCycleContent(
+  database: TemporaryDatabase,
+  clubId: string,
+  cycleId: string,
+): Promise<void> {
+  const routineId = await seedRoutine(database, clubId, cycleId);
+  await database.query(
+    `insert into public.training_cycle_days
+       (club_id, cycle_id, week_no, weekday, slot, routine_id)
+     values ('${clubId}', '${cycleId}', 1, 0, 1, '${routineId}');
+     insert into public.training_cycle_weeks
+       (club_id, cycle_id, week_no, note)
+     values ('${clubId}', '${cycleId}', 1, 'Training Camp');
+     insert into public.training_routine_items
+       (club_id, routine_id, position, kind, section_title)
+     values ('${clubId}', '${routineId}', 0, 'section', 'Warm up')`,
+  );
+}
+
+/** `ciclos|rutinas|filas|días|semanas` que lee cada socio con su sesión. */
+function countsVisibleTo(
+  database: TemporaryDatabase,
+  members: readonly Member[],
+): Promise<(string | undefined)[]> {
+  const countsSql = `select
+      (select count(*) from public.training_cycles) || '|' ||
+      (select count(*) from public.training_routines) || '|' ||
+      (select count(*) from public.training_routine_items) || '|' ||
+      (select count(*) from public.training_cycle_days) || '|' ||
+      (select count(*) from public.training_cycle_weeks)`;
+  return Promise.all(
+    members.map(async (member) =>
+      rowsOf(await database.query(`${asUser(member)} ${countsSql}`)).at(-1),
+    ),
+  );
+}
+
 function seedClubExercise(
   database: TemporaryDatabase,
   clubId: string,
@@ -490,24 +528,17 @@ describeConPostgres("las tablas de entrenamiento", () => {
   it("el ciclo activo y sus rutinas los lee quien está al día; quien no, no", async () => {
     const database = await migratedDatabase();
     const clubId = await seededClubId(database);
-    const cycleId = await seedCycle(database, clubId, "active");
-    const routineId = await seedRoutine(database, clubId, cycleId);
-    await seedRoutine(database, clubId, null);
-    await database.query(
-      `insert into public.training_cycle_days
-         (club_id, cycle_id, week_no, weekday, slot, routine_id)
-       values ('${clubId}', '${cycleId}', 1, 0, 1, '${routineId}');
-       insert into public.training_cycle_weeks
-         (club_id, cycle_id, week_no, note)
-       values ('${clubId}', '${cycleId}', 1, 'Training Camp');
-       insert into public.training_routine_items
-         (club_id, routine_id, position, kind, section_title)
-       values ('${clubId}', '${routineId}', 0, 'section', 'Warm up')`,
+    await seedCycleContent(
+      database,
+      clubId,
+      await seedCycle(database, clubId, "active"),
     );
-    const current = await seedMember(database, clubId, {
-      role: "Player",
-      status: "active",
-    });
+    await seedRoutine(database, clubId, null);
+    const current = await Promise.all(
+      (["active", "trialing", "waived"] as const).map((status) =>
+        seedMember(database, clubId, { role: "Player", status }),
+      ),
+    );
     const blocked = await Promise.all(
       (["past_due", "pending", "cancelled"] as const).map((status) =>
         seedMember(database, clubId, { role: "Committee", status }),
@@ -516,24 +547,15 @@ describeConPostgres("las tablas de entrenamiento", () => {
     const withoutMembership = await seedMember(database, clubId, {
       role: "Player",
     });
-    const countsSql = `select
-        (select count(*) from public.training_cycles) || '|' ||
-        (select count(*) from public.training_routines) || '|' ||
-        (select count(*) from public.training_routine_items) || '|' ||
-        (select count(*) from public.training_cycle_days) || '|' ||
-        (select count(*) from public.training_cycle_weeks)`;
 
-    const currentCounts = await database.query(
-      `${asUser(current)} ${countsSql}`,
-    );
-    const blockedCounts = await Promise.all(
-      [...blocked, withoutMembership].map((member) =>
-        database.query(`${asUser(member)} ${countsSql}`),
-      ),
-    );
+    const currentCounts = await countsVisibleTo(database, current);
+    const blockedCounts = await countsVisibleTo(database, [
+      ...blocked,
+      withoutMembership,
+    ]);
 
-    expect(rowsOf(currentCounts).at(-1)).toBe("1|2|1|1|1");
-    expect(blockedCounts.map((output) => rowsOf(output).at(-1))).toEqual([
+    expect(currentCounts).toEqual(["1|2|1|1|1", "1|2|1|1|1", "1|2|1|1|1"]);
+    expect(blockedCounts).toEqual([
       "0|0|0|0|0",
       "0|0|0|0|0",
       "0|0|0|0|0",
@@ -545,8 +567,11 @@ describeConPostgres("las tablas de entrenamiento", () => {
     const database = await migratedDatabase();
     const clubId = await seededClubId(database);
     for (const status of ["draft", "archived"] as const) {
-      const cycleId = await seedCycle(database, clubId, status);
-      await seedRoutine(database, clubId, cycleId);
+      await seedCycleContent(
+        database,
+        clubId,
+        await seedCycle(database, clubId, status),
+      );
     }
     const planners = await Promise.all(
       (["Admin", "Coach"] as const).map((role) =>
@@ -557,24 +582,12 @@ describeConPostgres("las tablas de entrenamiento", () => {
       role: "Player",
       status: "active",
     });
-    const countsSql = `select
-        (select count(*) from public.training_cycles) || '|' ||
-        (select count(*) from public.training_routines)`;
 
-    const plannerCounts = await Promise.all(
-      planners.map((planner) =>
-        database.query(`${asUser(planner)} ${countsSql}`),
-      ),
-    );
-    const playerCounts = await database.query(
-      `${asUser(currentPlayer)} ${countsSql}`,
-    );
+    const plannerCounts = await countsVisibleTo(database, planners);
+    const playerCounts = await countsVisibleTo(database, [currentPlayer]);
 
-    expect(plannerCounts.map((output) => rowsOf(output).at(-1))).toEqual([
-      "2|2",
-      "2|2",
-    ]);
-    expect(rowsOf(playerCounts).at(-1)).toBe("0|0");
+    expect(plannerCounts).toEqual(["2|2|2|2|2", "2|2|2|2|2"]);
+    expect(playerCounts).toEqual(["0|0|0|0|0"]);
   });
 
   it("los ejercicios de la biblioteca los lee cualquiera con sesión; los del club, sólo sus socios", async () => {
