@@ -237,6 +237,12 @@ export const ACCOUNT_NEWS_SEEN_API_PATH = "/api/v1/account/news-seen";
  * decide cada fuente, así que no aparece en `RESTRICTED_ROUTES`. */
 export const DASHBOARD_API_PATH = "/api/v1/dashboard";
 
+/** La semana del ciclo activo de entrenamiento (#898, RF-3 del PRD de E35).
+ * No aparece en `MEMBER_ONLY_ROUTES` aunque pida estar al día: la puerta la
+ * cierra el handler, porque su 403 lleva la cabecera del ciclo (RF-6) y deja
+ * pasar al Admin y al Coach sin pagar (D3). */
+export const TRAINING_PLAN_API_PATH = "/api/v1/training/plan";
+
 /** La búsqueda global (#425, RF-7 del PRD de E14). La alcanza cualquier
  * cuenta activa: qué encuentra cada rol lo decide cada sección (D3), así que
  * no aparece en `RESTRICTED_ROUTES`. */
