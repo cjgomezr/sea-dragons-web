@@ -3030,6 +3030,27 @@ export const spanishMessages: MessageCatalog = {
   "training.member.restDay": "Día de descanso",
   "training.member.restDayText": "Nada planificado. Recupérate bien.",
   "training.member.goodLuck": "Mucha suerte.",
+  "training.member.doseSetsReps": "{sets} × {reps}",
+  "training.member.doseRest": "descanso {rest}",
+  "training.member.kilos": "{kilos} kg",
+  "training.member.pct": "{pct} %",
+  "training.member.pctOfMark": "{pct} % de {mark} {value}",
+  "training.member.addYourMark": "de {mark} · añade tu marca",
+  "training.member.missingMark":
+    "Abre la fila para añadir tu {mark}, o usa Mis marcas.",
+  "training.member.nothingHereYet": "Todavía no hay nada",
+  "training.member.markField": "Tu mejor levantamiento de {mark}",
+  "training.member.markUnit": "kg",
+  "training.member.markInvalid":
+    "Escribe un número mayor que 0 y hasta 500, con un decimal como mucho.",
+  "training.member.markSaveFailed":
+    "No pudimos guardar tu marca. Vuelve a intentarlo.",
+  "training.member.photoStart": "Inicio",
+  "training.member.photoEnd": "Fin",
+  "training.member.photoStartAlt": "{exercise}: posición inicial",
+  "training.member.photoEndAlt": "{exercise}: posición final",
+  "training.member.watchOnYoutube": "Ver en YouTube",
+  "training.member.opensNewTab": "(se abre en una pestaña nueva)",
   "training.member.noPlan": "Todavía no hay plan",
   "training.member.noPlanText":
     "Cuando los entrenadores planifiquen un ciclo, tu semana aparecerá aquí.",

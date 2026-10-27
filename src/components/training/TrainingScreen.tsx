@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useIsPhone } from "@/components/use-is-phone";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { MarkValues } from "@/lib/training/routine-row-view";
 import type { ActiveTrainingPlan } from "@/lib/training/training-plan";
 import { defaultSelectedWeekday } from "@/lib/training/training-week-view";
 import { loadTrainingPlan } from "./training-client";
@@ -12,6 +13,11 @@ import { TrainingDayPills, TrainingDayRows } from "./TrainingDayList";
 import { PlanTrainingLink, TrainingHeader } from "./TrainingHeader";
 import { TrainingWeekNav } from "./TrainingWeekNav";
 import { TrainingWeekStrip } from "./TrainingWeekStrip";
+import {
+  type MemberMarksState,
+  type SaveMark,
+  useMemberMarks,
+} from "./use-member-marks";
 
 /**
  * Entrenamiento (#900, RF-3 y RF-12 del PRD de E35): la cabecera del ciclo
@@ -128,15 +134,23 @@ function PlanFailure({
   );
 }
 
+/** Las marcas del socio con las que cada fila calcula sus kilos (#901). */
+type MarksForRows = {
+  readonly markValues: MarkValues;
+  readonly onSaveMark: SaveMark;
+};
+
 function TrainingWeekView({
   translate,
   plan,
   canPlan,
+  marks,
   onChooseWeek,
 }: {
   readonly translate: Translator;
   readonly plan: ActiveTrainingPlan;
   readonly canPlan: boolean;
+  readonly marks: MarksForRows;
   readonly onChooseWeek: (week: number) => void;
 }): React.JSX.Element {
   const isPhone = useIsPhone();
@@ -196,11 +210,26 @@ function TrainingWeekView({
             translate={translate}
             cycle={plan.cycle}
             day={selectedDay}
+            weekDose={plan.week.dose}
+            {...marks}
           />
         )}
       </div>
     </>
   );
+}
+
+/** La pantalla espera al plan y a las marcas del socio: sin ellas, cada fila
+ * con % pediría una marca que a lo mejor ya tiene. Lo que falla o se cierra
+ * en cualquiera de los dos manda. */
+function combinedState(plan: PlanState, marks: MemberMarksState): PlanState {
+  if (plan.kind === "blocked" || marks.kind === "blocked") {
+    return { kind: "blocked" };
+  }
+  if (plan.kind === "failed" || marks.kind === "failed") {
+    return { kind: "failed" };
+  }
+  return marks.kind === "loading" ? { kind: "loading" } : plan;
 }
 
 function TrainingContent({
@@ -210,7 +239,13 @@ function TrainingContent({
   readonly translate: Translator;
   readonly canPlan: boolean;
 }): React.JSX.Element {
-  const { state, showWeek, retry } = useTrainingPlan();
+  const plan = useTrainingPlan();
+  const marks = useMemberMarks();
+  const state = combinedState(plan.state, marks.state);
+  const retry = (): void => {
+    plan.retry();
+    marks.retry();
+  };
   switch (state.kind) {
     case "loading":
       return (
@@ -229,7 +264,11 @@ function TrainingContent({
           translate={translate}
           plan={state.plan}
           canPlan={canPlan}
-          onChooseWeek={showWeek}
+          marks={{
+            markValues: marks.markValues,
+            onSaveMark: marks.saveMark,
+          }}
+          onChooseWeek={plan.showWeek}
         />
       );
   }

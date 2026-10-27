@@ -1,7 +1,17 @@
 import { z } from "zod";
 import { MEMBERSHIP_NOT_CURRENT_REASON } from "@/lib/api/error-codes";
-import { readApiPayload, requestApi } from "@/lib/api/request-api";
-import { TRAINING_PLAN_API_PATH } from "@/lib/auth/routes";
+import {
+  type ApiRequestOutcome,
+  JSON_REQUEST_HEADERS,
+  readApiPayload,
+  requestApi,
+} from "@/lib/api/request-api";
+import {
+  TRAINING_MY_MARKS_API_PATH,
+  TRAINING_PLAN_API_PATH,
+  trainingMyMarkApiPath,
+} from "@/lib/auth/routes";
+import type { MemberMarks } from "@/lib/training/member-marks";
 import type { TrainingPlan } from "@/lib/training/training-plan";
 
 /**
@@ -116,4 +126,58 @@ export async function loadTrainingPlan(
     outcome.reason === MEMBERSHIP_NOT_CURRENT_REASON
     ? { kind: "blocked" }
     : { kind: "failed" };
+}
+
+const memberMarksResponseSchema: z.ZodType<{
+  readonly data: MemberMarks;
+}> = z.object({
+  data: z.object({
+    marks: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        unit: z.literal("kg"),
+        value: z.number().nullable(),
+      }),
+    ),
+  }),
+});
+
+/** Las marcas del socio, la puerta cerrada, o un fallo. */
+export type MemberMarksOutcome =
+  | { readonly kind: "loaded"; readonly marks: MemberMarks }
+  | { readonly kind: "blocked" }
+  | { readonly kind: "failed" };
+
+function toMemberMarksOutcome(outcome: ApiRequestOutcome): MemberMarksOutcome {
+  const read = readApiPayload(outcome, memberMarksResponseSchema);
+  if (read.kind === "ok") {
+    return { kind: "loaded", marks: read.value.data };
+  }
+  return read.failure === "forbidden" &&
+    read.reason === MEMBERSHIP_NOT_CURRENT_REASON
+    ? { kind: "blocked" }
+    : { kind: "failed" };
+}
+
+export async function loadMemberMarks(): Promise<MemberMarksOutcome> {
+  return toMemberMarksOutcome(await requestApi(TRAINING_MY_MARKS_API_PATH));
+}
+
+/** Guarda el valor de una marca, o la deja sin valor si es nulo. Responde la
+ * lista entera, como el GET. */
+export async function storeMemberMark(
+  markId: string,
+  value: number | null,
+): Promise<MemberMarksOutcome> {
+  const path = trainingMyMarkApiPath(markId);
+  const init: RequestInit =
+    value === null
+      ? { method: "DELETE" }
+      : {
+          method: "PUT",
+          headers: JSON_REQUEST_HEADERS,
+          body: JSON.stringify({ value }),
+        };
+  return toMemberMarksOutcome(await requestApi(path, init));
 }

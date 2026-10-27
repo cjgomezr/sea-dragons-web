@@ -18,6 +18,10 @@ import { stubScreenWidth } from "../../support/screen-width";
  */
 
 const PLAN_PATH = "/api/v1/training/plan";
+const MARKS_PATH = "/api/v1/training/marks/me";
+
+/** Las marcas del socio (#899), que la pantalla pide junto al plan (#901). */
+const NO_MARKS = { data: { marks: [] } };
 
 const CYCLE: TrainingCycle = {
   id: "cccccccc-0000-4000-8000-00000000000c",
@@ -161,6 +165,9 @@ function stubPlan(
     "fetch",
     vi.fn(async (input: string) => {
       const url = new URL(input, "http://localhost");
+      if (url.pathname === MARKS_PATH) {
+        return jsonResponse(200, NO_MARKS);
+      }
       if (url.pathname !== PLAN_PATH) {
         return jsonResponse(404, { error: { code: "not_found" } });
       }
@@ -201,7 +208,9 @@ async function renderScreen(
 }
 
 function dayList(): HTMLElement {
-  return screen.getByRole("list");
+  return screen.getByRole("list", {
+    name: /^(Days of week|Días de la semana)/,
+  });
 }
 
 function dayButtons(): HTMLElement[] {
@@ -614,7 +623,10 @@ describe("cuando la API no da la semana", () => {
     let calls = 0;
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => {
+      vi.fn(async (input: string) => {
+        if (new URL(input, "http://localhost").pathname === MARKS_PATH) {
+          return jsonResponse(200, NO_MARKS);
+        }
         calls += 1;
         return calls === 1
           ? jsonResponse(500, { error: { code: "internal_error" } })

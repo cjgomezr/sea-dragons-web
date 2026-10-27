@@ -62,6 +62,9 @@
   --color-routine-3: #bc3b2e;
   --color-routine-4: #6e859b;
   --color-routine-5: #6b69b8;
+  /* El texto de aviso (#901): el aviso claro no llega a AA como texto, así
+     que una marca que falta se escribe en este, más oscuro. */
+  --color-warning-text: #85621a;
   /* El color de la rutina de una fila, una baldosa o un punto: el componente
      lo pone en línea con el de su rutina. */
   --routine-color: var(--color-routine-0);
@@ -171,6 +174,7 @@
     --color-routine-3: #f2887a;
     --color-routine-4: #b7c7d6;
     --color-routine-5: #9e9ddc;
+    --color-warning-text: #f2ce78;
     --color-hero-gradient-start: #163a55;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -210,6 +214,7 @@
   --color-routine-3: #f2887a;
   --color-routine-4: #b7c7d6;
   --color-routine-5: #9e9ddc;
+  --color-warning-text: #f2ce78;
   --color-hero-gradient-start: #163a55;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -24885,15 +24890,21 @@ a.dashboard-club-cell-body:focus-visible {
 }
 
 .training-panel-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-top: 4px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-panel);
+}
+
+.training-panel-header {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
   align-items: center;
   gap: 14px;
   padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-top: 4px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-panel);
 }
 
 .training-panel-routine {
@@ -24926,6 +24937,289 @@ a.dashboard-club-cell-body:focus-visible {
   margin: 2px 0 0;
   font-size: 12.5px;
   color: var(--color-text-secondary);
+}
+
+/* Las filas de la rutina del día (#901, §4.1 del handoff): la miniatura, el
+   nombre con la dosis, la carga a la derecha y el caret; abierta, el campo de
+   la marca, las fotos, los consejos y YouTube. */
+.training-routine-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.training-routine-items > li,
+.training-routine-empty,
+.training-missing-marks {
+  border-top: 1px solid var(--color-row-rule);
+}
+
+.training-section h4 {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.training-exercise-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 60px;
+  padding: 6px var(--space-4);
+  border: 0;
+  font: inherit;
+  text-align: left;
+  color: var(--color-text);
+  background: transparent;
+  cursor: pointer;
+}
+
+.training-exercise-row:hover {
+  background: var(--color-row-selected);
+}
+
+.training-exercise-row:focus-visible,
+.training-youtube:focus-visible,
+.training-mark-input input:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
+.training-thumbnail {
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.training-thumbnail img,
+.training-photos img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.training-photo-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 22px;
+  color: var(--color-text-secondary);
+  background: var(--color-editor-bar);
+}
+
+.training-exercise-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.training-exercise-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.training-exercise-dose {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--color-text-soft);
+}
+
+.training-exercise-rest,
+.training-exercise-note,
+.training-load-detail {
+  color: var(--color-text-secondary);
+}
+
+.training-exercise-note {
+  font-size: 12px;
+}
+
+.training-load {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  max-width: 16ch;
+  text-align: right;
+}
+
+.training-load-main {
+  font-family: var(--font-family-mono);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.training-load-warning {
+  color: var(--color-warning-text);
+}
+
+.training-load-detail {
+  font-size: 11.5px;
+}
+
+.training-exercise-caret {
+  display: grid;
+  place-items: center;
+  color: var(--color-text-secondary);
+}
+
+.training-exercise-row[aria-expanded="true"] .training-exercise-caret svg {
+  transform: rotate(180deg);
+}
+
+.training-exercise-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4) 76px;
+}
+
+.training-mark-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 8px;
+  font-size: 13.5px;
+  background: color-mix(in srgb, var(--color-warning) 20%, var(--color-panel));
+}
+
+.training-mark-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.training-mark-input input {
+  width: 110px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  font-family: var(--font-family-mono);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: right;
+  color: var(--color-text);
+  background: var(--color-panel);
+}
+
+.training-mark-input input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.training-mark-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.training-photos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.training-photos figure {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+}
+
+.training-photos .training-photo-fallback {
+  font-size: 32px;
+}
+
+.training-photos figcaption {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  background: var(--color-panel);
+}
+
+.training-tips {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  color: var(--color-text-soft);
+}
+
+.training-youtube {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.training-youtube svg {
+  font-size: 18px;
+  color: var(--color-danger);
+}
+
+.training-routine-empty {
+  margin: 0;
+  padding: var(--space-4);
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
+}
+
+.training-missing-marks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+}
+
+.training-missing-marks p {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-warning-text);
+}
+
+.training-missing-marks svg {
+  flex: none;
 }
 
 .training-empty {
@@ -25002,5 +25296,25 @@ a.dashboard-club-cell-body:focus-visible {
     justify-self: center;
     min-height: 44px;
     margin-left: 0;
+  }
+
+  /* Filas de 64 px, el campo de la marca de 44 px con texto de 16 px (que
+     iOS no amplía) y YouTube a todo el ancho (§4.2). */
+  .training-exercise-row {
+    min-height: 64px;
+  }
+
+  .training-exercise-details {
+    padding-left: var(--space-4);
+  }
+
+  .training-mark-input input {
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .training-youtube {
+    align-self: stretch;
+    min-height: 44px;
   }
 }

@@ -45,6 +45,9 @@ export type ResolvedLoad =
       readonly kind: "kilos";
       readonly mark: TrainingMarkRef;
       readonly pct: number;
+      /** La marca del socio de la que salen, para decir "75% of back squat
+       * 80". */
+      readonly markValue: number;
       readonly kilos: number;
     }
   | {
@@ -93,7 +96,13 @@ function percentOfMark(
 ): ResolvedLoad {
   return markValue === null
     ? { kind: "missingMark", mark, pct }
-    : { kind: "kilos", mark, pct, kilos: kilosFor({ markValue, pct }) };
+    : {
+        kind: "kilos",
+        mark,
+        pct,
+        markValue,
+        kilos: kilosFor({ markValue, pct }),
+      };
 }
 
 function weekIntensityLoad(

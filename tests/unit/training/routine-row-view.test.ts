@@ -84,6 +84,7 @@ describe("rowPrescription", () => {
       kind: "kilos",
       mark: SQUAT,
       pct: 75,
+      markValue: 80,
       kilos: 60,
     });
   });
@@ -110,7 +111,7 @@ describe("rowPrescription", () => {
     expect(prescription).toEqual({
       sets: 4,
       reps: "5",
-      load: { kind: "kilos", mark: SQUAT, pct: 80, kilos: 65 },
+      load: { kind: "kilos", mark: SQUAT, pct: 80, markValue: 80, kilos: 65 },
     });
   });
 });

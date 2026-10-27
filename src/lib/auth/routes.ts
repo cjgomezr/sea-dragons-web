@@ -258,6 +258,11 @@ export const TRAINING_PLAN_API_PATH = "/api/v1/training/plan";
  * handler, que deja pasar al Admin y al Coach sin pagar (D3), como el plan. */
 export const TRAINING_MY_MARKS_API_PATH = "/api/v1/training/marks/me";
 
+/** Guardar o borrar una marca del socio de la sesión (#899). */
+export function trainingMyMarkApiPath(markId: string): string {
+  return `/api/v1/training/marks/${encodeURIComponent(markId)}/me`;
+}
+
 /** La búsqueda global (#425, RF-7 del PRD de E14). La alcanza cualquier
  * cuenta activa: qué encuentra cada rol lo decide cada sección (D3), así que
  * no aparece en `RESTRICTED_ROUTES`. */
