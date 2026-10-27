@@ -50,6 +50,14 @@ desplazamiento lo sigan.
 | Segment selected | `#D6E6F2` | Chosen option of a segmented control                                    |
 | Border dashed    | `#A9BCCC` | Dashed outline of a drop zone or an "add" button                        |
 | Type meeting     | `#6E859B` | Colour of the Meeting event type                                        |
+| Row selected     | `#EBF3F9` | Chosen row of a list (training days)                                    |
+| Row rule         | `#E9EFF4` | Rule between rows inside a card                                         |
+| Routine 0        | `#1C6EA4` | Routine colour: bars, dots and tiles, never text                        |
+| Routine 1        | `#22806C` | Routine colour                                                          |
+| Routine 2        | `#9A6E14` | Routine colour                                                          |
+| Routine 3        | `#BC3B2E` | Routine colour                                                          |
+| Routine 4        | `#6E859B` | Routine colour                                                          |
+| Routine 5        | `#6B69B8` | Routine colour                                                          |
 
 > **Decisión del 2026-09-04.** El texto secundario del tema claro se desvía
 > del prototipo a propósito. El valor original del prototipo, `#6B8095`, da
@@ -83,6 +91,14 @@ desplazamiento lo sigan.
 | Segment selected | `#1D4869` | Chosen option of a segmented control             |
 | Border dashed    | `#3A5670` | Dashed outline of a drop zone or an "add" button |
 | Type meeting     | `#B7C7D6` | Colour of the Meeting event type                 |
+| Row selected     | `#16304A` | Chosen row of a list (training days)             |
+| Row rule         | `#22394D` | Rule between rows inside a card                  |
+| Routine 0        | `#33A1E0` | Routine colour: bars, dots and tiles, never text |
+| Routine 1        | `#6FD6B4` | Routine colour                                   |
+| Routine 2        | `#F2CE78` | Routine colour                                   |
+| Routine 3        | `#F2887A` | Routine colour                                   |
+| Routine 4        | `#B7C7D6` | Routine colour                                   |
+| Routine 5        | `#9E9DDC` | Routine colour                                   |
 
 Rules: one accent color; success/warning/danger appear only with their meaning;
 never place text on a background with contrast ratio below 4.5:1 (3:1 for
@@ -185,6 +201,18 @@ text ≥ 24px).
 > azul apenas más oscuro que el panel blanco, con `Text` encima a más de 10:1.
 > La selección del handoff (`#1d4869`) es `Segment selected` y el hover
 > (`#1a3349`) es `Hover`; la línea de fila (`#22394d`) no la usa este ticket.
+
+> **Decisión del 2026-10-27 (issue #900).** Entrenamiento (E35, D15) trae
+> dos colores sueltos y una paleta de rutinas; ahora son tokens. Los oscuros
+> son los del handoff (`docs/design/design_handoff_training/README.md`).
+> `Row selected` (`#16304a`) es la fila elegida de una lista, con `Text`
+> encima, y `Row rule` (`#22394d`) la línea entre filas de una tarjeta. Las
+> otras dos sueltas del handoff ya eran tokens: `#1d4869` es
+> `Segment selected` y `#0f2131` es `Editor bar`. `Routine 0` a `Routine 5`
+> son los seis colores de rutina, por el `color_index` de cada una. Sólo
+> pintan barras, puntos y baldosas, nunca texto, así que piden 3:1 sobre el
+> panel y sobre su baldosa al 20 %. En claro, el ámbar y el verde se
+> oscurecieron (`#9A6E14`, `#22806C`) para llegar a ese 3:1.
 
 #### Sidebar (no cambia con el tema)
 

@@ -16,6 +16,7 @@ export type NavIconId =
   | "equipos"
   | "evaluaciones"
   | "noticias"
+  | "entrenamiento"
   | "pagos"
   | "grupos";
 
@@ -77,6 +78,13 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     icon: "evaluaciones",
   },
   { labelKey: "nav.label.news", href: "/noticias", icon: "noticias" },
+  // Lo ve cualquier socio con sesión, al día o no (D1 del PRD de E35): quien
+  // no lo está encuentra ahí la pantalla bloqueada que lo manda a Pagos.
+  {
+    labelKey: "nav.label.training",
+    href: "/entrenamiento",
+    icon: "entrenamiento",
+  },
   { labelKey: "nav.label.payments", href: "/pagos", icon: "pagos" },
   // Grupos cierra la lista porque es de gestión y no la abre un Player. Sólo
   // sale en "Más" y en la barra lateral, donde su etiqueta cabe entera. La

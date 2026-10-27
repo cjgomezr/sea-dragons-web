@@ -237,6 +237,16 @@ export const ACCOUNT_NEWS_SEEN_API_PATH = "/api/v1/account/news-seen";
  * decide cada fuente, así que no aparece en `RESTRICTED_ROUTES`. */
 export const DASHBOARD_API_PATH = "/api/v1/dashboard";
 
+/** Entrenamiento (#900, D1 del PRD de E35): la semana del ciclo activo. La
+ * alcanza cualquier cuenta activa, al día o no: la puerta la cierra el
+ * endpoint del plan, y quien no está al día ve aquí la pantalla bloqueada. */
+export const TRAINING_PATH = "/entrenamiento";
+
+/** Planificar el entrenamiento (D1 y D3), de Admin y Coach. El enlace de la
+ * cabecera de Entrenamiento lleva aquí; la pantalla y su frontera llegan con
+ * su propio ticket. */
+export const TRAINING_PLANNING_PATH = `${TRAINING_PATH}/planificar`;
+
 /** La semana del ciclo activo de entrenamiento (#898, RF-3 del PRD de E35).
  * No aparece en `MEMBER_ONLY_ROUTES` aunque pida estar al día: la puerta la
  * cierra el handler, porque su 403 lleva la cabecera del ciclo (RF-6) y deja

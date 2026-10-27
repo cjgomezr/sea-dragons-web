@@ -162,6 +162,18 @@ function NoticiasIcon(): React.JSX.Element {
   );
 }
 
+/** Una barra con dos discos a cada lado, la `barbell` del handoff de
+ * entrenamiento (#900), con el trazo de los demás. */
+function EntrenamientoIcon(): React.JSX.Element {
+  return (
+    <IconBase>
+      <path d="M2.5 12h19" />
+      <rect x="5" y="7" width="3" height="10" rx="1" />
+      <rect x="16" y="7" width="3" height="10" rx="1" />
+    </IconBase>
+  );
+}
+
 function PagosIcon(): React.JSX.Element {
   return (
     <IconBase>
@@ -204,6 +216,7 @@ export const NAV_SECTION_ICONS: Record<NavIconId, () => React.JSX.Element> = {
   equipos: EquiposIcon,
   evaluaciones: EvaluacionesIcon,
   noticias: NoticiasIcon,
+  entrenamiento: EntrenamientoIcon,
   pagos: PagosIcon,
   grupos: GruposIcon,
 };

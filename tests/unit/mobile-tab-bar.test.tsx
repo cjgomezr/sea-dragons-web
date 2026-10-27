@@ -24,8 +24,8 @@ async function openMoreAndListIt(): Promise<(string | null)[]> {
 // puede abrir, y Directorio ocupa el hueco de Equipos.
 describe("barra móvil por rol", () => {
   it.each([
-    ["Player", ["Pagos"]],
-    ["Committee", ["Pagos", "Grupos"]],
+    ["Player", ["Entrenamiento", "Pagos"]],
+    ["Committee", ["Entrenamiento", "Pagos", "Grupos"]],
   ] as const)(
     "un %s tiene fijas Inicio, Agenda, Gente y Noticias, y el resto en Más",
     async (role, overflowLabels) => {
@@ -44,7 +44,7 @@ describe("barra móvil por rol", () => {
     },
   );
 
-  it("un Coach tiene fijas Inicio, Agenda, Equipos y Noticias, y en Más Directorio, Asistencia, Evaluaciones, Pagos y Grupos", async () => {
+  it("un Coach tiene fijas Inicio, Agenda, Equipos y Noticias, y en Más Directorio, Asistencia, Evaluaciones, Entrenamiento, Pagos y Grupos", async () => {
     usePathname.mockReturnValue("/dashboard");
     render(
       <MobileTabBar
@@ -63,6 +63,7 @@ describe("barra móvil por rol", () => {
       "Directorio",
       "Asistencia",
       "Evaluaciones",
+      "Entrenamiento",
       "Pagos",
       "Grupos",
     ]);
@@ -82,6 +83,7 @@ describe("barra móvil por rol", () => {
       "Directory",
       "Attendance",
       "Evaluations",
+      "Training",
       "Payments",
       "Groups",
     ]);
@@ -344,6 +346,7 @@ describe("navegación traducida en la barra móvil", () => {
       "Directory",
       "Attendance",
       "Evaluations",
+      "Training",
       "Payments",
       "Groups",
     ];
@@ -407,7 +410,7 @@ describe("navegación traducida en la barra móvil", () => {
 });
 
 describe("barra móvil de quien no tiene la membresía al día (#453)", () => {
-  it("un Player tiene fijas Inicio, Agenda y Pagos, y ningún Más vacío", () => {
+  it("un Player tiene fijas Inicio, Agenda y Pagos, y Entrenamiento en Más", async () => {
     usePathname.mockReturnValue("/dashboard");
     render(
       <MobileTabBar
@@ -417,9 +420,7 @@ describe("barra móvil de quien no tiene la membresía al día (#453)", () => {
     );
 
     expect(fixedTabLabels()).toEqual(["Inicio", "Agenda", "Pagos"]);
-    expect(
-      screen.queryByRole("button", { name: "Más" }),
-    ).not.toBeInTheDocument();
+    expect(await openMoreAndListIt()).toEqual(["Entrenamiento"]);
   });
 });
 

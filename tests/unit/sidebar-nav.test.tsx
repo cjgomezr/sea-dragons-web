@@ -14,11 +14,12 @@ const MEMBER_LABELS = [
   "Directorio",
   "Calendario",
   "Noticias",
+  "Entrenamiento",
   "Pagos",
 ];
 
 describe("secciones por rol", () => {
-  it("un Player ve Panel, Directorio, Calendario, Noticias y Pagos, sin Grupos", () => {
+  it("un Player ve Panel, Directorio, Calendario, Noticias, Entrenamiento y Pagos, sin Grupos", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
       <SidebarNav
@@ -68,6 +69,7 @@ describe("secciones por rol", () => {
       "Equipos",
       "Evaluaciones",
       "Noticias",
+      "Entrenamiento",
       "Pagos",
       "Grupos",
     ]);
@@ -90,6 +92,7 @@ describe("secciones por rol", () => {
       "Equipos",
       "Evaluaciones",
       "Noticias",
+      "Entrenamiento",
       "Pagos",
       "Grupos",
     ]);
@@ -153,6 +156,7 @@ describe("navegación traducida", () => {
       "Teams",
       "Evaluations",
       "News",
+      "Training",
       "Payments",
       "Groups",
     ]);
@@ -202,7 +206,7 @@ describe("navegación traducida", () => {
 });
 
 describe("secciones de quien no tiene la membresía al día (#453)", () => {
-  it("un Player solo ve Dashboard, Calendario y Pagos", () => {
+  it("un Player solo ve Dashboard, Calendario, Entrenamiento y Pagos", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
       <SidebarNav
@@ -211,7 +215,12 @@ describe("secciones de quien no tiene la membresía al día (#453)", () => {
       />,
     );
 
-    expect(renderedLabels()).toEqual(["Dashboard", "Calendario", "Pagos"]);
+    expect(renderedLabels()).toEqual([
+      "Dashboard",
+      "Calendario",
+      "Entrenamiento",
+      "Pagos",
+    ]);
   });
 
   it("un Admin conserva el Directorio, que gestiona", () => {
