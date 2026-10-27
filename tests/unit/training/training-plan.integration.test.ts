@@ -170,6 +170,9 @@ function withActiveCycle<T>(
             position: 0,
             kind: "section",
             section_title: "Main 1",
+            // Un insert de varias filas manda NULL en las columnas que una
+            // fila no trae, aunque la tabla tenga valor por defecto.
+            load_kind: "none",
           },
         ]),
       );
