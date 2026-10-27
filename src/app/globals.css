@@ -24949,6 +24949,19 @@ a.dashboard-club-cell-body:focus-visible {
   margin: 0;
 }
 
+/* `.admin-secondary` es de botones: en un enlace el texto quedaba arriba y
+   subrayado. */
+.training-plan-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.training-empty .training-plan-link {
+  margin-top: var(--space-2);
+}
+
 @media (width >= 1280px) {
   .training-layout {
     grid-template-columns: minmax(0, 1fr) 520px;

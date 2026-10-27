@@ -19,7 +19,10 @@ export function PlanTrainingLink({
   readonly translate: Translator;
 }): React.JSX.Element {
   return (
-    <Link href={TRAINING_PLANNING_PATH} className="admin-secondary">
+    <Link
+      href={TRAINING_PLANNING_PATH}
+      className="admin-secondary training-plan-link"
+    >
       {translate("training.member.planTraining")}
     </Link>
   );
