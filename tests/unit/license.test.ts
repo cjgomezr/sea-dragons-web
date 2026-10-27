@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-const COPYRIGHT_HOLDER = "Camilo Gómez Restrepo";
+const COPYRIGHT_NOTICE =
+  "Copyright (c) 2026 Camilo Gómez Restrepo. All rights reserved.";
 
 /** En npm, `UNLICENSED` es la marca de código propietario: no confundir con
  * The Unlicense, que es justo lo contrario. */
@@ -35,9 +36,6 @@ describe("licencia propietaria", () => {
   });
 
   it("reserva todos los derechos en LICENSE a nombre del titular", () => {
-    const license = readLicense();
-
-    expect(license).toContain("All rights reserved");
-    expect(license).toContain(COPYRIGHT_HOLDER);
+    expect(readLicense()).toContain(COPYRIGHT_NOTICE);
   });
 });
