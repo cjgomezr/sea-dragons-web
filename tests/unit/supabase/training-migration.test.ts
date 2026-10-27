@@ -513,7 +513,7 @@ describeConPostgres("las tablas de entrenamiento", () => {
            as p(privilege)
         where has_table_privilege(r.role, 'public.' || t.name, p.privilege)
         group by t.name
-        order by t.name`,
+        order by t.name collate "C"`,
     );
 
     expect(rowsOf(grants)).toEqual(
