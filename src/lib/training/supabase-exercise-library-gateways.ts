@@ -73,13 +73,15 @@ async function readPhotoFingerprint(
 ): Promise<string | null> {
   const bucket = client.storage.from(EXERCISE_IMAGES_BUCKET);
   const exists = await bucket.exists(storagePath);
+  // Si no está, `exists()` da `data: false` junto con el error 400 o 404 de
+  // Storage; cualquier otro fallo lo lanza.
+  if (exists.data === false) {
+    return null;
+  }
   if (exists.error) {
     throw new Error(
       `No se pudo comprobar la foto ${storagePath}: ${exists.error.message}`,
     );
-  }
-  if (!exists.data) {
-    return null;
   }
   const info = await bucket.info(storagePath);
   if (info.error) {
