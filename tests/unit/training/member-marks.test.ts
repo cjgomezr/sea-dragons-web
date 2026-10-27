@@ -105,6 +105,8 @@ describe("isValidMarkValue", () => {
     ["cero", 0],
     ["un negativo", -10],
     ["más de 500", 500.1],
+    ["menos de un decimal", 0.01],
+    ["casi cero", 1e-11],
     ["dos decimales", 82.55],
     ["un texto con número", "80"],
     ["vacío", undefined],

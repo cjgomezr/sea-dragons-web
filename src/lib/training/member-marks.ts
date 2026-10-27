@@ -19,7 +19,8 @@ import {
 /** Los que planifican ven el plan aunque su membresía no esté al día (D3). */
 const PLANNER_ROLES: ReadonlySet<Role> = new Set(["Admin", "Coach"]);
 
-const MIN_MARK_VALUE_EXCLUSIVE = 0;
+/** Más de 0 con un decimal: el menor valor que la base guarda sin volverlo 0. */
+const MIN_MARK_VALUE = 0.1;
 const MAX_MARK_VALUE = 500;
 /** Un decimal como mucho: el valor por diez es entero. */
 const DECIMAL_SCALE = 10;
@@ -106,7 +107,7 @@ export function isValidMarkValue(value: unknown): value is number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return false;
   }
-  if (value <= MIN_MARK_VALUE_EXCLUSIVE || value > MAX_MARK_VALUE) {
+  if (value < MIN_MARK_VALUE || value > MAX_MARK_VALUE) {
     return false;
   }
   const scaled = value * DECIMAL_SCALE;
