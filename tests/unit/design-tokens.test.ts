@@ -451,6 +451,16 @@ describe.each([
     ).toBeGreaterThanOrEqual(AA_TEXT);
   });
 
+  // La fecha y los ejercicios de la fila elegida van en texto secundario.
+  it("el texto secundario cumple AA sobre la fila elegida", () => {
+    expect(
+      contrastRatio(
+        token(tokens, "color-text-secondary"),
+        token(tokens, "color-row-selected"),
+      ),
+    ).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
   it.each(ROUTINE_COLORS)("%s se distingue del panel (3:1 o más)", (color) => {
     expect(
       contrastRatio(token(tokens, color), token(tokens, "color-panel")),

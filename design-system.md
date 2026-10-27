@@ -50,7 +50,7 @@ desplazamiento lo sigan.
 | Segment selected | `#D6E6F2` | Chosen option of a segmented control                                    |
 | Border dashed    | `#A9BCCC` | Dashed outline of a drop zone or an "add" button                        |
 | Type meeting     | `#6E859B` | Colour of the Meeting event type                                        |
-| Row selected     | `#E3EEF7` | Chosen row of a list (training days)                                    |
+| Row selected     | `#EBF3F9` | Chosen row of a list (training days)                                    |
 | Row rule         | `#E9EFF4` | Rule between rows inside a card                                         |
 | Routine 0        | `#1C6EA4` | Routine colour: bars, dots and tiles, never text                        |
 | Routine 1        | `#22806C` | Routine colour                                                          |

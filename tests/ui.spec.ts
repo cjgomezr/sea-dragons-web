@@ -1280,6 +1280,7 @@ test.describe("dentro de la aplicación", () => {
       "Directory",
       "Calendar",
       "News",
+      "Training",
       "Payments",
     ];
 
@@ -1522,11 +1523,12 @@ test.describe("dentro de la aplicación", () => {
           "Directory",
           "Calendar",
           "News",
+          "Training",
           "Payments",
         ]);
       });
 
-      test("the tab bar keeps Directory in the Teams slot and Payments behind More", async ({
+      test("the tab bar keeps Directory in the Teams slot and Training and Payments behind More", async ({
         page,
       }) => {
         await page.setViewportSize(MOBILE);
@@ -1539,7 +1541,7 @@ test.describe("dentro de la aplicación", () => {
         await openMore(page, ENGLISH_SHELL);
         await expect(
           tabBar.locator(".app-tabbar-overflow").getByRole("link"),
-        ).toHaveText(["Payments"]);
+        ).toHaveText(["Training", "Payments"]);
       });
     });
 
@@ -1563,6 +1565,7 @@ test.describe("dentro de la aplicación", () => {
           "Teams",
           "Evaluations",
           "News",
+          "Training",
           "Payments",
           "Groups",
         ]);
@@ -1588,6 +1591,7 @@ test.describe("dentro de la aplicación", () => {
           "Directory",
           "Attendance",
           "Evaluations",
+          "Training",
           "Payments",
           "Groups",
         ]);
@@ -26727,5 +26731,270 @@ test.describe("el RSVP del inicio con los datos de verdad", () => {
         );
       }
     }
+  });
+});
+/* ---------------------------------------------------------------------------
+   Entrenamiento (#900, RF-3 y RF-12 del PRD de E35), contra
+   docs/design/design_handoff_training/ (§4.1 y §4.2, d01-member-week.png y
+   m01-member-day.png). El plan lo sirve la prueba: qué semana toca lo decide
+   la API (#898), que tiene sus propias pruebas contra la base.
+   --------------------------------------------------------------------------- */
+
+const TRAINING_SCREEN_PATH = "/entrenamiento";
+const TRAINING_PLAN_ENDPOINT = "/api/v1/training/plan";
+
+function stubbedTrainingRoutine(
+  name: string,
+  colorIndex: number,
+  exercises: number,
+): unknown {
+  return {
+    id: `routine-${colorIndex}`,
+    name,
+    colorIndex,
+    items: Array.from({ length: exercises }, (_, index) => ({
+      kind: "exercise",
+      id: `${colorIndex}-${index}`,
+      exercise: {
+        id: `exercise-${colorIndex}-${index}`,
+        name: "Back squat",
+        tips: [],
+        photoUrls: [],
+        youtubeUrl: "https://www.youtube.com/results?search_query=squat",
+      },
+      sets: 4,
+      reps: "6",
+      rest: "2:00",
+      note: null,
+      load: { kind: "none" },
+    })),
+  };
+}
+
+const TRAINING_POOL = stubbedTrainingRoutine("Pool · Endurance", 0, 5);
+const TRAINING_GYM_A = stubbedTrainingRoutine("Gym A · Strength", 1, 5);
+const TRAINING_MOBILITY = stubbedTrainingRoutine("Mobility", 4, 2);
+const TRAINING_POOL_SPEED = stubbedTrainingRoutine("Pool · Speed", 2, 3);
+const TRAINING_GYM_B = stubbedTrainingRoutine("Gym B · Power", 3, 5);
+const TRAINING_CORE = stubbedTrainingRoutine("Core", 5, 4);
+
+/** El lunes de la semana 3 del ciclo, y los siete días que le siguen. */
+const TRAINING_WEEK_3_DATES = [
+  "2026-10-26",
+  "2026-10-27",
+  "2026-10-28",
+  "2026-10-29",
+  "2026-10-30",
+  "2026-10-31",
+  "2026-11-01",
+];
+
+/** Como la captura del handoff: el martes, que es hoy, con dos rutinas
+ * (D7), el domingo de descanso y una nota de semana (D6). */
+const TRAINING_WEEK_3_ROUTINES: readonly (readonly unknown[])[] = [
+  [TRAINING_POOL],
+  [TRAINING_GYM_A, TRAINING_CORE],
+  [TRAINING_MOBILITY],
+  [TRAINING_POOL_SPEED],
+  [TRAINING_GYM_B],
+  [TRAINING_POOL],
+  [],
+];
+
+const TRAINING_ACTIVE_PLAN = {
+  cycle: {
+    id: "cccccccc-0000-4000-8000-00000000000c",
+    name: "Road to Nationals 2027",
+    event: { name: "UWR Nationals", date: "2027-04-22" },
+    startDate: "2026-10-12",
+    endDate: "2027-04-25",
+    weeks: 28,
+  },
+  current: { week: 3, phase: "running", today: "2026-10-27" },
+  week: {
+    number: 3,
+    note: "Training Camp week: pool sessions run long.",
+    dose: null,
+    days: TRAINING_WEEK_3_DATES.map((date, weekday) => ({
+      weekday,
+      date,
+      routines: TRAINING_WEEK_3_ROUTINES[weekday],
+    })),
+  },
+};
+
+type TrainingState = {
+  readonly name: string;
+  readonly plan: unknown;
+  readonly storageState: string;
+  readonly isSpanish?: boolean;
+  readonly ready: (page: Page) => Promise<void>;
+};
+
+const TRAINING_WEEK_HEADING = /^(Week 3 of 28|Semana 3 de 28|Week 3|Semana 3)$/;
+
+async function waitForTrainingWeek(page: Page): Promise<void> {
+  await expect(
+    page.getByRole("heading", { name: TRAINING_WEEK_HEADING }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+const TRAINING_STATES: readonly TrainingState[] = [
+  {
+    name: "entrenamiento-semana",
+    plan: TRAINING_ACTIVE_PLAN,
+    storageState: E2E_STORAGE_STATE_PATH,
+    ready: waitForTrainingWeek,
+  },
+  {
+    name: "entrenamiento-semana-es",
+    plan: TRAINING_ACTIVE_PLAN,
+    storageState: E2E_STORAGE_STATE_PATH,
+    isSpanish: true,
+    ready: waitForTrainingWeek,
+  },
+  // Sin ciclo activo, como lo ve quien planifica: con el enlace a
+  // Planificar.
+  {
+    name: "entrenamiento-sin-plan",
+    plan: { cycle: null },
+    storageState: ADMIN_STORAGE_STATE,
+    ready: async (page) => {
+      await expect(
+        page.getByText(/^(No plan yet|Todavía no hay plan)$/),
+      ).toBeVisible();
+    },
+  },
+];
+
+async function goToTraining(
+  page: Page,
+  state: TrainingState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
+    (route) => route.fulfill(jsonBody(state.plan)),
+  );
+  if (state.isSpanish === true) {
+    await chooseSpanish(page);
+  }
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${TRAINING_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, TRAINING_SCREEN_PATH, theme);
+  }
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await state.ready(page);
+}
+
+const TRAINING_NARROW_WIDTHS = [320, 375, 768] as const;
+
+for (const state of TRAINING_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: state.storageState });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToTraining(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of TRAINING_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToTraining(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    for (const theme of themes) {
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await goToTraining(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
+  });
+}
+
+test.describe("entrenamiento en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("pide otra semana a la API y vuelve a la de hoy", async ({ page }) => {
+    const requestedWeeks: (string | null)[] = [];
+    await page.route(
+      (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
+      (route, request) => {
+        const week = new URL(request.url()).searchParams.get("week");
+        requestedWeeks.push(week);
+        const number = week === null ? 3 : Number(week);
+        return route.fulfill(
+          jsonBody({
+            ...TRAINING_ACTIVE_PLAN,
+            week: { ...TRAINING_ACTIVE_PLAN.week, number },
+          }),
+        );
+      },
+    );
+    await page.goto(`${APP_URL}${TRAINING_SCREEN_PATH}`);
+    await expect(
+      page.getByRole("heading", { name: "Week 3 of 28" }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Next week" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Week 4 of 28" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Back to this week" }).click();
+
+    await expect(
+      page.getByRole("heading", { name: "Week 3 of 28" }),
+    ).toBeVisible();
+    // En dev el efecto de montar corre dos veces: la de hoy puede pedirse
+    // dos veces, y lo que se prueba es lo que se pide después.
+    expect(requestedWeeks.filter((week) => week !== null)).toEqual(["4", "3"]);
+  });
+
+  test("el menú lleva a Entrenamiento", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.route(
+      (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
+      (route) => route.fulfill(jsonBody(TRAINING_ACTIVE_PLAN)),
+    );
+    await page.goto(`${APP_URL}/dashboard`);
+
+    await page
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("link", { name: "Training" })
+      .click();
+
+    await expect(page).toHaveURL(new RegExp(`${TRAINING_SCREEN_PATH}$`));
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Road to Nationals 2027" }),
+    ).toBeVisible();
   });
 });

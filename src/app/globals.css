@@ -54,7 +54,7 @@
   /* Entrenamiento (#900, D15 del PRD de E35): la fila elegida y la línea
      entre filas del handoff, y una paleta de seis colores de rutina. El de
      una rutina pinta barras, puntos y baldosas, nunca texto. */
-  --color-row-selected: #e3eef7;
+  --color-row-selected: #ebf3f9;
   --color-row-rule: #e9eff4;
   --color-routine-0: #1c6ea4;
   --color-routine-1: #22806c;
