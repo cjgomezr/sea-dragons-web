@@ -56,8 +56,8 @@ as $$
     from public.training_exercises e
    where (e.club_id is null or e.club_id = p_club_id)
      and e.name_normalized like public.search_like_pattern(btrim(p_text))
-   order by e.name_normalized
-              like public.search_normalize(btrim(p_text)) || '%' desc,
+   order by starts_with(e.name_normalized,
+                        public.search_normalize(btrim(p_text))) desc,
             e.name_normalized,
             e.id
    limit p_limit

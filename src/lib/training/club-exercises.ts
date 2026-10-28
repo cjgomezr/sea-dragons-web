@@ -568,7 +568,10 @@ async function insertOrCleanUp(
 }
 
 /** Sustituye los datos. Una foto que cambia de tipo cambia de ruta: la vieja
- * se borra después de guardar. */
+ * se borra después de guardar. Una del mismo tipo se sobrescribe en su ruta
+ * antes de guardar la fila, así que si otro gana el nombre o borra el
+ * ejercicio entretanto, la foto nueva se queda: es una carrera rara y no
+ * pierde nada que el planificador no quisiera cambiar. */
 export async function updateClubExercise(
   gateways: ClubExercisesGateways,
   request: {
