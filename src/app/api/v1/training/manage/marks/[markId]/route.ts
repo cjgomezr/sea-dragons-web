@@ -1,6 +1,5 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
-import { ApiError } from "@/lib/api/response";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
 import {
   type ManagedMarks,
@@ -11,6 +10,7 @@ import {
 import {
   asTrainingManageApiError,
   markNameBodySchema,
+  readConfirm,
   readRouteId,
   requireClubMarksGateways,
 } from "@/lib/training/training-manage-api";
@@ -28,8 +28,6 @@ export const dynamic = "force-dynamic";
 
 export type ManagedMarksResponse = ManagedMarks;
 
-const CONFIRM_PARAM = "confirm";
-
 type MarkNameBody = { readonly name: string };
 
 type MarkRouteContext = {
@@ -38,22 +36,6 @@ type MarkRouteContext = {
 
 async function readMarkId(context: MarkRouteContext): Promise<string> {
   return readRouteId((await context.params).markId, new MarkNotFoundError());
-}
-
-/** Sin el parámetro es `false`; cualquier cosa que no sea `true` o `false`,
- * un 400, para que un "sí" no se lea como una confirmación. */
-function readConfirm(searchParams: URLSearchParams): boolean {
-  const confirm = searchParams.get(CONFIRM_PARAM);
-  if (confirm === null || confirm === "false") {
-    return false;
-  }
-  if (confirm === "true") {
-    return true;
-  }
-  throw new ApiError(
-    "validation_error",
-    `"${CONFIRM_PARAM}" tiene que ser true o false.`,
-  );
 }
 
 export function PATCH(

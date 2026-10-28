@@ -285,6 +285,26 @@ export function trainingManageExerciseApiPath(exerciseId: string): string {
   return `${TRAINING_MANAGE_EXERCISES_API_PATH}/${encodeURIComponent(exerciseId)}`;
 }
 
+/** La última dosis que el club usó con un ejercicio (#905, RF-9). */
+export function trainingManageExerciseLastDoseApiPath(
+  exerciseId: string,
+): string {
+  return `${trainingManageExerciseApiPath(exerciseId)}/last-dose`;
+}
+
+/** Las rutinas de un ciclo o las compartidas, y crear una (#905, RF-9). */
+export const TRAINING_MANAGE_ROUTINES_API_PATH = `${TRAINING_MANAGE_API_PATH}/routines`;
+
+/** Renombrar o borrar una rutina (#905). */
+export function trainingManageRoutineApiPath(routineId: string): string {
+  return `${TRAINING_MANAGE_ROUTINES_API_PATH}/${encodeURIComponent(routineId)}`;
+}
+
+/** Las filas de una rutina, enteras (#905). */
+export function trainingManageRoutineItemsApiPath(routineId: string): string {
+  return `${trainingManageRoutineApiPath(routineId)}/items`;
+}
+
 /** Los ciclos del club y crear uno (#904, RF-7). */
 export const TRAINING_MANAGE_CYCLES_API_PATH = `${TRAINING_MANAGE_API_PATH}/cycles`;
 
