@@ -145,6 +145,22 @@ export const AUDIT_ACTIONS = [
   "training_exercise.created",
   "training_exercise.updated",
   "training_exercise.deleted",
+  // RF-7 y RF-8 de E35 (#904): un Admin o un Coach crea, cambia, activa,
+  // archiva o duplica un ciclo, o llena una semana o un día de su cuadrícula.
+  // La entidad es el ciclo (`training_cycle`); al duplicar, el nuevo. La
+  // metadata sólo lleva números e ids: cuántos días se quitaron
+  // (`{ daysRemoved }`), el ciclo que se archivó (`{ archivedCycleId }`), de
+  // cuál sale la copia (`{ sourceCycleId, routinesCopied }`), o qué semana,
+  // día y ranura (`{ weekNo, weekday, slot }`). Ni nombres, ni notas, ni
+  // dosis.
+  "training_cycle.created",
+  "training_cycle.updated",
+  "training_cycle.activated",
+  "training_cycle.archived",
+  "training_cycle.duplicated",
+  "training_cycle.week_updated",
+  "training_cycle.day_updated",
+  "training_cycle.week_one_copied",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

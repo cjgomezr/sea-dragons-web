@@ -30,7 +30,8 @@ const ACTIVE_STATUS = "active";
 
 const CYCLE_COLUMNS = "id, name, event_name, event_date, start_date, weeks";
 
-const WEEK_COLUMNS =
+/** Lo de una semana; también lo lee Planificar (#904). */
+export const WEEK_COLUMNS =
   "note, dose_sets, dose_reps, dose_intensity_kind, dose_pct, dose_text";
 
 // Las claves se nombran: entre estas tablas hay más de un camino posible y
@@ -58,7 +59,7 @@ const cycleRowSchema = z.object({
   weeks: z.number().int(),
 });
 
-const weekRowSchema = z.object({
+export const weekRowSchema = z.object({
   note: z.string().nullable(),
   dose_sets: z.number().int().nullable(),
   dose_reps: z.string().nullable(),
@@ -190,7 +191,7 @@ function toDoseIntensity(row: WeekRow): DoseIntensity {
 }
 
 /** Sin series, repeticiones ni intensidad, la semana no tiene dosis (D6). */
-function toWeekDose(row: WeekRow): WeekDose | null {
+export function toWeekDose(row: WeekRow): WeekDose | null {
   const intensity = toDoseIntensity(row);
   if (
     row.dose_sets === null &&
