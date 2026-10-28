@@ -108,7 +108,6 @@ export function DesktopCycleTab({
         translate={translate}
         planner={planner}
         cycle={selected}
-        isPhone={false}
       />
     </>
   );
@@ -236,7 +235,6 @@ export function PhoneCycleTab({
         translate={translate}
         planner={planner}
         cycle={selected}
-        isPhone
       />
     </>
   );

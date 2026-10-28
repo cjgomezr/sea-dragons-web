@@ -16,9 +16,9 @@ import type { GridContext } from "./PlannerCycleGrid";
 import { gridWeekRange, gridWeekdayName } from "./planner-format";
 
 /**
- * La cuadrícula en el móvil (#907, §5.2 del handoff): una semana a la vez,
- * con ‹ › de 44 px, "Week {k} of {N}" y sus fechas, su nota y su dosis, y
- * siete filas con el día y su `<select>`.
+ * La cuadrícula en el móvil y la tableta (#907, §5.2 del handoff): una
+ * semana a la vez, con ‹ › de 44 px, "Week {k} of {N}" y sus fechas, su nota
+ * y su dosis, y siete filas con el día y su `<select>`.
  */
 
 const FIRST_WEEK = 1;

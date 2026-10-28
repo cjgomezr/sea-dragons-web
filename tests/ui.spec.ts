@@ -10618,8 +10618,16 @@ function openPreview(copy: NewMemberCopy) {
     const toggle = invitePanel(page, copy).getByRole("button", {
       name: copy.preview,
     });
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // Un clic que llega mientras React aún monta la fila se pierde: se
+    // repite hasta que la semana queda abierta, sin cerrarla nunca.
+    await expect(async () => {
+      if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+        await toggle.click();
+      }
+      await expect(toggle).toHaveAttribute("aria-expanded", "true", {
+        timeout: 1_000,
+      });
+    }).toPass();
   };
 }
 
@@ -27412,8 +27420,8 @@ test.describe("entrenamiento en el navegador", () => {
 const PLANNER_SCREEN_PATH = "/entrenamiento/planificar";
 const PLANNER_CYCLES_ENDPOINT = "/api/v1/training/manage/cycles";
 const PLANNER_ROUTINES_ENDPOINT = "/api/v1/training/manage/routines";
-/** El corte de `useIsPhone`: por debajo, una semana a la vez. */
-const PHONE_BREAKPOINT_PX = 768;
+/** El corte de `useIsBelowDesktop`: por debajo, una semana a la vez. */
+const PLANNER_WEEK_AT_A_TIME_BELOW_PX = 1024;
 /** Las 12:00 del miércoles 28 de octubre de 2026 en Melbourne: la semana 3
  * del ciclo activo. */
 const PLANNER_NOW = new Date("2026-10-28T01:00:00.000Z");
@@ -27569,18 +27577,27 @@ async function stubPlannerCycles(page: Page): Promise<void> {
   );
 }
 
-/** La semana abierta: con su número en el escritorio, con ‹ en el móvil,
- * que abre en la semana 3. */
+/** La semana abierta: con su número en el escritorio, con ‹ en el móvil y
+ * la tableta, que abren en la semana 3. */
 async function openPlannerWeek(page: Page, week: number): Promise<void> {
-  const isPhone = (page.viewportSize()?.width ?? 0) < PHONE_BREAKPOINT_PX;
-  if (isPhone) {
+  const isWeekAtATime =
+    (page.viewportSize()?.width ?? 0) < PLANNER_WEEK_AT_A_TIME_BELOW_PX;
+  if (isWeekAtATime) {
     await page.getByRole("button", { name: "Previous week" }).click();
   } else {
     const toggle = page.getByRole("button", {
       name: `Week ${week}: note and dose`,
     });
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // Un clic que llega mientras React aún monta la fila se pierde: se
+    // repite hasta que la semana queda abierta, sin cerrarla nunca.
+    await expect(async () => {
+      if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+        await toggle.click();
+      }
+      await expect(toggle).toHaveAttribute("aria-expanded", "true", {
+        timeout: 1_000,
+      });
+    }).toPass();
   }
   await expect(page.getByRole("group", { name: `Week ${week}` })).toBeVisible();
   // Pulsar la semana puede desplazar la cuadrícula: la captura la quiere

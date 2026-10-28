@@ -26003,8 +26003,8 @@ a.dashboard-club-cell-body:focus-visible {
 
 /* Planificar → Ciclo: la cuadrícula (#907, §5.1 y §5.2 del handoff y §7 del
    PRD de E35). Una fila por semana bajo una cabecera fija, con hasta dos
-   rutinas por día; la nota y la dosis se abren bajo su fila. En el móvil, una
-   semana a la vez con filas de 56 px y selectores de 44 px. */
+   rutinas por día; la nota y la dosis se abren bajo su fila. Por debajo de
+   1024 px, una semana a la vez con filas de 56 px y selectores de 44 px. */
 .training-grid-section {
   display: flex;
   flex-direction: column;
@@ -26264,6 +26264,40 @@ a.dashboard-club-cell-body:focus-visible {
   border-bottom: none;
 }
 
+.training-grid-phone-nav {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+
+.training-grid-phone-nav .training-week-step {
+  width: 44px;
+  height: 44px;
+}
+
+.training-grid-phone-nav .training-week-title {
+  text-align: center;
+}
+
+.training-grid-phone .training-grid-week-editor {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.training-grid-phone .training-grid-week-dose {
+  grid-template-columns: 70px minmax(0, 1fr);
+}
+
+.training-grid-phone .training-grid-select {
+  height: 44px;
+  padding: 0 var(--space-3);
+  font-size: 16px;
+}
+
+.training-grid-phone .training-grid-add {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}
+
 .training-grid-phone-day-name {
   font-family: var(--font-family-mono);
   font-size: 12px;
@@ -26273,30 +26307,10 @@ a.dashboard-club-cell-body:focus-visible {
 }
 
 @media (width < 768px) {
-  .training-grid-week-editor {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .training-grid-week-dose {
-    grid-template-columns: 70px minmax(0, 1fr);
-  }
-
   .training-grid-week-editor .training-plan-field input,
   .training-grid-week-editor .training-plan-field select {
     min-height: 46px;
     font-size: 16px;
-  }
-
-  .training-grid-phone .training-grid-select {
-    height: 44px;
-    padding: 0 var(--space-3);
-    font-size: 16px;
-  }
-
-  .training-grid-phone .training-grid-add {
-    width: 44px;
-    height: 44px;
-    font-size: 18px;
   }
 
   .training-grid-copy {

@@ -631,9 +631,40 @@ describe("en español", () => {
   });
 });
 
+/** Por debajo de 1024 px la cuadrícula va una semana a la vez; por debajo
+ * de 768, también el resto de la pestaña. */
+function stubNarrowScreen(options: { readonly isPhone: boolean }): void {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches:
+      query === "(width < 1024px)" ||
+      (options.isPhone && query === "(width < 768px)"),
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }));
+}
+
+describe("en la tableta", () => {
+  it("va una semana a la vez junto a las tarjetas del escritorio", async () => {
+    stubNarrowScreen({ isPhone: false });
+    stubGrid();
+    render(<TrainingPlannerScreen locale="en" />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Week 3 of 28" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Road to Nationals 2027/ }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("en el móvil", () => {
   beforeEach(() => {
-    stubScreenWidth(true);
+    stubNarrowScreen({ isPhone: true });
   });
 
   async function renderPhoneGrid(): Promise<void> {

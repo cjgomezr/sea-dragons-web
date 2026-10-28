@@ -3,6 +3,7 @@
 import { Copy } from "@phosphor-icons/react/dist/ssr/Copy";
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { useIsBelowDesktop } from "@/components/use-is-phone";
 import type { Translator } from "@/lib/i18n/translator";
 import type { ManagedCycle } from "@/lib/training/club-cycles";
 import type { ManagedRoutine } from "@/lib/training/club-routines";
@@ -32,6 +33,9 @@ import type { PlannerCycles } from "./use-planner-cycles";
  * handoff): en el escritorio, una fila por semana con la cabecera fija; en
  * el móvil, una semana a la vez. Debajo, copiar la semana 1. Un ciclo
  * archivado se ve, pero no se cambia, como sus campos.
+ *
+ * La semana a la vez llega hasta los 1024 px: en la tableta, con la barra
+ * lateral, las nueve columnas no caben.
  */
 
 const NO_ROUTINES: readonly ManagedRoutine[] = [];
@@ -40,7 +44,6 @@ type GridProps = {
   readonly translate: Translator;
   readonly planner: PlannerCycles;
   readonly cycle: ManagedCycle;
-  readonly isPhone: boolean;
 };
 
 /** Lo que comparten la tabla del escritorio y la semana del móvil. */
@@ -250,14 +253,13 @@ function GridLoadFailure({
 
 function ReadyGrid({
   context,
-  isPhone,
 }: {
   readonly context: GridContext;
-  readonly isPhone: boolean;
 }): React.JSX.Element {
+  const isWeekAtATime = useIsBelowDesktop();
   return (
     <section className="training-grid-section">
-      {isPhone ? (
+      {isWeekAtATime ? (
         <PlannerPhoneWeek context={context} />
       ) : (
         <DesktopGrid context={context} />
@@ -276,7 +278,6 @@ export function PlannerCycleGrid({
   translate,
   planner,
   cycle,
-  isPhone,
 }: GridProps): React.JSX.Element {
   const grid = useCycleGrid(cycle, planner);
   const routines =
@@ -294,7 +295,6 @@ export function PlannerCycleGrid({
     case "ready":
       return (
         <ReadyGrid
-          isPhone={isPhone}
           context={{
             translate,
             planner,
