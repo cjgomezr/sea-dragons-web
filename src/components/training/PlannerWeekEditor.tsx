@@ -15,7 +15,8 @@ import {
   draftOfWeek,
   readWeekDraft,
 } from "@/lib/training/cycle-grid-view";
-import type { PlannerCycles } from "./use-planner-cycles";
+import type { DoseIntensity, WeekDose } from "@/lib/training/training-load";
+import type { GridReporter } from "./use-cycle-grid";
 
 /**
  * La nota y la dosis de una semana (#907, D6): la nota de hasta 140, y las
@@ -36,14 +37,37 @@ export type WeekEditorProps = {
   readonly translate: Translator;
   readonly week: CycleWeekRecord;
   readonly isReadOnly: boolean;
-  readonly reporter: Pick<PlannerCycles, "showError">;
+  readonly reporter: GridReporter;
   /** Verdadero si se guardó. */
   readonly onSave: (week: CycleWeekRecord) => Promise<boolean>;
   readonly id?: string;
 };
 
+function isSameIntensity(first: DoseIntensity, second: DoseIntensity): boolean {
+  switch (first.kind) {
+    case "none":
+      return second.kind === "none";
+    case "pct":
+      return second.kind === "pct" && second.pct === first.pct;
+    case "text":
+      return second.kind === "text" && second.text === first.text;
+  }
+}
+
+function isSameDose(first: WeekDose | null, second: WeekDose | null): boolean {
+  if (first === null || second === null) {
+    return first === second;
+  }
+  return (
+    first.sets === second.sets &&
+    first.reps === second.reps &&
+    isSameIntensity(first.intensity, second.intensity)
+  );
+}
+
+/** Salir de un campo sin cambiar nada no manda nada. */
 function isSameWeek(first: CycleWeekRecord, second: CycleWeekRecord): boolean {
-  return JSON.stringify(first) === JSON.stringify(second);
+  return first.note === second.note && isSameDose(first.dose, second.dose);
 }
 
 function TextField({

@@ -6,6 +6,7 @@ import {
   currentGridWeek,
   dayRoutines,
   draftOfWeek,
+  initialPhoneWeek,
   lastCopyTarget,
   readWeekDraft,
   weekRecordOf,
@@ -139,6 +140,16 @@ describe("currentGridWeek", () => {
     expect(
       currentGridWeek({ ...ACTIVE, startDate: "2026-11-02" }, NOW),
     ).toBeNull();
+  });
+});
+
+describe("initialPhoneWeek", () => {
+  it("abre el activo en la semana de hoy", () => {
+    expect(initialPhoneWeek(ACTIVE, NOW)).toBe(3);
+  });
+
+  it("abre un borrador en la semana 1 aunque sus fechas lleguen a hoy", () => {
+    expect(initialPhoneWeek({ ...ACTIVE, status: "draft" }, NOW)).toBe(1);
   });
 });
 

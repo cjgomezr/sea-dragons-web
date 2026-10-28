@@ -22,8 +22,6 @@ import type { DoseIntensity, WeekDose } from "./training-load";
 /** 0 es el lunes, como en `training_cycle_days`. */
 export const GRID_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 
-export type GridWeekday = (typeof GRID_WEEKDAYS)[number];
-
 export type GridDay = { readonly weekNo: number; readonly weekday: number };
 
 /** Las dos ranuras de un día; la 2 nunca está sin la 1 (D7). */
@@ -131,9 +129,11 @@ export function currentGridWeek(cycle: ManagedCycle, now: Date): number | null {
   return position.phase === "running" ? position.week : null;
 }
 
+const FIRST_WEEK = 1;
+
 /** La semana que se abre en el móvil: la de hoy en el activo, o la 1. */
 export function initialPhoneWeek(cycle: ManagedCycle, now: Date): number {
-  return cycleWeekAt(cycle, now).week;
+  return cycle.status === "active" ? cycleWeekAt(cycle, now).week : FIRST_WEEK;
 }
 
 export type IntensityKind = DoseIntensity["kind"];

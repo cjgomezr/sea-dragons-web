@@ -181,32 +181,36 @@ export function useCycleGrid(
     }
   }
 
+  async function saveWeek(week: CycleWeekRecord): Promise<boolean> {
+    reporter.showError(null);
+    const outcome = await saveCycleWeek(cycle.id, week);
+    if (outcome.kind === "failed") {
+      report(outcome);
+      return false;
+    }
+    setState(updatePlan((plan) => ({ ...plan, weeks: outcome.value.weeks })));
+    return true;
+  }
+
+  async function copyWeekOne(): Promise<boolean> {
+    reporter.showError(null);
+    setIsCopying(true);
+    const outcome = await copyCycleWeekOne(cycle.id);
+    setIsCopying(false);
+    if (outcome.kind === "failed") {
+      report(outcome);
+      return false;
+    }
+    setState(updatePlan(() => outcome.value));
+    return true;
+  }
+
   return {
     state,
     isCopying,
     retry: load.retry,
     setDay: (change) => void setDay(change),
-    saveWeek: async (week) => {
-      reporter.showError(null);
-      const outcome = await saveCycleWeek(cycle.id, week);
-      if (outcome.kind === "failed") {
-        report(outcome);
-        return false;
-      }
-      setState(updatePlan((plan) => ({ ...plan, weeks: outcome.value.weeks })));
-      return true;
-    },
-    copyWeekOne: async () => {
-      reporter.showError(null);
-      setIsCopying(true);
-      const outcome = await copyCycleWeekOne(cycle.id);
-      setIsCopying(false);
-      if (outcome.kind === "failed") {
-        report(outcome);
-        return false;
-      }
-      setState(updatePlan(() => outcome.value));
-      return true;
-    },
+    saveWeek,
+    copyWeekOne,
   };
 }
