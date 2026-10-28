@@ -41,9 +41,19 @@ import {
   MarkNotFoundError,
   MarkValidationError,
 } from "./club-marks";
+import {
+  type ClubRoutinesGateways,
+  ROUTINE_NAME_MAX_LENGTH,
+  RoutineInUseError,
+  RoutineItemReferenceError,
+  RoutineNotFoundError,
+  RoutineValidationError,
+} from "./club-routines";
+import { RoutineItemsValidationError } from "./routine-items";
 import { createSupabaseClubCyclesGateways } from "./supabase-club-cycles-gateways";
 import { createSupabaseClubExercisesGateways } from "./supabase-club-exercises-gateways";
 import { createSupabaseClubMarksGateways } from "./supabase-club-marks-gateways";
+import { createSupabaseClubRoutinesGateways } from "./supabase-club-routines-gateways";
 import { TrainingPlannerForbiddenError } from "./training-planner";
 
 /**
@@ -58,6 +68,10 @@ export const EXERCISE_NAME_TAKEN_REASON = "exercise_name_taken";
 export const EXERCISE_IN_USE_REASON = "exercise_in_use";
 export const LIBRARY_EXERCISE_REASON = "library_exercise";
 export const CYCLE_DAYS_WOULD_BE_REMOVED_REASON = "cycle_days_would_be_removed";
+export const ROUTINE_IN_USE_REASON = "routine_in_use";
+export const ROUTINE_UNKNOWN_REFERENCE_REASON = "unknown_reference";
+
+const CONFIRM_PARAM = "confirm";
 
 /** Un tope holgado sólo para no arrastrar un cuerpo de megas hasta el
  * dominio, que cuenta en caracteres y dice qué falló. */
@@ -141,6 +155,35 @@ export const cycleDayBodySchema: z.ZodType<CycleDayChange> = z
   })
   .strict();
 
+/** El nombre de una rutina (#905). */
+export const routineNameBodySchema = z
+  .object({ name: bodyText(ROUTINE_NAME_MAX_LENGTH) })
+  .strict();
+
+/** Sin `cycleId`, o nulo, es una compartida (D8). */
+export const routineCreateBodySchema = z
+  .object({
+    name: bodyText(ROUTINE_NAME_MAX_LENGTH),
+    cycleId: z.uuid().nullish(),
+  })
+  .strict();
+
+/** Las filas las lee el dominio una a una, para decir cuál no vale. */
+export const routineItemsBodySchema = z
+  .object({ items: z.array(z.unknown()) })
+  .strict();
+
+export function requireClubRoutinesGateways(): ClubRoutinesGateways {
+  const wiring = createSupabaseClubRoutinesGateways(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new ApiError(
+      "service_unavailable",
+      describeMissingAuthKeys(wiring.missingKeys),
+    );
+  }
+  return wiring.gateways;
+}
+
 export function requireClubCyclesGateways(): ClubCyclesGateways {
   const wiring = createSupabaseClubCyclesGateways(process.env);
   if (wiring.kind === "unconfigured") {
@@ -181,6 +224,22 @@ export function readRouteId(value: string, notFound: Error): string {
     throw new ApiError("not_found", notFound.message);
   }
   return value;
+}
+
+/** Sin `?confirm` es `false`; cualquier cosa que no sea `true` o `false`,
+ * un 400, para que un "sí" no se lea como una confirmación. */
+export function readConfirm(searchParams: URLSearchParams): boolean {
+  const confirm = searchParams.get(CONFIRM_PARAM);
+  if (confirm === null || confirm === "false") {
+    return false;
+  }
+  if (confirm === "true") {
+    return true;
+  }
+  throw new ApiError(
+    "validation_error",
+    `"${CONFIRM_PARAM}" tiene que ser true o false.`,
+  );
 }
 
 function asMarkApiError(error: unknown): void {
@@ -237,12 +296,41 @@ function asCycleApiError(error: unknown): void {
   }
 }
 
+function asRoutineApiError(error: unknown): void {
+  if (error instanceof RoutineValidationError) {
+    throw new ApiError("validation_error", error.message, error.code);
+  }
+  if (error instanceof RoutineItemsValidationError) {
+    throw new ApiErrorWithDetails("validation_error", error.message, {
+      reason: error.code,
+      details: { index: error.index },
+    });
+  }
+  if (error instanceof RoutineItemReferenceError) {
+    throw new ApiError(
+      "validation_error",
+      error.message,
+      ROUTINE_UNKNOWN_REFERENCE_REASON,
+    );
+  }
+  if (error instanceof RoutineNotFoundError) {
+    throw new ApiError("not_found", error.message);
+  }
+  if (error instanceof RoutineInUseError) {
+    throw new ApiErrorWithDetails("conflict", error.message, {
+      reason: ROUTINE_IN_USE_REASON,
+      details: { daysUsed: error.daysUsed },
+    });
+  }
+}
+
 export function asTrainingManageApiError(error: unknown): never {
   if (error instanceof TrainingPlannerForbiddenError) {
     throw new ApiError("forbidden", error.message);
   }
   asMarkApiError(error);
   asCycleApiError(error);
+  asRoutineApiError(error);
   asExerciseApiError(error);
   return asAccountApiError(error);
 }
@@ -288,6 +376,59 @@ export function createCycleRoute<T, Body = undefined>(config: {
               callerId,
               cycleId,
               body,
+            }),
+          };
+        } catch (error) {
+          return asTrainingManageApiError(error);
+        }
+      },
+    })(request);
+}
+
+export type RoutineRouteContext = {
+  readonly params: Promise<{ readonly routineId: string }>;
+};
+
+export type RoutineRouteRequest<Body> = {
+  readonly callerId: string;
+  readonly routineId: string;
+  readonly body: Body;
+  readonly searchParams: URLSearchParams;
+};
+
+/** Un handler de `/routines/{routineId}/...` (#905), como el de un ciclo:
+ * quién llama, qué rutina, el cuerpo ya validado y la consulta, y cada error
+ * del dominio con su código. */
+export function createRoutineRoute<T, Body = undefined>(config: {
+  readonly schema?: ZodType<Body>;
+  readonly run: (
+    gateways: ClubRoutinesGateways,
+    request: RoutineRouteRequest<Body>,
+  ) => Promise<T>;
+}): (
+  request: NextRequest,
+  context: RoutineRouteContext,
+) => Promise<NextResponse> {
+  return (request, context) =>
+    createApiRoute<T, Body>({
+      schema: config.schema,
+      handler: async ({ request: apiRequest, body, decorateResponse }) => {
+        const callerId = await identifyAccountCaller({
+          request: apiRequest,
+          decorateResponse,
+        });
+        const routineId = readRouteId(
+          (await context.params).routineId,
+          new RoutineNotFoundError(),
+        );
+        const { searchParams } = apiRequest.nextUrl;
+        try {
+          return {
+            data: await config.run(requireClubRoutinesGateways(), {
+              callerId,
+              routineId,
+              body,
+              searchParams,
             }),
           };
         } catch (error) {
