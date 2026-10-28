@@ -285,6 +285,25 @@ export function trainingManageExerciseApiPath(exerciseId: string): string {
   return `${TRAINING_MANAGE_EXERCISES_API_PATH}/${encodeURIComponent(exerciseId)}`;
 }
 
+/** Los ciclos del club y crear uno (#904, RF-7). */
+export const TRAINING_MANAGE_CYCLES_API_PATH = `${TRAINING_MANAGE_API_PATH}/cycles`;
+
+/** Leer o cambiar un ciclo (#904). */
+export function trainingManageCycleApiPath(cycleId: string): string {
+  return `${TRAINING_MANAGE_CYCLES_API_PATH}/${encodeURIComponent(cycleId)}`;
+}
+
+/** Lo que se le hace a un ciclo entero o a una parte (#904, RF-7 y RF-8). */
+export type TrainingCycleAction =
+  "activate" | "archive" | "duplicate" | "copy-week-one" | "weeks" | "days";
+
+export function trainingManageCycleActionApiPath(
+  cycleId: string,
+  action: TrainingCycleAction,
+): string {
+  return `${trainingManageCycleApiPath(cycleId)}/${action}`;
+}
+
 /** La búsqueda global (#425, RF-7 del PRD de E14). La alcanza cualquier
  * cuenta activa: qué encuentra cada rol lo decide cada sección (D3), así que
  * no aparece en `RESTRICTED_ROUTES`. */
