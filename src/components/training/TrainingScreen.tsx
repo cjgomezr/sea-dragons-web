@@ -4,13 +4,20 @@ import { useEffect, useState } from "react";
 import { useIsPhone } from "@/components/use-is-phone";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { MemberMark } from "@/lib/training/member-marks";
 import type { MarkValues } from "@/lib/training/routine-row-view";
 import type { ActiveTrainingPlan } from "@/lib/training/training-plan";
 import { defaultSelectedWeekday } from "@/lib/training/training-week-view";
-import { loadTrainingPlan } from "./training-client";
+import { type TrainingPlanBlock, loadTrainingPlan } from "./training-client";
 import { TrainingDayPanel } from "./TrainingDayPanel";
 import { TrainingDayPills, TrainingDayRows } from "./TrainingDayList";
-import { PlanTrainingLink, TrainingHeader } from "./TrainingHeader";
+import {
+  LockedTrainingHeader,
+  PlanTrainingLink,
+  TrainingHeader,
+} from "./TrainingHeader";
+import { TrainingLockCard } from "./TrainingLockCard";
+import { TrainingMyMarks } from "./TrainingMyMarks";
 import { TrainingWeekNav } from "./TrainingWeekNav";
 import { TrainingWeekStrip } from "./TrainingWeekStrip";
 import {
@@ -31,9 +38,18 @@ import {
 type PlanState =
   | { readonly kind: "loading" }
   | { readonly kind: "failed" }
-  | { readonly kind: "blocked" }
+  | ({ readonly kind: "blocked" } & TrainingPlanBlock)
   | { readonly kind: "noCycle" }
   | { readonly kind: "ready"; readonly plan: ActiveTrainingPlan };
+
+/** El plan junto a las marcas del socio, que la pantalla espera a la vez. */
+type ScreenState =
+  | Exclude<PlanState, { readonly kind: "ready" }>
+  | {
+      readonly kind: "ready";
+      readonly plan: ActiveTrainingPlan;
+      readonly memberMarks: readonly MemberMark[];
+    };
 
 /** El plan de la semana pedida; nula es la de hoy. Al cambiar de semana se
  * sigue viendo la anterior hasta que llega la nueva. */
@@ -55,7 +71,7 @@ function useTrainingPlan(): {
         return;
       }
       if (outcome.kind !== "loaded") {
-        setState({ kind: outcome.kind });
+        setState(outcome);
         return;
       }
       const { plan } = outcome;
@@ -140,6 +156,25 @@ type MarksForRows = {
   readonly onSaveMark: SaveMark;
 };
 
+/** Quien no está al día (#902, RF-6): la cabecera del ciclo, si hay uno, y
+ * la tarjeta con su motivo. */
+function LockedTraining({
+  translate,
+  block,
+  cycle,
+}: { readonly translate: Translator } & TrainingPlanBlock): React.JSX.Element {
+  return (
+    <>
+      {cycle === null ? (
+        <PlainHeader translate={translate} />
+      ) : (
+        <LockedTrainingHeader translate={translate} cycle={cycle} />
+      )}
+      <TrainingLockCard translate={translate} block={block} />
+    </>
+  );
+}
+
 function TrainingWeekView({
   translate,
   plan,
@@ -150,7 +185,9 @@ function TrainingWeekView({
   readonly translate: Translator;
   readonly plan: ActiveTrainingPlan;
   readonly canPlan: boolean;
-  readonly marks: MarksForRows;
+  readonly marks: MarksForRows & {
+    readonly memberMarks: readonly MemberMark[];
+  };
   readonly onChooseWeek: (week: number) => void;
 }): React.JSX.Element {
   const isPhone = useIsPhone();
@@ -165,6 +202,16 @@ function TrainingWeekView({
   const selectedDay = plan.week.days.find(
     (day) => day.weekday === selectedWeekday,
   );
+  // Sin marcas en el club no hay tarjeta (#902).
+  const myMarks =
+    marks.memberMarks.length === 0 ? null : (
+      <TrainingMyMarks
+        translate={translate}
+        marks={marks.memberMarks}
+        week={plan.week}
+        onSaveMark={marks.onSaveMark}
+      />
+    );
   const dayListProps = {
     translate,
     plan,
@@ -202,7 +249,10 @@ function TrainingWeekView({
           {isPhone ? (
             <TrainingDayPills {...dayListProps} />
           ) : (
-            <TrainingDayRows {...dayListProps} />
+            <>
+              <TrainingDayRows {...dayListProps} />
+              {myMarks}
+            </>
           )}
         </div>
         {selectedDay === undefined ? null : (
@@ -211,25 +261,37 @@ function TrainingWeekView({
             cycle={plan.cycle}
             day={selectedDay}
             weekDose={plan.week.dose}
-            {...marks}
+            markValues={marks.markValues}
+            onSaveMark={marks.onSaveMark}
           />
         )}
+        {/* En el móvil, al final, después de la rutina (§4.2). */}
+        {isPhone ? myMarks : null}
       </div>
     </>
   );
 }
 
 /** La pantalla espera al plan y a las marcas del socio: sin ellas, cada fila
- * con % pediría una marca que a lo mejor ya tiene. Lo que falla o se cierra
- * en cualquiera de los dos manda. */
-function combinedState(plan: PlanState, marks: MemberMarksState): PlanState {
-  if (plan.kind === "blocked" || marks.kind === "blocked") {
-    return { kind: "blocked" };
+ * con % pediría una marca que a lo mejor ya tiene. La puerta cerrada la dice
+ * el plan, que trae el motivo y el ciclo. Las marcas cerradas con el plan
+ * abierto es que la membresía cambió entre las dos peticiones: se reintenta. */
+function combinedState(plan: PlanState, marks: MemberMarksState): ScreenState {
+  if (plan.kind === "blocked") {
+    return plan;
   }
   if (plan.kind === "failed" || marks.kind === "failed") {
     return { kind: "failed" };
   }
-  return marks.kind === "loading" ? { kind: "loading" } : plan;
+  if (plan.kind === "loading" || marks.kind === "loading") {
+    return { kind: "loading" };
+  }
+  if (marks.kind === "blocked") {
+    return { kind: "failed" };
+  }
+  return plan.kind === "ready"
+    ? { kind: "ready", plan: plan.plan, memberMarks: marks.marks }
+    : plan;
 }
 
 function TrainingContent({
@@ -254,8 +316,13 @@ function TrainingContent({
     case "failed":
       return <PlanFailure translate={translate} onRetry={retry} />;
     case "blocked":
-      // La pantalla bloqueada llega con #902; mientras, sin días.
-      return <PlainHeader translate={translate} />;
+      return (
+        <LockedTraining
+          translate={translate}
+          block={state.block}
+          cycle={state.cycle}
+        />
+      );
     case "noCycle":
       return <NoPlan translate={translate} canPlan={canPlan} />;
     case "ready":
@@ -265,6 +332,7 @@ function TrainingContent({
           plan={state.plan}
           canPlan={canPlan}
           marks={{
+            memberMarks: state.memberMarks,
             markValues: marks.markValues,
             onSaveMark: marks.saveMark,
           }}

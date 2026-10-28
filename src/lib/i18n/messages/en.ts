@@ -3040,4 +3040,19 @@ export const englishMessages = {
   "training.member.loading": "Loading your training…",
   "training.member.failed": "We couldn't load the training plan.",
   "training.member.retry": "Try again",
+  "training.member.myMarks": "My marks",
+  "training.member.marksSet": "{set} of {total} set",
+  "training.member.onlyYou": "Only you see these",
+  "training.member.myMarksHelp":
+    'Your best single lift (1RM). Routines with "% of" use it to show your kilos.',
+  "training.member.showAllMarks": "Show all {total} marks",
+  "training.member.showWeekMarks": "Show only this week's marks",
+  "training.member.lockedPending": "Activate your membership to see your plan",
+  "training.member.lockedPastDue":
+    "Your last payment failed. Update your card to see your plan",
+  "training.member.lockedCancelled":
+    "Your membership is cancelled. Renew to see your plan",
+  "training.member.lockedText":
+    "Training is for members with an active membership. Renew and you'll pick up the cycle where the club is now.",
+  "training.member.renewMembership": "Renew membership",
 } as const satisfies Readonly<Record<string, Message>>;

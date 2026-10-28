@@ -3057,4 +3057,19 @@ export const spanishMessages: MessageCatalog = {
   "training.member.loading": "Cargando tu entrenamiento…",
   "training.member.failed": "No pudimos cargar el plan de entrenamiento.",
   "training.member.retry": "Reintentar",
+  "training.member.myMarks": "Mis marcas",
+  "training.member.marksSet": "{set} de {total} anotadas",
+  "training.member.onlyYou": "Solo tú las ves",
+  "training.member.myMarksHelp":
+    "Tu mejor levantamiento a una repetición (1RM). Las rutinas con «% de» lo usan para darte los kilos.",
+  "training.member.showAllMarks": "Ver las {total} marcas",
+  "training.member.showWeekMarks": "Ver solo las de esta semana",
+  "training.member.lockedPending": "Activa tu membresía para ver tu plan",
+  "training.member.lockedPastDue":
+    "Tu último pago falló. Actualiza tu tarjeta para ver tu plan",
+  "training.member.lockedCancelled":
+    "Tu membresía está cancelada. Renuévala para ver tu plan",
+  "training.member.lockedText":
+    "El entrenamiento es para miembros con la membresía activa. Renuévala y retomarás el ciclo donde está ahora el club.",
+  "training.member.renewMembership": "Renovar membresía",
 };

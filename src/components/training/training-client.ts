@@ -11,8 +11,9 @@ import {
   TRAINING_PLAN_API_PATH,
   trainingMyMarkApiPath,
 } from "@/lib/auth/routes";
+import type { MembershipBlock } from "@/lib/membership/membership";
 import type { MemberMarks } from "@/lib/training/member-marks";
-import type { TrainingPlan } from "@/lib/training/training-plan";
+import type { TrainingCycle, TrainingPlan } from "@/lib/training/training-plan";
 
 /**
  * Lo que la pantalla de Entrenamiento (#900) le pide a la API v1 (#898) y
@@ -104,13 +105,45 @@ const planResponseSchema: z.ZodType<{ readonly data: TrainingPlan }> = z.object(
   },
 );
 
+/** El 403 de quien no está al día (#898): el motivo y la cabecera del ciclo,
+ * o nula si el club no tiene ciclo activo. */
+const blockedResponseSchema = z.object({
+  error: z.object({
+    reason: z.literal(MEMBERSHIP_NOT_CURRENT_REASON),
+    block: z.enum([
+      "pending",
+      "past_due",
+      "cancelled",
+    ] as const satisfies readonly MembershipBlock[]),
+    cycle: cycleSchema.nullable(),
+  }),
+});
+
+/** La puerta cerrada de quien no está al día, con lo que la tarjeta dice. */
+export type TrainingPlanBlock = {
+  readonly block: MembershipBlock;
+  readonly cycle: TrainingCycle | null;
+};
+
 /** El plan, la puerta cerrada de quien no está al día, o un fallo. */
 export type TrainingPlanOutcome =
   | { readonly kind: "loaded"; readonly plan: TrainingPlan }
-  | { readonly kind: "blocked" }
+  | ({ readonly kind: "blocked" } & TrainingPlanBlock)
   | { readonly kind: "failed" };
 
-/** La semana `week` del ciclo activo, o la de hoy si es nula. */
+function toBlockedOutcome(payload: unknown): TrainingPlanOutcome {
+  const parsed = blockedResponseSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { kind: "failed" };
+  }
+  const { block, cycle } = parsed.data.error;
+  return { kind: "blocked", block, cycle };
+}
+
+/** La semana `week` del ciclo activo, o la de hoy si es nula.
+ *
+ * Va por su cuenta y no por `requestApi`: del 403, además del motivo, hacen
+ * falta el de la membresía y la cabecera del ciclo (#902). */
 export async function loadTrainingPlan(
   week: number | null,
 ): Promise<TrainingPlanOutcome> {
@@ -118,13 +151,19 @@ export async function loadTrainingPlan(
     week === null
       ? TRAINING_PLAN_API_PATH
       : `${TRAINING_PLAN_API_PATH}?week=${week}`;
-  const outcome = readApiPayload(await requestApi(path), planResponseSchema);
-  if (outcome.kind === "ok") {
-    return { kind: "loaded", plan: outcome.value.data };
+  let response: Response;
+  try {
+    response = await fetch(path);
+  } catch {
+    return { kind: "failed" };
   }
-  return outcome.failure === "forbidden" &&
-    outcome.reason === MEMBERSHIP_NOT_CURRENT_REASON
-    ? { kind: "blocked" }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    return toBlockedOutcome(payload);
+  }
+  const parsed = planResponseSchema.safeParse(payload);
+  return parsed.success
+    ? { kind: "loaded", plan: parsed.data.data }
     : { kind: "failed" };
 }
 

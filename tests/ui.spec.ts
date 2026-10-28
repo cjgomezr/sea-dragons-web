@@ -26978,8 +26978,62 @@ type TrainingState = {
   readonly plan: unknown;
   readonly storageState: string;
   readonly isSpanish?: boolean;
+  /** Las marcas del socio; por defecto, las tres de `TRAINING_MARKS`. */
+  readonly marks?: unknown;
+  /** Un 403 en vez del plan: `plan` es entonces el error que responde. */
+  readonly isBlocked?: boolean;
   readonly ready: (page: Page) => Promise<void>;
 };
+
+/* Mis marcas con diez (#902, RF-5): la semana usa back squat, bench press y
+   deadlift, así que solo salen esas tres, con "this week". */
+const TRAINING_TEN_MARKS = {
+  marks: [
+    ...TRAINING_MARKS.marks,
+    ...[
+      "Power clean",
+      "Overhead press",
+      "Bent-over row",
+      "Front squat",
+      "Hip thrust",
+      "Push press",
+      "Snatch",
+    ].map((name, index) => ({
+      id: `mark-extra-${index}`,
+      name,
+      unit: "kg",
+      value: index === 0 ? 70 : null,
+    })),
+  ],
+};
+
+/* La pantalla de quien no está al día (#902, RF-6), contra d07-locked.png y
+   m08-locked.png: el 403 de la API con el motivo y la cabecera del ciclo. */
+const TRAINING_BLOCKED_ERROR = {
+  error: {
+    block: "past_due",
+    cycle: TRAINING_ACTIVE_PLAN.cycle,
+    code: "forbidden",
+    message: "Tu membresía no está al día.",
+    reason: "membership_not_current",
+  },
+};
+
+const TRAINING_RENEW_LINK = /^(Renew membership|Renovar membresía)$/;
+
+async function waitForTrainingLock(page: Page): Promise<void> {
+  await expect(
+    page.getByRole("link", { name: TRAINING_RENEW_LINK }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+async function waitForTrainingWeekAndMarks(page: Page): Promise<void> {
+  await waitForTrainingWeek(page);
+  await expect(
+    page.getByRole("region", { name: /^(My marks|Mis marcas)$/ }),
+  ).toBeVisible();
+}
 
 const TRAINING_WEEK_HEADING = /^(Week 3 of 28|Semana 3 de 28|Week 3|Semana 3)$/;
 
@@ -27019,6 +27073,36 @@ const TRAINING_STATES: readonly TrainingState[] = [
     isSpanish: true,
     ready: openTrainingSquatRow,
   },
+  {
+    name: "entrenamiento-diez-marcas",
+    plan: TRAINING_DAY_WITH_KILOS_PLAN,
+    marks: TRAINING_TEN_MARKS,
+    storageState: E2E_STORAGE_STATE_PATH,
+    ready: waitForTrainingWeekAndMarks,
+  },
+  {
+    name: "entrenamiento-diez-marcas-es",
+    plan: TRAINING_DAY_WITH_KILOS_PLAN,
+    marks: TRAINING_TEN_MARKS,
+    storageState: E2E_STORAGE_STATE_PATH,
+    isSpanish: true,
+    ready: waitForTrainingWeekAndMarks,
+  },
+  {
+    name: "entrenamiento-bloqueado",
+    plan: TRAINING_BLOCKED_ERROR,
+    isBlocked: true,
+    storageState: E2E_STORAGE_STATE_PATH,
+    ready: waitForTrainingLock,
+  },
+  {
+    name: "entrenamiento-bloqueado-es",
+    plan: TRAINING_BLOCKED_ERROR,
+    isBlocked: true,
+    storageState: E2E_STORAGE_STATE_PATH,
+    isSpanish: true,
+    ready: waitForTrainingLock,
+  },
   // Sin ciclo activo, como lo ve quien planifica: con el enlace a
   // Planificar.
   {
@@ -27036,10 +27120,13 @@ const TRAINING_STATES: readonly TrainingState[] = [
 /** Las marcas del socio y las fotos de los ejercicios, que la pantalla pide
  * junto al plan (#901). Las marcas reales dependen de la membresía de la
  * cuenta de pruebas, que aquí no se prueba. */
-async function stubTrainingMarksAndPhotos(page: Page): Promise<void> {
+async function stubTrainingMarksAndPhotos(
+  page: Page,
+  marks: unknown = TRAINING_MARKS,
+): Promise<void> {
   await page.route(
     (url) => url.pathname === TRAINING_MARKS_ENDPOINT,
-    (route) => route.fulfill(jsonBody(TRAINING_MARKS)),
+    (route) => route.fulfill(jsonBody(marks)),
   );
   await page.route(
     (url) => url.pathname.startsWith(TRAINING_PHOTOS_PATH),
@@ -27059,10 +27146,19 @@ async function goToTraining(
   state: TrainingState,
   theme?: (typeof themes)[number],
 ): Promise<void> {
-  await stubTrainingMarksAndPhotos(page);
+  await stubTrainingMarksAndPhotos(page, state.marks);
   await page.route(
     (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
-    (route) => route.fulfill(jsonBody(state.plan)),
+    (route) =>
+      route.fulfill(
+        state.isBlocked === true
+          ? {
+              status: 403,
+              contentType: "application/json",
+              body: JSON.stringify(state.plan),
+            }
+          : jsonBody(state.plan),
+      ),
   );
   if (state.isSpanish === true) {
     await chooseSpanish(page);
@@ -27254,4 +27350,52 @@ test.describe("entrenamiento en el navegador", () => {
     await expect(deadlift).toContainText("60 kg");
     await expect(deadlift).toContainText("60% of deadlift 100");
   });
+
+  test("en el móvil, Mis marcas tiene filas de 48 px y campos de 44 px con texto de 16 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await stubTrainingMarksAndPhotos(page);
+    await page.route(
+      (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
+      (route) => route.fulfill(jsonBody(TRAINING_DAY_WITH_KILOS_PLAN)),
+    );
+    await page.goto(`${APP_URL}${TRAINING_SCREEN_PATH}`);
+    await waitForTrainingWeekAndMarks(page);
+
+    const card = page.getByRole("region", { name: "My marks" });
+    for (const row of await card.getByRole("listitem").all()) {
+      expect((await row.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+    }
+    const input = card.getByRole("textbox", { name: "Back squat" });
+    expect((await input.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    await expect(input).toHaveCSS("font-size", "16px");
+  });
+
+  for (const { width, height } of [
+    { width: 1440, height: 46 },
+    { width: 375, height: 48 },
+  ]) {
+    test(`Renew membership mide ${height} px a ${width} px y lleva a Pagos`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await stubTrainingMarksAndPhotos(page);
+      await page.route(
+        (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
+        (route) =>
+          route.fulfill({
+            status: 403,
+            contentType: "application/json",
+            body: JSON.stringify(TRAINING_BLOCKED_ERROR),
+          }),
+      );
+      await page.goto(`${APP_URL}${TRAINING_SCREEN_PATH}`);
+      await waitForTrainingLock(page);
+
+      const renew = page.getByRole("link", { name: "Renew membership" });
+      expect(Math.round((await renew.boundingBox())?.height ?? 0)).toBe(height);
+      await expect(renew).toHaveAttribute("href", "/pagos");
+    });
+  }
 });

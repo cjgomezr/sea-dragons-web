@@ -3,7 +3,10 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { TRAINING_PLANNING_PATH } from "@/lib/auth/routes";
 import type { Translator } from "@/lib/i18n/translator";
-import type { ActiveTrainingPlan } from "@/lib/training/training-plan";
+import type {
+  ActiveTrainingPlan,
+  TrainingCycle,
+} from "@/lib/training/training-plan";
 import { weeksToGo } from "@/lib/training/training-week-view";
 import { formatDayWithYear } from "./training-format";
 
@@ -30,12 +33,12 @@ export function PlanTrainingLink({
 
 function CycleTarget({
   translate,
-  plan,
+  cycle,
 }: {
   readonly translate: Translator;
-  readonly plan: ActiveTrainingPlan;
+  readonly cycle: TrainingCycle;
 }): React.JSX.Element {
-  const { event, endDate } = plan.cycle;
+  const { event, endDate } = cycle;
   if (event === null || event.date === null) {
     return (
       <p className="training-target">
@@ -147,12 +150,34 @@ export function TrainingHeader({
             {compactPosition(translate, plan)}
           </p>
         ) : (
-          <CycleTarget translate={translate} plan={plan} />
+          <CycleTarget translate={translate} cycle={plan.cycle} />
         )}
       </div>
       <div className="training-header-side">
         {canPlan ? <PlanTrainingLink translate={translate} /> : null}
         {isPhone ? null : <Countdown translate={translate} plan={plan} />}
+      </div>
+    </header>
+  );
+}
+
+/** La cabecera de quien no está al día (#902, §4.3 del handoff): el ciclo y
+ * su evento, sin dónde cae hoy. También en el móvil lleva el evento. */
+export function LockedTrainingHeader({
+  translate,
+  cycle,
+}: {
+  readonly translate: Translator;
+  readonly cycle: TrainingCycle;
+}): React.JSX.Element {
+  return (
+    <header className="training-header">
+      <div className="training-heading">
+        <p className="training-eyebrow">
+          {translate("training.member.eyebrow")}
+        </p>
+        <h1>{cycle.name}</h1>
+        <CycleTarget translate={translate} cycle={cycle} />
       </div>
     </header>
   );
