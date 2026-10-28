@@ -11,6 +11,7 @@ import {
   PAYMENTS_PATH,
   EVALUATION_CATEGORIES_PATH,
   SIGN_IN_PATH,
+  TRAINING_PLANNING_PATH,
 } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
 
@@ -281,4 +282,29 @@ describe("frontera de la membresía, a través del proxy (#453)", () => {
 
     expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
   });
+});
+
+describe("Planificar el entrenamiento (#906, D3 del PRD de E35)", () => {
+  it.each(["Player", "Committee"] as const)(
+    "redirige al panel a un %s que pide Planificar",
+    async (role) => {
+      givenSession({ kind: "active", role, membershipCurrent: true });
+
+      const response = await proxy(requestFor(TRAINING_PLANNING_PATH));
+
+      expect(response.status).toBe(TEMPORARY_REDIRECT);
+      expect(redirectedTo(response)).toBe(DASHBOARD_PATH);
+    },
+  );
+
+  it.each(["Coach", "Admin"] as const)(
+    "deja pasar a un %s a Planificar aunque no esté al día",
+    async (role) => {
+      givenSession({ kind: "active", role, membershipCurrent: false });
+
+      const response = await proxy(requestFor(TRAINING_PLANNING_PATH));
+
+      expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
+    },
+  );
 });

@@ -27399,3 +27399,228 @@ test.describe("entrenamiento en el navegador", () => {
     });
   }
 });
+
+/* ---------------------------------------------------------------------------
+   Planificar → Ciclo (#906, RF-7 del PRD de E35), contra
+   docs/design/design_handoff_training/ (§5.1 y §5.2, d04-coach-cycle.png y
+   m03-coach-cycle.png, sin el panel de Excel). Los ciclos los sirve la
+   prueba: qué vale y qué se guarda lo decide la API (#904), que tiene sus
+   propias pruebas contra la base. La hora se fija para que "Members are in
+   week 3 today" no cambie con el día en que corre la suite.
+   --------------------------------------------------------------------------- */
+
+const PLANNER_SCREEN_PATH = "/entrenamiento/planificar";
+const PLANNER_CYCLES_ENDPOINT = "/api/v1/training/manage/cycles";
+/** Las 12:00 del miércoles 28 de octubre de 2026 en Melbourne: la semana 3
+ * del ciclo activo. */
+const PLANNER_NOW = new Date("2026-10-28T01:00:00.000Z");
+
+const PLANNER_ACTIVE_CYCLE = {
+  id: "aaaaaaaa-0000-4000-8000-000000000001",
+  name: "Road to Nationals 2027",
+  status: "active",
+  weeks: 28,
+  startDate: "2026-10-12",
+  event: { name: "UWR Nationals", date: "2027-04-22" },
+  ownRoutines: 4,
+};
+
+const PLANNER_CYCLES = [
+  PLANNER_ACTIVE_CYCLE,
+  {
+    id: "aaaaaaaa-0000-4000-8000-000000000002",
+    name: "Summer base 2027",
+    status: "draft",
+    weeks: 8,
+    startDate: "2027-06-07",
+    event: null,
+    ownRoutines: 1,
+  },
+  {
+    id: "aaaaaaaa-0000-4000-8000-000000000003",
+    name: "Winter 2026",
+    status: "archived",
+    weeks: 10,
+    startDate: "2026-05-04",
+    event: null,
+    ownRoutines: 3,
+  },
+];
+
+type PlannerState = {
+  readonly name: string;
+  readonly isSpanish?: boolean;
+};
+
+/** Como la captura del handoff: un activo elegido, un borrador y un
+ * archivado escondido. */
+const PLANNER_STATES: readonly PlannerState[] = [
+  { name: "planificar-ciclo" },
+  { name: "planificar-ciclo-es", isSpanish: true },
+];
+
+const PLANNER_SUMMARY =
+  /^(Week 1 starts|La semana 1 empieza) .* (week 3 today|semana 3)\.$/;
+
+async function stubPlannerCycles(page: Page): Promise<void> {
+  // Con el reloj instalado, y no fijo, los temporizadores siguen: el aviso
+  // se va solo cuando la prueba adelanta el reloj.
+  await page.clock.install({ time: PLANNER_NOW });
+  await page.route(
+    (url) => url.pathname === PLANNER_CYCLES_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ cycles: PLANNER_CYCLES })),
+  );
+}
+
+async function goToPlanner(
+  page: Page,
+  state: PlannerState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubPlannerCycles(page);
+  if (state.isSpanish === true) {
+    await chooseSpanish(page);
+  }
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${PLANNER_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, PLANNER_SCREEN_PATH, theme);
+  }
+  await expect(page.getByText(PLANNER_SUMMARY)).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+const PLANNER_NARROW_WIDTHS = [320, 375, 768] as const;
+
+for (const state of PLANNER_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToPlanner(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of PLANNER_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToPlanner(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    for (const theme of themes) {
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await goToPlanner(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
+  });
+}
+
+test.describe("planificar en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("en el escritorio, las pestañas no saltan de línea y las tarjetas miden 270 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlanner(page, { name: "planificar-ciclo" });
+
+    const tab = page.getByRole("tab", { name: "Cycle 28 wk" });
+    expect(Math.round((await tab.boundingBox())?.height ?? 0)).toBe(44);
+    const card = page.getByRole("button", { name: /^Road to Nationals 2027/ });
+    expect(Math.round((await card.boundingBox())?.width ?? 0)).toBe(270);
+  });
+
+  test("Duplicate enseña el aviso verde y se va solo", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.route(
+      (url) => url.pathname.endsWith("/duplicate"),
+      (route) =>
+        route.fulfill(
+          jsonBody({
+            cycles: [
+              ...PLANNER_CYCLES,
+              {
+                ...PLANNER_ACTIVE_CYCLE,
+                id: "aaaaaaaa-0000-4000-8000-000000000004",
+                name: "Road to Nationals 2027 (copy)",
+                status: "draft",
+              },
+            ],
+            duplicatedCycleId: "aaaaaaaa-0000-4000-8000-000000000004",
+            routinesCopied: 4,
+          }),
+        ),
+    );
+    await goToPlanner(page, { name: "planificar-ciclo" });
+
+    await page.getByRole("button", { name: "Duplicate" }).click();
+
+    const notice = page.getByRole("status");
+    await expect(notice).toHaveText(
+      "Duplicated as a draft · rename it and set the dates · 4 routines copied",
+    );
+    await page.clock.runFor(3_000);
+    // Vacío, el aviso no ocupa sitio y sale del árbol accesible.
+    await expect(page.getByText(/^Duplicated as a draft/)).toHaveCount(0);
+  });
+
+  // §5.2: el selector de 48 px, los campos de 46 px con texto de 16 px y las
+  // acciones de 44 px.
+  test("en el móvil, el selector, los campos y las acciones tienen su tamaño", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPlanner(page, { name: "planificar-ciclo" });
+
+    const select = page.getByRole("combobox", { name: "Cycle" });
+    expect(Math.round((await select.boundingBox())?.height ?? 0)).toBe(48);
+    await page.getByRole("button", { name: "Edit name and dates" }).click();
+    const name = page.getByRole("textbox", { name: "Cycle name" });
+    expect(Math.round((await name.boundingBox())?.height ?? 0)).toBe(46);
+    await expect(name).toHaveCSS("font-size", "16px");
+    for (const action of ["Duplicate", "Archive", "New cycle"]) {
+      const box = await page
+        .getByRole("button", { name: action })
+        .boundingBox();
+      expect(Math.round(box?.height ?? 0)).toBe(44);
+    }
+  });
+});
+
+test.describe("planificar no es para un Committee", () => {
+  skipWithoutSession();
+  test.use({ storageState: CLUB_COMMITTEE_STORAGE_STATE });
+
+  test("la frontera lo devuelve al panel", async ({ page }) => {
+    await page.goto(`${APP_URL}${PLANNER_SCREEN_PATH}`);
+
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
+});

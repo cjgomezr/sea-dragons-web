@@ -3055,4 +3055,78 @@ export const englishMessages = {
   "training.member.lockedText":
     "Training is for members with an active membership. Renew and you'll pick up the cycle where the club is now.",
   "training.member.renewMembership": "Renew membership",
+  "training.manage.metaTitle": "Plan training · {club}",
+  "training.manage.eyebrow": "Training · Manage",
+  "training.manage.title": "Plan training",
+  "training.manage.lead": "Members with an active membership see it.",
+  "training.manage.tabs": "Planning sections",
+  "training.manage.tabCycle": "Cycle",
+  "training.manage.tabCycleCount": "{weeks} wk",
+  "training.manage.loading": "Loading the cycles…",
+  "training.manage.failed": "We couldn't load the cycles.",
+  "training.manage.retry": "Try again",
+  "training.manage.noCycles": "No cycles yet",
+  "training.manage.noCyclesText":
+    "Create one: it starts as a draft, and members see it when you make it active.",
+  "training.manage.cycles": "Cycles",
+  "training.manage.statusActive": "Active",
+  "training.manage.statusDraft": "Draft",
+  "training.manage.statusArchived": "Archived",
+  "training.manage.cycleMeta": {
+    one: "{count} week · {start} – {end} · {routines}",
+    other: "{count} weeks · {start} – {end} · {routines}",
+  },
+  "training.manage.routines": {
+    one: "{count} routine",
+    other: "{count} routines",
+  },
+  "training.manage.newCycle": "New cycle",
+  "training.manage.newCycleName": "New cycle",
+  "training.manage.showArchived": "Show archived · {count}",
+  "training.manage.hideArchived": "Hide archived",
+  "training.manage.editing": "Editing",
+  "training.manage.makeActive": "Make active",
+  "training.manage.duplicate": "Duplicate",
+  "training.manage.archive": "Archive",
+  "training.manage.cycleName": "Cycle name",
+  "training.manage.targetEvent": "Target event · optional",
+  "training.manage.eventDate": "Event first day",
+  "training.manage.startDate": "Start date",
+  "training.manage.weeks": "Weeks",
+  "training.manage.lineActiveEvent":
+    "Week 1 starts {start} · week {eventWeek} is event week. Members are in week {week} today.",
+  "training.manage.lineActive":
+    "Week 1 starts {start} · ends {end}. Members are in week {week} today.",
+  "training.manage.lineDraft":
+    "Week 1 would start {start} · draft: members don't see it until you make it active.",
+  "training.manage.lineArchived":
+    "Ran {start} – {end} · archived. Duplicate it to reuse it.",
+  "training.manage.cycleSelect": "Cycle",
+  "training.manage.optionActive": "{name} · active",
+  "training.manage.optionDraft": "{name} · draft",
+  "training.manage.archivedGroup": "Archived",
+  "training.manage.editNameAndDates": "Edit name and dates",
+  "training.manage.confirmRemoval": {
+    one: "Going down to {weeks} weeks removes {count} planned day. This can't be undone.",
+    other:
+      "Going down to {weeks} weeks removes {count} planned days. This can't be undone.",
+  },
+  "training.manage.confirmRemove": {
+    one: "Remove {count} day",
+    other: "Remove {count} days",
+  },
+  "training.manage.cancel": "Cancel",
+  "training.manage.activated": "{name} is active · members see it now",
+  "training.manage.archived": "{name} archived",
+  "training.manage.duplicated": {
+    one: "Duplicated as a draft · rename it and set the dates · {count} routine copied",
+    other:
+      "Duplicated as a draft · rename it and set the dates · {count} routines copied",
+  },
+  "training.manage.errorNameRequired": "Give the cycle a name.",
+  "training.manage.errorNameTooLong": "Use 80 characters at most.",
+  "training.manage.errorEventName": "Name the event, or leave it empty.",
+  "training.manage.errorWeeks": "Weeks go from 1 to 52.",
+  "training.manage.errorDate": "Pick a date.",
+  "training.manage.errorSave": "We couldn't save that change. Try again.",
 } as const satisfies Readonly<Record<string, Message>>;

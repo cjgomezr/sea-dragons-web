@@ -25547,3 +25547,456 @@ a.dashboard-club-cell-body:focus-visible {
     min-height: 44px;
   }
 }
+
+/* Planificar → Ciclo (#906), siguiendo docs/design/design_handoff_training/
+   (§5.1 y §5.2, d04-coach-cycle.png y m03-coach-cycle.png): la cabecera, las
+   pestañas, las tarjetas de los ciclos, la franja de acciones, los campos y
+   la línea calculada. En el móvil, un selector y una tarjeta. */
+.training-plan-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.training-plan-header h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.training-plan-lead {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.training-plan-tabs {
+  display: flex;
+  gap: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.training-plan-tab {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: var(--touch-target-min);
+  margin-bottom: -1px;
+  padding: 0 var(--space-1);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-bottom: 2px solid var(--color-accent);
+  cursor: default;
+}
+
+.training-plan-tab-count {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.training-plan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.training-plan-notice {
+  align-self: flex-start;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-success) 18%, var(--color-panel));
+  border: 1px solid color-mix(in srgb, var(--color-success) 45%, transparent);
+  border-radius: var(--radius);
+}
+
+.training-plan-notice:empty {
+  display: none;
+}
+
+.training-plan-cards-area {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Una fila que se desplaza de lado: las tarjetas no bajan de línea. */
+.training-plan-cards {
+  display: flex;
+  gap: var(--space-2);
+  max-width: 100%;
+  margin: 0;
+  padding: 0 0 var(--space-1);
+  overflow-x: auto;
+  list-style: none;
+}
+
+.training-plan-cards li {
+  display: flex;
+  flex: none;
+}
+
+.training-plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 270px;
+  padding: var(--space-3) var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.training-plan-card:hover {
+  border-color: var(--color-accent);
+}
+
+.training-plan-card[aria-pressed="true"] {
+  background: var(--color-row-selected);
+  border-color: var(--color-accent);
+}
+
+.training-plan-card-top {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.training-plan-card-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.training-plan-card-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.training-plan-status {
+  flex: none;
+  padding: 1px var(--space-2);
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.training-plan-status-active {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-success) 24%, transparent);
+}
+
+.training-plan-status-draft {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-warning) 30%, transparent);
+}
+
+.training-plan-status-archived {
+  color: var(--color-text-secondary);
+  background: var(--color-hover);
+}
+
+.training-plan-new-card {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  width: 150px;
+  min-height: 62px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  background: none;
+  border: 1px dashed var(--color-border-dashed);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.training-plan-archived-toggle,
+.training-plan-edit-toggle {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.training-plan-edit-toggle {
+  align-self: flex-start;
+  color: var(--color-accent-text);
+}
+
+.training-plan-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-editor-bar);
+  border-radius: 10px;
+}
+
+.training-plan-editing {
+  margin: 0;
+  min-width: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.training-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.training-plan-action {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.training-plan-action:hover:not(:disabled),
+.training-plan-new-card:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.training-plan-action:disabled,
+.training-plan-new-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.training-plan-action-activate {
+  border-color: var(--color-success);
+}
+
+.training-plan-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) 100px;
+  gap: var(--space-3);
+  max-width: 780px;
+}
+
+.training-plan-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.training-plan-field label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.training-plan-field input,
+.training-plan-field select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: 15px;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.training-plan-field input[readonly] {
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+.training-plan-summary {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-soft);
+}
+
+.training-plan-summary-icon {
+  display: inline-flex;
+  flex: none;
+  padding-top: 2px;
+  font-size: 16px;
+  color: var(--color-accent-text);
+}
+
+.training-plan-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 780px;
+  padding: var(--space-3) var(--space-4);
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-panel));
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+}
+
+.training-plan-confirm p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.training-plan-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.training-plan-danger {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-danger);
+  background: var(--color-panel);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.training-plan-phone-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.training-plan-phone-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.training-plan-phone-actions .training-plan-action {
+  flex: 1 1 auto;
+}
+
+.training-plan-phone-actions .training-plan-action-archive,
+.training-plan-phone-actions .training-plan-action-new {
+  flex: none;
+  width: var(--touch-target-min);
+  padding: 0;
+}
+
+.training-plan-action-new {
+  color: var(--color-accent-text);
+  border-style: dashed;
+  border-color: var(--color-border-dashed);
+}
+
+.training-plan-tab:focus-visible,
+.training-plan-card:focus-visible,
+.training-plan-new-card:focus-visible,
+.training-plan-archived-toggle:focus-visible,
+.training-plan-edit-toggle:focus-visible,
+.training-plan-action:focus-visible,
+.training-plan-danger:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+@media (width < 1024px) {
+  .training-plan-fields {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+/* §5.2: el selector de 48 px, campos de 46 px con texto de 16 px para que
+   iOS no acerque, y acciones de 44 px. */
+@media (width < 768px) {
+  .training-plan-header h1 {
+    font-size: 22px;
+  }
+
+  .training-plan-lead {
+    display: none;
+  }
+
+  .training-plan-tabs {
+    padding: 3px;
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+  }
+
+  .training-plan-tab {
+    justify-content: center;
+    min-height: 40px;
+    margin: 0;
+    padding: 0 var(--space-4);
+    background: var(--color-segment-selected);
+    border: none;
+    border-radius: var(--radius);
+  }
+
+  .training-plan-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .training-plan-field input {
+    min-height: 46px;
+    font-size: 16px;
+  }
+
+  .training-plan-cycle-select select {
+    min-height: 48px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+}
