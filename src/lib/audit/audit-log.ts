@@ -161,6 +161,15 @@ export const AUDIT_ACTIONS = [
   "training_cycle.week_updated",
   "training_cycle.day_updated",
   "training_cycle.week_one_copied",
+  // RF-9 de E35 (#905): un Admin o un Coach crea, renombra o borra una rutina,
+  // o guarda sus filas. La entidad es la rutina (`training_routine`). Sin
+  // metadata salvo al borrar, que lleva cuántos días quedaron en descanso
+  // (`{ daysCleared }`), y al guardar las filas, cuántas son
+  // (`{ itemCount }`). Ni el nombre ni qué ejercicios.
+  "training_routine.created",
+  "training_routine.renamed",
+  "training_routine.deleted",
+  "training_routine.items_saved",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
