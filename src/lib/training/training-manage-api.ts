@@ -71,7 +71,7 @@ export const markNameBodySchema = z
  * marca: el dominio cuenta en caracteres y dice cuál falló. */
 const BODY_TEXT_SLACK = 4;
 
-function bodyText(maxLength: number) {
+function bodyText(maxLength: number): z.ZodString {
   return z.string().max(maxLength * BODY_TEXT_SLACK);
 }
 

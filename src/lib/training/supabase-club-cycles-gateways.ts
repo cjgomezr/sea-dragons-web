@@ -25,9 +25,9 @@ import type { DoseIntensity } from "./training-load";
 /**
  * Los ciclos de Planificar contra Supabase (#904), con la llave de servicio
  * como todo lo que escribe Entrenamiento (D4). Cada consulta filtra por el
- * club de quien llama. Activar, duplicar, poner un día y copiar la semana 1
- * son funciones de `0085_training_cycles_manage.sql`, para que cada una sea
- * una transacción.
+ * club de quien llama. Cambiar, activar, duplicar, poner un día y copiar la
+ * semana 1 son funciones de `0085_training_cycles_manage.sql`, para que cada
+ * una sea una transacción.
  */
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -64,6 +64,8 @@ const dayRowSchema = z.object({
   routine_id: z.string(),
 });
 
+const updateRowsSchema = z.array(z.object({ days_removed: z.number().int() }));
+
 const activationRowsSchema = z.array(
   z.object({ archived_cycle_id: z.string().nullable() }),
 );
@@ -94,7 +96,15 @@ function toCycleRecord(row: z.infer<typeof cycleRowSchema>): ClubCycleRecord {
   };
 }
 
-function cycleColumns(fields: CycleFields) {
+type CycleColumns = {
+  readonly name: string;
+  readonly weeks: number;
+  readonly start_date: string;
+  readonly event_name: string | null;
+  readonly event_date: string | null;
+};
+
+function cycleColumns(fields: CycleFields): CycleColumns {
   return {
     name: fields.name,
     weeks: fields.weeks,
@@ -207,42 +217,27 @@ async function insertCycle(
   return z.object({ id: z.string() }).parse(data).id;
 }
 
-/** Lo que pase de la última semana se va con ella. */
-async function removeWeeksAfter(
-  serviceClient: SupabaseClient,
-  target: CycleTarget,
-  lastWeek: number,
-): Promise<void> {
-  for (const table of [DAYS_TABLE, WEEKS_TABLE]) {
-    const { error } = await serviceClient
-      .from(table)
-      .delete()
-      .eq("cycle_id", target.cycleId)
-      .eq("club_id", target.clubId)
-      .gt("week_no", lastWeek);
-    if (error) {
-      throw failure(
-        `quitar de ${table} las semanas que sobran del ciclo ${target.cycleId}`,
-        error.message,
-      );
-    }
-  }
-}
-
+/** El cambio y el borrado de lo que sobra, en una transacción. */
 async function updateCycle(
   serviceClient: SupabaseClient,
   target: CycleTarget,
   fields: CycleFields,
 ): Promise<void> {
-  const { error } = await serviceClient
-    .from(CYCLES_TABLE)
-    .update({ ...cycleColumns(fields), updated_at: new Date().toISOString() })
-    .eq("id", target.cycleId)
-    .eq("club_id", target.clubId);
+  const { data, error } = await serviceClient.rpc("update_training_cycle", {
+    p_club_id: target.clubId,
+    p_cycle_id: target.cycleId,
+    p_name: fields.name,
+    p_weeks: fields.weeks,
+    p_start_date: fields.startDate,
+    p_event_name: fields.event === null ? null : fields.event.name,
+    p_event_date: fields.event === null ? null : fields.event.date,
+  });
   if (error) {
     throw failure(`cambiar el ciclo ${target.cycleId}`, error.message);
   }
-  await removeWeeksAfter(serviceClient, target, fields.weeks);
+  if (updateRowsSchema.parse(data).length === 0) {
+    throw failure(`cambiar el ciclo ${target.cycleId}`, "no es del club");
+  }
 }
 
 async function activateCycle(
@@ -339,7 +334,13 @@ async function setDay(
   }
 }
 
-function intensityColumns(intensity: DoseIntensity) {
+type IntensityColumns = {
+  readonly dose_intensity_kind: DoseIntensity["kind"];
+  readonly dose_pct: number | null;
+  readonly dose_text: string | null;
+};
+
+function intensityColumns(intensity: DoseIntensity): IntensityColumns {
   return {
     dose_intensity_kind: intensity.kind,
     dose_pct: intensity.kind === "pct" ? intensity.pct : null,
@@ -399,10 +400,13 @@ export function createClubCyclesGateways(
     cycles: {
       listCycles: (clubId) => listCycles(serviceClient, clubId),
       findCycle: (target) => findCycle(serviceClient, target),
-      readCyclePlan: async (target) => ({
-        weeks: await readWeeks(serviceClient, target),
-        days: await readDays(serviceClient, target),
-      }),
+      readCyclePlan: async (target) => {
+        const [weeks, days] = await Promise.all([
+          readWeeks(serviceClient, target),
+          readDays(serviceClient, target),
+        ]);
+        return { weeks, days };
+      },
       insertCycle: (cycle) => insertCycle(serviceClient, cycle),
       updateCycle: (target, fields) =>
         updateCycle(serviceClient, target, fields),

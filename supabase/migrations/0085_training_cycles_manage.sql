@@ -1,8 +1,8 @@
 -- Planificar: los ciclos y su cuadrícula (issue #904, RF-7, RF-8 y D5 a D8 de
 -- `docs/prd/e35-entrenamiento.md`). Lo que tiene que ser una sola
--- transacción va aquí: activar (que archiva el anterior), duplicar (que copia
--- y reapunta), poner o quitar una rutina de un día (que corre la ranura 2) y
--- copiar la semana 1. Todo lo llama el servidor con la llave de servicio
+-- transacción va aquí: activar (que archiva el anterior), cambiar (que quita
+-- las semanas que sobran), duplicar (que copia y reapunta), poner o quitar
+-- una rutina de un día (que corre la ranura 2) y copiar la semana 1. Todo lo llama el servidor con la llave de servicio
 -- (D4); ninguna función es para una sesión.
 --
 -- Producción reaplica el histórico entero en cada merge: todo es
@@ -47,6 +47,57 @@ begin
    where c.id = p_cycle_id
      and c.status <> 'active';
   archived_cycle_id := v_previous;
+  return next;
+end;
+$$;
+
+-- Cambia el ciclo y quita los días y las semanas que pasen de `p_weeks`
+-- (RF-7), todo junto: si no, un fallo a medias dejaría filas escondidas que
+-- volverían al subir las semanas. Bloquea el ciclo para que un día puesto a
+-- la vez no quede más allá de la última semana. Sin filas si el ciclo no es
+-- del club; con una, cuántos días con rutina se quitaron.
+create or replace function public.update_training_cycle(
+  p_club_id uuid,
+  p_cycle_id uuid,
+  p_name text,
+  p_weeks integer,
+  p_start_date date,
+  p_event_name text,
+  p_event_date date
+)
+  returns table (days_removed integer)
+  language plpgsql
+  security invoker
+  set search_path = ''
+as $$
+begin
+  perform 1
+     from public.training_cycles c
+    where c.id = p_cycle_id
+      and c.club_id = p_club_id
+      for update;
+  if not found then
+    return;
+  end if;
+  select count(distinct (d.week_no, d.weekday))::integer
+    into days_removed
+    from public.training_cycle_days d
+   where d.cycle_id = p_cycle_id
+     and d.week_no > p_weeks;
+  update public.training_cycles c
+     set name = p_name,
+         weeks = p_weeks,
+         start_date = p_start_date,
+         event_name = p_event_name,
+         event_date = p_event_date,
+         updated_at = now()
+   where c.id = p_cycle_id;
+  delete from public.training_cycle_days d
+   where d.cycle_id = p_cycle_id
+     and d.week_no > p_weeks;
+  delete from public.training_cycle_weeks w
+   where w.cycle_id = p_cycle_id
+     and w.week_no > p_weeks;
   return next;
 end;
 $$;
@@ -233,6 +284,13 @@ revoke all on function public.activate_training_cycle(uuid, uuid)
   from public, anon, authenticated;
 grant execute on function public.activate_training_cycle(uuid, uuid)
   to service_role;
+
+revoke all on function public.update_training_cycle(
+  uuid, uuid, text, integer, date, text, date
+) from public, anon, authenticated;
+grant execute on function public.update_training_cycle(
+  uuid, uuid, text, integer, date, text, date
+) to service_role;
 
 revoke all on function public.duplicate_training_cycle(uuid, uuid, text, uuid)
   from public, anon, authenticated;

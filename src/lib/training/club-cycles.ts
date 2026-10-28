@@ -108,7 +108,8 @@ export type ClubCyclesGateway = {
       readonly createdBy: string;
     },
   ): Promise<string>;
-  /** Se lleva los días y las semanas que pasen de `fields.weeks`. */
+  /** Se lleva los días y las semanas que pasen de `fields.weeks`, en la
+   * misma transacción. */
   updateCycle(target: CycleTarget, fields: CycleFields): Promise<void>;
   activateCycle(
     target: CycleTarget,

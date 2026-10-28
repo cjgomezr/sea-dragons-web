@@ -162,6 +162,83 @@ describeConPostgres("activar un ciclo", () => {
   });
 });
 
+describeConPostgres("cambiar un ciclo", () => {
+  it("cambia el ciclo y quita los días y semanas que sobran, contando los días", async () => {
+    const database = await migratedDatabase();
+    const clubId = await seededClubId(database);
+    const cycleId = await seedCycle(database, clubId, {
+      name: "Winter",
+      status: "draft",
+    });
+    const strength = await seedRoutine(database, clubId, {
+      name: "Strength",
+      cycleId,
+    });
+    for (const [weekNo, slot] of [
+      [2, 1],
+      [3, 1],
+      [3, 2],
+    ] as const) {
+      await seedDay(database, clubId, {
+        cycleId,
+        weekNo,
+        weekday: 0,
+        slot,
+        routineId: strength,
+      });
+    }
+    await database.query(
+      `insert into public.training_cycle_weeks (club_id, cycle_id, week_no, note)
+       values ('${clubId}', '${cycleId}', 4, 'Taper')`,
+    );
+
+    const removed = await database.query(
+      `select days_removed from public.update_training_cycle(
+         '${clubId}', '${cycleId}', 'Winter block', 2, '2026-11-30',
+         null, null)`,
+    );
+
+    expect(removed).toBe("1");
+    const cycle = await database.query(
+      `select name || '|' || weeks || '|' || start_date || '|'
+              || coalesce(event_name, '-')
+         from public.training_cycles where id = '${cycleId}'`,
+    );
+    expect(cycle).toBe("Winter block|2|2026-11-30|-");
+    const leftovers = await database.query(
+      `select (select count(*) from public.training_cycle_days
+                where cycle_id = '${cycleId}' and week_no > 2)
+           + (select count(*) from public.training_cycle_weeks
+                where cycle_id = '${cycleId}' and week_no > 2)`,
+    );
+    expect(leftovers).toBe("0");
+    expect(await daysOf(database, cycleId, 2)).toBe("0:1:Strength");
+  });
+
+  it("no toca nada si el ciclo es de otro club", async () => {
+    const database = await migratedDatabase();
+    const clubId = await seededClubId(database);
+    const otherClubId = await createOtherClub(database);
+    const cycleId = await seedCycle(database, clubId, {
+      name: "Winter",
+      status: "draft",
+    });
+
+    const rows = await database.query(
+      `select count(*) from public.update_training_cycle(
+         '${otherClubId}', '${cycleId}', 'Stolen', 2, '2026-11-30',
+         null, null)`,
+    );
+
+    expect(rows).toBe("0");
+    expect(
+      await database.query(
+        `select name from public.training_cycles where id = '${cycleId}'`,
+      ),
+    ).toBe("Winter");
+  });
+});
+
 describeConPostgres("duplicar un ciclo", () => {
   async function seedPlannedCycle(database: TemporaryDatabase) {
     const clubId = await seededClubId(database);
@@ -419,6 +496,7 @@ describeConPostgres("copiar la semana 1", () => {
 describeConPostgres("las funciones de los ciclos", () => {
   it.each([
     "activate_training_cycle(uuid, uuid)",
+    "update_training_cycle(uuid, uuid, text, integer, date, text, date)",
     "duplicate_training_cycle(uuid, uuid, text, uuid)",
     "set_training_cycle_day(uuid, uuid, integer, integer, integer, uuid)",
     "copy_training_cycle_week_one(uuid, uuid, integer[])",

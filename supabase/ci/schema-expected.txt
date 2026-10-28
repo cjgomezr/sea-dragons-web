@@ -454,6 +454,7 @@ funcion training_mark_usage(p_club_id uuid)
 funcion unpin_news_post(acting_club_id uuid, acting_user_id uuid, target_post_id uuid)
 funcion update_event(acting_club_id uuid, target_event_id uuid, changes jsonb)
 funcion update_series(acting_club_id uuid, target_series_id uuid, changes jsonb)
+funcion update_training_cycle(p_club_id uuid, p_cycle_id uuid, p_name text, p_weeks integer, p_start_date date, p_event_name text, p_event_date date)
 funcion waive_membership(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, reason text, until_day date)
 grant attendance_records authenticated SELECT
 grant attendance_records postgres DELETE
