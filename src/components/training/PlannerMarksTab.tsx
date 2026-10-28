@@ -15,7 +15,7 @@ import {
 } from "./PlannerMarkRow";
 import { markErrorMessage } from "./planner-marks-format";
 import type { MarkList } from "./planner-marks-client";
-import type { PlannerMarks } from "./use-planner-marks";
+import { MARK_IN_USE_REASON, type PlannerMarks } from "./use-planner-marks";
 
 /**
  * Planificar → Marcas (#911, RF-11 y D11 del PRD de E35; §5.1 "Tab Marks" y
@@ -117,6 +117,11 @@ function MarkRows({
     if (result.kind === "done") {
       setOpenRow(null);
       onDeleted();
+      return;
+    }
+    // Alguien la puso en una rutina entretanto: confirmar ya no sirve.
+    if (result.reason === MARK_IN_USE_REASON) {
+      close(mark.id, "delete");
     }
   }
 

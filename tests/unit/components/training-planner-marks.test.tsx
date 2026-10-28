@@ -327,6 +327,42 @@ describe("renombrar", () => {
     expect(screen.queryByRole("textbox", { name: /^New name/ })).toBeNull();
   });
 
+  it("guardar el mismo nombre cierra el campo sin mandar nada", async () => {
+    stubApi();
+    const user = await openMarks();
+    await user.click(screen.getByRole("button", { name: "Rename Back squat" }));
+
+    await user.click(screen.getByRole("button", { name: "Save name" }));
+
+    expect(writes()).toEqual([]);
+    expect(screen.queryByRole("textbox", { name: /^New name/ })).toBeNull();
+  });
+
+  it("si el servidor ve el nombre repetido, lo dice y deja el campo abierto", async () => {
+    stubApi({
+      write: () => ({
+        status: 409,
+        body: {
+          error: { code: "conflict", message: "x", reason: "mark_name_taken" },
+        },
+      }),
+    });
+    const user = await openMarks();
+    await user.click(screen.getByRole("button", { name: "Rename Back squat" }));
+    const field = screen.getByRole("textbox", {
+      name: "New name for Back squat",
+    });
+
+    await user.clear(field);
+    await user.type(field, "Clean{Enter}");
+
+    expect(
+      await screen.findByText(`There's already a mark called "Clean".`),
+    ).toBeVisible();
+    expect(field).toHaveValue("Clean");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("un nombre de otra marca se dice y no se manda", async () => {
     stubApi();
     const user = await openMarks();
@@ -468,6 +504,28 @@ describe("borrar", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "That mark is in a routine now: change those routine rows first.",
     );
+  });
+
+  it("si la pusieron en una rutina con la confirmación abierta, la cierra", async () => {
+    stubApi({
+      write: () => ({
+        status: 409,
+        body: {
+          error: { code: "conflict", message: "x", reason: "mark_in_use" },
+        },
+      }),
+    });
+    const user = await openMarks();
+    await user.click(
+      screen.getByRole("button", { name: "Delete Bench press" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Delete mark" }));
+
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(
+      screen.queryByRole("group", { name: "Delete Bench press" }),
+    ).toBeNull();
   });
 });
 

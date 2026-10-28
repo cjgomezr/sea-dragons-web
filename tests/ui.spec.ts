@@ -27693,8 +27693,14 @@ test.describe("planificar → marcas en el navegador", () => {
     const rows = page
       .getByRole("list", { name: "Club marks" })
       .getByRole("listitem");
+    // 58 px es la altura de la fila; a 375 px la línea de uso no cabe en
+    // una sola línea junto a los dos botones y la fila crece con ella.
     for (const row of await rows.all()) {
-      expect(await roundedHeightOf(row)).toBe(58);
+      await expect(row.locator(".training-marks-row-main")).toHaveCSS(
+        "min-height",
+        "58px",
+      );
+      expect(await roundedHeightOf(row)).toBeGreaterThanOrEqual(58);
     }
     for (const name of ["Rename Back squat", "Delete Back squat"]) {
       const button = page.getByRole("button", { name });

@@ -26165,6 +26165,11 @@ a.dashboard-club-cell-body:focus-visible {
     height: var(--touch-target-min);
   }
 
+  /* 44 px de botón y 7 arriba y abajo: la fila de 58 px de §5.2. */
+  .training-marks-row-main {
+    padding-block: 7px;
+  }
+
   .training-marks-field input {
     min-height: var(--touch-target-min);
     font-size: 16px;

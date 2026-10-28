@@ -23,11 +23,14 @@ import type { PlannerError } from "./use-planner-cycles";
 /** El 409 del nombre repetido (#903): lo dice el campo, no la pestaña. */
 export const MARK_NAME_TAKEN_REASON = "mark_name_taken";
 
+/** El 409 de borrar una marca que alguien puso en una rutina entretanto. */
+export const MARK_IN_USE_REASON = "mark_in_use";
+
 /** Los 409 de borrar una marca que cambió desde que se pintó: alguien la
  * puso en una rutina o la registró. Se vuelve a leer la lista para que el
  * siguiente Delete vea lo que hay. */
 const STALE_MARK_REASONS: ReadonlySet<string> = new Set([
-  "mark_in_use",
+  MARK_IN_USE_REASON,
   "mark_has_values",
 ]);
 
