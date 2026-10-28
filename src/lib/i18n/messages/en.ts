@@ -3129,4 +3129,50 @@ export const englishMessages = {
   "training.manage.errorWeeks": "Weeks go from 1 to 52.",
   "training.manage.errorDate": "Pick a date.",
   "training.manage.errorSave": "We couldn't save that change. Try again.",
+  "training.manage.tabMarks": "Marks",
+  "training.marks.lead":
+    'The lifts your members can record (their best single lift, in kg). Routines use "% of" a mark to show each person their own kilos. Members only see marks you list here.',
+  "training.marks.loading": "Loading the marks…",
+  "training.marks.failed": "We couldn't load the marks.",
+  "training.marks.list": "Club marks",
+  "training.marks.usedIn": {
+    one: "Used in {count} exercise",
+    other: "Used in {count} exercises",
+  },
+  "training.marks.notUsed": "Not in any routine",
+  "training.marks.recorded": {
+    one: "{count} member recorded it",
+    other: "{count} members recorded it",
+  },
+  "training.marks.notRecorded": "Nobody recorded it yet",
+  "training.marks.rename": "Rename {name}",
+  "training.marks.renameField": "New name for {name}",
+  "training.marks.renameSave": "Save name",
+  "training.marks.renameCancel": "Cancel rename",
+  "training.marks.renameHint":
+    "Routines and members' values follow the new name.",
+  "training.marks.delete": "Delete {name}",
+  "training.marks.inUse": "In use: change those routine rows first",
+  "training.marks.confirmDelete": {
+    one: '{count} member recorded "{name}". Their values will be deleted too. This can\'t be undone.',
+    other:
+      '{count} members recorded "{name}". Their values will be deleted too. This can\'t be undone.',
+  },
+  "training.marks.cancel": "Cancel",
+  "training.marks.deleteMark": "Delete mark",
+  "training.marks.newMark": "New mark",
+  "training.marks.newMarkPlaceholder": "New mark, e.g. Power clean",
+  "training.marks.add": "Add",
+  "training.marks.footer":
+    "Coaches and admins never see members' values. Only each member does.",
+  "training.marks.created": "{name} added",
+  "training.marks.renamed": "Renamed to {name}",
+  "training.marks.deleted": "{name} deleted",
+  "training.marks.errorNameTaken": 'There\'s already a mark called "{name}".',
+  "training.marks.errorNameRequired": "Give the mark a name.",
+  "training.marks.errorNameTooLong": "Use 60 characters at most.",
+  "training.marks.errorInUse":
+    "That mark is in a routine now: change those routine rows first.",
+  "training.marks.errorHasValues":
+    "Someone recorded that mark just now. Press Delete again to confirm.",
 } as const satisfies Readonly<Record<string, Message>>;

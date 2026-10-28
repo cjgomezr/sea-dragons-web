@@ -3147,4 +3147,50 @@ export const spanishMessages: MessageCatalog = {
   "training.manage.errorDate": "Elige una fecha.",
   "training.manage.errorSave":
     "No pudimos guardar el cambio. Inténtalo de nuevo.",
+  "training.manage.tabMarks": "Marcas",
+  "training.marks.lead":
+    'Los levantamientos que pueden registrar los miembros (su mejor levantamiento a una repetición, en kg). Las rutinas usan "% de" una marca para enseñarle a cada uno sus kilos. Los miembros solo ven las marcas de esta lista.',
+  "training.marks.loading": "Cargando las marcas…",
+  "training.marks.failed": "No pudimos cargar las marcas.",
+  "training.marks.list": "Marcas del club",
+  "training.marks.usedIn": {
+    one: "Usada en {count} ejercicio",
+    other: "Usada en {count} ejercicios",
+  },
+  "training.marks.notUsed": "No está en ninguna rutina",
+  "training.marks.recorded": {
+    one: "la registró {count} miembro",
+    other: "la registraron {count} miembros",
+  },
+  "training.marks.notRecorded": "Nadie la ha registrado aún",
+  "training.marks.rename": "Renombrar {name}",
+  "training.marks.renameField": "Nombre nuevo de {name}",
+  "training.marks.renameSave": "Guardar el nombre",
+  "training.marks.renameCancel": "Cancelar el cambio de nombre",
+  "training.marks.renameHint":
+    "Las rutinas y los valores de los miembros siguen al nombre nuevo.",
+  "training.marks.delete": "Borrar {name}",
+  "training.marks.inUse": "En uso: cambia antes esas filas de rutina",
+  "training.marks.confirmDelete": {
+    one: '{count} miembro registró "{name}". Su valor se borra también. No se puede deshacer.',
+    other:
+      '{count} miembros registraron "{name}". Sus valores se borran también. No se puede deshacer.',
+  },
+  "training.marks.cancel": "Cancelar",
+  "training.marks.deleteMark": "Borrar la marca",
+  "training.marks.newMark": "Marca nueva",
+  "training.marks.newMarkPlaceholder": "Marca nueva, p. ej. Power clean",
+  "training.marks.add": "Añadir",
+  "training.marks.footer":
+    "Ni los entrenadores ni los administradores ven los valores de los miembros. Solo cada miembro ve los suyos.",
+  "training.marks.created": "{name} añadida",
+  "training.marks.renamed": "Ahora se llama {name}",
+  "training.marks.deleted": "{name} borrada",
+  "training.marks.errorNameTaken": 'Ya hay una marca llamada "{name}".',
+  "training.marks.errorNameRequired": "Ponle un nombre a la marca.",
+  "training.marks.errorNameTooLong": "Usa 60 caracteres como mucho.",
+  "training.marks.errorInUse":
+    "Esa marca ya está en una rutina: cambia antes esas filas de rutina.",
+  "training.marks.errorHasValues":
+    "Alguien acaba de registrar esa marca. Pulsa Borrar otra vez para confirmar.",
 };

@@ -27411,6 +27411,7 @@ test.describe("entrenamiento en el navegador", () => {
 
 const PLANNER_SCREEN_PATH = "/entrenamiento/planificar";
 const PLANNER_CYCLES_ENDPOINT = "/api/v1/training/manage/cycles";
+const PLANNER_MARKS_ENDPOINT = "/api/v1/training/manage/marks";
 /** Las 12:00 del miércoles 28 de octubre de 2026 en Melbourne: la semana 3
  * del ciclo activo. */
 const PLANNER_NOW = new Date("2026-10-28T01:00:00.000Z");
@@ -27447,6 +27448,32 @@ const PLANNER_CYCLES = [
   },
 ];
 
+/** Como d06-coach-marks.png, con Bench press sin usar en ninguna rutina para
+ * que se pueda borrar (#911). */
+const PLANNER_MARKS = [
+  {
+    id: "bbbbbbbb-0000-4000-8000-000000000001",
+    name: "Back squat",
+    unit: "kg",
+    routineRows: 1,
+    membersRecorded: 12,
+  },
+  {
+    id: "bbbbbbbb-0000-4000-8000-000000000002",
+    name: "Bench press",
+    unit: "kg",
+    routineRows: 0,
+    membersRecorded: 3,
+  },
+  {
+    id: "bbbbbbbb-0000-4000-8000-000000000003",
+    name: "Deadlift",
+    unit: "kg",
+    routineRows: 2,
+    membersRecorded: 9,
+  },
+];
+
 type PlannerState = {
   readonly name: string;
   readonly isSpanish?: boolean;
@@ -27469,6 +27496,12 @@ async function stubPlannerCycles(page: Page): Promise<void> {
   await page.route(
     (url) => url.pathname === PLANNER_CYCLES_ENDPOINT,
     (route) => route.fulfill(jsonBody({ cycles: PLANNER_CYCLES })),
+  );
+  // La pestaña Marks dice cuántas hay (#911): sin servirlas, la cuenta
+  // sería la de seadragons-dev y la captura cambiaría con sus datos.
+  await page.route(
+    (url) => url.pathname === PLANNER_MARKS_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ marks: PLANNER_MARKS })),
   );
 }
 
@@ -27539,6 +27572,146 @@ for (const state of PLANNER_STATES) {
     }
   });
 }
+
+/* ---------------------------------------------------------------------------
+   Planificar → Marcas (#911, RF-11 y D11 del PRD de E35), contra §5.1 "Tab
+   Marks" y §5.2 del handoff (d06-coach-marks.png y m07-coach-marks.png).
+   Las marcas las sirve la prueba, como los ciclos: qué se puede borrar lo
+   decide la API (#903).
+   --------------------------------------------------------------------------- */
+
+type PlannerMarksState = PlannerState & {
+  /** Con la confirmación de borrar Bench press abierta. */
+  readonly isConfirming?: boolean;
+};
+
+const PLANNER_MARKS_STATES: readonly PlannerMarksState[] = [
+  { name: "planificar-marcas" },
+  { name: "planificar-marcas-borrar", isConfirming: true },
+  { name: "planificar-marcas-es", isSpanish: true },
+];
+
+const PLANNER_MARK_USAGE = /^(Used in 1 exercise|Usada en 1 ejercicio)/;
+
+async function goToPlannerMarks(
+  page: Page,
+  state: PlannerMarksState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await goToPlanner(page, state, theme);
+  await page.getByRole("tab", { name: /^(Marks|Marcas) 3$/ }).click();
+  await expect(page.getByText(PLANNER_MARK_USAGE)).toBeVisible();
+  if (state.isConfirming === true) {
+    await page.getByRole("button", { name: "Delete Bench press" }).click();
+    await expect(
+      page.getByRole("group", { name: "Delete Bench press" }),
+    ).toBeVisible();
+  }
+  await page.mouse.move(0, 0);
+}
+
+for (const state of PLANNER_MARKS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToPlannerMarks(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of PLANNER_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToPlannerMarks(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    for (const theme of themes) {
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await goToPlannerMarks(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
+  });
+}
+
+async function roundedHeightOf(locator: Locator): Promise<number> {
+  return Math.round((await locator.boundingBox())?.height ?? 0);
+}
+
+async function roundedWidthOf(locator: Locator): Promise<number> {
+  return Math.round((await locator.boundingBox())?.width ?? 0);
+}
+
+test.describe("planificar → marcas en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("en el escritorio, la pestaña mide como mucho 620 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlannerMarks(page, { name: "planificar-marcas" });
+
+    const list = page.getByRole("list", { name: "Club marks" });
+    expect(await roundedWidthOf(list)).toBeLessThanOrEqual(620);
+    expect(await roundedWidthOf(list)).toBeGreaterThan(600);
+  });
+
+  // §5.2: filas de 58 px con botones de 44 px, y la confirmación con los
+  // botones a todo el ancho.
+  test("en el móvil, filas de 58 px, botones de 44 px y la confirmación a todo el ancho", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPlannerMarks(page, { name: "planificar-marcas" });
+
+    const rows = page
+      .getByRole("list", { name: "Club marks" })
+      .getByRole("listitem");
+    for (const row of await rows.all()) {
+      expect(await roundedHeightOf(row)).toBe(58);
+    }
+    for (const name of ["Rename Back squat", "Delete Back squat"]) {
+      const button = page.getByRole("button", { name });
+      expect(await roundedHeightOf(button)).toBe(44);
+      expect(await roundedWidthOf(button)).toBe(44);
+    }
+
+    await page.getByRole("button", { name: "Delete Bench press" }).click();
+    const confirm = page.getByRole("group", { name: "Delete Bench press" });
+    const confirmText = confirm.getByText(/^3 members recorded/);
+    for (const name of ["Cancel", "Delete mark"]) {
+      expect(await roundedWidthOf(confirm.getByRole("button", { name }))).toBe(
+        await roundedWidthOf(confirmText),
+      );
+    }
+  });
+});
 
 test.describe("planificar en el navegador", () => {
   skipWithoutSession();

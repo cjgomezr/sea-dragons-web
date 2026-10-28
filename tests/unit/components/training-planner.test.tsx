@@ -167,13 +167,12 @@ describe("la cabecera y las pestañas", () => {
     ).toBeInTheDocument();
   });
 
-  it("solo tiene la pestaña Ciclo, elegida, con las semanas del ciclo", async () => {
+  it("abre la pestaña Ciclo, elegida, con las semanas del ciclo", async () => {
     stubCycles();
 
     await renderPlanner();
 
     const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
-    expect(tabs).toHaveLength(1);
     expect(tabs[0]).toHaveAccessibleName("Cycle 28 wk");
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Cycle 28 wk");
