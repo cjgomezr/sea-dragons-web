@@ -122,6 +122,7 @@ const colorRoleToCssVariable: Record<string, string> = {
   "Routine 3": "color-routine-3",
   "Routine 4": "color-routine-4",
   "Routine 5": "color-routine-5",
+  "Warning text": "color-warning-text",
 };
 
 describe("tokens de color: tema claro", () => {
@@ -459,6 +460,22 @@ describe.each([
         token(tokens, "color-row-selected"),
       ),
     ).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
+  // #901: el % de una marca que falta y el aviso bajo la lista van en texto
+  // de aviso, sobre el panel y sobre el campo de la marca, que lleva el aviso
+  // al 20 %.
+  it("el texto de aviso cumple AA sobre el panel y sobre su tinte", () => {
+    const tint = tintOver(
+      token(tokens, "color-warning"),
+      token(tokens, "color-panel"),
+      ROUTINE_TILE_WEIGHT,
+    );
+    const warningText = token(tokens, "color-warning-text");
+    expect(
+      contrastRatio(warningText, token(tokens, "color-panel")),
+    ).toBeGreaterThanOrEqual(AA_TEXT);
+    expect(contrastRatio(warningText, tint)).toBeGreaterThanOrEqual(AA_TEXT);
   });
 
   it.each(ROUTINE_COLORS)("%s se distingue del panel (3:1 o más)", (color) => {

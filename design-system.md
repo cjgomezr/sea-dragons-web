@@ -58,6 +58,7 @@ desplazamiento lo sigan.
 | Routine 3        | `#BC3B2E` | Routine colour                                                          |
 | Routine 4        | `#6E859B` | Routine colour                                                          |
 | Routine 5        | `#6B69B8` | Routine colour                                                          |
+| Warning text     | `#85621A` | A warning written as text (a missing mark)                              |
 
 > **Decisión del 2026-09-04.** El texto secundario del tema claro se desvía
 > del prototipo a propósito. El valor original del prototipo, `#6B8095`, da
@@ -99,6 +100,7 @@ desplazamiento lo sigan.
 | Routine 3        | `#F2887A` | Routine colour                                   |
 | Routine 4        | `#B7C7D6` | Routine colour                                   |
 | Routine 5        | `#9E9DDC` | Routine colour                                   |
+| Warning text     | `#F2CE78` | A warning written as text (a missing mark)       |
 
 Rules: one accent color; success/warning/danger appear only with their meaning;
 never place text on a background with contrast ratio below 4.5:1 (3:1 for
@@ -213,6 +215,13 @@ text ≥ 24px).
 > pintan barras, puntos y baldosas, nunca texto, así que piden 3:1 sobre el
 > panel y sobre su baldosa al 20 %. En claro, el ámbar y el verde se
 > oscurecieron (`#9A6E14`, `#22806C`) para llegar a ese 3:1.
+
+> **Decisión del 2026-10-28 (issue #901).** La fila de un ejercicio escribe
+> en aviso el % de una marca que el socio no tiene, y debajo de la lista el
+> aviso que lo repite. `Warning` claro (`#C99A3E`) se queda en 2,6:1 sobre el
+> panel, así que el texto va en `Warning text`: `#85621A` en claro, que pasa
+> AA sobre el panel y sobre el campo de la marca (el aviso al 20 %), y el
+> mismo `#F2CE78` del handoff en oscuro.
 
 #### Sidebar (no cambia con el tema)
 

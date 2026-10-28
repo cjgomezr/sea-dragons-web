@@ -93,6 +93,7 @@ describe("trainingLoadFor", () => {
       kind: "kilos",
       mark: SQUAT,
       pct: 75,
+      markValue: 80,
       kilos: 60,
     });
   });
@@ -135,7 +136,7 @@ describe("trainingLoadFor", () => {
     expect(prescription).toEqual({
       sets: 4,
       reps: "5",
-      load: { kind: "kilos", mark: SQUAT, pct: 80, kilos: 80 },
+      load: { kind: "kilos", mark: SQUAT, pct: 80, markValue: 100, kilos: 80 },
     });
   });
 
@@ -195,7 +196,7 @@ describe("trainingLoadFor", () => {
     expect(prescription).toEqual({
       sets: 3,
       reps: "8",
-      load: { kind: "kilos", mark: SQUAT, pct: 70, kilos: 70 },
+      load: { kind: "kilos", mark: SQUAT, pct: 70, markValue: 100, kilos: 70 },
     });
   });
 
