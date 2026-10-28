@@ -361,6 +361,7 @@ columna training_routine_items.position tipo=smallint null=NO default=-
 columna training_routine_items.reps tipo=text null=YES default=-
 columna training_routine_items.rest tipo=text null=YES default=-
 columna training_routine_items.routine_id tipo=uuid null=NO default=-
+columna training_routine_items.saved_at tipo=timestamp with time zone null=NO default=now()
 columna training_routine_items.section_title tipo=text null=YES default=-
 columna training_routine_items.sets tipo=smallint null=YES default=-
 columna training_routines.club_id tipo=uuid null=NO default=-
@@ -392,6 +393,7 @@ funcion create_member_evaluation(acting_club_id uuid, acting_user_id uuid, targe
 funcion credit_session_pack(user_id uuid, club_id uuid, sessions integer, payment_id uuid)
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
 funcion delete_rows_older_than(target_table regclass, age_column name, cutoff timestamp with time zone)
+funcion delete_training_routine(p_club_id uuid, p_routine_id uuid, p_confirm boolean)
 funcion duplicate_training_cycle(p_club_id uuid, p_cycle_id uuid, p_name text, p_created_by uuid)
 funcion evaluation_category_name_taken(acting_club_id uuid, own_category_id uuid, category_name text)
 funcion event_rsvp_tallies(p_event_ids uuid[])
@@ -426,6 +428,7 @@ funcion rename_evaluation_category(acting_club_id uuid, target_category_id uuid,
 funcion reorder_club_positions(acting_club_id uuid, ordered_ids uuid[])
 funcion reorder_evaluation_categories(acting_club_id uuid, ordered_ids uuid[])
 funcion replace_club_session_pack_options(acting_club_id uuid, pack_sessions integer[])
+funcion replace_training_routine_items(p_club_id uuid, p_routine_id uuid, p_items jsonb)
 funcion reschedule_series_sessions(acting_club_id uuid, target_series_id uuid, from_day date, schedule jsonb)
 funcion reserve_directory_email_quota(target_club_id uuid, sender_user_id uuid, send_request_id uuid, recipient_count integer, quota_limit integer, window_start timestamp with time zone)
 funcion run_nightly_cleanup()
@@ -451,6 +454,7 @@ funcion set_training_cycle_day(p_club_id uuid, p_cycle_id uuid, p_week_no intege
 funcion split_series(acting_club_id uuid, target_series_id uuid, from_event_id uuid, changes jsonb, schedule jsonb)
 funcion training_exercise_name_taken(p_club_id uuid, p_name text, p_except_id uuid)
 funcion training_mark_usage(p_club_id uuid)
+funcion training_routine_overview(p_club_id uuid)
 funcion unpin_news_post(acting_club_id uuid, acting_user_id uuid, target_post_id uuid)
 funcion update_event(acting_club_id uuid, target_event_id uuid, changes jsonb)
 funcion update_series(acting_club_id uuid, target_series_id uuid, changes jsonb)
