@@ -26283,7 +26283,7 @@ a.dashboard-club-cell-body:focus-visible {
 }
 
 .training-grid-phone .training-grid-week-dose {
-  grid-template-columns: 70px minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .training-grid-phone .training-grid-select {

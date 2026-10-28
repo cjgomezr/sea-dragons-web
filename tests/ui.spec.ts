@@ -27631,6 +27631,28 @@ async function goToPlanner(
   await page.mouse.move(0, 0);
 }
 
+/** La captura de página entera pasa la ventana por 1 × 1 px un momento: la
+ * pestaña cruza al móvil, se vuelve a montar y la semana abierta se cierra.
+ * Con una semana abierta, la ventana crece hasta la página y se captura tal
+ * cual. Devuelve si la captura tiene que ser de página entera. */
+async function plannerCaptureFullPage(
+  page: Page,
+  state: PlannerState,
+): Promise<boolean> {
+  if (state.openWeek === undefined) {
+    return true;
+  }
+  const viewport = page.viewportSize();
+  if (viewport === null) {
+    throw new Error("La prueba necesita un tamaño de ventana.");
+  }
+  const height = await page.evaluate(
+    () => document.documentElement.scrollHeight,
+  );
+  await page.setViewportSize({ width: viewport.width, height });
+  return false;
+}
+
 const PLANNER_NARROW_WIDTHS = [320, 375, 768] as const;
 
 for (const state of PLANNER_STATES) {
@@ -27647,13 +27669,14 @@ for (const state of PLANNER_STATES) {
           for (const theme of themes) {
             test(`matches approved baseline (${theme})`, async ({ page }) => {
               await goToPlanner(page, state, theme);
+              const fullPage = await plannerCaptureFullPage(page, state);
               const snapshot = `${state.name}-${vp.name}-${theme}.png`;
               await createMissingLocalBaseline(snapshot, () =>
-                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage }),
               );
               await expect(page).toHaveScreenshot(snapshot, {
                 ...SCREENSHOT_OPTIONS,
-                fullPage: true,
+                fullPage,
                 maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
               });
             });
