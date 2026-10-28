@@ -17,8 +17,10 @@ import type { PlannerCycles } from "./use-planner-cycles";
  * de él. Si la API no lo acepta, el campo vuelve a lo que tenía. Bajar las
  * semanas cuando las que sobran tienen días pide confirmar antes.
  *
- * Quien lo pinta le pone de `key` el ciclo tal como llegó, así que cada
- * respuesta del servidor vuelve a llenar los campos.
+ * Quien lo pinta le pone de `key` el id del ciclo: otro ciclo trae campos
+ * nuevos. Cada respuesta del servidor llena solo los campos que nadie está
+ * cambiando, sin volver a montarlos: quien sale de un campo y ya escribe en
+ * el siguiente no pierde el foco ni lo que lleva escrito.
  */
 
 type FieldName = "name" | "event" | "date" | "weeks";
@@ -34,6 +36,25 @@ function draftsOf(cycle: ManagedCycle): Drafts {
   };
 }
 
+/** Los borradores con lo que dice el ciclo nuevo, salvo los que difieren
+ * del ciclo anterior: ésos se están escribiendo. */
+function refreshedDrafts(
+  drafts: Drafts,
+  before: ManagedCycle,
+  after: ManagedCycle,
+): Drafts {
+  const shown = draftsOf(before);
+  const fresh = draftsOf(after);
+  const pick = (field: FieldName): string =>
+    drafts[field] === shown[field] ? fresh[field] : drafts[field];
+  return {
+    name: pick("name"),
+    event: pick("event"),
+    date: pick("date"),
+    weeks: pick("weeks"),
+  };
+}
+
 /** Lo que se manda al salir de un campo; nulo si nada cambió, o el motivo
  * si ni se puede mandar. */
 function changesFor(
@@ -43,7 +64,7 @@ function changesFor(
 ): CycleChanges | { readonly invalid: string } | null {
   switch (field) {
     case "name":
-      return value === cycle.name ? null : { name: value };
+      return value.trim() === cycle.name ? null : { name: value };
     case "event": {
       const schedule = scheduleForEventName(cycle, value);
       return schedule === null ? null : { schedule };
@@ -157,6 +178,11 @@ export function PlannerCycleFields({
   readonly planner: Pick<PlannerCycles, "save" | "showError">;
 }): React.JSX.Element {
   const [drafts, setDrafts] = useState<Drafts>(() => draftsOf(cycle));
+  const [shownCycle, setShownCycle] = useState(cycle);
+  if (shownCycle !== cycle) {
+    setDrafts(refreshedDrafts(drafts, shownCycle, cycle));
+    setShownCycle(cycle);
+  }
   const [pending, setPending] = useState<PendingRemoval | null>(null);
   const isReadOnly = cycle.status === "archived";
 

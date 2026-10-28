@@ -57,7 +57,7 @@ type ApiRequest = {
 };
 
 const requests: ApiRequest[] = [];
-let replyTo: (request: ApiRequest) => ApiReply;
+let replyTo: (request: ApiRequest) => ApiReply | Promise<ApiReply>;
 
 function ok(data: unknown, status = 200): ApiReply {
   return { status, body: { data } };
@@ -72,7 +72,9 @@ function listReply(cycles: readonly ManagedCycle[]): ApiReply {
   return ok({ cycles });
 }
 
-function stubApi(reply: (request: ApiRequest) => ApiReply): void {
+function stubApi(
+  reply: (request: ApiRequest) => ApiReply | Promise<ApiReply>,
+): void {
   replyTo = reply;
   vi.stubGlobal(
     "fetch",
@@ -84,7 +86,7 @@ function stubApi(reply: (request: ApiRequest) => ApiReply): void {
           typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
       };
       requests.push(request);
-      const { status, body } = replyTo(request);
+      const { status, body } = await replyTo(request);
       return new Response(JSON.stringify(body), {
         status,
         headers: { "content-type": "application/json" },
@@ -95,7 +97,7 @@ function stubApi(reply: (request: ApiRequest) => ApiReply): void {
 
 function stubCycles(
   cycles: readonly ManagedCycle[] = [ACTIVE, DRAFT, ARCHIVED],
-  other: (request: ApiRequest) => ApiReply = () => ({
+  other: (request: ApiRequest) => ApiReply | Promise<ApiReply> = () => ({
     status: 500,
     body: { error: { code: "internal_error", message: "x" } },
   }),
@@ -446,6 +448,79 @@ describe("los campos y la línea calculada", () => {
         eventDate: "2027-07-26",
       },
     });
+  });
+});
+
+describe("guardar mientras se escribe en otro campo", () => {
+  it("no le quita el foco ni lo escrito al campo siguiente", async () => {
+    let resolveSave: (reply: ApiReply) => void = () => {};
+    stubCycles(
+      undefined,
+      () =>
+        new Promise<ApiReply>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    await renderPlanner();
+
+    await replaceValue(user, field("Cycle name"), "Road to Worlds");
+    await user.clear(field("Target event · optional"));
+    await user.type(field("Target event · optional"), "Worlds");
+    await act(async () => {
+      resolveSave(ok(detailOf({ ...ACTIVE, name: "Road to Worlds" })));
+    });
+
+    expect(await screen.findByText(/^Editing/)).toHaveTextContent(
+      "Editing Road to Worlds",
+    );
+    expect(field("Target event · optional")).toHaveFocus();
+    expect(field("Target event · optional")).toHaveValue("Worlds");
+    expect(field("Cycle name")).toHaveValue("Road to Worlds");
+  });
+
+  it("deja abierta la confirmación de las semanas si se guarda otro campo", async () => {
+    stubCycles(undefined, (request) => {
+      const body = request.body as { readonly weeks?: number };
+      return body.weeks === undefined
+        ? ok(detailOf({ ...ACTIVE, name: "Road to Worlds" }))
+        : {
+            status: 409,
+            body: {
+              error: {
+                daysRemoved: 5,
+                code: "conflict",
+                message: "x",
+                reason: "cycle_days_would_be_removed",
+              },
+            },
+          };
+    });
+    const user = userEvent.setup();
+    await renderPlanner();
+    await replaceValue(user, field("Weeks"), "20");
+    await screen.findByRole("button", { name: "Remove 5 days" });
+
+    await replaceValue(user, field("Cycle name"), "Road to Worlds");
+
+    expect(await screen.findByText(/^Editing/)).toHaveTextContent(
+      "Editing Road to Worlds",
+    );
+    expect(
+      screen.getByRole("button", { name: "Remove 5 days" }),
+    ).toBeInTheDocument();
+    expect(field("Weeks")).toHaveValue(20);
+  });
+
+  it("no guarda un nombre que solo cambia en los espacios de los bordes", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+
+    await user.type(field("Cycle name"), " ");
+    await user.tab();
+
+    expect(writes()).toEqual([]);
   });
 });
 

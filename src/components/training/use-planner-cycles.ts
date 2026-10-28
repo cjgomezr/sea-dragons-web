@@ -174,7 +174,9 @@ export function usePlannerCycles(translate: Translator): PlannerCycles {
     },
     save: async ({ cycleId, changes, confirmRemoval }) => {
       setError(null);
+      setIsBusy(true);
       const outcome = await updateCycle(cycleId, { changes, confirmRemoval });
+      setIsBusy(false);
       switch (outcome.kind) {
         case "confirmRemoval":
           return outcome;

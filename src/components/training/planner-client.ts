@@ -58,6 +58,11 @@ const daysWouldBeRemovedSchema = z.object({
   }),
 });
 
+/** El motivo de cualquier otro error de la convención. */
+const errorReasonSchema = z.object({
+  error: z.object({ reason: z.string() }),
+});
+
 /** Por qué no salió: el `reason` del error, si lo trae, elige la frase. */
 export type PlannerFailure = {
   readonly kind: "failed";
@@ -155,9 +160,7 @@ export async function updateCycle(
       daysRemoved: removal.data.error.daysRemoved,
     };
   }
-  const reason = z
-    .object({ error: z.object({ reason: z.string() }) })
-    .safeParse(payload);
+  const reason = errorReasonSchema.safeParse(payload);
   return {
     kind: "failed",
     reason: reason.success ? reason.data.error.reason : null,

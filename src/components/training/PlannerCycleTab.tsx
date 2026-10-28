@@ -28,11 +28,6 @@ type CycleTabProps = {
   readonly selected: ManagedCycle;
 };
 
-/** Los campos vuelven a llenarse con cada respuesta del servidor. */
-function fieldsKey(cycle: ManagedCycle): string {
-  return JSON.stringify(cycle);
-}
-
 function SummaryLine({
   translate,
   cycle,
@@ -101,7 +96,7 @@ export function DesktopCycleTab({
         </div>
       </div>
       <PlannerCycleFields
-        key={fieldsKey(selected)}
+        key={selected.id}
         translate={translate}
         cycle={selected}
         planner={planner}
@@ -167,7 +162,7 @@ function PhoneFields({
   const [isEditingActive, setIsEditingActive] = useState(false);
   const fields = (
     <PlannerCycleFields
-      key={fieldsKey(selected)}
+      key={selected.id}
       translate={translate}
       cycle={selected}
       planner={planner}
