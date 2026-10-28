@@ -238,7 +238,7 @@ export function TrainingExerciseRow({
         <span className="training-exercise-text">
           <span className="training-exercise-name">{row.exercise.name}</span>
           <span className="training-exercise-dose">
-            {dose}
+            <span className="training-exercise-sets">{dose}</span>
             {row.rest === null ? null : (
               <span className="training-exercise-rest">
                 {dose === "" ? null : " · "}

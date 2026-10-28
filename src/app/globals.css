@@ -25046,6 +25046,13 @@ a.dashboard-club-cell-body:focus-visible {
   font-size: 12px;
 }
 
+/* La dosis y el descanso pueden ir en dos líneas, pero ninguno se parte por
+   dentro ("4 ×" arriba y "6" abajo). */
+.training-exercise-sets,
+.training-exercise-rest {
+  white-space: nowrap;
+}
+
 .training-load {
   display: flex;
   flex-direction: column;
@@ -25069,7 +25076,10 @@ a.dashboard-club-cell-body:focus-visible {
   font-size: 11.5px;
 }
 
+/* Sin carga, la fila no pinta nada a la derecha: el caret se queda en su
+   columna para no desalinearse con las demás. */
 .training-exercise-caret {
+  grid-column: 4;
   display: grid;
   place-items: center;
   color: var(--color-text-secondary);
@@ -25303,6 +25313,14 @@ a.dashboard-club-cell-body:focus-visible {
      iOS no amplía) y YouTube a todo el ancho (§4.2). */
   .training-exercise-row {
     min-height: 64px;
+    gap: 10px;
+    padding: 6px var(--space-3);
+  }
+
+  /* La carga deja sitio a la dosis: "75% of back squat 80" parte en dos
+     líneas bajo los kilos. */
+  .training-load {
+    max-width: 96px;
   }
 
   .training-exercise-details {
