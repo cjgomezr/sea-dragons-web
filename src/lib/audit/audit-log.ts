@@ -132,6 +132,19 @@ export const AUDIT_ACTIONS = [
   // como viajan en la dirección y cuántos socios salieron
   // (`{ filters, memberCount }`). Ni quiénes ni sus datos.
   "directory.exported",
+  // RF-11 de E35 (#903): un Admin o un Coach crea, renombra o borra una marca
+  // del club. La entidad es la marca (`training_mark`), sin metadata salvo al
+  // borrar, que lleva cuántos valores de socios se fueron con ella
+  // (`{ valuesDeleted }`). Nunca un valor ni de quién (D11).
+  "training_mark.created",
+  "training_mark.renamed",
+  "training_mark.deleted",
+  // RF-10 de E35 (#903): un Admin o un Coach crea, edita o borra un ejercicio
+  // del club. La entidad es el ejercicio (`training_exercise`), sin metadata:
+  // ni el nombre, ni los consejos, ni las fotos.
+  "training_exercise.created",
+  "training_exercise.updated",
+  "training_exercise.deleted",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

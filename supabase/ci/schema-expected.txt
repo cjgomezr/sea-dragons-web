@@ -339,6 +339,7 @@ columna training_marks.club_id tipo=uuid null=NO default=-
 columna training_marks.created_at tipo=timestamp with time zone null=NO default=now()
 columna training_marks.id tipo=uuid null=NO default=gen_random_uuid()
 columna training_marks.name tipo=text null=NO default=-
+columna training_marks.name_normalized tipo=text null=YES default=-
 columna training_marks.sort_order tipo=smallint null=NO default=0
 columna training_marks.unit tipo=text null=NO default='kg'::text
 columna training_marks.updated_at tipo=timestamp with time zone null=NO default=now()
@@ -434,6 +435,7 @@ funcion search_like_pattern(p_text text)
 funcion search_members(p_club_id uuid, p_text text)
 funcion search_news_posts(p_club_id uuid, p_text text, p_reader_id uuid, p_group_ids uuid[])
 funcion search_normalize(p_text text)
+funcion search_training_exercises(p_club_id uuid, p_text text, p_limit integer)
 funcion seed_default_evaluation_categories(target_club_id uuid)
 funcion seed_default_session_pack_options(target_club_id uuid)
 funcion session_ledger_refresh_status()
@@ -443,6 +445,8 @@ funcion set_club_position_short_names(acting_club_id uuid, target_position_id uu
 funcion set_evaluation_category_active(acting_club_id uuid, target_category_id uuid, active boolean)
 funcion set_member_status(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_status text)
 funcion split_series(acting_club_id uuid, target_series_id uuid, from_event_id uuid, changes jsonb, schedule jsonb)
+funcion training_exercise_name_taken(p_club_id uuid, p_name text, p_except_id uuid)
+funcion training_mark_usage(p_club_id uuid)
 funcion unpin_news_post(acting_club_id uuid, acting_user_id uuid, target_post_id uuid)
 funcion update_event(acting_club_id uuid, target_event_id uuid, changes jsonb)
 funcion update_series(acting_club_id uuid, target_series_id uuid, changes jsonb)
@@ -1238,6 +1242,7 @@ indice training_exercises_library_key_key CREATE UNIQUE INDEX training_exercises
 indice training_exercises_name_per_scope_key CREATE UNIQUE INDEX training_exercises_name_per_scope_key ON public.training_exercises USING btree (COALESCE(club_id, '00000000-0000-0000-0000-000000000000'::uuid), name_normalized)
 indice training_exercises_pkey CREATE UNIQUE INDEX training_exercises_pkey ON public.training_exercises USING btree (id)
 indice training_marks_club_id_name_key CREATE UNIQUE INDEX training_marks_club_id_name_key ON public.training_marks USING btree (club_id, name)
+indice training_marks_club_id_name_normalized_key CREATE UNIQUE INDEX training_marks_club_id_name_normalized_key ON public.training_marks USING btree (club_id, name_normalized)
 indice training_marks_id_club_id_key CREATE UNIQUE INDEX training_marks_id_club_id_key ON public.training_marks USING btree (id, club_id)
 indice training_marks_pkey CREATE UNIQUE INDEX training_marks_pkey ON public.training_marks USING btree (id)
 indice training_member_marks_mark_id_idx CREATE INDEX training_member_marks_mark_id_idx ON public.training_member_marks USING btree (mark_id)

@@ -263,6 +263,28 @@ export function trainingMyMarkApiPath(markId: string): string {
   return `/api/v1/training/marks/${encodeURIComponent(markId)}/me`;
 }
 
+/** Planificar por API (#903, D3 y D4 del PRD de E35): las marcas del club,
+ * los ejercicios del club y, después, ciclos y rutinas. Todo lo que cuelga
+ * de aquí es de Admin y Coach (`RESTRICTED_ROUTES`), y el dominio lo vuelve
+ * a comprobar. */
+export const TRAINING_MANAGE_API_PATH = "/api/v1/training/manage";
+
+/** Las marcas del club con sus cuentas (#903, RF-11). */
+export const TRAINING_MANAGE_MARKS_API_PATH = `${TRAINING_MANAGE_API_PATH}/marks`;
+
+/** Renombrar o borrar una marca del club (#903). */
+export function trainingManageMarkApiPath(markId: string): string {
+  return `${TRAINING_MANAGE_MARKS_API_PATH}/${encodeURIComponent(markId)}`;
+}
+
+/** Buscar ejercicios y crear uno del club (#903, RF-10). */
+export const TRAINING_MANAGE_EXERCISES_API_PATH = `${TRAINING_MANAGE_API_PATH}/exercises`;
+
+/** Editar o borrar un ejercicio del club (#903). */
+export function trainingManageExerciseApiPath(exerciseId: string): string {
+  return `${TRAINING_MANAGE_EXERCISES_API_PATH}/${encodeURIComponent(exerciseId)}`;
+}
+
 /** La búsqueda global (#425, RF-7 del PRD de E14). La alcanza cualquier
  * cuenta activa: qué encuentra cada rol lo decide cada sección (D3), así que
  * no aparece en `RESTRICTED_ROUTES`. */
@@ -824,6 +846,7 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: LEVY_PAYERS_API_PATH, capability: "viewLevyPayers" },
   { path: LEVY_SALES_API_PATH, capability: "viewLevyPayers" },
   { path: LEVY_BUYERS_API_PATH, capability: "viewLevyPayers" },
+  { path: TRAINING_MANAGE_API_PATH, capability: "planTraining" },
 ];
 
 /** Una ruta cuya lectura alcanzan más roles que su escritura. */
