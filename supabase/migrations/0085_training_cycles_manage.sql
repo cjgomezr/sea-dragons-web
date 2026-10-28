@@ -2,8 +2,9 @@
 -- `docs/prd/e35-entrenamiento.md`). Lo que tiene que ser una sola
 -- transacción va aquí: activar (que archiva el anterior), cambiar (que quita
 -- las semanas que sobran), duplicar (que copia y reapunta), poner o quitar
--- una rutina de un día (que corre la ranura 2) y copiar la semana 1. Todo lo llama el servidor con la llave de servicio
--- (D4); ninguna función es para una sesión.
+-- una rutina de un día (que corre la ranura 2) y copiar la semana 1. Todo lo
+-- llama el servidor con la llave de servicio (D4); ninguna función es para
+-- una sesión.
 --
 -- Producción reaplica el histórico entero en cada merge: todo es
 -- `create or replace`.
@@ -213,6 +214,12 @@ as $$
 declare
   v_slot integer := p_slot;
 begin
+  -- Espera a un cambio del ciclo a la vez, que puede quitar esta semana.
+  perform 1
+     from public.training_cycles c
+    where c.id = p_cycle_id
+      and c.club_id = p_club_id
+      for update;
   if p_routine_id is null then
     delete from public.training_cycle_days d
      where d.club_id = p_club_id
