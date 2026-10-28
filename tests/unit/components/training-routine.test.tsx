@@ -716,7 +716,9 @@ describe("las filas de la rutina", () => {
       .map((region) => region.getAttribute("aria-labelledby"))
       .map((id) =>
         id === null ? "" : document.getElementById(id)?.textContent,
-      );
+      )
+      // Mis marcas (#902) también es una región, en la otra columna.
+      .filter((name) => name !== "My marks");
     expect(regions).toEqual(["Gym A · Strength", "Pool · Endurance"]);
     expect(
       within(routinePanel("Pool · Endurance")).getByRole("button", {

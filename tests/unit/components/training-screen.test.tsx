@@ -606,6 +606,8 @@ describe("cuando la API no da la semana", () => {
       vi.fn(async () =>
         jsonResponse(403, {
           error: {
+            block: "pending",
+            cycle: CYCLE,
             code: "forbidden",
             message: "Tu membresía no está al día.",
             reason: "membership_not_current",
