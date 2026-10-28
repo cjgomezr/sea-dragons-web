@@ -173,10 +173,12 @@ export function usePlannerCycles(translate: Translator): PlannerCycles {
       );
     },
     save: async ({ cycleId, changes, confirmRemoval }) => {
+      // No toca `isBusy`: deshabilitar las acciones en cada salida de un
+      // campo le quitaría el foco a quien vuelve a ellas con Tab hacia atrás.
+      // Un cambio que se cruza con activar o archivar no estropea nada:
+      // éstos traen la lista entera.
       setError(null);
-      setIsBusy(true);
       const outcome = await updateCycle(cycleId, { changes, confirmRemoval });
-      setIsBusy(false);
       switch (outcome.kind) {
         case "confirmRemoval":
           return outcome;

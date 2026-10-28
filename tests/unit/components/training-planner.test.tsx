@@ -479,6 +479,32 @@ describe("guardar mientras se escribe en otro campo", () => {
     expect(field("Cycle name")).toHaveValue("Road to Worlds");
   });
 
+  it("no le quita el foco a la acción a la que se vuelve con Tab hacia atrás", async () => {
+    let resolveSave: (reply: ApiReply) => void = () => {};
+    stubCycles(
+      undefined,
+      () =>
+        new Promise<ApiReply>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    await renderPlanner();
+
+    await user.clear(field("Cycle name"));
+    await user.type(field("Cycle name"), "Road to Worlds");
+    await user.tab({ shift: true });
+    // Un botón que se deshabilita con el foco dentro lo suelta en el
+    // navegador (jsdom no lo hace): mientras se guarda, sigue habilitado.
+    expect(screen.getByRole("button", { name: "Archive" })).toBeEnabled();
+    await act(async () => {
+      resolveSave(ok(detailOf({ ...ACTIVE, name: "Road to Worlds" })));
+    });
+
+    await screen.findByText("Road to Worlds", { selector: "strong" });
+    expect(screen.getByRole("button", { name: "Archive" })).toHaveFocus();
+  });
+
   it("deja abierta la confirmación de las semanas si se guarda otro campo", async () => {
     stubCycles(undefined, (request) => {
       const body = request.body as { readonly weeks?: number };
