@@ -5,6 +5,7 @@ import {
   mkdtemp,
   readFile,
   rm,
+  utimes,
   writeFile,
 } from "node:fs/promises";
 import { spawn } from "node:child_process";
@@ -116,6 +117,10 @@ if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
   if [ -n "\${FAIL_PR_LIST:-}" ]; then
     echo "gh: API rate limit exceeded" >&2
     exit 1
+  fi
+  if [ -n "\${PR_LIST_JSON:-}" ]; then
+    echo "$PR_LIST_JSON"
+    exit 0
   fi
   echo "\${PR_LIST_COUNT:-0}"
   exit 0
@@ -1588,4 +1593,234 @@ describe("CLAUDE.md", () => {
       exceptionalSituations.indexOf("Integration tests without credentials"),
     );
   });
+});
+/**
+ * Un worker que ya abrió su PR pero dejó un shell en segundo plano (el caso
+ * real: `pg_ctl ... start; sleep 100000` para su Postgres de pruebas) nunca
+ * termina: `claude -p` espera a ese shell, y la fábrica espera a `claude -p`.
+ * Con el PR abierto y la sesión callada un rato, el script lo da por
+ * terminado, para su Postgres y lo cierra.
+ */
+describe("worker que no termina después de abrir su PR", () => {
+  let workDir = "";
+
+  afterEach(async () => {
+    if (workDir) {
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
+      workDir = "";
+    }
+  });
+
+  const minutesAgo = (minutes: number): Date =>
+    new Date(Date.now() - minutes * 60 * 1000);
+
+  /** Lo que `gh pr list --json createdAt` devuelve: un PR abierto en `at`. */
+  const openPrCreatedAt = (at: Date): string =>
+    JSON.stringify([{ createdAt: at.toISOString().replace(/\.\d+Z$/, "Z") }]);
+
+  /** Un HOME con la sesión del worker de #42, tocada por última vez en `at`. */
+  async function writeWorkerSession(at: Date | null): Promise<string> {
+    const home = path.join(workDir, "home");
+    const sessionDir = path.join(
+      home,
+      ".claude/projects/C--repo--claude-worktrees-impl-42",
+    );
+    await mkdir(sessionDir, { recursive: true });
+    if (at) {
+      const sessionFile = path.join(sessionDir, "sesion.jsonl");
+      await writeFile(sessionFile, "{}\n");
+      await utimes(sessionFile, at, at);
+    }
+    return home;
+  }
+
+  /** El veredicto para un worker lanzado hace 60 minutos, y el log de gh. */
+  async function checkLingering(
+    env: Record<string, string>,
+  ): Promise<{ verdict: string; ghLog: string }> {
+    const { binDir, logFile } = await installFakeGh(workDir);
+    const startedAt = Math.floor(minutesAgo(60).getTime() / 1000);
+    const { stdout } = await runBash(
+      `source scripts/process-backlog.sh; if worker_is_lingering 42 ${startedAt}; then echo COLGADO; else echo SIGUE; fi`,
+      workDir,
+      {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        ...env,
+      },
+    );
+    // Cargar el script imprime su cabecera antes del veredicto.
+    const verdict = stdout.trim().split("\n").pop() ?? "";
+    return { verdict, ghLog: await readLog(logFile) };
+  }
+
+  it(
+    "lo da por colgado con el PR que abrió y la sesión callada más de 30 minutos",
+    async () => {
+      workDir = await setupWorkDir();
+      const home = await writeWorkerSession(minutesAgo(40));
+
+      const { verdict, ghLog } = await checkLingering({
+        HOME: home,
+        PR_LIST_JSON: openPrCreatedAt(minutesAgo(45)),
+      });
+
+      expect(verdict).toBe("COLGADO");
+      expect(ghLog).toMatch(/pr list --state open --search Closes #42 in:body/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no lo da por colgado si el único PR abierto es de un intento anterior",
+    async () => {
+      workDir = await setupWorkDir();
+      const home = await writeWorkerSession(minutesAgo(40));
+
+      const { verdict } = await checkLingering({
+        HOME: home,
+        PR_LIST_JSON: openPrCreatedAt(minutesAgo(24 * 60)),
+      });
+
+      expect(verdict).toBe("SIGUE");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no lo da por colgado si la sesión se movió hace menos de 30 minutos",
+    async () => {
+      workDir = await setupWorkDir();
+      const home = await writeWorkerSession(minutesAgo(20));
+
+      const { verdict } = await checkLingering({
+        HOME: home,
+        PR_LIST_JSON: openPrCreatedAt(minutesAgo(45)),
+      });
+
+      expect(verdict).toBe("SIGUE");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no lo da por colgado mientras no haya PR abierto",
+    async () => {
+      workDir = await setupWorkDir();
+      const home = await writeWorkerSession(minutesAgo(40));
+
+      const { verdict } = await checkLingering({
+        HOME: home,
+        PR_LIST_JSON: "[]",
+      });
+
+      expect(verdict).toBe("SIGUE");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no lo da por colgado si gh no puede decir si hay PR",
+    async () => {
+      workDir = await setupWorkDir();
+      const home = await writeWorkerSession(minutesAgo(40));
+
+      const { verdict } = await checkLingering({
+        HOME: home,
+        FAIL_PR_LIST: "1",
+      });
+
+      expect(verdict).toBe("SIGUE");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no lo da por colgado si todavía no hay sesión que mirar",
+    async () => {
+      workDir = await setupWorkDir();
+      const home = await writeWorkerSession(null);
+
+      const { verdict } = await checkLingering({
+        HOME: home,
+        PR_LIST_JSON: openPrCreatedAt(minutesAgo(45)),
+      });
+
+      expect(verdict).toBe("SIGUE");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "un worker soltado no se marca needs-human aunque su wait salga distinto de cero",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      const { code } = await runBash(
+        `source scripts/process-backlog.sh
+ME=tester
+WORKER_RELEASED=1
+handle_worker_exit 42 "$(worker_exit_status 143)"`,
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ISSUE_VIEW_JSON: OPEN_IN_PROGRESS_ISSUE,
+          PR_LIST_COUNT: "1",
+        },
+      );
+
+      expect(code).toBe(0);
+      expect(await readLog(logFile)).not.toMatch(/needs-human/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "un worker que no se soltó conserva su código de salida",
+    async () => {
+      workDir = await setupWorkDir();
+
+      const { stdout } = await runBash(
+        "source scripts/process-backlog.sh; worker_exit_status 143",
+        workDir,
+        process.env,
+      );
+
+      expect(stdout.trim().split("\n").pop()).toBe("143");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "al soltarlo para su Postgres de pruebas, cierra el worker y lo anota como soltado",
+    async () => {
+      workDir = await setupWorkDir();
+      const postgresLog = path.join(workDir, "test-postgres.log");
+      await writeFile(
+        path.join(workDir, "scripts/test-postgres.sh"),
+        `#!/usr/bin/env bash\necho "$*" >> "${toBashPath(postgresLog)}"\n`,
+      );
+
+      const { code, stdout } = await runBash(
+        `source scripts/process-backlog.sh
+( exec sleep 1000 >/dev/null 2>&1 ) &
+WORKER_PID=$!
+release_lingering_worker 42
+wait "$WORKER_PID" 2>/dev/null || true
+if kill -0 "$WORKER_PID" 2>/dev/null; then echo VIVO; else echo CERRADO; fi
+echo "SOLTADO=$WORKER_RELEASED"`,
+        workDir,
+        process.env,
+      );
+
+      expect(code).toBe(0);
+      expect(stdout).toContain("CERRADO");
+      expect(stdout).toContain("SOLTADO=1");
+      expect(await readFile(postgresLog, "utf8")).toContain("stop 42");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 });

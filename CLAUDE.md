@@ -292,6 +292,13 @@ is no board) alongside the label and the comment.
   worker), you cannot run them by hand: say "⚠ integration tests not run by
   hand" in the PR and let the PR's `checks` decide. If those checks fail
   because a non-Supabase secret is missing (Stripe), `needs-human` naming it.
+- **Migration tests on a machine** (`tests/unit/supabase/`,
+  `apply-migrations.test.ts`) need a disposable Postgres. Start it with
+  `bash scripts/test-postgres.sh start`: it returns as soon as the server is
+  ready and prints the `MIGRATIONS_TEST_DATABASE_URL` to export. Stop it with
+  `bash scripts/test-postgres.sh stop` before you finish. Never hold a server
+  up from a background shell (`run_in_background`, `&`, `sleep`): `claude -p`
+  does not exit while one is alive, so the worker never ends after its PR.
 - **Never print the contents of a `.env*` file** (not in comments, PRs or
   logs). To check a variable exists use `grep -c '^NAME=' .env.local` or
   `[ -n "${NAME:-}" ]`.

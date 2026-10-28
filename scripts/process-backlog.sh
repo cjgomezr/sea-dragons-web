@@ -252,6 +252,82 @@ latest_touched_file() {  # worktree dir -> "epoch path" or empty
     -printf '%T@ %P\n' 2>/dev/null | sort -nr | head -1 || true
 }
 
+# A worker that already opened its PR can still never exit: `claude -p` waits
+# for every background shell it started, and the usual culprit is the one
+# that keeps its test Postgres up (`pg_ctl ... start; sleep 100000`). With
+# the PR open and the session silent this long, the work is done and only
+# that shell is left. 30, well past what a finished worker can legitimately
+# spend silent: the Stop gate stops itself after 10 minutes and a single
+# foreground tool call after another 10.
+IDLE_AFTER_PR_MINUTES="${IDLE_AFTER_PR_MINUTES:-30}"
+
+# Only a confirmed open PR opened by THIS run counts. A retry inherits the
+# draft PR of the attempt before, and ending it for that would strand its
+# work in silence. A gh failure counts as no PR either: unlike
+# pr_declares_closes, here it must not end a worker that may still be working.
+worker_has_open_pr() {  # issue number, epoch the worker started
+  local n="$1" since="$2" prs count
+  prs=$(gh pr list --state open --search "Closes #$n in:body" --json createdAt 2>/dev/null) || return 1
+  count=$(echo "$prs" | jq --argjson since "$since" \
+    '[.[] | select((.createdAt | fromdateiso8601) >= $since)] | length' 2>/dev/null) || return 1
+  [ "${count:-0}" != "0" ]
+}
+
+session_silent_for() {  # session file, minutes
+  local sess_file="$1" minutes="$2"
+  [ -n "$sess_file" ] || return 1
+  [ -n "$(find "$sess_file" -mmin +"$minutes" 2>/dev/null || true)" ]
+}
+
+worker_is_lingering() {  # issue number, epoch the worker started
+  local n="$1" since="$2"
+  # The session check goes first: it is local, and it keeps the heartbeat
+  # from asking GitHub every minute while the worker is busy.
+  session_silent_for "$(latest_session_file "$n")" "$IDLE_AFTER_PR_MINUTES" || return 1
+  worker_has_open_pr "$n" "$since"
+}
+
+# Seconds a process gets to exit on SIGTERM before it gets SIGKILL: a worker
+# that traps the first one would leave the `wait` below hanging again.
+KILL_GRACE_SECONDS=5
+
+kill_process_tree() {  # pid
+  local pid="$1" child
+  # Git Bash: the worker is a native claude.exe whose shells hang below it.
+  if [ -r "/proc/$pid/winpid" ] && command -v taskkill >/dev/null 2>&1; then
+    taskkill //F //T //PID "$(cat "/proc/$pid/winpid")" >/dev/null 2>&1 || true
+  fi
+  if command -v pgrep >/dev/null 2>&1; then
+    for child in $(pgrep -P "$pid" || true); do
+      kill_process_tree "$child"
+    done
+  fi
+  kill "$pid" 2>/dev/null || return 0
+  for _ in $(seq "$KILL_GRACE_SECONDS"); do
+    kill -0 "$pid" 2>/dev/null || return 0
+    sleep 1
+  done
+  kill -KILL "$pid" 2>/dev/null || true
+}
+
+# The status a worker's `wait` stands for: one closed on purpose after it
+# opened its PR finished its work, and the kill is ours, not its failure.
+worker_exit_status() {  # wait's exit status
+  if [ -n "${WORKER_RELEASED:-}" ]; then
+    echo 0
+  else
+    echo "$1"
+  fi
+}
+
+release_lingering_worker() {  # issue number
+  local n="$1"
+  echo "  🧹 #$n ya tiene PR y el worker lleva ${IDLE_AFTER_PR_MINUTES}m callado: paro su Postgres de pruebas y lo cierro"
+  bash scripts/test-postgres.sh stop "$n" >/dev/null 2>&1 || true
+  kill_process_tree "$WORKER_PID"
+  WORKER_RELEASED=1
+}
+
 # Creates (or reuses) the worktree for a ticket, always on branch `impl-N`.
 # `claude --worktree NAME` cannot be trusted for this: it prefixes whatever
 # name it's given with `worktree-`, which is exactly how #62 happened
@@ -357,6 +433,7 @@ main() {
 
   while [ "$PROCESSED" -lt "$MAX_ISSUES" ]; do
     WORKER_LAUNCHED=""
+    WORKER_RELEASED=""
     TICKET_OUTCOME_RECORDED=""
     N=$(next_issue)
     if [ -z "${N:-}" ]; then
@@ -397,6 +474,10 @@ main() {
     while kill -0 "$WORKER_PID" 2>/dev/null; do
       sleep 60
       kill -0 "$WORKER_PID" 2>/dev/null || break
+      if worker_is_lingering "$N" "$START_TS"; then
+        release_lingering_worker "$N"
+        break
+      fi
       ELAPSED_MIN=$(( ($(date +%s) - START_TS) / 60 ))
       if [ -d "$WT_DIR" ]; then
         # Untracked files never travel to worktrees, so hand the worker every
@@ -460,6 +541,7 @@ main() {
     else
       WORKER_EXIT_CODE=$?
     fi
+    WORKER_EXIT_CODE=$(worker_exit_status "$WORKER_EXIT_CODE")
     handle_worker_exit "$N" "$WORKER_EXIT_CODE"
     TICKET_OUTCOME_RECORDED=1
 
