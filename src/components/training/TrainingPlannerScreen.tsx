@@ -2,6 +2,7 @@
 
 import { Barbell } from "@phosphor-icons/react/dist/ssr/Barbell";
 import { CalendarBlank } from "@phosphor-icons/react/dist/ssr/CalendarBlank";
+import { ListChecks } from "@phosphor-icons/react/dist/ssr/ListChecks";
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { Trophy } from "@phosphor-icons/react/dist/ssr/Trophy";
 import { useMemo, useState } from "react";
@@ -13,6 +14,7 @@ import type { ManagedCycle } from "@/lib/training/club-cycles";
 import { DesktopCycleTab, PhoneCycleTab } from "./PlannerCycleTab";
 import { PlannerExercisesTab } from "./PlannerExercisesTab";
 import { PlannerMarksTab } from "./PlannerMarksTab";
+import { PlannerRoutinesTab } from "./PlannerRoutinesTab";
 import { plannerErrorMessage } from "./planner-format";
 import { type PlannerCycles, usePlannerCycles } from "./use-planner-cycles";
 import {
@@ -23,27 +25,33 @@ import { type PlannerMarks, usePlannerMarks } from "./use-planner-marks";
 
 /**
  * Planificar (#906, RF-7 y D3 del PRD de E35; §5.1 y §5.2 del handoff): la
- * cabecera, las pestañas y la pestaña Ciclo; Marcas llegó con #911 y
- * Ejercicios con #910. Solo
- * salen las pestañas que ya existen; las demás llegan con sus tickets.
+ * cabecera, las pestañas y la pestaña Ciclo; Rutinas llegó con #908, Marcas
+ * con #911 y Ejercicios con #910.
  *
  * Es de cliente porque elige y cambia ciclos sin recargar. Lee y escribe
- * solo por la API v1 (#904), como la aplicación nativa (CON-002).
+ * solo por la API v1 (#904 y #905), como la aplicación nativa (CON-002).
  */
 
-type PlannerTab = "cycle" | "exercises" | "marks";
+type PlannerTab = "cycle" | "routines" | "exercises" | "marks";
 
 /** En el orden en que salen, que es el que recorren las flechas. */
-const PLANNER_TABS: readonly PlannerTab[] = ["cycle", "exercises", "marks"];
+const PLANNER_TABS: readonly PlannerTab[] = [
+  "cycle",
+  "routines",
+  "exercises",
+  "marks",
+];
 
 const TAB_IDS = {
   cycle: "planificar-pestana-ciclo",
+  routines: "planificar-pestana-rutinas",
   exercises: "planificar-pestana-ejercicios",
   marks: "planificar-pestana-marcas",
 } as const satisfies Record<PlannerTab, string>;
 
 const PANEL_IDS = {
   cycle: "planificar-panel-ciclo",
+  routines: "planificar-panel-rutinas",
   exercises: "planificar-panel-ejercicios",
   marks: "planificar-panel-marcas",
 } as const satisfies Record<PlannerTab, string>;
@@ -162,6 +170,14 @@ function PlannerTabs({
             })}
           />
         )}
+      </TabButton>
+      <TabButton
+        tab="routines"
+        isSelected={selectedTab === "routines"}
+        onSelect={onSelect}
+      >
+        <Icon glyph={ListChecks} />
+        {translate("training.manage.tabRoutines")}
       </TabButton>
       <TabButton
         tab="exercises"
@@ -317,6 +333,13 @@ function PlannerContent({
               selected={selected}
             />
           </>
+        ) : null}
+        {selectedTab === "routines" ? (
+          <PlannerRoutinesTab
+            translate={translate}
+            cycles={state.cycles}
+            selectedCycleId={state.selectedId}
+          />
         ) : null}
         {selectedTab === "exercises" ? (
           <PlannerExercisesTab translate={translate} planner={exercises} />
