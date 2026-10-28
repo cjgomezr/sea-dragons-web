@@ -242,9 +242,9 @@ export const DASHBOARD_API_PATH = "/api/v1/dashboard";
  * endpoint del plan, y quien no está al día ve aquí la pantalla bloqueada. */
 export const TRAINING_PATH = "/entrenamiento";
 
-/** Planificar el entrenamiento (D1 y D3), de Admin y Coach. El enlace de la
- * cabecera de Entrenamiento lleva aquí; la pantalla y su frontera llegan con
- * su propio ticket. */
+/** Planificar el entrenamiento (#906, D1 y D3), de Admin y Coach. El enlace
+ * de la cabecera de Entrenamiento lleva aquí. No pide estar al día: el Admin
+ * y el Coach planifican aunque no hayan pagado (D3). */
 export const TRAINING_PLANNING_PATH = `${TRAINING_PATH}/planificar`;
 
 /** La semana del ciclo activo de entrenamiento (#898, RF-3 del PRD de E35).
@@ -886,6 +886,7 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: LEVY_SALES_API_PATH, capability: "viewLevyPayers" },
   { path: LEVY_BUYERS_API_PATH, capability: "viewLevyPayers" },
   { path: TRAINING_MANAGE_API_PATH, capability: "planTraining" },
+  { path: TRAINING_PLANNING_PATH, capability: "planTraining" },
 ];
 
 /** Una ruta cuya lectura alcanzan más roles que su escritura. */

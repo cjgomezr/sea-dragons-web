@@ -3072,4 +3072,79 @@ export const spanishMessages: MessageCatalog = {
   "training.member.lockedText":
     "El entrenamiento es para miembros con la membresía activa. Renuévala y retomarás el ciclo donde está ahora el club.",
   "training.member.renewMembership": "Renovar membresía",
+  "training.manage.metaTitle": "Planificar · {club}",
+  "training.manage.eyebrow": "Entrenamiento · Gestión",
+  "training.manage.title": "Planificar",
+  "training.manage.lead": "Lo ven los miembros con la membresía activa.",
+  "training.manage.tabs": "Secciones de la planificación",
+  "training.manage.tabCycle": "Ciclo",
+  "training.manage.tabCycleCount": "{weeks} sem",
+  "training.manage.loading": "Cargando los ciclos…",
+  "training.manage.failed": "No pudimos cargar los ciclos.",
+  "training.manage.retry": "Reintentar",
+  "training.manage.noCycles": "Todavía no hay ciclos",
+  "training.manage.noCyclesText":
+    "Crea uno: nace en borrador, y los miembros lo ven cuando lo activas.",
+  "training.manage.cycles": "Ciclos",
+  "training.manage.statusActive": "Activo",
+  "training.manage.statusDraft": "Borrador",
+  "training.manage.statusArchived": "Archivado",
+  "training.manage.cycleMeta": {
+    one: "{count} semana · {start} – {end} · {routines}",
+    other: "{count} semanas · {start} – {end} · {routines}",
+  },
+  "training.manage.routines": {
+    one: "{count} rutina",
+    other: "{count} rutinas",
+  },
+  "training.manage.newCycle": "Nuevo ciclo",
+  "training.manage.newCycleName": "Nuevo ciclo",
+  "training.manage.showArchived": "Ver archivados · {count}",
+  "training.manage.hideArchived": "Ocultar archivados",
+  "training.manage.editing": "Editando",
+  "training.manage.makeActive": "Activar",
+  "training.manage.duplicate": "Duplicar",
+  "training.manage.archive": "Archivar",
+  "training.manage.cycleName": "Nombre del ciclo",
+  "training.manage.targetEvent": "Evento objetivo · opcional",
+  "training.manage.eventDate": "Primer día del evento",
+  "training.manage.startDate": "Fecha de inicio",
+  "training.manage.weeks": "Semanas",
+  "training.manage.lineActiveEvent":
+    "La semana 1 empieza el {start} · la semana {eventWeek} es la del evento. Hoy los miembros están en la semana {week}.",
+  "training.manage.lineActive":
+    "La semana 1 empieza el {start} · termina el {end}. Hoy los miembros están en la semana {week}.",
+  "training.manage.lineDraft":
+    "La semana 1 empezaría el {start} · borrador: los miembros no lo ven hasta que lo actives.",
+  "training.manage.lineArchived":
+    "Corrió del {start} al {end} · archivado. Duplícalo para reutilizarlo.",
+  "training.manage.cycleSelect": "Ciclo",
+  "training.manage.optionActive": "{name} · activo",
+  "training.manage.optionDraft": "{name} · borrador",
+  "training.manage.archivedGroup": "Archivados",
+  "training.manage.editNameAndDates": "Editar nombre y fechas",
+  "training.manage.confirmRemoval": {
+    one: "Bajar a {weeks} semanas quita {count} día planificado. No se puede deshacer.",
+    other:
+      "Bajar a {weeks} semanas quita {count} días planificados. No se puede deshacer.",
+  },
+  "training.manage.confirmRemove": {
+    one: "Quitar {count} día",
+    other: "Quitar {count} días",
+  },
+  "training.manage.cancel": "Cancelar",
+  "training.manage.activated": "{name} está activo · los miembros ya lo ven",
+  "training.manage.archived": "{name} archivado",
+  "training.manage.duplicated": {
+    one: "Duplicado como borrador · cámbiale el nombre y las fechas · {count} rutina copiada",
+    other:
+      "Duplicado como borrador · cámbiale el nombre y las fechas · {count} rutinas copiadas",
+  },
+  "training.manage.errorNameRequired": "Ponle un nombre al ciclo.",
+  "training.manage.errorNameTooLong": "Usa 80 caracteres como mucho.",
+  "training.manage.errorEventName": "Nombra el evento, o déjalo vacío.",
+  "training.manage.errorWeeks": "Las semanas van de 1 a 52.",
+  "training.manage.errorDate": "Elige una fecha.",
+  "training.manage.errorSave":
+    "No pudimos guardar el cambio. Inténtalo de nuevo.",
 };
