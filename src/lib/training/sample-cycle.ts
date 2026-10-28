@@ -196,7 +196,7 @@ export type SampleCyclePlan = {
   readonly marks: readonly string[];
   readonly exercises: readonly SampleExercise[];
   readonly routines: readonly SampleRoutine[];
-  /** Sólo las semanas con nota o dosis. */
+  /** Sólo las semanas que trae la muestra: la que salta no está. */
   readonly weeks: readonly SampleWeek[];
   readonly days: readonly SampleDay[];
 };
@@ -502,9 +502,11 @@ function sampleExercises(
 ): readonly SampleExercise[] {
   const byKey = new Map<string, SampleExercise>();
   for (const item of routines.flatMap((routine) => routine.items)) {
-    const key =
-      item.kind === "exercise" ? normalizeForSearch(item.exerciseName) : "";
-    if (item.kind === "section" || byKey.has(key)) {
+    if (item.kind === "section") {
+      continue;
+    }
+    const key = normalizeForSearch(item.exerciseName);
+    if (byKey.has(key)) {
       continue;
     }
     const guide = sample.guide[sample.gmap[item.exerciseName] ?? ""];

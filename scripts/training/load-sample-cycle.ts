@@ -41,13 +41,16 @@ async function findCallerId(
   if (error) {
     throw new Error(`No se pudo buscar al socio ${email}: ${error.message}`);
   }
-  const accounts = data.filter((row) => row.user_id !== null);
-  if (accounts.length !== 1) {
+  const accounts = data.flatMap((row) =>
+    row.user_id === null ? [] : [String(row.user_id)],
+  );
+  const [callerId] = accounts;
+  if (callerId === undefined || accounts.length > 1) {
     throw new Error(
       `Hay ${accounts.length} socios con cuenta y el correo ${email}; tiene que haber uno.`,
     );
   }
-  return String(accounts[0]?.user_id);
+  return callerId;
 }
 
 async function main(): Promise<void> {

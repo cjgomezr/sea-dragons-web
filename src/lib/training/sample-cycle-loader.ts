@@ -246,6 +246,28 @@ async function fillWeeksAndDays(
   }
 }
 
+/** Con el ciclo ya creado, un fallo deja el borrador a medias, y la
+ * siguiente corrida lo daría por cargado: el error lo nombra. */
+async function fillCycle(
+  gateways: SampleCycleGateways,
+  request: LoadRequest & {
+    readonly cycleId: string;
+    readonly ids: { readonly exercises: IdsByName; readonly marks: IdsByName };
+  },
+): Promise<readonly string[]> {
+  try {
+    const routineIds = await createRoutines(gateways, request);
+    await fillWeeksAndDays(gateways, { ...request, routineIds });
+    return routineIds;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `El borrador ${request.cycleId} quedó incompleto (${reason}): archívalo y renómbralo antes de volver a cargar.`,
+      { cause: error },
+    );
+  }
+}
+
 function countDaysWithSessions(plan: SampleCyclePlan): number {
   return new Set(plan.days.map((day) => `${day.weekNo}:${day.weekday}`)).size;
 }
@@ -279,15 +301,10 @@ export async function loadSampleCycle(
       schedule: { kind: "start", startDate: request.plan.cycle.startDate },
     },
   });
-  const routineIds = await createRoutines(gateways, {
+  const routineIds = await fillCycle(gateways, {
     ...request,
     cycleId: cycle.id,
     ids: { exercises: exercises.ids, marks: marks.ids },
-  });
-  await fillWeeksAndDays(gateways, {
-    ...request,
-    cycleId: cycle.id,
-    routineIds,
   });
   return {
     kind: "loaded",
