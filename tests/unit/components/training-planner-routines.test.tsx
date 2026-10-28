@@ -7,7 +7,7 @@ import type {
   ManagedRoutine,
   RoutineEditorItem,
 } from "@/lib/training/club-routines";
-import { stubScreenWidth } from "../../support/screen-width";
+import { stubScreenSize } from "../../support/screen-width";
 
 /**
  * Planificar → Rutinas (#908, RF-9, D8 y D9 del PRD de E35): el filtro, la
@@ -270,7 +270,7 @@ beforeEach(() => {
   items = new Map([[STRENGTH.id, STRENGTH_ITEMS]]);
   failWrites = false;
   stubApi();
-  stubScreenWidth(false);
+  stubScreenSize("desktop");
 });
 
 afterEach(() => {
@@ -872,9 +872,30 @@ describe("borrar una rutina", () => {
   });
 });
 
+describe("en la tableta", () => {
+  beforeEach(() => {
+    stubScreenSize("tablet");
+  });
+
+  it("enseña la lista y el editor, con una tarjeta por fila", async () => {
+    const user = userEvent.setup();
+
+    await openStrength(user);
+
+    expect(routineButton("Mobility")).toBeInTheDocument();
+    const squat = screen
+      .getByRole("button", { name: "Delete Back squat" })
+      .closest("li");
+    if (squat === null) {
+      throw new Error("Falta la tarjeta de Back squat");
+    }
+    expect(within(squat).getByText("Reps / distance")).toBeInTheDocument();
+  });
+});
+
 describe("en el móvil", () => {
   beforeEach(() => {
-    stubScreenWidth(true);
+    stubScreenSize("phone");
   });
 
   it("enseña la lista sin editor hasta que se toca una rutina", async () => {

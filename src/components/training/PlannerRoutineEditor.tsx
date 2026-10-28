@@ -5,6 +5,7 @@ import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { Trash } from "@phosphor-icons/react/dist/ssr/Trash";
 import { useId, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { useIsBelowDesktop } from "@/components/use-is-phone";
 import type { Translator } from "@/lib/i18n/translator";
 import {
   type ManagedRoutine,
@@ -171,12 +172,12 @@ function DeleteRoutine({
 function EditorRows({
   translate,
   editor,
-  isPhone,
 }: {
   readonly translate: Translator;
   readonly editor: RoutineEditorControls;
-  readonly isPhone: boolean;
 }): React.JSX.Element {
+  // La tabla solo cabe en el escritorio; por debajo, una tarjeta por fila.
+  const isCompact = useIsBelowDesktop();
   const { state } = editor;
   if (state.kind === "loading") {
     return (
@@ -207,7 +208,7 @@ function EditorRows({
           translate={translate}
           rows={rows}
           marks={state.marks}
-          isPhone={isPhone}
+          isCompact={isCompact}
           onSave={editor.saveRows}
         />
       )}
@@ -258,7 +259,7 @@ export function PlannerRoutineEditor(
         />
         <DeleteRoutine {...props} />
       </div>
-      <EditorRows translate={translate} editor={editor} isPhone={isPhone} />
+      <EditorRows translate={translate} editor={editor} />
       <p className="training-routine-hint">
         {translate("training.manage.loadHint")}
       </p>

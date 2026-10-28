@@ -26,7 +26,8 @@ import { ExercisePhoto } from "./TrainingExerciseRow";
 /**
  * Las filas del editor de rutinas (#908, RF-9 y D9 del PRD de E35; §5.1 y
  * §5.2 del handoff): un ejercicio con su dosis y su carga, o un título de
- * sección. En el escritorio, una fila de la tabla; en el móvil, una tarjeta.
+ * sección. En el escritorio, una fila de la tabla; por debajo, donde la
+ * tabla no cabe, una tarjeta.
  * Cada una se arrastra por su asa (dnd-kit, con el dedo tras mantenerlo) o
  * se mueve con ↑ ↓ con el foco en el asa.
  */
@@ -42,7 +43,7 @@ type RowsProps = {
   readonly translate: Translator;
   readonly rows: readonly EditorRow[];
   readonly marks: readonly RoutineMark[];
-  readonly isPhone: boolean;
+  readonly isCompact: boolean;
   readonly onSave: (rows: readonly EditorRow[]) => void;
 };
 
@@ -50,7 +51,7 @@ type RowProps = {
   readonly translate: Translator;
   readonly rank: number;
   readonly total: number;
-  readonly isPhone: boolean;
+  readonly isCompact: boolean;
   readonly onMove: (direction: MoveDirection) => void;
   readonly onDelete: () => void;
 };
@@ -183,16 +184,17 @@ function optionalText(text: string): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
-/** Series, repeticiones y descanso, con su etiqueta a la vista en el móvil. */
+/** Series, repeticiones y descanso, con su etiqueta a la vista en la
+ * tarjeta. */
 function DoseFields({
   translate,
   row,
-  isPhone,
+  isCompact,
   onChange,
 }: {
   readonly translate: Translator;
   readonly row: ExerciseEditorRow;
-  readonly isPhone: boolean;
+  readonly isCompact: boolean;
   readonly onChange: (row: EditorRow) => void;
 }): React.JSX.Element {
   const exercise = row.exercise.name;
@@ -249,7 +251,7 @@ function DoseFields({
   return (
     <>
       {fields.map(({ name, label, field }) =>
-        isPhone ? (
+        isCompact ? (
           <label key={name} className={`training-routine-dose-${name}`}>
             <span>{label}</span>
             {field}
@@ -299,7 +301,7 @@ function ExerciseRow({
   readonly marks: readonly RoutineMark[];
   readonly onChange: (row: EditorRow) => void;
 }): React.JSX.Element {
-  const { translate, isPhone } = props;
+  const { translate, isCompact } = props;
   const name = row.exercise.name;
   const fieldProps = { translate, row, onChange };
   const { setRowNode, rowClassName, rowStyle, setHandleNode, handleListeners } =
@@ -323,17 +325,17 @@ function ExerciseRow({
         </span>
         <span className="training-routine-name-and-note">
           <span className="training-routine-name">{name}</span>
-          {isPhone ? null : <NoteField {...fieldProps} />}
+          {isCompact ? null : <NoteField {...fieldProps} />}
         </span>
       </span>
-      <DoseFields {...fieldProps} isPhone={isPhone} />
+      <DoseFields {...fieldProps} isCompact={isCompact} />
       <PlannerRoutineLoad
         translate={translate}
         row={row}
         marks={marks}
         onChange={(load) => onChange({ ...row, load })}
       />
-      {isPhone ? <NoteField {...fieldProps} /> : null}
+      {isCompact ? <NoteField {...fieldProps} /> : null}
       <DeleteRowButton
         translate={translate}
         item={name}
@@ -392,7 +394,7 @@ export function PlannerRoutineRows({
   translate,
   rows,
   marks,
-  isPhone,
+  isCompact,
   onSave,
 }: RowsProps): React.JSX.Element {
   const { containerRef, focusLater } = useFocusAfterMove(rows);
@@ -403,7 +405,7 @@ export function PlannerRoutineRows({
       translate,
       rank: index + 1,
       total,
-      isPhone,
+      isCompact,
       onMove: (direction) => {
         const moved = moveRow(rows, index, direction);
         if (moved !== null) {
@@ -421,7 +423,7 @@ export function PlannerRoutineRows({
 
   return (
     <div ref={containerRef} className="training-routine-table">
-      {isPhone ? null : <ColumnHeader translate={translate} />}
+      {isCompact ? null : <ColumnHeader translate={translate} />}
       <SortableList
         translate={translate}
         isDisabled={false}
