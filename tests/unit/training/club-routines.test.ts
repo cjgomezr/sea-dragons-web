@@ -17,6 +17,8 @@ import {
   findLastExerciseDose,
   listClubRoutines,
   nextRoutineColorIndex,
+  type RoutineEditorItem,
+  readRoutineEditor,
   renameClubRoutine,
   saveRoutineItems,
 } from "@/lib/training/club-routines";
@@ -49,6 +51,7 @@ let callerRole: Role;
 let routines: ManagedRoutine[];
 let savedItems: Map<string, readonly RoutineItemDraft[]>;
 let lastDoses: Map<string, LastDose>;
+let editorItems: Map<string, readonly RoutineEditorItem[]>;
 let auditRows: AuditLogInsertRow[];
 let deletedWithConfirm: boolean[];
 let referenceRace: boolean;
@@ -133,6 +136,7 @@ function gateways(): ClubRoutinesGateways {
         exerciseId === EXERCISE_ID,
       findLastDose: async (_clubId, exerciseId) =>
         lastDoses.get(exerciseId) ?? null,
+      listItems: async ({ routineId }) => editorItems.get(routineId) ?? [],
     },
     audit: {
       insertAuditLogRow: async (row) => {
@@ -157,6 +161,7 @@ beforeEach(() => {
   ];
   savedItems = new Map();
   lastDoses = new Map();
+  editorItems = new Map();
   auditRows = [];
   deletedWithConfirm = [];
   referenceRace = false;
@@ -567,6 +572,59 @@ describe("saveRoutineItems", () => {
         items,
       }),
     ).rejects.toThrow(TrainingPlannerForbiddenError);
+  });
+});
+
+describe("readRoutineEditor", () => {
+  const SQUAT_ROW: RoutineEditorItem = {
+    kind: "exercise",
+    exercise: { id: EXERCISE_ID, name: "Back squat", photoUrl: null },
+    sets: 4,
+    reps: "6",
+    rest: "2:00",
+    note: null,
+    load: { kind: "pct", markId: MARK_ID, pct: 75 },
+  };
+
+  it("devuelve la rutina y sus filas en orden, con el nombre del ejercicio", async () => {
+    editorItems.set(STRENGTH_ID, [
+      { kind: "section", title: "Main" },
+      SQUAT_ROW,
+    ]);
+
+    const result = await readRoutineEditor(gateways(), {
+      callerId: COACH_ID,
+      routineId: STRENGTH_ID,
+    });
+
+    expect(result.routine).toMatchObject({
+      id: STRENGTH_ID,
+      name: "Strength A",
+    });
+    expect(result.items).toEqual([
+      { kind: "section", title: "Main" },
+      SQUAT_ROW,
+    ]);
+  });
+
+  it("no encuentra una rutina de otro club", async () => {
+    await expect(
+      readRoutineEditor(gateways(), {
+        callerId: COACH_ID,
+        routineId: UNKNOWN_ROUTINE_ID,
+      }),
+    ).rejects.toBeInstanceOf(RoutineNotFoundError);
+  });
+
+  it("no deja leerla a un Player", async () => {
+    callerRole = "Player";
+
+    await expect(
+      readRoutineEditor(gateways(), {
+        callerId: COACH_ID,
+        routineId: STRENGTH_ID,
+      }),
+    ).rejects.toBeInstanceOf(TrainingPlannerForbiddenError);
   });
 });
 

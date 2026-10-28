@@ -12,6 +12,7 @@ import type {
   ClubRoutinesGateways,
   LastDose,
   ManagedRoutine,
+  RoutineEditorItem,
 } from "@/lib/training/club-routines";
 import type { RoutineItemDraft } from "@/lib/training/routine-items";
 
@@ -46,6 +47,23 @@ const insertAuditLogRow = vi.fn();
 const deleteRoutine = vi.fn();
 const replaceItems = vi.fn();
 let routines: ManagedRoutine[];
+
+const STRENGTH_ITEMS: readonly RoutineEditorItem[] = [
+  { kind: "section", title: "Main" },
+  {
+    kind: "exercise",
+    exercise: {
+      id: EXERCISE_ID,
+      name: "Back squat",
+      photoUrl: "https://example.test/squat.jpg",
+    },
+    sets: 4,
+    reps: "6",
+    rest: "2:00",
+    note: "Slow down",
+    load: { kind: "week", markId: MARK_ID },
+  },
+];
 
 const LAST_DOSE: LastDose = {
   sets: 5,
@@ -136,6 +154,8 @@ function clubRoutinesGateways(): ClubRoutinesGateways {
         OWN_EXERCISES.includes(exerciseId),
       findLastDose: async (_clubId, exerciseId) =>
         exerciseId === EXERCISE_ID ? LAST_DOSE : null,
+      listItems: async ({ routineId }) =>
+        routineId === STRENGTH_ID ? STRENGTH_ITEMS : [],
     },
     audit: {
       insertAuditLogRow: async (row) => {
@@ -257,6 +277,15 @@ function putItems(routineId: string, body: unknown): Promise<Response> {
   );
   return throughProxy(request, () =>
     itemsRoute.PUT(request, routineContext(routineId)),
+  );
+}
+
+function getItems(routineId: string): Promise<Response> {
+  const request = new NextRequest(
+    new URL(trainingManageRoutineItemsApiPath(routineId), ORIGIN),
+  );
+  return throughProxy(request, () =>
+    itemsRoute.GET(request, routineContext(routineId)),
   );
 }
 
@@ -506,6 +535,23 @@ describe("DELETE /api/v1/training/manage/routines/{routineId}", () => {
   });
 });
 
+describe("GET /api/v1/training/manage/routines/{routineId}/items", () => {
+  it("devuelve la rutina y sus filas en orden, con el nombre y la foto del ejercicio", async () => {
+    const response = await getItems(STRENGTH_ID);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.routine).toMatchObject({ id: STRENGTH_ID });
+    expect(body.data.items).toEqual(STRENGTH_ITEMS);
+  });
+
+  it("responde 404 a una rutina de otro club", async () => {
+    const response = await getItems(OTHER_CLUBS_ROUTINE_ID);
+
+    expect(response.status).toBe(404);
+  });
+});
+
 describe("PUT /api/v1/training/manage/routines/{routineId}/items", () => {
   it("sustituye las filas en ese orden y responde lo guardado", async () => {
     const items = [
@@ -649,6 +695,7 @@ describe("quién puede llamar", () => {
       () => putItems(STRENGTH_ID, { items: [{ kind: "section", title: "M" }] }),
     ],
     ["GET de la última dosis", () => getLastDose(EXERCISE_ID)],
+    ["GET de las filas", () => getItems(STRENGTH_ID)],
   ];
 
   it.each(
