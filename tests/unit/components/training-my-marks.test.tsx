@@ -494,6 +494,36 @@ describe("la pantalla bloqueada", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("trata como un fallo las marcas cerradas con el plan abierto", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) =>
+        new URL(input, "http://localhost").pathname === PLAN_PATH
+          ? jsonResponse(200, { data: PLAN })
+          : jsonResponse(403, {
+              error: {
+                block: "pending",
+                code: "forbidden",
+                message: "Tu membresía no está al día.",
+                reason: "membership_not_current",
+              },
+            }),
+      ),
+    );
+
+    render(<TrainingScreen locale="en" canPlan={false} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't load the training plan.",
+    );
+    expect(
+      screen.getByRole("button", { name: "Try again" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Renew membership" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("habla de tú en español", async () => {
     stubBlocked("past_due");
 

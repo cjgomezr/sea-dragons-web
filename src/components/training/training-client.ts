@@ -110,7 +110,11 @@ const planResponseSchema: z.ZodType<{ readonly data: TrainingPlan }> = z.object(
 const blockedResponseSchema = z.object({
   error: z.object({
     reason: z.literal(MEMBERSHIP_NOT_CURRENT_REASON),
-    block: z.enum(["pending", "past_due", "cancelled"]),
+    block: z.enum([
+      "pending",
+      "past_due",
+      "cancelled",
+    ] as const satisfies readonly MembershipBlock[]),
     cycle: cycleSchema.nullable(),
   }),
 });
