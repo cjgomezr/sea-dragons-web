@@ -299,6 +299,31 @@ describeConPostgres("borrar una rutina", () => {
     expect(days).toBe("1:0:1:Swim");
   });
 
+  it("no toca los días que no usaban la rutina borrada", async () => {
+    const database = await migratedDatabase();
+    const seed = await seedUsedRoutine(database);
+    // Una ranura 2 sola que ya estaba ahí: no es de este borrado.
+    await seedDay(database, seed.clubId, {
+      cycleId: seed.cycleId,
+      weekNo: 3,
+      weekday: 5,
+      slot: 2,
+      routineId: seed.swim,
+    });
+
+    await deleteRoutine(
+      database,
+      { clubId: seed.clubId, routineId: seed.strength },
+      true,
+    );
+
+    const untouched = await database.query(
+      `select slot from public.training_cycle_days
+        where cycle_id = '${seed.cycleId}' and week_no = 3 and weekday = 5`,
+    );
+    expect(untouched).toBe("2");
+  });
+
   it("borra sin confirmar una que no se usa", async () => {
     const database = await migratedDatabase();
     const clubId = await seededClubId(database);

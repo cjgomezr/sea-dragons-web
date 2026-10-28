@@ -60,7 +60,7 @@ export class RoutineItemsValidationError extends Error {
 }
 
 /** Como `char_length` de Postgres: un emoji es un carácter, no dos. */
-function countCharacters(text: string): number {
+export function countCharacters(text: string): number {
   return [...text].length;
 }
 

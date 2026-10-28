@@ -102,7 +102,7 @@ end;
 $$;
 
 -- Borra la rutina si no se usa en la cuadrícula o si `p_confirm` (RF-9). Sus
--- días quedan en descanso (`on delete cascade`), y donde ocupaba la ranura 1
+-- días quedan en descanso, y donde ocupaba la ranura 1
 -- de un día con otra en la 2, ésta sube: la ranura 2 nunca queda sola (D7).
 -- Bloquea la rutina: un día que la pone a la vez espera por su clave y
 -- después no la encuentra. Sin filas si no es del club; con una, si la borró
@@ -142,21 +142,25 @@ begin
     return;
   end if;
 
-  delete from public.training_routines r
-   where r.id = p_routine_id;
-
+  -- Sólo los días donde ocupaba la ranura 1: el resto de la cuadrícula no se
+  -- toca.
+  with removed as (
+    delete from public.training_cycle_days d
+     where d.routine_id = p_routine_id
+    returning d.cycle_id, d.week_no, d.weekday, d.slot
+  )
   update public.training_cycle_days d
      set slot = 1
-   where d.club_id = p_club_id
+    from removed
+   where removed.slot = 1
+     and d.cycle_id = removed.cycle_id
+     and d.week_no = removed.week_no
+     and d.weekday = removed.weekday
      and d.slot = 2
-     and not exists (
-       select 1
-         from public.training_cycle_days first
-        where first.cycle_id = d.cycle_id
-          and first.week_no = d.week_no
-          and first.weekday = d.weekday
-          and first.slot = 1
-     );
+     and d.routine_id <> p_routine_id;
+
+  delete from public.training_routines r
+   where r.id = p_routine_id;
 
   deleted := true;
   days_used := v_days;

@@ -10,6 +10,7 @@ import { ExerciseNotFoundError } from "./club-exercises";
 import {
   type RoutineItemDraft,
   type RoutineLoadDraft,
+  countCharacters,
   readRoutineItems,
   referencedIds,
 } from "./routine-items";
@@ -187,11 +188,6 @@ export class RoutineItemReferenceError extends Error {
  * hay ya en su ámbito, el ciclo o las compartidas. */
 export function nextRoutineColorIndex(routinesInScope: number): number {
   return routinesInScope % ROUTINE_PALETTE_SIZE;
-}
-
-/** Como `char_length` de Postgres: un emoji es un carácter, no dos. */
-function countCharacters(text: string): number {
-  return [...text].length;
 }
 
 function validRoutineName(raw: string): string {
