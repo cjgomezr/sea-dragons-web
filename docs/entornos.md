@@ -593,6 +593,15 @@ export MIGRATIONS_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/postgre
 npx vitest run tests/unit/scripts/apply-migrations.test.ts "tests/unit/supabase/"
 ```
 
+Un worker de la fábrica no usa el de la máquina: levanta uno propio con
+`bash scripts/test-postgres.sh start`, en el puerto 55000 más las tres últimas
+cifras de su ticket, y lo para con `stop`, que borra también sus datos. El
+script vuelve en cuanto el servidor acepta conexiones. Antes cada worker lo
+improvisaba con un `sleep` en un shell en segundo plano, y `claude -p` no
+termina mientras quede uno vivo. Si aun así pasa, `process-backlog.sh` cierra
+al worker cuando el PR que abrió está abierto y su sesión lleva 30 minutos callada
+(`IDLE_AFTER_PR_MINUTES`).
+
 ### Aplicadas al mergear a main (issue #94)
 
 `migraciones-produccion.yml` aplica el histórico a `seadragons-prod` cuando un
