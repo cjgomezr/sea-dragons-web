@@ -24,6 +24,7 @@ export type Capability =
   | "configureSessionPacks"
   | "viewLevyPayers"
   | "viewMemberRecords"
+  | "planTraining"
   | "useMemberFeatures";
 
 /** Una fila de la matriz. Al ser un `Record` de los cuatro roles, una fila que
@@ -85,6 +86,15 @@ export const CAPABILITY_MATRIX: Readonly<Record<Capability, RoleGrants>> = {
     Admin: true,
     Coach: true,
     Committee: true,
+    Player: false,
+  },
+  // Planificar el entrenamiento: ciclos, rutinas, ejercicios y marcas del
+  // club (#903). Tampoco está en la sección 4: es D3 del PRD de E35, del 27
+  // de octubre de 2026. El Committee es gobierno, no entrenamiento.
+  planTraining: {
+    Admin: true,
+    Coach: true,
+    Committee: false,
     Player: false,
   },
   // Directorio, calendario, noticias, RSVP, perfil propio y pagos.
