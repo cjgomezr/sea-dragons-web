@@ -27411,6 +27411,9 @@ test.describe("entrenamiento en el navegador", () => {
 
 const PLANNER_SCREEN_PATH = "/entrenamiento/planificar";
 const PLANNER_CYCLES_ENDPOINT = "/api/v1/training/manage/cycles";
+const PLANNER_ROUTINES_ENDPOINT = "/api/v1/training/manage/routines";
+/** El corte de `useIsPhone`: por debajo, una semana a la vez. */
+const PHONE_BREAKPOINT_PX = 768;
 /** Las 12:00 del miércoles 28 de octubre de 2026 en Melbourne: la semana 3
  * del ciclo activo. */
 const PLANNER_NOW = new Date("2026-10-28T01:00:00.000Z");
@@ -27450,14 +27453,85 @@ const PLANNER_CYCLES = [
 type PlannerState = {
   readonly name: string;
   readonly isSpanish?: boolean;
+  /** La semana cuya nota y dosis se abren (#907): en el escritorio, con su
+   * número; en el móvil, yendo a ella con ‹. */
+  readonly openWeek?: number;
 };
 
 /** Como la captura del handoff: un activo elegido, un borrador y un
- * archivado escondido. */
+ * archivado escondido, con su cuadrícula (#907). */
 const PLANNER_STATES: readonly PlannerState[] = [
   { name: "planificar-ciclo" },
   { name: "planificar-ciclo-es", isSpanish: true },
+  { name: "planificar-semana-abierta", openWeek: 2 },
 ];
+
+/* La cuadrícula del ciclo activo (#907): rutinas del ciclo y una compartida,
+   dos rutinas el lunes, y la nota y la dosis de algunas semanas. */
+const PLANNER_GYM_A = "bbbbbbbb-0000-4000-8000-000000000001";
+const PLANNER_POOL = "bbbbbbbb-0000-4000-8000-000000000002";
+const PLANNER_GYM_B = "bbbbbbbb-0000-4000-8000-000000000003";
+const PLANNER_MOBILITY = "bbbbbbbb-0000-4000-8000-000000000004";
+
+const PLANNER_ROUTINES = [
+  {
+    id: PLANNER_GYM_A,
+    name: "Gym A",
+    colorIndex: 0,
+    cycleId: PLANNER_ACTIVE_CYCLE.id,
+  },
+  {
+    id: PLANNER_POOL,
+    name: "Pool skills",
+    colorIndex: 1,
+    cycleId: PLANNER_ACTIVE_CYCLE.id,
+  },
+  {
+    id: PLANNER_GYM_B,
+    name: "Gym B",
+    colorIndex: 3,
+    cycleId: PLANNER_ACTIVE_CYCLE.id,
+  },
+  { id: PLANNER_MOBILITY, name: "Mobility", colorIndex: 2, cycleId: null },
+].map((routine) => ({ ...routine, itemCount: 5, daysUsed: 26 }));
+
+/** Lunes gimnasio y piscina, miércoles piscina, jueves gimnasio B y sábado
+ * movilidad, de la semana 1 a la 26; las dos últimas, solo el lunes. */
+const PLANNER_WEEK_DAYS = [
+  { weekday: 0, slot: 1, routineId: PLANNER_GYM_A },
+  { weekday: 0, slot: 2, routineId: PLANNER_POOL },
+  { weekday: 2, slot: 1, routineId: PLANNER_POOL },
+  { weekday: 3, slot: 1, routineId: PLANNER_GYM_B },
+  { weekday: 5, slot: 1, routineId: PLANNER_MOBILITY },
+] as const;
+
+function plannerDays(weeks: number): readonly unknown[] {
+  return Array.from({ length: weeks }, (_, index) => index + 1).flatMap(
+    (weekNo) =>
+      weekNo > weeks - 2
+        ? [{ weekNo, weekday: 0, slot: 1, routineId: PLANNER_POOL }]
+        : PLANNER_WEEK_DAYS.map((day) => ({ weekNo, ...day })),
+  );
+}
+
+const PLANNER_WEEKS = [
+  {
+    weekNo: 2,
+    note: "Base camp",
+    dose: { sets: 4, reps: "5", intensity: { kind: "pct", pct: 80 } },
+  },
+  {
+    weekNo: 3,
+    note: null,
+    dose: { sets: 3, reps: "8", intensity: { kind: "text", text: "RPE 7" } },
+  },
+  { weekNo: 27, note: "Taper", dose: null },
+  { weekNo: 28, note: "Nationals", dose: null },
+];
+
+function plannerPlan(cycle: { readonly weeks: number }): unknown {
+  return { cycle, weeks: PLANNER_WEEKS, days: plannerDays(cycle.weeks) };
+}
 
 const PLANNER_SUMMARY =
   /^(Week 1 starts|La semana 1 empieza) .* (week 3 today|semana 3)\.$/;
@@ -27470,6 +27544,50 @@ async function stubPlannerCycles(page: Page): Promise<void> {
     (url) => url.pathname === PLANNER_CYCLES_ENDPOINT,
     (route) => route.fulfill(jsonBody({ cycles: PLANNER_CYCLES })),
   );
+  // Cada ciclo con su cuadrícula, y sus rutinas (#907). Lo que se guarda
+  // responde la misma cuadrícula: la API tiene sus propias pruebas.
+  await page.route(
+    (url) => url.pathname.startsWith(`${PLANNER_CYCLES_ENDPOINT}/`),
+    (route) => {
+      // Activar, archivar y duplicar los sirve cada prueba.
+      if (
+        route.request().method() === "POST" &&
+        !route.request().url().endsWith("/copy-week-one")
+      ) {
+        return route.fallback();
+      }
+      const cycle =
+        PLANNER_CYCLES.find((candidate) =>
+          route.request().url().includes(candidate.id),
+        ) ?? PLANNER_ACTIVE_CYCLE;
+      return route.fulfill(jsonBody(plannerPlan(cycle)));
+    },
+  );
+  await page.route(
+    (url) => url.pathname === PLANNER_ROUTINES_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ routines: PLANNER_ROUTINES })),
+  );
+}
+
+/** La semana abierta: con su número en el escritorio, con ‹ en el móvil,
+ * que abre en la semana 3. */
+async function openPlannerWeek(page: Page, week: number): Promise<void> {
+  const isPhone = (page.viewportSize()?.width ?? 0) < PHONE_BREAKPOINT_PX;
+  if (isPhone) {
+    await page.getByRole("button", { name: "Previous week" }).click();
+  } else {
+    const toggle = page.getByRole("button", {
+      name: `Week ${week}: note and dose`,
+    });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  }
+  await expect(page.getByRole("group", { name: `Week ${week}` })).toBeVisible();
+  // Pulsar la semana puede desplazar la cuadrícula: la captura la quiere
+  // siempre arriba.
+  await page
+    .locator(".training-grid")
+    .evaluateAll((grids) => grids.forEach((grid) => grid.scrollTo(0, 0)));
 }
 
 async function goToPlanner(
@@ -27487,6 +27605,12 @@ async function goToPlanner(
     await goToWithTheme(page, PLANNER_SCREEN_PATH, theme);
   }
   await expect(page.getByText(PLANNER_SUMMARY)).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: /^(Week|Semana) 3, / }).first(),
+  ).toBeVisible();
+  if (state.openWeek !== undefined) {
+    await openPlannerWeek(page, state.openWeek);
+  }
   await page.mouse.move(0, 0);
 }
 
@@ -27611,6 +27735,114 @@ test.describe("planificar en el navegador", () => {
         .boundingBox();
       expect(Math.round(box?.height ?? 0)).toBe(44);
     }
+  });
+});
+
+test.describe("la cuadrícula del ciclo en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("en el escritorio, la cabecera queda fija y las celdas miden 32 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlanner(page, { name: "planificar-ciclo" });
+
+    const grid = page.locator(".training-grid");
+    expect(Math.round((await grid.boundingBox())?.height ?? 0)).toBe(460);
+    const header = page.getByRole("columnheader", { name: "Mon" });
+    const headerTop = (await header.boundingBox())?.y ?? 0;
+    await grid.evaluate((element) => element.scrollBy(0, 300));
+    expect(Math.round((await header.boundingBox())?.y ?? 0)).toBe(
+      Math.round(headerTop),
+    );
+    const cell = page.getByRole("combobox", {
+      name: "Week 1, Mon",
+      exact: true,
+    });
+    expect(Math.round((await cell.boundingBox())?.height ?? 0)).toBe(32);
+  });
+
+  test("con dos rutinas el día no tiene +, y con una sí", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlanner(page, { name: "planificar-ciclo" });
+
+    await expect(
+      page.getByRole("combobox", { name: "Week 1, Mon, second routine" }),
+    ).toHaveValue(PLANNER_POOL);
+    await page
+      .getByRole("button", { name: "Add a second routine to week 1, Wed" })
+      .click();
+
+    await expect(
+      page.getByRole("combobox", { name: "Week 1, Wed, second routine" }),
+    ).toBeFocused();
+  });
+
+  test("elegir una rutina la guarda al momento", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlanner(page, { name: "planificar-ciclo" });
+    const saved = page.waitForRequest(
+      (request) =>
+        request.method() === "PUT" && request.url().endsWith("/days"),
+    );
+
+    await page
+      .getByRole("combobox", { name: "Week 1, Tue" })
+      .selectOption({ label: "Mobility (shared)" });
+
+    expect((await saved).postDataJSON()).toEqual({
+      weekNo: 1,
+      weekday: 1,
+      slot: 1,
+      routineId: PLANNER_MOBILITY,
+    });
+  });
+
+  test("un ciclo de 52 semanas pinta todas sus filas", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const long = { ...PLANNER_ACTIVE_CYCLE, weeks: 52 };
+    await page.clock.install({ time: PLANNER_NOW });
+    await page.route(
+      (url) => url.pathname === PLANNER_CYCLES_ENDPOINT,
+      (route) => route.fulfill(jsonBody({ cycles: [long] })),
+    );
+    await page.route(
+      (url) => url.pathname.startsWith(`${PLANNER_CYCLES_ENDPOINT}/`),
+      (route) => route.fulfill(jsonBody(plannerPlan(long))),
+    );
+    await page.route(
+      (url) => url.pathname === PLANNER_ROUTINES_ENDPOINT,
+      (route) => route.fulfill(jsonBody({ routines: PLANNER_ROUTINES })),
+    );
+
+    await page.goto(`${APP_URL}${PLANNER_SCREEN_PATH}`);
+
+    await expect(page.getByRole("rowheader")).toHaveCount(52);
+    const select = page.getByRole("combobox", { name: "Week 52, Sun" });
+    await select.selectOption({ label: "Gym A" });
+    await expect(select).toHaveValue(PLANNER_GYM_A);
+  });
+
+  // §5.2: ‹ › de 44 px, filas de 56 px y selectores de 44 px.
+  test("en el móvil, una semana a la vez con sus tamaños", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPlanner(page, { name: "planificar-ciclo" });
+
+    await expect(
+      page.getByRole("heading", { name: "Week 3 of 28" }),
+    ).toBeVisible();
+    for (const step of ["Previous week", "Next week"]) {
+      const box = await page.getByRole("button", { name: step }).boundingBox();
+      expect(Math.round(box?.height ?? 0)).toBe(44);
+      expect(Math.round(box?.width ?? 0)).toBe(44);
+    }
+    const select = page.getByRole("combobox", { name: "Week 3, Tue" });
+    expect(Math.round((await select.boundingBox())?.height ?? 0)).toBe(44);
+    const row = page.locator(".training-grid-phone-day").nth(1);
+    expect(Math.round((await row.boundingBox())?.height ?? 0)).toBe(56);
+    await expect(page.getByRole("table")).toHaveCount(0);
   });
 });
 
