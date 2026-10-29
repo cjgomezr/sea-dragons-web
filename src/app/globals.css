@@ -25588,11 +25588,17 @@ a.dashboard-club-cell-body:focus-visible {
   font: inherit;
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-secondary);
   white-space: nowrap;
   background: none;
   border: none;
-  border-bottom: 2px solid var(--color-accent);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.training-plan-tab[aria-selected="true"] {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
   cursor: default;
 }
 
@@ -25957,6 +25963,156 @@ a.dashboard-club-cell-body:focus-visible {
   }
 }
 
+/* Planificar → Marcas (#911), siguiendo §5.1 "Tab Marks" y §5.2 del
+   handoff (d06-coach-marks.png y m07-coach-marks.png): como mucho 620 px,
+   filas de 58 px con Rename y Delete, la confirmación de borrar en la fila,
+   la fila de añadir y el pie. */
+.training-marks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 620px;
+}
+
+.training-marks-lead {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-soft);
+}
+
+.training-marks-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.training-marks-row + .training-marks-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.training-marks-row-main {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: 58px;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+}
+
+.training-marks-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.training-marks-name {
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.training-marks-usage {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.training-marks-actions {
+  display: flex;
+  flex: none;
+  gap: var(--space-1);
+}
+
+.training-marks-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 18px;
+  color: var(--color-text);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.training-marks-icon-button:hover:not(:disabled, [aria-disabled="true"]) {
+  border-color: var(--color-border);
+}
+
+.training-marks-icon-button-primary {
+  color: var(--color-accent-text);
+}
+
+.training-marks-icon-button:disabled,
+.training-marks-icon-button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.training-marks-field {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.training-marks-field input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: 15px;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.training-marks-field .auth-field-error {
+  margin: 0;
+}
+
+.training-marks-hint {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.training-marks-confirm {
+  margin: 0 var(--space-3) var(--space-3);
+}
+
+.training-marks-add {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.training-marks-add .training-marks-field input {
+  min-height: var(--touch-target-min);
+}
+
+.training-marks-footer {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.training-marks-icon-button:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
 /* §5.2: el selector de 48 px, campos de 46 px con texto de 16 px para que
    iOS no acerque, y acciones de 44 px. */
 @media (width < 768px) {
@@ -25976,13 +26132,17 @@ a.dashboard-club-cell-body:focus-visible {
   }
 
   .training-plan-tab {
+    flex: 1 1 0;
     justify-content: center;
     min-height: 40px;
     margin: 0;
     padding: 0 var(--space-4);
-    background: var(--color-segment-selected);
     border: none;
     border-radius: var(--radius);
+  }
+
+  .training-plan-tab[aria-selected="true"] {
+    background: var(--color-segment-selected);
   }
 
   .training-plan-fields {
@@ -25998,6 +26158,30 @@ a.dashboard-club-cell-body:focus-visible {
     min-height: 48px;
     font-size: 16px;
     font-weight: 700;
+  }
+
+  .training-marks-icon-button {
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+  }
+
+  /* 44 px de botón y 7 arriba y abajo: la fila de 58 px de §5.2. */
+  .training-marks-row-main {
+    padding-block: 7px;
+  }
+
+  .training-marks-field input {
+    min-height: var(--touch-target-min);
+    font-size: 16px;
+  }
+
+  .training-marks-add .training-marks-field input,
+  .training-marks-add-button {
+    min-height: 48px;
+  }
+
+  .training-marks-confirm .training-plan-confirm-actions {
+    flex-direction: column;
   }
 }
 

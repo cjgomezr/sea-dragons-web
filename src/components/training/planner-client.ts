@@ -140,7 +140,7 @@ export type CycleUpdateOutcome =
   | PlannerOutcome<ManagedCycle>
   | { readonly kind: "confirmRemoval"; readonly daysRemoved: number };
 
-async function requestAndRead<Value, Read>(
+export async function requestAndRead<Value, Read>(
   path: string,
   init: RequestInit | undefined,
   read: {
@@ -154,7 +154,7 @@ async function requestAndRead<Value, Read>(
     : { kind: "failed", reason: outcome.reason };
 }
 
-function jsonInit(method: string, body?: unknown): RequestInit {
+export function jsonInit(method: string, body?: unknown): RequestInit {
   return body === undefined
     ? { method }
     : { method, headers: JSON_REQUEST_HEADERS, body: JSON.stringify(body) };

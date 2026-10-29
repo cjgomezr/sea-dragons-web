@@ -2,27 +2,49 @@
 
 import { CalendarBlank } from "@phosphor-icons/react/dist/ssr/CalendarBlank";
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
-import { useMemo } from "react";
+import { Trophy } from "@phosphor-icons/react/dist/ssr/Trophy";
+import { useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { useIsPhone } from "@/components/use-is-phone";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import type { ManagedCycle } from "@/lib/training/club-cycles";
 import { DesktopCycleTab, PhoneCycleTab } from "./PlannerCycleTab";
+import { PlannerMarksTab } from "./PlannerMarksTab";
 import { plannerErrorMessage } from "./planner-format";
 import { type PlannerCycles, usePlannerCycles } from "./use-planner-cycles";
+import { type PlannerMarks, usePlannerMarks } from "./use-planner-marks";
 
 /**
  * Planificar (#906, RF-7 y D3 del PRD de E35; §5.1 y §5.2 del handoff): la
- * cabecera, las pestañas y la pestaña Ciclo. Solo salen las pestañas que ya
- * existen; las demás llegan con sus tickets.
+ * cabecera, las pestañas y la pestaña Ciclo; Marcas llegó con #911. Solo
+ * salen las pestañas que ya existen; las demás llegan con sus tickets.
  *
  * Es de cliente porque elige y cambia ciclos sin recargar. Lee y escribe
  * solo por la API v1 (#904), como la aplicación nativa (CON-002).
  */
 
-const CYCLE_TAB_ID = "planificar-pestana-ciclo";
-const CYCLE_PANEL_ID = "planificar-panel-ciclo";
+type PlannerTab = "cycle" | "marks";
+
+/** En el orden en que salen, que es el que recorren las flechas. */
+const PLANNER_TABS: readonly PlannerTab[] = ["cycle", "marks"];
+
+const TAB_IDS = {
+  cycle: "planificar-pestana-ciclo",
+  marks: "planificar-pestana-marcas",
+} as const satisfies Record<PlannerTab, string>;
+
+const PANEL_IDS = {
+  cycle: "planificar-panel-ciclo",
+  marks: "planificar-panel-marcas",
+} as const satisfies Record<PlannerTab, string>;
+
+/** ← y → pasan a la pestaña de al lado, dando la vuelta, como pide el patrón
+ * de pestañas de WAI-ARIA. */
+const TAB_STEP_OF_KEY: Readonly<Record<string, number>> = {
+  ArrowLeft: -1,
+  ArrowRight: 1,
+};
 
 function PlannerHeader({
   translate,
@@ -42,41 +64,105 @@ function PlannerHeader({
   );
 }
 
-/** La pestaña Ciclo, con las semanas del ciclo elegido si lo hay. */
+function TabButton({
+  tab,
+  isSelected,
+  onSelect,
+  children,
+}: {
+  readonly tab: PlannerTab;
+  readonly isSelected: boolean;
+  readonly onSelect: (tab: PlannerTab) => void;
+  readonly children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      role="tab"
+      id={TAB_IDS[tab]}
+      className="training-plan-tab"
+      aria-selected={isSelected}
+      aria-controls={PANEL_IDS[tab]}
+      tabIndex={isSelected ? 0 : -1}
+      onClick={() => onSelect(tab)}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TabCount({ text }: { readonly text: string }): React.JSX.Element {
+  return (
+    <>
+      {" "}
+      <span className="training-plan-tab-count">{text}</span>
+    </>
+  );
+}
+
+/** Ciclo con las semanas del elegido si lo hay, y Marcas con cuántas hay
+ * cuando ya llegaron. */
 function PlannerTabs({
   translate,
-  selected,
+  selectedTab,
+  selectedCycle,
+  marks,
+  onSelect,
 }: {
   readonly translate: Translator;
-  readonly selected: ManagedCycle | null;
+  readonly selectedTab: PlannerTab;
+  readonly selectedCycle: ManagedCycle | null;
+  readonly marks: PlannerMarks;
+  readonly onSelect: (tab: PlannerTab) => void;
 }): React.JSX.Element {
+  function handleKey(event: React.KeyboardEvent): void {
+    const step = TAB_STEP_OF_KEY[event.key];
+    if (step === undefined) {
+      return;
+    }
+    event.preventDefault();
+    const at = PLANNER_TABS.indexOf(selectedTab);
+    const next =
+      PLANNER_TABS[(at + step + PLANNER_TABS.length) % PLANNER_TABS.length];
+    if (next !== undefined) {
+      onSelect(next);
+      document.getElementById(TAB_IDS[next])?.focus();
+    }
+  }
+
   return (
     <div
       className="training-plan-tabs"
       role="tablist"
       aria-label={translate("training.manage.tabs")}
+      onKeyDown={handleKey}
     >
-      <button
-        type="button"
-        role="tab"
-        id={CYCLE_TAB_ID}
-        className="training-plan-tab"
-        aria-selected="true"
-        aria-controls={CYCLE_PANEL_ID}
+      <TabButton
+        tab="cycle"
+        isSelected={selectedTab === "cycle"}
+        onSelect={onSelect}
       >
         <Icon glyph={CalendarBlank} />
         {translate("training.manage.tabCycle")}
-        {selected === null ? null : (
-          <>
-            {" "}
-            <span className="training-plan-tab-count">
-              {translate("training.manage.tabCycleCount", {
-                weeks: selected.weeks,
-              })}
-            </span>
-          </>
+        {selectedCycle === null ? null : (
+          <TabCount
+            text={translate("training.manage.tabCycleCount", {
+              weeks: selectedCycle.weeks,
+            })}
+          />
         )}
-      </button>
+      </TabButton>
+      <TabButton
+        tab="marks"
+        isSelected={selectedTab === "marks"}
+        onSelect={onSelect}
+      >
+        <Icon glyph={Trophy} />
+        {translate("training.manage.tabMarks")}
+        {marks.state.kind === "ready" ? (
+          <TabCount text={String(marks.state.marks.length)} />
+        ) : null}
+      </TabButton>
     </div>
   );
 }
@@ -160,6 +246,8 @@ function PlannerContent({
   readonly translate: Translator;
 }): React.JSX.Element {
   const planner = usePlannerCycles(translate);
+  const marks = usePlannerMarks(translate);
+  const [selectedTab, setSelectedTab] = useState<PlannerTab>("cycle");
   const { state } = planner;
   if (state.kind === "loading") {
     return (
@@ -182,20 +270,32 @@ function PlannerContent({
     state.cycles.find((cycle) => cycle.id === state.selectedId) ?? null;
   return (
     <>
-      <PlannerTabs translate={translate} selected={selected} />
+      <PlannerTabs
+        translate={translate}
+        selectedTab={selectedTab}
+        selectedCycle={selected}
+        marks={marks}
+        onSelect={setSelectedTab}
+      />
       <div
         className="training-plan-panel"
         role="tabpanel"
-        id={CYCLE_PANEL_ID}
-        aria-labelledby={CYCLE_TAB_ID}
+        id={PANEL_IDS[selectedTab]}
+        aria-labelledby={TAB_IDS[selectedTab]}
       >
-        <PlannerMessages translate={translate} planner={planner} />
-        <CyclePanelContent
-          translate={translate}
-          planner={planner}
-          cycles={state.cycles}
-          selected={selected}
-        />
+        {selectedTab === "cycle" ? (
+          <>
+            <PlannerMessages translate={translate} planner={planner} />
+            <CyclePanelContent
+              translate={translate}
+              planner={planner}
+              cycles={state.cycles}
+              selected={selected}
+            />
+          </>
+        ) : (
+          <PlannerMarksTab translate={translate} planner={marks} />
+        )}
       </div>
     </>
   );
