@@ -27344,9 +27344,13 @@ a.dashboard-club-cell-body:focus-visible {
   text-align: center;
 }
 
+/* 86 px como pide §5.1: con el relleno y la letra del select de al lado,
+   "Bodyweight" cabe entero. */
 .training-routine-exercise .training-routine-load-text {
   flex: none;
   width: 86px;
+  padding: 0 6px;
+  font-size: 13px;
 }
 
 .training-routine-add-section {
@@ -27515,6 +27519,8 @@ a.dashboard-club-cell-body:focus-visible {
 
   .training-routine-exercise .training-routine-load-text {
     width: 120px;
+    padding: 0 var(--space-2);
+    font-size: 16px;
   }
 
   /* En el móvil la nota es un campo como los demás, con borde punteado. */
