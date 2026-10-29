@@ -3207,6 +3207,8 @@ export const spanishMessages: MessageCatalog = {
     "Cada consejo tiene que tener menos de 300 caracteres.",
   "training.exercises.errorYoutubeTooLong":
     "El enlace o la búsqueda de YouTube tiene que tener menos de 300 caracteres.",
+  "training.exercises.errorLoadMore":
+    "No pudimos cargar más ejercicios. Vuelve a intentarlo.",
   "training.exercises.errorInUse":
     "Ese ejercicio ya está en una rutina. Sácalo de la rutina primero.",
   "training.manage.tabMarks": "Marcas",

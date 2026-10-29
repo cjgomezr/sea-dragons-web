@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrainingPlannerScreen } from "@/components/training/TrainingPlannerScreen";
@@ -110,7 +110,7 @@ function page(
  * `write` lo demás. */
 function stubApi(
   options: {
-    readonly list?: (request: ApiRequest) => ApiReply;
+    readonly list?: (request: ApiRequest) => ApiReply | Promise<ApiReply>;
     readonly write?: (request: ApiRequest) => ApiReply;
   } = {},
 ): void {
@@ -127,14 +127,13 @@ function stubApi(
         form: init?.body instanceof FormData ? init.body : null,
       };
       requests.push(request);
-      const reply =
-        request.method !== "GET"
-          ? write(request)
-          : request.path === CYCLES_PATH
-            ? ok({ cycles: [CYCLE] })
-            : request.path === EXERCISES_PATH
-              ? list(request)
-              : SERVER_ERROR;
+      const reply = await (request.method !== "GET"
+        ? write(request)
+        : request.path === CYCLES_PATH
+          ? ok({ cycles: [CYCLE] })
+          : request.path === EXERCISES_PATH
+            ? list(request)
+            : SERVER_ERROR);
       return new Response(
         reply.status === 204 ? null : JSON.stringify(reply.body),
         {
@@ -144,6 +143,13 @@ function stubApi(
       );
     }),
   );
+}
+
+/** Una respuesta que llega cuando la prueba la suelta. */
+function deferred(
+  keep: (release: (reply: ApiReply) => void) => void,
+): Promise<ApiReply> {
+  return new Promise((resolve) => keep(resolve));
 }
 
 function listRequests(): ApiRequest[] {
@@ -312,6 +318,73 @@ describe("la pestaña Exercises", () => {
     expect(
       screen.queryByRole("button", { name: "Show more" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("mientras llega la página siguiente, Show more no se puede volver a pulsar", async () => {
+    let releasePage: (reply: ApiReply) => void = () => undefined;
+    stubApi({
+      list: (request) =>
+        request.params.get("offset") === "20"
+          ? deferred((release) => (releasePage = release))
+          : page([BACK_SQUAT, FIN_KICK], 20),
+    });
+    const user = await openExercises();
+
+    await user.click(screen.getByRole("button", { name: "Show more" }));
+
+    expect(screen.getByRole("button", { name: "Show more" })).toBeDisabled();
+    releasePage(page([TURN_AND_PUSH]));
+    expect(
+      await screen.findByRole("button", { name: /^Turn and push-off/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("la página de un filtro viejo no pisa la lista del nuevo", async () => {
+    let releasePage: (reply: ApiReply) => void = () => undefined;
+    stubApi({
+      list: (request) => {
+        if (request.params.get("offset") === "20") {
+          return deferred((release) => (releasePage = release));
+        }
+        return request.params.get("source") === "club"
+          ? page([FIN_KICK, TURN_AND_PUSH])
+          : page([BACK_SQUAT], 20);
+      },
+    });
+    const user = await openExercises();
+
+    await user.click(screen.getByRole("button", { name: "Show more" }));
+    await user.click(screen.getByRole("button", { name: "Club's own 5" }));
+    await screen.findByRole("button", { name: /^Turn and push-off/ });
+    await act(async () => {
+      releasePage(page([{ ...BACK_SQUAT, id: "otro", name: "Bench press" }]));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(
+      within(exerciseList())
+        .getAllByRole("listitem")
+        .map(
+          (row) => row.querySelector(".training-exercises-name")?.textContent,
+        ),
+    ).toEqual(["Fin kick", "Turn and push-off"]);
+  });
+
+  it("si la página siguiente no llega, lo dice", async () => {
+    stubApi({
+      list: (request) =>
+        request.params.get("offset") === "20"
+          ? SERVER_ERROR
+          : page([BACK_SQUAT, FIN_KICK], 20),
+    });
+    const user = await openExercises();
+
+    await user.click(screen.getByRole("button", { name: "Show more" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't load more exercises. Try again.",
+    );
+    expect(screen.getByRole("button", { name: "Show more" })).toBeEnabled();
   });
 
   it("dice que no hay nada cuando la búsqueda no encuentra", async () => {

@@ -202,6 +202,7 @@ function ExerciseListBody({
         <button
           type="button"
           className="training-plan-action training-exercises-more"
+          disabled={state.isLoadingMore}
           onClick={() => void planner.loadMore()}
         >
           {translate("training.exercises.showMore")}

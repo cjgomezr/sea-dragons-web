@@ -29,6 +29,9 @@ import type { PlannerError } from "./use-planner-cycles";
 /** El 409 del nombre repetido (#903): lo dice el campo, no la pestaña. */
 export const EXERCISE_NAME_TAKEN_REASON = "exercise_name_taken";
 
+/** No viene de la API: la página siguiente no llegó. */
+export const LOAD_MORE_FAILED_REASON = "exercises_load_more_failed";
+
 /** Lo que se espera a que deje de escribir antes de buscar. */
 const SEARCH_DELAY_MS = 250;
 
@@ -49,6 +52,9 @@ export type ExerciseListState =
       /** Lo que se buscó: la lista de una búsqueda vieja sigue a la vista
        * mientras llega la nueva. */
       readonly text: string;
+      readonly source: ExerciseSource | null;
+      /** Si la página siguiente ya se pidió y no llegó. */
+      readonly isLoadingMore: boolean;
     };
 
 export type ExerciseActionResult =
@@ -86,8 +92,45 @@ function useDebounced<Value>(value: Value, delayMs: number): Value {
 
 type ReadyExerciseList = Extract<ExerciseListState, { kind: "ready" }>;
 
-function readyState(page: ManagedExercises, text: string): ReadyExerciseList {
-  return { kind: "ready", ...page, text };
+type ListQuery = Pick<ReadyExerciseList, "text" | "source">;
+
+function readyState(
+  page: ManagedExercises,
+  query: ListQuery,
+): ReadyExerciseList {
+  return { kind: "ready", ...page, ...query, isLoadingMore: false };
+}
+
+/** La lista sigue siendo la de esa búsqueda y esa ficha, y esperaba esa
+ * página: si no, la página que llega es de una lista que ya no está. */
+function isAwaitingPage(
+  state: ExerciseListState,
+  query: ListQuery & { readonly offset: number },
+): state is ReadyExerciseList {
+  return (
+    state.kind === "ready" &&
+    state.text === query.text &&
+    state.source === query.source &&
+    state.nextOffset === query.offset
+  );
+}
+
+/** Añade la página que llegó, o sólo deja de esperarla si falló. */
+function appendPage(
+  state: ExerciseListState,
+  query: ListQuery & { readonly offset: number },
+  outcome: PlannerOutcome<ManagedExercises>,
+): ExerciseListState {
+  if (!isAwaitingPage(state, query)) {
+    return state;
+  }
+  if (outcome.kind === "failed") {
+    return { ...state, isLoadingMore: false };
+  }
+  return {
+    ...readyState(outcome.value, query),
+    exercises: [...state.exercises, ...outcome.value.exercises],
+  };
 }
 
 /** Sólo una lista sin buscar nada dice cuántos hay en total. */
@@ -101,7 +144,7 @@ function useExerciseList(filter: ExerciseFilter): {
   readonly shiftTotal: (delta: number) => void;
   readonly retry: () => void;
   readonly refresh: () => Promise<void>;
-  readonly loadMore: () => Promise<void>;
+  readonly loadMore: () => Promise<PlannerOutcome<ManagedExercises> | null>;
 } {
   const text = useDebounced(filter.text.trim(), SEARCH_DELAY_MS);
   const { source } = filter;
@@ -116,7 +159,7 @@ function useExerciseList(filter: ExerciseFilter): {
         return;
       }
       if (outcome.kind === "ok") {
-        setState(readyState(outcome.value, text));
+        setState(readyState(outcome.value, { text, source }));
         setTotal((previous) => totalOf(outcome.value, text) ?? previous);
         return;
       }
@@ -141,25 +184,24 @@ function useExerciseList(filter: ExerciseFilter): {
     refresh: async () => {
       const outcome = await loadExercises({ text, source, offset: 0 });
       if (outcome.kind === "ok") {
-        setState(readyState(outcome.value, text));
+        setState(readyState(outcome.value, { text, source }));
         setTotal((previous) => totalOf(outcome.value, text) ?? previous);
       }
     },
+    // Nulo: no había página que pedir, o ya se estaba pidiendo.
     loadMore: async () => {
-      if (state.kind !== "ready" || state.nextOffset === null) {
-        return;
+      if (
+        state.kind !== "ready" ||
+        state.nextOffset === null ||
+        state.isLoadingMore
+      ) {
+        return null;
       }
-      const outcome = await loadExercises({
-        text,
-        source,
-        offset: state.nextOffset,
-      });
-      if (outcome.kind === "ok") {
-        setState({
-          ...readyState(outcome.value, text),
-          exercises: [...state.exercises, ...outcome.value.exercises],
-        });
-      }
+      const query = { text, source, offset: state.nextOffset };
+      setState({ ...state, isLoadingMore: true });
+      const outcome = await loadExercises(query);
+      setState((previous) => appendPage(previous, query, outcome));
+      return outcome;
     },
   };
 }
@@ -208,7 +250,13 @@ export function usePlannerExercises(translate: Translator): PlannerExercises {
     isBusy,
     setText: (text) => setFilter((previous) => ({ ...previous, text })),
     setSource: (source) => setFilter((previous) => ({ ...previous, source })),
-    loadMore: list.loadMore,
+    loadMore: async () => {
+      setError(null);
+      const outcome = await list.loadMore();
+      if (outcome !== null && outcome.kind === "failed") {
+        setError({ reason: LOAD_MORE_FAILED_REASON });
+      }
+    },
     retry: list.retry,
     create: (form) =>
       run(() => createExercise(form), {

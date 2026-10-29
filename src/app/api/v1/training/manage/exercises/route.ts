@@ -21,9 +21,9 @@ import {
  * los primeros. Para la lista de Planificar → Ejercicios (#910), `?source=`
  * (`library` o `club`) se queda con un origen y `?offset=` pide la página
  * que empieza ahí; la respuesta trae cuántos casan de cada origen y el
- * `nextOffset` de la página siguiente. POST crea uno del club con un formulario multipart (ver
- * `club-exercise-form.ts`) y responde 201. La frontera los reserva a Admin y
- * Coach, y el dominio lo vuelve a comprobar.
+ * `nextOffset` de la página siguiente. POST crea uno del club con un
+ * formulario multipart (ver `club-exercise-form.ts`) y responde 201. La
+ * frontera los reserva a Admin y Coach, y el dominio lo vuelve a comprobar.
  */
 
 // Depende de la sesión de quien llama y de los ejercicios del club ahora.

@@ -2,6 +2,7 @@ import type { MessageKey } from "@/lib/i18n/message";
 import type { Translator } from "@/lib/i18n/translator";
 import type { ManagedExercise } from "@/lib/training/club-exercises";
 import type { PlannerError } from "./use-planner-cycles";
+import { LOAD_MORE_FAILED_REASON } from "./use-planner-exercises";
 
 /** Cómo se escriben los ejercicios en Planificar (#910). */
 
@@ -35,6 +36,7 @@ const ERROR_KEYS = {
   photo_too_large: "training.exercises.photoTooLarge",
   photo_type_unsupported: "training.exercises.photoType",
   exercise_in_use: "training.exercises.errorInUse",
+  [LOAD_MORE_FAILED_REASON]: "training.exercises.errorLoadMore",
 } as const satisfies Record<string, MessageKey>;
 
 type ExplainedReason = keyof typeof ERROR_KEYS;

@@ -6,6 +6,7 @@ import {
   type ClubExerciseRow,
   type ClubExercisesGateways,
   EXERCISE_PHOTO_MAX_BYTES,
+  EXERCISE_OFFSET_MAX,
   EXERCISE_SEARCH_LIMIT,
   type ExerciseRecord,
   ExerciseInUseError,
@@ -318,7 +319,7 @@ describe("searchExercises", () => {
     expect(second.nextOffset).toBeNull();
   });
 
-  it.each([-1, 1.5])("rechaza el desplazamiento %s", async (offset) => {
+  it.each([-1, 1.5, EXERCISE_OFFSET_MAX + 1])("rechaza el desplazamiento %s", async (offset) => {
     await expect(
       searchExercises(gateways(), { callerId: COACH_ID, query: "", offset }),
     ).rejects.toThrow(ExerciseValidationError);

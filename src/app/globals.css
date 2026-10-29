@@ -26275,6 +26275,11 @@ a.dashboard-club-cell-body:focus-visible {
   color: var(--color-text-secondary);
 }
 
+/* Sobre el tinte de la elegida, el secundario no llega a 4.5:1. */
+.training-exercises-chip[aria-pressed="true"] .training-exercises-chip-count {
+  color: var(--color-text);
+}
+
 .training-exercises-scroll {
   display: flex;
   flex-direction: column;

@@ -4,8 +4,10 @@ import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import type { Translator } from "@/lib/i18n/translator";
+import type { MessageKey } from "@/lib/i18n/message";
 import {
   EXERCISE_PHOTO_SLOTS,
+  type ExercisePhotoSlot,
   type ManagedExercise,
 } from "@/lib/training/club-exercises";
 import { PlannerExerciseForm } from "./PlannerExerciseForm";
@@ -34,7 +36,7 @@ const NEW_EXERCISE: OpenExercise = { kind: "new" };
 const PHOTO_ALT_KEYS = {
   start: "training.exercises.photoStartAlt",
   end: "training.exercises.photoEndAlt",
-} as const;
+} as const satisfies Record<ExercisePhotoSlot, MessageKey>;
 
 function ExercisesMessages({
   translate,
@@ -87,8 +89,8 @@ function LibraryExercise({
       )}
       {exercise.tips.length === 0 ? null : (
         <ul className="training-exercise-library-tips">
-          {exercise.tips.map((tip) => (
-            <li key={tip}>{tip}</li>
+          {exercise.tips.map((tip, index) => (
+            <li key={`${index}-${tip}`}>{tip}</li>
           ))}
         </ul>
       )}

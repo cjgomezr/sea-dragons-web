@@ -3187,6 +3187,8 @@ export const englishMessages = {
   "training.exercises.errorTipTooLong": "Keep each tip under 300 characters.",
   "training.exercises.errorYoutubeTooLong":
     "Keep the YouTube link or search under 300 characters.",
+  "training.exercises.errorLoadMore":
+    "We couldn't load more exercises. Try again.",
   "training.exercises.errorInUse":
     "That exercise is in a routine now. Take it out of the routine first.",
   "training.manage.tabMarks": "Marks",

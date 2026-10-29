@@ -50,8 +50,8 @@ create or replace function public.count_training_exercises(
   security invoker
   set search_path = ''
 as $$
-  select count(*) filter (where e.club_id is null),
-         count(*) filter (where e.club_id is not null)
+  select count(*) filter (where e.source = 'library'),
+         count(*) filter (where e.source = 'club')
     from public.training_exercises e
    where (e.club_id is null or e.club_id = p_club_id)
      and e.name_normalized like public.search_like_pattern(btrim(p_text))

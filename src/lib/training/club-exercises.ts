@@ -27,6 +27,8 @@ export const EXERCISE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 /** Los resultados de una búsqueda (#903), que son también una página de la
  * lista de Planificar → Ejercicios (#910). */
 export const EXERCISE_SEARCH_LIMIT = 20;
+/** El `integer` de `p_offset` en `0087`: más allá, Postgres no lo acepta. */
+export const EXERCISE_OFFSET_MAX = 2_147_483_647;
 /** Lo que cabe en una búsqueda: el nombre más largo posible. */
 export const EXERCISE_QUERY_MAX_LENGTH = EXERCISE_NAME_MAX_LENGTH;
 /** Topes de la base no hay; éstos sólo impiden un ejercicio de megas. */
@@ -522,7 +524,11 @@ function validQuery(raw: string): string {
 }
 
 function validOffset(offset: number): number {
-  if (!Number.isSafeInteger(offset) || offset < 0) {
+  if (
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    offset > EXERCISE_OFFSET_MAX
+  ) {
     throw new ExerciseValidationError("offset_invalid");
   }
   return offset;
