@@ -4746,28 +4746,38 @@ test.describe("barra lateral fija", () => {
     expect(pageScroll.scrollHeight).toBe(pageScroll.clientHeight);
   });
 
-  test("el menú de la cuenta abierto queda por encima de la barra lateral", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await goToLongHome(page);
-    await scrollPageBy(page, SIDEBAR_SCROLL_PX);
-
-    const menu = await openAccountMenu(page);
-    const menuBox = await boxOf(menu);
-    const isMenuOnTop = await menu.evaluate(
-      (element, point) => {
-        const hit = document.elementFromPoint(point.x, point.y);
-        return hit !== null && element.contains(hit);
+  const TOP_BAR_DROPDOWNS = [
+    { name: "el menú de la cuenta", open: openAccountMenu },
+    {
+      name: "la lista de la campana",
+      open: async (page: Page): Promise<Locator> => {
+        await openNotifications(page);
+        return notificationsRegion(page);
       },
-      {
-        x: menuBox.x + menuBox.width / 2,
-        y: menuBox.y + menuBox.height / 2,
-      },
-    );
+    },
+  ] as const;
 
-    expect(isMenuOnTop).toBe(true);
-  });
+  for (const dropdown of TOP_BAR_DROPDOWNS) {
+    test(`${dropdown.name} abierto queda por encima de la barra lateral`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await goToLongHome(page);
+      await scrollPageBy(page, SIDEBAR_SCROLL_PX);
+
+      const opened = await dropdown.open(page);
+      const box = await boxOf(opened);
+      const isOnTop = await opened.evaluate(
+        (element, point) => {
+          const hit = document.elementFromPoint(point.x, point.y);
+          return hit !== null && element.contains(hit);
+        },
+        { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+      );
+
+      expect(isOnTop).toBe(true);
+    });
+  }
 
   test("a 375 px la cabecera del móvil se va con la página como siempre", async ({
     page,

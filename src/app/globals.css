@@ -1463,6 +1463,7 @@ button.notification-item-content:hover {
     position: sticky;
     top: 0;
     align-self: flex-start;
+    height: 100vh;
     height: 100dvh;
     overflow-y: auto;
     width: var(--sidebar-width);
