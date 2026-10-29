@@ -18,3 +18,13 @@
 .profile-cell-extra:not(.profile-cell-late) {
   color: transparent !important;
 }
+
+/* La barra lateral fija (#931) se pega a la ventana: en una captura de
+   página entera, después de que el test bajó la página para rellenar o
+   pulsar algo, salía a media altura, y a una altura distinta en cada
+   corrida. En la captura se queda arriba, como al cargar; el fondo de la
+   columna lo pinta el shell. Que se quede fija lo prueban los tests de
+   "barra lateral fija". */
+.app-sidebar {
+  position: static !important;
+}

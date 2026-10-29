@@ -1443,11 +1443,29 @@ button.notification-item-content:hover {
 }
 
 @media (min-width: 768px) {
+  /* La columna de la barra se pinta también en el fondo del shell: la barra
+     fija mide lo que la ventana, y en una captura de página entera, más alta
+     que la ventana, dejaría debajo un hueco del color de la página. */
   .app-shell {
     flex-direction: row;
+    background: linear-gradient(
+      to right,
+      var(--color-sidebar-background) calc(var(--sidebar-width) - 1px),
+      var(--color-sidebar-border) 0 var(--sidebar-width),
+      transparent 0
+    );
   }
 
+  /* Fija mientras la página hace scroll (#931): la navegación se queda quieta
+     y sólo se mueve el contenido. Con la ventana más baja que la lista de
+     secciones, la barra hace scroll por dentro. */
   .app-sidebar {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
     width: var(--sidebar-width);
     flex-shrink: 0;
     padding: var(--space-4);
