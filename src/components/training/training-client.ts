@@ -50,7 +50,7 @@ const routineItemSchema = z.discriminatedUnion("kind", [
       name: z.string(),
       tips: z.array(z.string()),
       photoUrls: z.array(z.string()),
-      youtubeUrl: z.string(),
+      youtubeUrl: z.string().nullable(),
     }),
     sets: z.number().nullable(),
     reps: z.string().nullable(),

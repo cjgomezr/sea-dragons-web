@@ -44,7 +44,7 @@ const DAY_COLUMNS = `
       id, position, kind, section_title, sets, reps, rest, note,
       load_kind, load_pct, load_text,
       exercise:training_exercises!training_routine_items_exercise_id_fkey (
-        id, name, tips, youtube, image_start_path, image_end_path
+        id, name, source, tips, youtube, image_start_path, image_end_path
       ),
       mark:training_marks!training_routine_items_load_mark_fkey ( id, name )
     )
@@ -86,6 +86,7 @@ const itemRowSchema = z.object({
     .object({
       id: z.string(),
       name: z.string(),
+      source: z.enum(["library", "club"]),
       tips: z.array(z.string()),
       youtube: z.string().nullable(),
       image_start_path: z.string().nullable(),
@@ -160,6 +161,7 @@ function toRoutineItem(row: ItemRow): RoutineItemRecord {
     exercise: {
       id: exercise.id,
       name: exercise.name,
+      source: exercise.source,
       tips: exercise.tips,
       youtube: exercise.youtube,
       imageStartPath: exercise.image_start_path,

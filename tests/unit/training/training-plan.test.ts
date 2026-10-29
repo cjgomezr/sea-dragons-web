@@ -51,6 +51,7 @@ const SQUAT_ROW: ExerciseItemRecord = {
   exercise: {
     id: "ex-squat",
     name: "Barbell Squat",
+    source: "library",
     tips: ["Brace", "Knees out"],
     youtube: null,
     imageStartPath: "library/squat/0.jpg",
@@ -70,6 +71,7 @@ const CRAWL_ROW: ExerciseItemRecord = {
   exercise: {
     id: "ex-crawl",
     name: "Front crawl",
+    source: "club",
     tips: [],
     youtube: "https://youtu.be/abc",
     imageStartPath: null,

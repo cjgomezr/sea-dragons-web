@@ -14,6 +14,7 @@ import {
 } from "@/lib/training/routine-row-view";
 import type {
   ResolvedLoad,
+  TrainingMarkRef,
   TrainingPrescription,
   WeekDose,
 } from "@/lib/training/training-load";
@@ -163,18 +164,54 @@ function RowPhotos({
   );
 }
 
+function YoutubeLink({
+  translate,
+  url,
+}: {
+  readonly translate: Translator;
+  readonly url: string;
+}): React.JSX.Element {
+  return (
+    <a
+      className="training-youtube"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <Icon glyph={YoutubeLogo} weight="fill" />
+      {translate("training.member.watchOnYoutube")}
+      <span className="visually-hidden">
+        {translate("training.member.opensNewTab")}
+      </span>
+    </a>
+  );
+}
+
+/** Un ejercicio del club sin YouTube, fotos ni consejos, y sin marca, no
+ * tiene nada que enseñar al abrirse: no se pinta un panel vacío (#937). */
+function hasDetails(row: ExerciseRow, mark: TrainingMarkRef | null): boolean {
+  const { tips, photoUrls, youtubeUrl } = row.exercise;
+  return (
+    mark !== null ||
+    photoUrls.length > 0 ||
+    tips.length > 0 ||
+    youtubeUrl !== null
+  );
+}
+
 function RowDetails({
   translate,
   row,
   context,
+  mark,
   id,
 }: {
   readonly translate: Translator;
   readonly row: ExerciseRow;
   readonly context: RowContext;
+  readonly mark: TrainingMarkRef | null;
   readonly id: string;
 }): React.JSX.Element {
-  const mark = markUsedByRow(row, context.weekDose);
   const { tips, youtubeUrl } = row.exercise;
   return (
     <div id={id} className="training-exercise-details">
@@ -194,18 +231,9 @@ function RowDetails({
           ))}
         </ul>
       )}
-      <a
-        className="training-youtube"
-        href={youtubeUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <Icon glyph={YoutubeLogo} weight="fill" />
-        {translate("training.member.watchOnYoutube")}
-        <span className="visually-hidden">
-          {translate("training.member.opensNewTab")}
-        </span>
-      </a>
+      {youtubeUrl === null ? null : (
+        <YoutubeLink translate={translate} url={youtubeUrl} />
+      )}
     </div>
   );
 }
@@ -221,6 +249,8 @@ export function TrainingExerciseRow({
 }): React.JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const detailsId = useId();
+  const mark = markUsedByRow(row, context.weekDose);
+  const isShowingDetails = isOpen && hasDetails(row, mark);
   const prescription = rowPrescription(row, context);
   const dose = describeDose(translate, prescription);
   return (
@@ -229,7 +259,7 @@ export function TrainingExerciseRow({
         type="button"
         className="training-exercise-row"
         aria-expanded={isOpen}
-        aria-controls={isOpen ? detailsId : undefined}
+        aria-controls={isShowingDetails ? detailsId : undefined}
         onClick={() => setIsOpen((previous) => !previous)}
       >
         <span className="training-thumbnail">
@@ -255,11 +285,12 @@ export function TrainingExerciseRow({
           <Icon glyph={CaretDown} />
         </span>
       </button>
-      {isOpen ? (
+      {isShowingDetails ? (
         <RowDetails
           translate={translate}
           row={row}
           context={context}
+          mark={mark}
           id={detailsId}
         />
       ) : null}
