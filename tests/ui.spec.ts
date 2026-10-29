@@ -27966,6 +27966,16 @@ async function goToPlanner(
   theme?: (typeof themes)[number],
 ): Promise<void> {
   await stubPlannerCycles(page);
+  await openPlanner(page, state, theme);
+}
+
+/** Abre Planificar con lo que ya sirve la prueba: las rutas que se añaden
+ * después de `stubPlannerCycles` mandan sobre las suyas. */
+async function openPlanner(
+  page: Page,
+  state: PlannerState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
   if (state.isSpanish === true) {
     await chooseSpanish(page);
   }
@@ -28685,8 +28695,9 @@ async function goToPlannerRoutines(
     readonly saved?: PlannerSavedItems[];
   } = {},
 ): Promise<void> {
+  await stubPlannerCycles(page);
   await stubPlannerRoutines(page, options.saved);
-  await goToPlanner(
+  await openPlanner(
     page,
     { name: "planificar-rutinas", isSpanish: options.isSpanish },
     options.theme,

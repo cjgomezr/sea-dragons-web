@@ -26142,7 +26142,9 @@ a.dashboard-club-cell-body:focus-visible {
     display: none;
   }
 
+  /* Los cuatro segmentos caben en 320 px sin el hueco del escritorio. */
   .training-plan-tabs {
+    gap: 0;
     padding: 3px;
     background: var(--color-panel);
     border: 1px solid var(--color-border);
