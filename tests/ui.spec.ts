@@ -4588,6 +4588,237 @@ test.describe("la sección Grupos en escritorio", () => {
   });
 });
 
+/* ---------------------------------------------------------------------------
+   La barra lateral fija (#931): desde 768 px la navegación se queda quieta y
+   sólo se mueve el contenido. En el móvil nada cambia.
+   --------------------------------------------------------------------------- */
+
+test.describe("barra lateral fija", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  const SIDEBAR_SCROLL_PX = 1000;
+  const MOBILE_SCROLL_PX = 300;
+  const SIDEBAR_NAV_NAME = /^(Main|Principal)$/;
+  // Esconde el contenido del inicio para tener una página más corta que la
+  // ventana sin depender de qué pantalla queda casi vacía en dev.
+  const EMPTY_MAIN_CSS = ".app-main > * { display: none !important; }";
+  // Y al revés: el inicio del socio de prueba cabe en la ventana, así que se
+  // alarga con un relleno para tener siempre algo que bajar.
+  const TALL_MAIN_CSS =
+    ".app-main::after { content: ''; display: block; height: 3000px; }";
+
+  type SidebarGeometry = {
+    readonly top: number;
+    readonly height: number;
+    readonly right: number;
+    readonly scrollHeight: number;
+    readonly clientHeight: number;
+  };
+
+  async function sidebarGeometry(page: Page): Promise<SidebarGeometry> {
+    return page.evaluate(() => {
+      const sidebar = document.querySelector<HTMLElement>(".app-sidebar");
+      if (sidebar === null) {
+        throw new Error("No hay .app-sidebar en la página");
+      }
+      const box = sidebar.getBoundingClientRect();
+      return {
+        top: box.top,
+        height: box.height,
+        right: box.right,
+        scrollHeight: sidebar.scrollHeight,
+        clientHeight: sidebar.clientHeight,
+      };
+    });
+  }
+
+  async function scrollPageBy(page: Page, pixels: number): Promise<void> {
+    await page.evaluate((y) => window.scrollTo(0, y), pixels);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(0);
+  }
+
+  async function goToHome(page: Page): Promise<void> {
+    await page.goto(`${APP_URL}/dashboard`);
+    await waitForSectionsLoaded(page, []);
+  }
+
+  async function goToLongHome(page: Page): Promise<void> {
+    await goToHome(page);
+    await page.addStyleTag({ content: TALL_MAIN_CSS });
+  }
+
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 768, height: 1024 },
+  ]) {
+    test(`a ${viewport.width}×${viewport.height}, tras bajar, la barra sigue arriba con Dashboard a la vista`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await goToLongHome(page);
+
+      await scrollPageBy(page, SIDEBAR_SCROLL_PX);
+
+      expect((await sidebarGeometry(page)).top).toBe(0);
+      await expect(
+        page
+          .getByRole("navigation", { name: SIDEBAR_NAV_NAME })
+          .getByRole("link", { name: "Dashboard" }),
+      ).toBeInViewport();
+    });
+  }
+
+  test("tras bajar, el fondo de la barra cubre la ventana de arriba abajo", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToLongHome(page);
+
+    await scrollPageBy(page, SIDEBAR_SCROLL_PX);
+
+    const geometry = await sidebarGeometry(page);
+    expect(geometry.top).toBe(0);
+    expect(geometry.height).toBe(900);
+  });
+
+  test.describe("con la sesión de administración", () => {
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    test("a 1440×500 la barra hace scroll por dentro antes que la página", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 500 });
+      await goToLongHome(page);
+      const before = await sidebarGeometry(page);
+      expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
+      const lastSection = page
+        .getByRole("navigation", { name: SIDEBAR_NAV_NAME })
+        .getByRole("link")
+        .last();
+      await expect(lastSection).not.toBeInViewport();
+
+      const sidebarBox = await boxOf(page.locator(".app-sidebar"));
+      await page.mouse.move(
+        sidebarBox.x + sidebarBox.width / 2,
+        sidebarBox.y + sidebarBox.height / 2,
+      );
+      await page.mouse.wheel(0, before.scrollHeight - before.clientHeight);
+
+      await expect(lastSection).toBeInViewport();
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    });
+
+    test("la barra de abajo de Grupos empieza justo a la derecha de la barra", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 768, height: 1024 });
+      await goToGroups(page, {
+        name: "barra-lateral-fija-grupos",
+        withGroups: true,
+        layout: "compact",
+        prepare: selectGroup,
+      });
+
+      const bar = await boxOf(page.locator(".groups-bottom-bar"));
+
+      expect(bar.x).toBe((await sidebarGeometry(page)).right);
+    });
+  });
+
+  test("en una página más corta que la ventana, la barra mide la ventana y nada hace scroll", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToHome(page);
+    await page.addStyleTag({ content: EMPTY_MAIN_CSS });
+
+    const geometry = await sidebarGeometry(page);
+    const pageScroll = await page.evaluate(() => ({
+      scrollHeight: document.documentElement.scrollHeight,
+      clientHeight: document.documentElement.clientHeight,
+    }));
+    expect(geometry.height).toBe(900);
+    expect(geometry.scrollHeight).toBe(geometry.clientHeight);
+    expect(pageScroll.scrollHeight).toBe(pageScroll.clientHeight);
+  });
+
+  const TOP_BAR_DROPDOWNS = [
+    { name: "el menú de la cuenta", open: openAccountMenu },
+    {
+      name: "la lista de la campana",
+      open: async (page: Page): Promise<Locator> => {
+        await openNotifications(page);
+        return notificationsRegion(page);
+      },
+    },
+  ] as const;
+
+  for (const dropdown of TOP_BAR_DROPDOWNS) {
+    test(`${dropdown.name} abierto queda por encima de la barra lateral`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await goToLongHome(page);
+      await scrollPageBy(page, SIDEBAR_SCROLL_PX);
+
+      const opened = await dropdown.open(page);
+      const box = await boxOf(opened);
+      const isOnTop = await opened.evaluate(
+        (element, point) => {
+          const hit = document.elementFromPoint(point.x, point.y);
+          return hit !== null && element.contains(hit);
+        },
+        { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+      );
+
+      expect(isOnTop).toBe(true);
+    });
+  }
+
+  test("a 375 px la cabecera del móvil se va con la página como siempre", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToLongHome(page);
+
+    await scrollPageBy(page, MOBILE_SCROLL_PX);
+
+    const scrollY = await page.evaluate(() => window.scrollY);
+    expect((await sidebarGeometry(page)).top).toBe(-scrollY);
+  });
+
+  test("con el teclado, el foco va de la marca a las secciones, la barra de arriba y el contenido", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToHome(page);
+
+    const regions: string[] = [];
+    while (!regions.includes("main") && regions.length < 60) {
+      await page.keyboard.press("Tab");
+      regions.push(
+        await page.evaluate(() => {
+          const focused = document.activeElement;
+          if (focused?.closest(".app-sidebar-header")) return "brand";
+          if (focused?.closest(".app-sidebar nav")) return "nav";
+          if (focused?.closest(".app-topbar")) return "topbar";
+          if (focused?.closest(".app-main")) return "main";
+          return "other";
+        }),
+      );
+    }
+    const order = regions.filter(
+      (region, index) => region !== regions[index - 1],
+    );
+
+    expect(order).toEqual(["brand", "nav", "topbar", "main"]);
+  });
+});
+
 /** El cuerpo del panel (#830, D13): desde 1280px, miembros `1fr` y
  * "Audiencia de" de 260px lado a lado; por debajo, la audiencia encima. */
 test.describe("el cuerpo del panel de un grupo", () => {
