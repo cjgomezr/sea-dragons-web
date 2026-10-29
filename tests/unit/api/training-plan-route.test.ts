@@ -8,6 +8,7 @@ import type { MembershipStatus } from "@/lib/membership/membership";
 import type {
   TrainingCycleRecord,
   TrainingPlanGateways,
+  TrainingWeekRecord,
 } from "@/lib/training/training-plan";
 
 /**
@@ -31,11 +32,51 @@ const CYCLE: TrainingCycleRecord = {
   weeks: 4,
 };
 
+const EMPTY_WEEK: TrainingWeekRecord = { note: null, dose: null, days: [] };
+
+/** El lunes, un ejercicio del club con el campo YouTube vacío (#937). */
+const WEEK_WITH_CLUB_EXERCISE: TrainingWeekRecord = {
+  ...EMPTY_WEEK,
+  days: [
+    {
+      weekday: 0,
+      slot: 1,
+      routine: {
+        id: "routine-pool",
+        name: "Pool",
+        colorIndex: 0,
+        items: [
+          {
+            kind: "exercise",
+            id: "item-swim",
+            position: 0,
+            exercise: {
+              id: "ex-swim",
+              name: "Swim set",
+              source: "club",
+              tips: [],
+              youtube: null,
+              imageStartPath: null,
+              imageEndPath: null,
+            },
+            sets: null,
+            reps: "8 x 50 m",
+            rest: null,
+            note: "Fins on",
+            load: { kind: "none" },
+          },
+        ],
+      },
+    },
+  ],
+};
+
 const readSessionState = vi.fn();
 const readAuthenticatedUserId = vi.fn();
 let role: Role;
 let membershipStatus: MembershipStatus;
 let activeCycle: TrainingCycleRecord | null;
+let weekRecord: TrainingWeekRecord;
 
 function trainingPlanGateways(): TrainingPlanGateways {
   return {
@@ -63,7 +104,7 @@ function trainingPlanGateways(): TrainingPlanGateways {
     },
     plan: {
       findActiveCycle: async () => activeCycle,
-      findWeek: async () => ({ note: null, dose: null, days: [] }),
+      findWeek: async () => weekRecord,
       exercisePhotoUrl: (path) => path,
     },
   };
@@ -123,6 +164,7 @@ beforeEach(() => {
   readAuthenticatedUserId.mockResolvedValue(USER_ID);
   membershipStatus = "active";
   activeCycle = CYCLE;
+  weekRecord = EMPTY_WEEK;
   givenActiveCaller("Player", true);
 });
 
@@ -144,6 +186,22 @@ describe("GET /api/v1/training/plan", () => {
       week: { note: null, dose: null },
     });
     expect(body.data.week.days).toHaveLength(7);
+  });
+
+  it("sirve youtubeUrl nulo para un ejercicio del club sin YouTube", async () => {
+    weekRecord = WEEK_WITH_CLUB_EXERCISE;
+
+    const response = await getPlan();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.week.days[0].routines[0].items[0].exercise).toEqual({
+      id: "ex-swim",
+      name: "Swim set",
+      tips: [],
+      photoUrls: [],
+      youtubeUrl: null,
+    });
   });
 
   it("no se guarda en ninguna caché", () => {
