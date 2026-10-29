@@ -317,11 +317,10 @@ describe("buildSampleCyclePlan: la clave de la biblioteca", () => {
   });
 
   it("da la misma clave a dos ejercicios cuya guía trae la misma foto", () => {
-    const keys = plan.exercises.flatMap((exercise) =>
-      exercise.libraryKey === null ? [] : [exercise.libraryKey],
+    expect(exerciseNamed(plan, "Deadlift").libraryKey).toBe("Barbell_Deadlift");
+    expect(exerciseNamed(plan, "Paused Deadlift").libraryKey).toBe(
+      "Barbell_Deadlift",
     );
-
-    expect(keys.length).toBeGreaterThan(new Set(keys).size);
   });
 
   it("deja la clave nula al ejercicio sin foto en la guía", () => {

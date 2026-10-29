@@ -186,13 +186,12 @@ describeRls("El ciclo de muestra contra Supabase (#912)", () => {
 
   it("usa los ejercicios de la biblioteca con la clave de la guía y no crea sus equivalentes del club (#938)", async () => {
     const suffix = randomUUID();
-    const library = [
-      { key: `Squat_${suffix}`, name: `Library squat ${suffix}` },
-      { key: `Row_${suffix}`, name: `Library row ${suffix}` },
-    ];
+    const squat = { key: `Squat_${suffix}`, name: `Library squat ${suffix}` };
+    const row = { key: `Row_${suffix}`, name: `Library row ${suffix}` };
+    const library = [squat, row];
     const plan = planLinkedTo([
-      { name: "Paused Squat", libraryKey: library[0]?.key ?? "" },
-      { name: "Inverted Rows", libraryKey: library[1]?.key ?? "" },
+      { name: "Paused Squat", libraryKey: squat.key },
+      { name: "Inverted Rows", libraryKey: row.key },
     ]);
     const serviceClient = createServiceRoleTestClient(process.env);
 
