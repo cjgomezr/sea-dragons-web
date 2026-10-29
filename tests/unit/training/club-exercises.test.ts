@@ -319,11 +319,14 @@ describe("searchExercises", () => {
     expect(second.nextOffset).toBeNull();
   });
 
-  it.each([-1, 1.5, EXERCISE_OFFSET_MAX + 1])("rechaza el desplazamiento %s", async (offset) => {
-    await expect(
-      searchExercises(gateways(), { callerId: COACH_ID, query: "", offset }),
-    ).rejects.toThrow(ExerciseValidationError);
-  });
+  it.each([-1, 1.5, EXERCISE_OFFSET_MAX + 1])(
+    "rechaza el desplazamiento %s",
+    async (offset) => {
+      await expect(
+        searchExercises(gateways(), { callerId: COACH_ID, query: "", offset }),
+      ).rejects.toThrow(ExerciseValidationError);
+    },
+  );
 
   it.each<Role>(["Player", "Committee"])(
     "a un %s se lo niega",

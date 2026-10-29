@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChangeNotice } from "@/components/groups/use-change-notice";
 import type { Translator } from "@/lib/i18n/translator";
 import type {
@@ -151,6 +151,12 @@ function useExerciseList(filter: ExerciseFilter): {
   const [state, setState] = useState<ExerciseListState>({ kind: "loading" });
   const [total, setTotal] = useState<number | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // La lista pintada, para saber al volver una página si sigue siendo suya.
+  const shownState = useRef(state);
+
+  useEffect(() => {
+    shownState.current = state;
+  }, [state]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -198,10 +204,16 @@ function useExerciseList(filter: ExerciseFilter): {
         return null;
       }
       const query = { text, source, offset: state.nextOffset };
-      setState({ ...state, isLoadingMore: true });
+      setState((previous) =>
+        previous.kind === "ready"
+          ? { ...previous, isLoadingMore: true }
+          : previous,
+      );
       const outcome = await loadExercises(query);
+      // La página de una lista que ya no está no se añade ni se queja.
+      const isStale = !isAwaitingPage(shownState.current, query);
       setState((previous) => appendPage(previous, query, outcome));
-      return outcome;
+      return isStale ? null : outcome;
     },
   };
 }
