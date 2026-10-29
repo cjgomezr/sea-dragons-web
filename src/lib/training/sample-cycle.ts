@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { normalizeForSearch } from "@/lib/text/name-search";
+import { isSameName, normalizeForSearch } from "@/lib/text/name-search";
 import { clubDaysBetween } from "@/lib/time/club-calendar";
 import { WEEK_NOTE_MAX_LENGTH } from "./club-cycle-input";
 import type { CycleDaySlot } from "./club-cycles";
@@ -36,6 +36,9 @@ const SLOTS: readonly CycleDaySlot[] = [1, 2];
  * decimal como mucho. */
 const FRACTION_TO_PCT_TENTHS = 1000;
 const PCT_TENTHS = 10;
+/** La primera foto de free-exercise-db en la guía: su carpeta es la
+ * `library_key` del ejercicio en la biblioteca (#938). */
+const LIBRARY_PHOTO_PATH = /^img\/([^/]+)-0\.jpg$/;
 
 /** La marca de cada ejercicio con filas "Macro Vol", en el orden en que se
  * crean las marcas. */
@@ -130,7 +133,11 @@ const sampleSchema = z.object({
   }),
   guide: z.record(
     z.string(),
-    z.object({ yt: z.string(), cues: z.array(z.string()) }),
+    z.object({
+      yt: z.string(),
+      cues: z.array(z.string()),
+      img: z.array(z.string()).default([]),
+    }),
   ),
   gmap: z.record(z.string(), z.string()),
 });
@@ -164,10 +171,12 @@ export type SampleRoutine = {
   readonly items: readonly SampleItem[];
 };
 
-/** Un ejercicio que las filas nombran: se busca en la biblioteca y el club,
- * y si no está se crea con lo que dice la guía de la muestra. */
+/** Un ejercicio que las filas nombran: se busca en la biblioteca por la
+ * foto de su guía (`libraryKey`, nula si no trae), luego por su nombre en la
+ * biblioteca y el club, y si no está se crea con lo que dice la guía. */
 export type SampleExercise = {
   readonly name: string;
+  readonly libraryKey: string | null;
   readonly tips: readonly string[];
   readonly youtube: string;
 };
@@ -240,6 +249,19 @@ function joinNote(parts: readonly string[], maxLength: number): string | null {
     .filter((part) => part !== "")
     .join(NOTE_SEPARATOR);
   return note === "" ? null : shorten(note, maxLength);
+}
+
+/** La nota de una fila enlazada a un ejercicio que se llama de otra forma
+ * ("Paused Deadlift" en "Barbell Deadlift"): el nombre del plan va delante
+ * para que no se pierda la variante (D16). */
+export function rowNoteFor(
+  row: { readonly exerciseName: string; readonly note: string | null },
+  linkedName: string,
+): string | null {
+  if (isSameName(row.exerciseName, linkedName)) {
+    return row.note;
+  }
+  return joinNote([row.exerciseName, row.note ?? ""], ITEM_NOTE_MAX_LENGTH);
 }
 
 /** El texto si cabe en su columna; vacío o demasiado largo, nulo. */
@@ -494,6 +516,15 @@ function sampleDays(
   );
 }
 
+/** Nula si la guía no trae foto o la trae con otra forma de ruta. */
+function libraryKeyOf(img: readonly string[]): string | null {
+  const [firstPhoto] = img;
+  if (firstPhoto === undefined) {
+    return null;
+  }
+  return LIBRARY_PHOTO_PATH.exec(firstPhoto)?.[1] ?? null;
+}
+
 /** Cada ejercicio una vez, sin contar mayúsculas ni tildes: el club no
  * admite dos que se lean igual (D13). */
 function sampleExercises(
@@ -512,6 +543,7 @@ function sampleExercises(
     const guide = sample.guide[sample.gmap[item.exerciseName] ?? ""];
     byKey.set(key, {
       name: item.exerciseName,
+      libraryKey: libraryKeyOf(guide?.img ?? []),
       tips: guide?.cues ?? [],
       youtube: guide?.yt ?? "",
     });
