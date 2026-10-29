@@ -9,6 +9,7 @@ import type {
   ClubExerciseRow,
   ClubExercisesGateway,
   ClubExercisesGateways,
+  ExerciseCounts,
   ExerciseDeleteResult,
   ExercisePhotosGateway,
   ExerciseRecord,
@@ -27,7 +28,8 @@ type Environment = Readonly<Record<string, string | undefined>>;
 
 const EXERCISES_TABLE = "training_exercises";
 const ROUTINE_ITEMS_TABLE = "training_routine_items";
-const SEARCH_FUNCTION = "search_training_exercises";
+const LIST_FUNCTION = "list_training_exercises";
+const COUNT_FUNCTION = "count_training_exercises";
 const NAME_TAKEN_FUNCTION = "training_exercise_name_taken";
 const UNIQUE_VIOLATION_CODE = "23505";
 const FOREIGN_KEY_VIOLATION_CODE = "23503";
@@ -84,10 +86,12 @@ async function searchExercises(
   query: Parameters<ClubExercisesGateway["searchExercises"]>[0],
 ): Promise<readonly ExerciseRecord[]> {
   const { data, error } = await serviceClient
-    .rpc(SEARCH_FUNCTION, {
+    .rpc(LIST_FUNCTION, {
       p_club_id: query.clubId,
       p_text: query.text,
+      p_source: query.source,
       p_limit: query.limit,
+      p_offset: query.offset,
     })
     .select(EXERCISE_COLUMNS);
   if (error) {
@@ -96,6 +100,28 @@ async function searchExercises(
     );
   }
   return z.array(exerciseRowSchema).parse(data).map(toRecord);
+}
+
+/** La función devuelve una sola fila con las dos cuentas. */
+const exerciseCountsSchema = z.tuple([
+  z.object({ library: z.number(), club: z.number() }),
+]);
+
+async function countExercises(
+  serviceClient: SupabaseClient,
+  query: Parameters<ClubExercisesGateway["countExercises"]>[0],
+): Promise<ExerciseCounts> {
+  const { data, error } = await serviceClient.rpc(COUNT_FUNCTION, {
+    p_club_id: query.clubId,
+    p_text: query.text,
+  });
+  if (error) {
+    throw new Error(
+      `No se pudieron contar los ejercicios del club ${query.clubId}: ${error.message}`,
+    );
+  }
+  const [counts] = exerciseCountsSchema.parse(data);
+  return { library: counts.library, club: counts.club };
 }
 
 async function findExercise(
@@ -277,6 +303,7 @@ export function createClubExercisesGateways(
     members: createRoleRequestGateways(serviceClient).members,
     exercises: {
       searchExercises: (query) => searchExercises(serviceClient, query),
+      countExercises: (query) => countExercises(serviceClient, query),
       findExercise: (exerciseId) => findExercise(serviceClient, exerciseId),
       isNameTaken: (query) => isNameTaken(serviceClient, query),
       listRoutineNames: (query) => listRoutineNames(serviceClient, query),

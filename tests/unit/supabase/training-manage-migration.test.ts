@@ -9,8 +9,9 @@ import {
 /**
  * `0084_training_manage.sql` contra un Postgres desechable (#903, RF-10,
  * RF-11, D11 y D13 del PRD de E35): el nombre de una marca sin repetir sin
- * contar mayúsculas ni acentos, las cuentas de cada marca sin valores, la
- * búsqueda de ejercicios y el nombre repetido entre la biblioteca y el club.
+ * contar mayúsculas ni acentos, las cuentas de cada marca sin valores y el
+ * nombre repetido entre la biblioteca y el club. La búsqueda de ejercicios
+ * pasó a `0087` y la prueba `training-exercises-list-migration.test.ts`.
  *
  * Los acentos van con `chr()`: los argumentos de psql en ASCII pasan también
  * en Windows.
@@ -100,17 +101,6 @@ async function seedRowUsingMark(
   );
 }
 
-function searchNames(
-  database: TemporaryDatabase,
-  clubId: string,
-  options: { readonly text: string; readonly limit: number },
-): Promise<string> {
-  return database.query(
-    `select name from public.search_training_exercises(
-       '${clubId}', '${options.text}', ${options.limit})`,
-  );
-}
-
 describeConPostgres("las marcas del club sin repetir", () => {
   it("rechaza un nombre que sólo cambia en mayúsculas o acentos", async () => {
     const database = await migratedDatabase();
@@ -192,68 +182,6 @@ describeConPostgres("las cuentas de cada marca", () => {
 
     expect(fromSession.code).not.toBe(0);
     expect(fromSession.stderr).toContain("permission denied");
-  });
-});
-
-describeConPostgres("la búsqueda de ejercicios", () => {
-  it("encuentra la biblioteca y el club sin mayúsculas ni acentos, primero los que empiezan así", async () => {
-    const database = await migratedDatabase();
-    const clubId = await seededClubId(database);
-    await seedExercise(database, null, "Barbell Squat");
-    await seedExercise(database, null, "Bench Press");
-    await seedExercise(database, clubId, "Squat jump");
-
-    const names = await searchNames(database, clubId, {
-      text: "SQU",
-      limit: 20,
-    });
-
-    expect(rowsOf(names)).toEqual(["Squat jump", "Barbell Squat"]);
-  });
-
-  it("encuentra un nombre con acento escribiéndolo sin él", async () => {
-    const database = await migratedDatabase();
-    const clubId = await seededClubId(database);
-    await database.query(
-      `insert into public.training_exercises (club_id, name, source)
-       values ('${clubId}', 'Sentad' || ${I_ACUTE} || 'lla', 'club')`,
-    );
-
-    const found = await database.query(
-      `select count(*) from public.search_training_exercises(
-         '${clubId}', 'sentadilla', 20)`,
-    );
-
-    expect(found).toBe("1");
-  });
-
-  it("no enseña los ejercicios de otro club", async () => {
-    const database = await migratedDatabase();
-    const clubId = await seededClubId(database);
-    const otherClubId = await createOtherClub(database);
-    await seedExercise(database, otherClubId, "Squat jump");
-
-    const names = await searchNames(database, clubId, {
-      text: "squat",
-      limit: 20,
-    });
-
-    expect(names).toBe("");
-  });
-
-  it("devuelve como mucho el tope pedido", async () => {
-    const database = await migratedDatabase();
-    const clubId = await seededClubId(database);
-    for (const name of ["Squat A", "Squat B", "Squat C"]) {
-      await seedExercise(database, null, name);
-    }
-
-    const names = await searchNames(database, clubId, {
-      text: "squat",
-      limit: 2,
-    });
-
-    expect(rowsOf(names)).toEqual(["Squat A", "Squat B"]);
   });
 });
 
