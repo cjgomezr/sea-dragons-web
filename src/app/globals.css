@@ -26184,3 +26184,321 @@ a.dashboard-club-cell-body:focus-visible {
     flex-direction: column;
   }
 }
+
+/* Planificar → Ciclo: la cuadrícula (#907, §5.1 y §5.2 del handoff y §7 del
+   PRD de E35). Una fila por semana bajo una cabecera fija, con hasta dos
+   rutinas por día; la nota y la dosis se abren bajo su fila. Por debajo de
+   1024 px, una semana a la vez con filas de 56 px y selectores de 44 px. */
+.training-grid-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.training-grid {
+  max-height: 460px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  scrollbar-width: thin;
+}
+
+.training-grid table {
+  width: 100%;
+  min-width: 720px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.training-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 34px;
+  padding: 0 4px;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  background: var(--color-editor-bar);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.training-grid thead th:first-child {
+  width: 54px;
+  padding-left: 10px;
+}
+
+.training-grid thead th:nth-child(2) {
+  width: 104px;
+}
+
+.training-grid tbody th,
+.training-grid tbody td {
+  padding: 3px 2px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--color-row-rule);
+}
+
+.training-grid tbody th {
+  padding-left: 6px;
+  text-align: left;
+}
+
+.training-grid tbody td:last-child {
+  padding-right: 10px;
+}
+
+.training-grid-current th,
+.training-grid-current td {
+  background: var(--color-row-selected);
+}
+
+.training-grid-week {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 4px;
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.training-grid-week:hover {
+  border-color: var(--color-border);
+}
+
+.training-grid-week[aria-expanded="true"] {
+  border-color: var(--color-accent);
+}
+
+.training-grid-current .training-grid-week {
+  color: var(--color-accent-text);
+}
+
+.training-grid-week-last,
+.training-grid-current .training-grid-week-last {
+  color: var(--color-warning-text);
+}
+
+.training-grid-dates {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.training-grid-dates > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.training-grid-summary {
+  font-size: 11.5px;
+  color: var(--color-text-soft);
+}
+
+.training-grid-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.training-grid-slot {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  min-width: 0;
+}
+
+.training-grid-select {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 4px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-editor-bar);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.training-grid-select-routine {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--routine-color) 20%, var(--color-panel));
+  border-color: color-mix(in srgb, var(--routine-color) 45%, transparent);
+}
+
+.training-grid-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.training-grid-add {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 32px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--color-accent-text);
+  background: transparent;
+  border: 1px dashed var(--color-border-dashed);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.training-grid-add:hover {
+  border-color: var(--color-accent);
+}
+
+.training-grid-editor-row td {
+  padding: var(--space-3) 10px;
+  background: var(--color-panel);
+}
+
+.training-grid-week-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: var(--space-3) var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.training-grid-week-editor legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.training-grid-week-dose {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.training-grid-week-editor .training-grid-hint {
+  margin: 6px 0 0;
+}
+
+.training-grid-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.training-grid-copy {
+  align-self: flex-start;
+}
+
+.training-grid-week:focus-visible,
+.training-grid-select:focus-visible,
+.training-grid-add:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 1px;
+}
+
+.training-grid-phone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.training-grid-phone-days {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.training-grid-phone-day {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 56px;
+  padding: 5px var(--space-3);
+  border-bottom: 1px solid var(--color-row-rule);
+}
+
+.training-grid-phone-day:last-child {
+  border-bottom: none;
+}
+
+.training-grid-phone-nav {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+
+.training-grid-phone-nav .training-week-step {
+  width: 44px;
+  height: 44px;
+}
+
+.training-grid-phone-nav .training-week-title {
+  text-align: center;
+}
+
+.training-grid-phone .training-grid-week-editor {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.training-grid-phone .training-grid-week-dose {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.training-grid-phone .training-grid-select {
+  height: 44px;
+  padding: 0 var(--space-3);
+  font-size: 16px;
+}
+
+.training-grid-phone .training-grid-add {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}
+
+.training-grid-phone-day-name {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+@media (width < 768px) {
+  .training-grid-week-editor .training-plan-field input,
+  .training-grid-week-editor .training-plan-field select {
+    min-height: 46px;
+    font-size: 16px;
+  }
+
+  .training-grid-copy {
+    align-self: stretch;
+    min-height: 46px;
+  }
+}

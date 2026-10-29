@@ -3193,4 +3193,38 @@ export const spanishMessages: MessageCatalog = {
     "Esa marca ya está en una rutina: cambia antes esas filas de rutina.",
   "training.marks.errorHasValues":
     "Alguien acaba de registrar esa marca. Pulsa Borrar otra vez para confirmar.",
+  "training.manage.grid": "Plan de {name} por semanas",
+  "training.manage.gridWeek": "Sem",
+  "training.manage.gridDates": "Fechas",
+  "training.manage.gridLoading": "Cargando las semanas…",
+  "training.manage.gridFailed": "No pudimos cargar las semanas de este ciclo.",
+  "training.manage.rest": "Descanso",
+  "training.manage.sharedRoutine": "{name} (compartida)",
+  "training.manage.daySlot": "Semana {week}, {day}",
+  "training.manage.daySecondSlot": "Semana {week}, {day}, segunda rutina",
+  "training.manage.addSecondRoutine":
+    "Añadir una segunda rutina a la semana {week}, {day}",
+  "training.manage.weekToggle": "Semana {week}: nota y dosis",
+  "training.manage.weekEditor": "Semana {week}",
+  "training.manage.weekNote": "Nota",
+  "training.manage.weekNoteHint": "La ven los miembros sobre los días.",
+  "training.manage.weekDose": "Dosis de la semana",
+  "training.manage.doseSets": "Series",
+  "training.manage.doseReps": "Repeticiones",
+  "training.manage.doseIntensity": "Intensidad",
+  "training.manage.intensityNone": "Ninguna",
+  "training.manage.intensityPct": "% de la marca",
+  "training.manage.intensityText": "Texto",
+  "training.manage.intensityPctValue": "Porcentaje",
+  "training.manage.intensityTextValue": "Texto de la intensidad",
+  "training.manage.gridHint":
+    "Los cambios se guardan al momento. Consejo: llena la semana 1, luego «Copiar la semana 1 a todas» y ajusta las últimas.",
+  "training.manage.copyWeekOne": "Copiar la semana 1 a todas",
+  "training.manage.weekOneCopied":
+    "Semana 1 copiada a las semanas 2–{last} · las 2 últimas no cambian",
+  "training.manage.errorNoteTooLong": "Usa 140 caracteres como mucho.",
+  "training.manage.errorDoseSets": "Las series van de 1 a 99.",
+  "training.manage.errorDoseTextTooLong": "Usa 20 caracteres como mucho.",
+  "training.manage.errorDosePct":
+    "El porcentaje va de 1 a 150, con un decimal como mucho.",
 };

@@ -3,7 +3,7 @@
 import { CalendarBlank } from "@phosphor-icons/react/dist/ssr/CalendarBlank";
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { Trophy } from "@phosphor-icons/react/dist/ssr/Trophy";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { useIsPhone } from "@/components/use-is-phone";
 import type { Locale } from "@/lib/i18n/locale";
@@ -306,7 +306,8 @@ export function TrainingPlannerScreen({
 }: {
   readonly locale: Locale;
 }): React.JSX.Element {
-  const translate = createTranslator(locale);
+  // Uno por idioma: la cuadrícula pinta sus opciones una vez con él.
+  const translate = useMemo(() => createTranslator(locale), [locale]);
   return (
     <div className="training training-plan">
       <PlannerHeader translate={translate} />

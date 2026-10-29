@@ -14,6 +14,7 @@ import { stubScreenWidth } from "../../support/screen-width";
  */
 
 const CYCLES_PATH = "/api/v1/training/manage/cycles";
+const ROUTINES_PATH = "/api/v1/training/manage/routines";
 
 const ACTIVE: ManagedCycle = {
   id: "aaaaaaaa-0000-4000-8000-000000000001",
@@ -102,11 +103,24 @@ function stubCycles(
     body: { error: { code: "internal_error", message: "x" } },
   }),
 ): void {
-  stubApi((request) =>
-    request.method === "GET" && request.path === CYCLES_PATH
-      ? listReply(cycles)
-      : other(request),
-  );
+  stubApi((request) => {
+    if (request.method !== "GET") {
+      return other(request);
+    }
+    if (request.path === CYCLES_PATH) {
+      return listReply(cycles);
+    }
+    // La cuadrícula (#907) pide el ciclo y sus rutinas: aquí, vacíos.
+    const cycle = cycles.find(
+      (candidate) => request.path === `${CYCLES_PATH}/${candidate.id}`,
+    );
+    if (cycle !== undefined) {
+      return ok(detailOf(cycle));
+    }
+    return request.path === ROUTINES_PATH
+      ? ok({ routines: [] })
+      : other(request);
+  });
 }
 
 function writes(): ApiRequest[] {

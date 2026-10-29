@@ -3175,4 +3175,38 @@ export const englishMessages = {
     "That mark is in a routine now: change those routine rows first.",
   "training.marks.errorHasValues":
     "Someone recorded that mark just now. Press Delete again to confirm.",
+  "training.manage.grid": "Plan of {name} by week",
+  "training.manage.gridWeek": "Wk",
+  "training.manage.gridDates": "Dates",
+  "training.manage.gridLoading": "Loading the weeks…",
+  "training.manage.gridFailed": "We couldn't load the weeks of this cycle.",
+  "training.manage.rest": "Rest",
+  "training.manage.sharedRoutine": "{name} (shared)",
+  "training.manage.daySlot": "Week {week}, {day}",
+  "training.manage.daySecondSlot": "Week {week}, {day}, second routine",
+  "training.manage.addSecondRoutine":
+    "Add a second routine to week {week}, {day}",
+  "training.manage.weekToggle": "Week {week}: note and dose",
+  "training.manage.weekEditor": "Week {week}",
+  "training.manage.weekNote": "Note",
+  "training.manage.weekNoteHint": "Members see it above the days.",
+  "training.manage.weekDose": "Dose of the week",
+  "training.manage.doseSets": "Sets",
+  "training.manage.doseReps": "Reps",
+  "training.manage.doseIntensity": "Intensity",
+  "training.manage.intensityNone": "None",
+  "training.manage.intensityPct": "% of mark",
+  "training.manage.intensityText": "Text",
+  "training.manage.intensityPctValue": "Percent",
+  "training.manage.intensityTextValue": "Intensity text",
+  "training.manage.gridHint":
+    'Changes save right away. Tip: fill week 1, then "Copy week 1 to all" and adjust the last weeks.',
+  "training.manage.copyWeekOne": "Copy week 1 to all weeks",
+  "training.manage.weekOneCopied":
+    "Week 1 copied to weeks 2–{last} · the last 2 weeks were kept",
+  "training.manage.errorNoteTooLong": "Use 140 characters at most.",
+  "training.manage.errorDoseSets": "Sets go from 1 to 99.",
+  "training.manage.errorDoseTextTooLong": "Use 20 characters at most.",
+  "training.manage.errorDosePct":
+    "The percentage goes from 1 to 150, with one decimal at most.",
 } as const satisfies Readonly<Record<string, Message>>;

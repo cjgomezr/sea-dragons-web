@@ -58,7 +58,10 @@ export type PlannerCycles = {
     readonly changes: CycleChanges;
     readonly confirmRemoval: boolean;
   }) => Promise<CycleSaveResult>;
-  readonly showError: (error: PlannerError) => void;
+  /** Nulo borra el que haya. */
+  readonly showError: (error: PlannerError | null) => void;
+  /** El aviso verde de un cambio que salió bien. */
+  readonly announce: (notice: string) => void;
   readonly activate: (cycle: ManagedCycle) => void;
   readonly archive: (cycle: ManagedCycle) => void;
   readonly duplicate: (cycle: ManagedCycle) => void;
@@ -195,6 +198,7 @@ export function usePlannerCycles(translate: Translator): PlannerCycles {
       }
     },
     showError: setError,
+    announce,
     activate: (cycle) =>
       void run(
         () => activateCycle(cycle.id),
