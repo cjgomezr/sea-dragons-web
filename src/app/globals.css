@@ -26145,6 +26145,26 @@ a.dashboard-club-cell-body:focus-visible {
     background: var(--color-segment-selected);
   }
 
+  /* Como m06-coach-exercises.png: con tres pestañas o más, el segmento sólo
+     lleva el nombre. El número sigue en el nombre accesible. */
+  .training-plan-tab {
+    position: relative;
+    padding: 0 var(--space-1);
+  }
+
+  .training-plan-tab svg {
+    display: none;
+  }
+
+  .training-plan-tab-count {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   .training-plan-fields {
     grid-template-columns: minmax(0, 1fr);
   }
