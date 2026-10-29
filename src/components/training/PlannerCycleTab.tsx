@@ -10,6 +10,7 @@ import type { ManagedCycle } from "@/lib/training/club-cycles";
 import { summarizeCycle } from "@/lib/training/cycle-planner-view";
 import { CycleStatusPill, PlannerCycleCards } from "./PlannerCycleCards";
 import { PlannerCycleActions } from "./PlannerCycleActions";
+import { PlannerCycleGrid } from "./PlannerCycleGrid";
 import { PlannerCycleFields } from "./PlannerCycleFields";
 import { cycleMeta, summaryLine } from "./planner-format";
 import type { PlannerCycles } from "./use-planner-cycles";
@@ -18,7 +19,7 @@ import type { PlannerCycles } from "./use-planner-cycles";
  * La pestaña Ciclo de Planificar (#906, §5.1 y §5.2 del handoff): en el
  * escritorio, las tarjetas, la franja de acciones y los campos; en el móvil,
  * un selector de ciclo y una tarjeta con su estado, sus campos y sus
- * acciones. La cuadrícula llega con #907.
+ * acciones. Debajo, la cuadrícula del ciclo (#907).
  */
 
 type CycleTabProps = {
@@ -102,6 +103,12 @@ export function DesktopCycleTab({
         planner={planner}
       />
       <SummaryLine translate={translate} cycle={selected} />
+      <PlannerCycleGrid
+        key={`grid-${selected.id}`}
+        translate={translate}
+        planner={planner}
+        cycle={selected}
+      />
     </>
   );
 }
@@ -223,6 +230,12 @@ export function PhoneCycleTab({
         </div>
       </div>
       <SummaryLine translate={translate} cycle={selected} />
+      <PlannerCycleGrid
+        key={`grid-${selected.id}`}
+        translate={translate}
+        planner={planner}
+        cycle={selected}
+      />
     </>
   );
 }

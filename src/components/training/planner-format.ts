@@ -1,10 +1,17 @@
-import { formatDashboardDay } from "@/lib/i18n/format";
+import type { IsoWeekday } from "@/lib/events/event-occurrences";
+import { formatDashboardDay, formatWeekdayName } from "@/lib/i18n/format";
 import type { MessageKey } from "@/lib/i18n/message";
 import type { Translator } from "@/lib/i18n/translator";
-import type { CycleStatus, ManagedCycle } from "@/lib/training/club-cycles";
+import type {
+  CycleStatus,
+  CycleWeekRecord,
+  ManagedCycle,
+} from "@/lib/training/club-cycles";
+import type { ManagedRoutine } from "@/lib/training/club-routines";
 import type { CycleIssueCode } from "@/lib/training/club-cycle-input";
 import type { CycleSummary } from "@/lib/training/cycle-planner-view";
-import { cycleEndDate } from "@/lib/training/cycle-week";
+import { cycleDayDate, cycleEndDate } from "@/lib/training/cycle-week";
+import type { DoseIntensity, WeekDose } from "@/lib/training/training-load";
 import { formatShortDate } from "./training-format";
 import type { PlannerError } from "./use-planner-cycles";
 
@@ -75,6 +82,11 @@ const ERROR_KEYS = {
   event_name_required: "training.manage.errorEventName",
   event_name_too_long: "training.manage.errorNameTooLong",
   weeks_out_of_range: "training.manage.errorWeeks",
+  note_too_long: "training.manage.errorNoteTooLong",
+  dose_sets_out_of_range: "training.manage.errorDoseSets",
+  dose_reps_too_long: "training.manage.errorDoseTextTooLong",
+  dose_text_too_long: "training.manage.errorDoseTextTooLong",
+  dose_pct_out_of_range: "training.manage.errorDosePct",
   [DATE_REQUIRED_REASON]: "training.manage.errorDate",
 } as const satisfies Partial<
   Record<CycleIssueCode | typeof DATE_REQUIRED_REASON, MessageKey>
@@ -95,4 +107,84 @@ export function plannerErrorMessage(
       ? ERROR_KEYS[error.reason]
       : "training.manage.errorSave",
   );
+}
+
+/** "Mon", "lun": la cabecera de un día de la cuadrícula (0 es el lunes). */
+export function gridWeekdayName(
+  translate: Translator,
+  weekday: number,
+): string {
+  return formatWeekdayName(
+    translate.locale,
+    (weekday + 1) as IsoWeekday,
+    "short",
+  );
+}
+
+/** "26 Oct – 1 Nov": del lunes al domingo de una semana del ciclo. */
+export function gridWeekRange(
+  translate: Translator,
+  cycle: ManagedCycle,
+  week: number,
+): string {
+  const dateOf = (weekday: number): string =>
+    formatShortDate(translate.locale, cycleDayDate(cycle, { week, weekday }));
+  return translate("training.member.weekRange", {
+    start: dateOf(0),
+    end: dateOf(6),
+  });
+}
+
+/** Las compartidas acaban en "(shared)" (§5.1 del handoff). */
+export function routineOptionLabel(
+  translate: Translator,
+  routine: ManagedRoutine,
+): string {
+  return routine.cycleId === null
+    ? translate("training.manage.sharedRoutine", { name: routine.name })
+    : routine.name;
+}
+
+function describeSetsReps(
+  translate: Translator,
+  dose: WeekDose,
+): string | null {
+  const { sets, reps } = dose;
+  if (sets !== null && reps !== null) {
+    return translate("training.member.doseSetsReps", { sets, reps });
+  }
+  return reps ?? (sets === null ? null : String(sets));
+}
+
+function describeIntensity(
+  translate: Translator,
+  intensity: DoseIntensity,
+): string | null {
+  switch (intensity.kind) {
+    case "none":
+      return null;
+    case "pct":
+      return translate("training.member.pct", { pct: intensity.pct });
+    case "text":
+      return intensity.text;
+  }
+}
+
+const SUMMARY_SEPARATOR = " · ";
+
+/** "Camp · 4 × 5 · 80%" junto a las fechas; nulo sin nota ni dosis. */
+export function weekSummary(
+  translate: Translator,
+  week: CycleWeekRecord,
+): string | null {
+  const parts = [
+    week.note,
+    ...(week.dose === null
+      ? []
+      : [
+          describeSetsReps(translate, week.dose),
+          describeIntensity(translate, week.dose.intensity),
+        ]),
+  ].filter((part): part is string => part !== null);
+  return parts.length === 0 ? null : parts.join(SUMMARY_SEPARATOR);
 }

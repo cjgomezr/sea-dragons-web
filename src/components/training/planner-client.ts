@@ -6,14 +6,19 @@ import {
 } from "@/lib/api/request-api";
 import {
   TRAINING_MANAGE_CYCLES_API_PATH,
+  TRAINING_MANAGE_ROUTINES_API_PATH,
   trainingManageCycleActionApiPath,
   trainingManageCycleApiPath,
 } from "@/lib/auth/routes";
 import type {
   CycleChanges,
+  CycleDayChange,
+  CycleDayRecord,
   CycleInput,
+  CycleWeekRecord,
   ManagedCycle,
 } from "@/lib/training/club-cycles";
+import type { ManagedRoutine } from "@/lib/training/club-routines";
 
 /**
  * Lo que Planificar → Ciclo (#906) le pide a la API v1 de los ciclos (#904).
@@ -38,9 +43,53 @@ const cyclesResponseSchema = z.object({
   data: z.object({ cycles: z.array(managedCycleSchema) }),
 });
 
-/** Un ciclo con sus semanas y su cuadrícula: aquí basta el ciclo. */
+/** Un ciclo con sus semanas y su cuadrícula: los campos leen el ciclo. */
 const cycleDetailResponseSchema = z.object({
   data: z.object({ cycle: managedCycleSchema }),
+});
+
+const weekDoseSchema = z.object({
+  sets: z.number().int().nullable(),
+  reps: z.string().nullable(),
+  intensity: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("none") }),
+    z.object({ kind: z.literal("pct"), pct: z.number() }),
+    z.object({ kind: z.literal("text"), text: z.string() }),
+  ]),
+});
+
+const cycleWeekSchema: z.ZodType<CycleWeekRecord> = z.object({
+  weekNo: z.number().int().positive(),
+  note: z.string().nullable(),
+  dose: weekDoseSchema.nullable(),
+});
+
+const cycleDaySchema: z.ZodType<CycleDayRecord> = z.object({
+  weekNo: z.number().int().positive(),
+  weekday: z.number().int().nonnegative(),
+  slot: z.union([z.literal(1), z.literal(2)]),
+  routineId: z.string(),
+});
+
+/** La cuadrícula: las semanas con su nota y su dosis, y los días. */
+const cyclePlanResponseSchema = z.object({
+  data: z.object({
+    weeks: z.array(cycleWeekSchema),
+    days: z.array(cycleDaySchema),
+  }),
+});
+
+const managedRoutineSchema: z.ZodType<ManagedRoutine> = z.object({
+  id: z.string(),
+  name: z.string(),
+  cycleId: z.string().nullable(),
+  colorIndex: z.number().int().nonnegative(),
+  itemCount: z.number().int().nonnegative(),
+  daysUsed: z.number().int().nonnegative(),
+});
+
+const routinesResponseSchema = z.object({
+  data: z.object({ routines: z.array(managedRoutineSchema) }),
 });
 
 const duplicatedResponseSchema = z.object({
@@ -73,6 +122,12 @@ export type PlannerOutcome<Value> =
   { readonly kind: "ok"; readonly value: Value } | PlannerFailure;
 
 export type CycleList = readonly ManagedCycle[];
+
+/** Lo que pinta la cuadrícula de un ciclo (#907). */
+export type CyclePlan = {
+  readonly weeks: readonly CycleWeekRecord[];
+  readonly days: readonly CycleDayRecord[];
+};
 
 export type DuplicateOutcome = {
   readonly cycles: CycleList;
@@ -194,5 +249,67 @@ export function duplicateCycle(
     trainingManageCycleActionApiPath(cycleId, "duplicate"),
     jsonInit("POST"),
     { schema: duplicatedResponseSchema, pick: (response) => response.data },
+  );
+}
+
+function readCyclePlan(
+  response: z.infer<typeof cyclePlanResponseSchema>,
+): CyclePlan {
+  return { weeks: response.data.weeks, days: response.data.days };
+}
+
+export function loadCyclePlan(
+  cycleId: string,
+): Promise<PlannerOutcome<CyclePlan>> {
+  return requestAndRead(trainingManageCycleApiPath(cycleId), undefined, {
+    schema: cyclePlanResponseSchema,
+    pick: readCyclePlan,
+  });
+}
+
+/** Las del ciclo y después las compartidas, en el orden de la API (#905). */
+export function loadCycleRoutines(
+  cycleId: string,
+): Promise<PlannerOutcome<readonly ManagedRoutine[]>> {
+  const query = new URLSearchParams({ cycle: cycleId });
+  return requestAndRead(
+    `${TRAINING_MANAGE_ROUTINES_API_PATH}?${query.toString()}`,
+    undefined,
+    {
+      schema: routinesResponseSchema,
+      pick: (response) => response.data.routines,
+    },
+  );
+}
+
+export function setCycleDay(
+  cycleId: string,
+  change: CycleDayChange,
+): Promise<PlannerOutcome<CyclePlan>> {
+  return requestAndRead(
+    trainingManageCycleActionApiPath(cycleId, "days"),
+    jsonInit("PUT", change),
+    { schema: cyclePlanResponseSchema, pick: readCyclePlan },
+  );
+}
+
+export function saveCycleWeek(
+  cycleId: string,
+  week: CycleWeekRecord,
+): Promise<PlannerOutcome<CyclePlan>> {
+  return requestAndRead(
+    trainingManageCycleActionApiPath(cycleId, "weeks"),
+    jsonInit("PUT", week),
+    { schema: cyclePlanResponseSchema, pick: readCyclePlan },
+  );
+}
+
+export function copyCycleWeekOne(
+  cycleId: string,
+): Promise<PlannerOutcome<CyclePlan>> {
+  return requestAndRead(
+    trainingManageCycleActionApiPath(cycleId, "copy-week-one"),
+    jsonInit("POST"),
+    { schema: cyclePlanResponseSchema, pick: readCyclePlan },
   );
 }
