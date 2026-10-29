@@ -27430,13 +27430,15 @@ a.dashboard-club-cell-body:focus-visible {
     border-radius: 12px;
   }
 
+  /* Descanso ocupa las dos últimas columnas; arriba, el nombre se queda con
+     la primera de ellas y la papelera con la otra. */
   .training-routine-exercise {
-    grid-template-columns: 70px minmax(0, 1fr) 80px;
+    grid-template-columns: 70px minmax(0, 1fr) 28px var(--touch-target-min);
     grid-template-areas:
-      "handle name delete"
-      "sets reps rest"
-      "load load load"
-      "note note note";
+      "handle name name delete"
+      "sets reps rest rest"
+      "load load load load"
+      "note note note note";
     gap: var(--space-2);
   }
 
@@ -27504,6 +27506,12 @@ a.dashboard-club-cell-body:focus-visible {
   .training-routine-thumbnail {
     width: 40px;
     height: 40px;
+  }
+
+  /* Como m05: en la tarjeta el nombre entero, en dos líneas si hace falta. */
+  .training-routine-name {
+    overflow: visible;
+    white-space: normal;
   }
 
   .training-routine-exercise input,
