@@ -212,7 +212,7 @@ function form(): HTMLElement {
 }
 
 describe("la pestaña Exercises", () => {
-  it("sale entre Cycle y Marks con cuántos ejercicios hay", async () => {
+  it("sale entre Routines y Marks con cuántos ejercicios hay", async () => {
     stubApi();
 
     await openExercises();
@@ -220,10 +220,11 @@ describe("la pestaña Exercises", () => {
     const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       "Cycle 28 wk",
+      "Routines",
       "Exercises 22",
       "Marks",
     ]);
-    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
+    expect(tabs[2]).toHaveAttribute("aria-selected", "true");
   });
 
   it("tiene la búsqueda y las fichas All, Library y Club's own con su número", async () => {

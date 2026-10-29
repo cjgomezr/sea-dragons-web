@@ -158,10 +158,11 @@ describe("la pestaña Marks", () => {
     const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       "Cycle 28 wk",
+      "Routines",
       "Exercises",
       "Marks 4",
     ]);
-    expect(tabs[2]).toHaveAttribute("aria-selected", "true");
+    expect(tabs[3]).toHaveAttribute("aria-selected", "true");
     expect(tabs[0]).toHaveAttribute("aria-selected", "false");
     expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Marks 4");
   });

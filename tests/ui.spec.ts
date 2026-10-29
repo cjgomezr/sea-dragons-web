@@ -28556,9 +28556,6 @@ test.describe("planificar no es para un Committee", () => {
    (#905), que tiene sus propias pruebas contra la base.
    --------------------------------------------------------------------------- */
 
-const PLANNER_ROUTINES_ENDPOINT = "/api/v1/training/manage/routines";
-const PLANNER_MARKS_ENDPOINT = "/api/v1/training/manage/marks";
-
 const PLANNER_SQUAT_MARK = {
   id: "1b2c3d4e-0000-4000-8000-000000000001",
   name: "Back squat",
@@ -28577,7 +28574,7 @@ const PLANNER_STRENGTH_ROUTINE = {
   daysUsed: 27,
 };
 
-const PLANNER_ROUTINES = [
+const ROUTINES_TAB_ROUTINES = [
   PLANNER_STRENGTH_ROUTINE,
   {
     id: "bbbbbbbb-0000-4000-8000-000000000002",
@@ -28659,7 +28656,7 @@ async function stubPlannerRoutines(
   );
   await page.route(
     (url) => url.pathname === PLANNER_ROUTINES_ENDPOINT,
-    (route) => route.fulfill(jsonBody({ routines: PLANNER_ROUTINES })),
+    (route) => route.fulfill(jsonBody({ routines: ROUTINES_TAB_ROUTINES })),
   );
   await page.route(
     (url) => url.pathname.endsWith("/items"),
