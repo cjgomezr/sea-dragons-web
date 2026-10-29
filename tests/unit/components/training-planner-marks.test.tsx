@@ -158,9 +158,10 @@ describe("la pestaña Marks", () => {
     const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       "Cycle 28 wk",
+      "Exercises",
       "Marks 4",
     ]);
-    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
+    expect(tabs[2]).toHaveAttribute("aria-selected", "true");
     expect(tabs[0]).toHaveAttribute("aria-selected", "false");
     expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Marks 4");
   });
@@ -172,7 +173,8 @@ describe("la pestaña Marks", () => {
     const cycleTab = await screen.findByRole("tab", { name: /^Cycle/ });
 
     cycleTab.focus();
-    await user.keyboard("{ArrowRight}");
+    // Marks es la última (#910): ← desde la primera da la vuelta hasta ella.
+    await user.keyboard("{ArrowLeft}");
 
     const marksTab = screen.getByRole("tab", { name: /^Marks/ });
     expect(marksTab).toHaveFocus();

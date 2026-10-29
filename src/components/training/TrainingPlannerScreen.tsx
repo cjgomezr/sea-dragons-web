@@ -1,5 +1,6 @@
 "use client";
 
+import { Barbell } from "@phosphor-icons/react/dist/ssr/Barbell";
 import { CalendarBlank } from "@phosphor-icons/react/dist/ssr/CalendarBlank";
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { Trophy } from "@phosphor-icons/react/dist/ssr/Trophy";
@@ -10,32 +11,40 @@ import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import type { ManagedCycle } from "@/lib/training/club-cycles";
 import { DesktopCycleTab, PhoneCycleTab } from "./PlannerCycleTab";
+import { PlannerExercisesTab } from "./PlannerExercisesTab";
 import { PlannerMarksTab } from "./PlannerMarksTab";
 import { plannerErrorMessage } from "./planner-format";
 import { type PlannerCycles, usePlannerCycles } from "./use-planner-cycles";
+import {
+  type PlannerExercises,
+  usePlannerExercises,
+} from "./use-planner-exercises";
 import { type PlannerMarks, usePlannerMarks } from "./use-planner-marks";
 
 /**
  * Planificar (#906, RF-7 y D3 del PRD de E35; §5.1 y §5.2 del handoff): la
- * cabecera, las pestañas y la pestaña Ciclo; Marcas llegó con #911. Solo
+ * cabecera, las pestañas y la pestaña Ciclo; Marcas llegó con #911 y
+ * Ejercicios con #910. Solo
  * salen las pestañas que ya existen; las demás llegan con sus tickets.
  *
  * Es de cliente porque elige y cambia ciclos sin recargar. Lee y escribe
  * solo por la API v1 (#904), como la aplicación nativa (CON-002).
  */
 
-type PlannerTab = "cycle" | "marks";
+type PlannerTab = "cycle" | "exercises" | "marks";
 
 /** En el orden en que salen, que es el que recorren las flechas. */
-const PLANNER_TABS: readonly PlannerTab[] = ["cycle", "marks"];
+const PLANNER_TABS: readonly PlannerTab[] = ["cycle", "exercises", "marks"];
 
 const TAB_IDS = {
   cycle: "planificar-pestana-ciclo",
+  exercises: "planificar-pestana-ejercicios",
   marks: "planificar-pestana-marcas",
 } as const satisfies Record<PlannerTab, string>;
 
 const PANEL_IDS = {
   cycle: "planificar-panel-ciclo",
+  exercises: "planificar-panel-ejercicios",
   marks: "planificar-panel-marcas",
 } as const satisfies Record<PlannerTab, string>;
 
@@ -100,18 +109,20 @@ function TabCount({ text }: { readonly text: string }): React.JSX.Element {
   );
 }
 
-/** Ciclo con las semanas del elegido si lo hay, y Marcas con cuántas hay
- * cuando ya llegaron. */
+/** Ciclo con las semanas del elegido si lo hay, y Ejercicios y Marcas con
+ * cuántos hay cuando ya llegaron. */
 function PlannerTabs({
   translate,
   selectedTab,
   selectedCycle,
+  exercises,
   marks,
   onSelect,
 }: {
   readonly translate: Translator;
   readonly selectedTab: PlannerTab;
   readonly selectedCycle: ManagedCycle | null;
+  readonly exercises: PlannerExercises;
   readonly marks: PlannerMarks;
   readonly onSelect: (tab: PlannerTab) => void;
 }): React.JSX.Element {
@@ -150,6 +161,17 @@ function PlannerTabs({
               weeks: selectedCycle.weeks,
             })}
           />
+        )}
+      </TabButton>
+      <TabButton
+        tab="exercises"
+        isSelected={selectedTab === "exercises"}
+        onSelect={onSelect}
+      >
+        <Icon glyph={Barbell} />
+        {translate("training.manage.tabExercises")}
+        {exercises.total === null ? null : (
+          <TabCount text={String(exercises.total)} />
         )}
       </TabButton>
       <TabButton
@@ -246,6 +268,7 @@ function PlannerContent({
   readonly translate: Translator;
 }): React.JSX.Element {
   const planner = usePlannerCycles(translate);
+  const exercises = usePlannerExercises(translate);
   const marks = usePlannerMarks(translate);
   const [selectedTab, setSelectedTab] = useState<PlannerTab>("cycle");
   const { state } = planner;
@@ -274,6 +297,7 @@ function PlannerContent({
         translate={translate}
         selectedTab={selectedTab}
         selectedCycle={selected}
+        exercises={exercises}
         marks={marks}
         onSelect={setSelectedTab}
       />
@@ -293,9 +317,13 @@ function PlannerContent({
               selected={selected}
             />
           </>
-        ) : (
+        ) : null}
+        {selectedTab === "exercises" ? (
+          <PlannerExercisesTab translate={translate} planner={exercises} />
+        ) : null}
+        {selectedTab === "marks" ? (
           <PlannerMarksTab translate={translate} planner={marks} />
-        )}
+        ) : null}
       </div>
     </>
   );
