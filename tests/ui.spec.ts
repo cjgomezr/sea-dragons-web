@@ -27716,6 +27716,78 @@ const PLANNER_MARKS = [
   },
 ];
 
+/** Como d05-coach-exercises.png: de la biblioteca con sus fotos, del club
+ * sin ellas, uno en una rutina y otro sin usar; hay más páginas (#910). */
+const PLANNER_EXERCISES_ENDPOINT = "/api/v1/training/manage/exercises";
+
+function plannerExercise(exercise: {
+  readonly id: string;
+  readonly name: string;
+  readonly source: "library" | "club";
+  readonly photoStem?: string;
+  readonly routines: readonly string[];
+}): unknown {
+  const [start = null, end = null] =
+    exercise.photoStem === undefined ? [] : trainingPhotos(exercise.photoStem);
+  return {
+    id: exercise.id,
+    name: exercise.name,
+    source: exercise.source,
+    tips: ["Brace before you move.", "Control the way down."],
+    youtube: null,
+    thumbnailUrl: start,
+    photoUrls: { start, end },
+    routines: exercise.routines,
+  };
+}
+
+const PLANNER_EXERCISES = {
+  exercises: [
+    plannerExercise({
+      id: "cccccccc-0000-4000-8000-000000000001",
+      name: "Back squat",
+      source: "library",
+      photoStem: "Barbell_Squat",
+      routines: ["Gym A", "Strength"],
+    }),
+    plannerExercise({
+      id: "cccccccc-0000-4000-8000-000000000002",
+      name: "Bench press",
+      source: "library",
+      photoStem: "Barbell_Bench_Press_-_Medium_Grip",
+      routines: ["Gym A"],
+    }),
+    plannerExercise({
+      id: "cccccccc-0000-4000-8000-000000000003",
+      name: "Deadlift",
+      source: "library",
+      photoStem: "Barbell_Deadlift",
+      routines: ["Gym B"],
+    }),
+    plannerExercise({
+      id: "cccccccc-0000-4000-8000-000000000004",
+      name: "Chin-up",
+      source: "library",
+      photoStem: "Chin-Up",
+      routines: [],
+    }),
+    plannerExercise({
+      id: "cccccccc-0000-4000-8000-000000000005",
+      name: "Turn and push-off",
+      source: "club",
+      routines: ["Pool skills"],
+    }),
+    plannerExercise({
+      id: "cccccccc-0000-4000-8000-000000000006",
+      name: "Fin kick",
+      source: "club",
+      routines: [],
+    }),
+  ],
+  counts: { library: 17, club: 5 },
+  nextOffset: 20,
+};
+
 type PlannerState = {
   readonly name: string;
   readonly isSpanish?: boolean;
@@ -27838,6 +27910,23 @@ async function stubPlannerCycles(page: Page): Promise<void> {
   await page.route(
     (url) => url.pathname === PLANNER_ROUTINES_ENDPOINT,
     (route) => route.fulfill(jsonBody({ routines: PLANNER_ROUTINES })),
+  );
+  // La pestaña Exercises dice cuántos hay (#910), como Marks; y sus
+  // miniaturas son las fotos del handoff.
+  await page.route(
+    (url) => url.pathname === PLANNER_EXERCISES_ENDPOINT,
+    (route) => route.fulfill(jsonBody(PLANNER_EXERCISES)),
+  );
+  await page.route(
+    (url) => url.pathname.startsWith(TRAINING_PHOTOS_PATH),
+    (route, request) =>
+      route.fulfill({
+        contentType: "image/jpeg",
+        path: path.join(
+          TRAINING_PHOTOS_DIR,
+          path.basename(new URL(request.url()).pathname),
+        ),
+      }),
   );
 }
 
@@ -28110,6 +28199,157 @@ test.describe("planificar → marcas en el navegador", () => {
       expect(await roundedWidthOf(confirm.getByRole("button", { name }))).toBe(
         await roundedWidthOf(confirmText),
       );
+    }
+  });
+});
+
+/* ---------------------------------------------------------------------------
+   Planificar → Ejercicios (#910, RF-10 y D13 del PRD de E35), contra §5.1
+   "Tab Exercises" y §5.2 del handoff (d05-coach-exercises.png y
+   m06-coach-exercises.png). Los ejercicios los sirve la prueba, como los
+   ciclos, con las fotos del handoff: qué se guarda lo decide la API (#903).
+   --------------------------------------------------------------------------- */
+
+type PlannerExercisesState = PlannerState & {
+  /** Con Turn and push-off, del club y en una rutina, abierto. */
+  readonly isOpen?: boolean;
+};
+
+const PLANNER_EXERCISES_STATES: readonly PlannerExercisesState[] = [
+  { name: "planificar-ejercicios" },
+  { name: "planificar-ejercicios-abierto", isOpen: true },
+  { name: "planificar-ejercicios-es", isSpanish: true },
+];
+
+async function goToPlannerExercises(
+  page: Page,
+  state: PlannerExercisesState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await goToPlanner(page, state, theme);
+  await page.getByRole("tab", { name: /^(Exercises|Ejercicios) 22$/ }).click();
+  await expect(page.getByRole("button", { name: /^Back squat/ })).toBeVisible();
+  // Las miniaturas llegan después de la lista: la captura las quiere ya.
+  await expect
+    .poll(() =>
+      page
+        .locator(".training-exercises-thumb")
+        .evaluateAll((thumbs) =>
+          thumbs.every(
+            (thumb) => !(thumb instanceof HTMLImageElement) || thumb.complete,
+          ),
+        ),
+    )
+    .toBe(true);
+  if (state.isOpen === true) {
+    await page.getByRole("button", { name: /^Turn and push-off/ }).click();
+    await expect(
+      page.getByRole("heading", { name: "Turn and push-off" }),
+    ).toBeVisible();
+  }
+  await page.mouse.move(0, 0);
+}
+
+for (const state of PLANNER_EXERCISES_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToPlannerExercises(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of PLANNER_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToPlannerExercises(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    for (const theme of themes) {
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await goToPlannerExercises(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
+  });
+}
+
+test.describe("planificar → ejercicios en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("en el escritorio, las filas miden al menos 54 px y el formulario va a la derecha", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlannerExercises(page, { name: "planificar-ejercicios" });
+
+    const rows = page
+      .getByRole("list", { name: "Exercises" })
+      .getByRole("button");
+    for (const row of await rows.all()) {
+      expect(await roundedHeightOf(row)).toBeGreaterThanOrEqual(54);
+    }
+    const list = await page
+      .getByRole("list", { name: "Exercises" })
+      .boundingBox();
+    const form = await page
+      .getByRole("region", { name: "New club exercise" })
+      .boundingBox();
+    expect(form?.x ?? 0).toBeGreaterThan((list?.x ?? 0) + (list?.width ?? 0));
+  });
+
+  // §5.2: búsqueda de 46 px, filas de 58 px y campos de 48 px con texto de
+  // 16 px, para que iOS no acerque.
+  test("en el móvil, búsqueda de 46 px, filas de 58 px y campos de 48 px con texto de 16 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPlannerExercises(page, { name: "planificar-ejercicios" });
+
+    const search = page.getByRole("searchbox", { name: "Search exercises" });
+    expect(await roundedHeightOf(search)).toBe(46);
+    await expect(search).toHaveCSS("font-size", "16px");
+    const rows = page
+      .getByRole("list", { name: "Exercises" })
+      .getByRole("button");
+    for (const row of await rows.all()) {
+      expect(await roundedHeightOf(row)).toBeGreaterThanOrEqual(58);
+    }
+    const form = page.getByRole("form", { name: "New club exercise" });
+    for (const label of [
+      "Name",
+      "How to do it · optional",
+      "YouTube link or search · optional",
+    ]) {
+      const field = form.getByLabel(label);
+      expect(await roundedHeightOf(field)).toBeGreaterThanOrEqual(48);
+      await expect(field).toHaveCSS("font-size", "16px");
     }
   });
 });

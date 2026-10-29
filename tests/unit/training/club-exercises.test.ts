@@ -6,6 +6,7 @@ import {
   type ClubExerciseRow,
   type ClubExercisesGateways,
   EXERCISE_PHOTO_MAX_BYTES,
+  EXERCISE_OFFSET_MAX,
   EXERCISE_SEARCH_LIMIT,
   type ExerciseRecord,
   ExerciseInUseError,
@@ -66,6 +67,18 @@ function rowToRecord(row: ClubExerciseRow): ExerciseRecord {
   return { ...row };
 }
 
+function sourceOf(exercise: ExerciseRecord): "library" | "club" {
+  return exercise.clubId === null ? "library" : "club";
+}
+
+function matching(clubId: string, text: string): ExerciseRecord[] {
+  return exercises.filter(
+    (exercise) =>
+      (exercise.clubId === null || exercise.clubId === clubId) &&
+      exercise.name.toLowerCase().includes(text.trim().toLowerCase()),
+  );
+}
+
 function gateways(): ClubExercisesGateways {
   return {
     members: {
@@ -76,14 +89,19 @@ function gateways(): ClubExercisesGateways {
       }),
     },
     exercises: {
-      searchExercises: async ({ clubId, text, limit }) =>
-        exercises
+      searchExercises: async ({ clubId, text, source, limit, offset }) =>
+        matching(clubId, text)
           .filter(
-            (exercise) =>
-              (exercise.clubId === null || exercise.clubId === clubId) &&
-              exercise.name.toLowerCase().includes(text.trim().toLowerCase()),
+            (exercise) => source === null || sourceOf(exercise) === source,
           )
-          .slice(0, limit),
+          .slice(offset, offset + limit),
+      countExercises: async ({ clubId, text }) => {
+        const found = matching(clubId, text);
+        return {
+          library: found.filter((exercise) => exercise.clubId === null).length,
+          club: found.filter((exercise) => exercise.clubId !== null).length,
+        };
+      },
       findExercise: async (id) =>
         exercises.find((exercise) => exercise.id === id) ?? null,
       isNameTaken: async ({ clubId, name, exceptId }) =>
@@ -258,6 +276,57 @@ describe("searchExercises", () => {
 
     expect(result.exercises).toHaveLength(EXERCISE_SEARCH_LIMIT);
   });
+
+  it("cuenta cuántos casan de la biblioteca y del club", async () => {
+    const result = await searchExercises(gateways(), {
+      callerId: COACH_ID,
+      query: "",
+    });
+
+    expect(result.counts).toEqual({ library: 1, club: 1 });
+  });
+
+  it("con un origen sólo devuelve los de ese origen, y cuenta los dos", async () => {
+    const result = await searchExercises(gateways(), {
+      callerId: COACH_ID,
+      query: "",
+      source: "club",
+    });
+
+    expect(result.exercises.map((exercise) => exercise.id)).toEqual([CRAWL_ID]);
+    expect(result.counts).toEqual({ library: 1, club: 1 });
+  });
+
+  it("dice desde dónde sigue la página siguiente, o nulo si no hay más", async () => {
+    exercises = Array.from({ length: EXERCISE_SEARCH_LIMIT + 5 }, (_, i) => ({
+      ...exercises[0]!,
+      id: `e0e0e0e0-0000-4000-8000-${String(i).padStart(12, "0")}`,
+      name: `Squat ${i}`,
+    }));
+
+    const first = await searchExercises(gateways(), {
+      callerId: COACH_ID,
+      query: "squat",
+    });
+    const second = await searchExercises(gateways(), {
+      callerId: COACH_ID,
+      query: "squat",
+      offset: EXERCISE_SEARCH_LIMIT,
+    });
+
+    expect(first.nextOffset).toBe(EXERCISE_SEARCH_LIMIT);
+    expect(second.exercises).toHaveLength(5);
+    expect(second.nextOffset).toBeNull();
+  });
+
+  it.each([-1, 1.5, EXERCISE_OFFSET_MAX + 1])(
+    "rechaza el desplazamiento %s",
+    async (offset) => {
+      await expect(
+        searchExercises(gateways(), { callerId: COACH_ID, query: "", offset }),
+      ).rejects.toThrow(ExerciseValidationError);
+    },
+  );
 
   it.each<Role>(["Player", "Committee"])(
     "a un %s se lo niega",

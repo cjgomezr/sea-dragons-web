@@ -24,8 +24,11 @@ import { findTrainingPlanner } from "./training-planner";
 export const EXERCISE_NAME_MAX_LENGTH = 80;
 /** 5 MB por foto (RF-10), lo mismo que el bucket. */
 export const EXERCISE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
-/** Los resultados de una búsqueda (#903). */
+/** Los resultados de una búsqueda (#903), que son también una página de la
+ * lista de Planificar → Ejercicios (#910). */
 export const EXERCISE_SEARCH_LIMIT = 20;
+/** El `integer` de `p_offset` en `0087`: más allá, Postgres no lo acepta. */
+export const EXERCISE_OFFSET_MAX = 2_147_483_647;
 /** Lo que cabe en una búsqueda: el nombre más largo posible. */
 export const EXERCISE_QUERY_MAX_LENGTH = EXERCISE_NAME_MAX_LENGTH;
 /** Topes de la base no hay; éstos sólo impiden un ejercicio de megas. */
@@ -96,8 +99,14 @@ export type ManagedExercise = {
   readonly routines: readonly string[];
 };
 
+/** Cuántos casan con el texto de cada origen, para las fichas (#910). */
+export type ExerciseCounts = Readonly<Record<ExerciseSource, number>>;
+
 export type ManagedExercises = {
   readonly exercises: readonly ManagedExercise[];
+  readonly counts: ExerciseCounts;
+  /** Desde dónde pedir la página siguiente, o nulo si no hay más. */
+  readonly nextOffset: number | null;
 };
 
 /** Lo que llega del formulario, sin recortar. */
@@ -126,12 +135,19 @@ export type ExerciseDeleteResult =
   { readonly kind: "deleted" } | { readonly kind: "in_use" };
 
 export type ClubExercisesGateway = {
-  /** En el orden de la base: primero los que empiezan por `text`. */
+  /** En el orden de la base: primero los que empiezan por `text`. Un
+   * `source` nulo son los dos orígenes. */
   searchExercises(query: {
     readonly clubId: string;
     readonly text: string;
+    readonly source: ExerciseSource | null;
     readonly limit: number;
+    readonly offset: number;
   }): Promise<readonly ExerciseRecord[]>;
+  countExercises(query: {
+    readonly clubId: string;
+    readonly text: string;
+  }): Promise<ExerciseCounts>;
   findExercise(exerciseId: string): Promise<ExerciseRecord | null>;
   isNameTaken(query: {
     readonly clubId: string;
@@ -176,6 +192,7 @@ export type ExerciseIssueCode =
   | "tip_too_long"
   | "youtube_too_long"
   | "query_too_long"
+  | "offset_invalid"
   | "photo_too_large"
   | "photo_type_unsupported";
 
@@ -498,21 +515,55 @@ function rowOf(
   };
 }
 
-export async function searchExercises(
-  gateways: ClubExercisesGateways,
-  request: { readonly callerId: string; readonly query: string },
-): Promise<ManagedExercises> {
-  const text = request.query.trim();
+function validQuery(raw: string): string {
+  const text = raw.trim();
   if (countCharacters(text) > EXERCISE_QUERY_MAX_LENGTH) {
     throw new ExerciseValidationError("query_too_long");
   }
+  return text;
+}
+
+function validOffset(offset: number): number {
+  if (
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    offset > EXERCISE_OFFSET_MAX
+  ) {
+    throw new ExerciseValidationError("offset_invalid");
+  }
+  return offset;
+}
+
+/** Una página de la lista: sin `source`, de los dos orígenes; sin `offset`,
+ * la primera. Pide uno de más para saber si hay otra página. */
+export async function searchExercises(
+  gateways: ClubExercisesGateways,
+  request: {
+    readonly callerId: string;
+    readonly query: string;
+    readonly source?: ExerciseSource | null;
+    readonly offset?: number;
+  },
+): Promise<ManagedExercises> {
+  const text = validQuery(request.query);
+  const offset = validOffset(request.offset ?? 0);
   const actor = await findTrainingPlanner(gateways.members, request.callerId);
-  const found = await gateways.exercises.searchExercises({
-    clubId: actor.clubId,
-    text,
-    limit: EXERCISE_SEARCH_LIMIT,
-  });
-  return { exercises: await describeExercises(gateways, actor.clubId, found) };
+  const [found, counts] = await Promise.all([
+    gateways.exercises.searchExercises({
+      clubId: actor.clubId,
+      text,
+      source: request.source ?? null,
+      limit: EXERCISE_SEARCH_LIMIT + 1,
+      offset,
+    }),
+    gateways.exercises.countExercises({ clubId: actor.clubId, text }),
+  ]);
+  const page = found.slice(0, EXERCISE_SEARCH_LIMIT);
+  return {
+    exercises: await describeExercises(gateways, actor.clubId, page),
+    counts,
+    nextOffset: found.length > page.length ? offset + page.length : null,
+  };
 }
 
 /** Todo se comprueba antes de subir nada; si la fila no entra, las fotos

@@ -3147,6 +3147,70 @@ export const spanishMessages: MessageCatalog = {
   "training.manage.errorDate": "Elige una fecha.",
   "training.manage.errorSave":
     "No pudimos guardar el cambio. Inténtalo de nuevo.",
+  "training.manage.tabExercises": "Ejercicios",
+  "training.exercises.search": "Buscar ejercicios",
+  "training.exercises.filter": "Mostrar",
+  "training.exercises.all": "Todos",
+  "training.exercises.library": "Biblioteca",
+  "training.exercises.club": "Del club",
+  "training.exercises.list": "Ejercicios",
+  "training.exercises.loading": "Cargando los ejercicios…",
+  "training.exercises.failed": "No pudimos cargar los ejercicios.",
+  "training.exercises.inRoutines": "En {routines}",
+  "training.exercises.notInRoutine": "Todavía en ninguna rutina",
+  "training.exercises.sourceLibrary": "Biblioteca",
+  "training.exercises.sourceClub": "Club",
+  "training.exercises.showMore": "Ver más",
+  "training.exercises.empty": "Todavía no hay ejercicios aquí.",
+  "training.exercises.noMatch": 'Ningún ejercicio se llama "{query}".',
+  "training.exercises.credit":
+    "Fotos de la biblioteca: free-exercise-db (dominio público).",
+  "training.exercises.newTitle": "Nuevo ejercicio del club",
+  "training.exercises.newLead":
+    "Para lo que la biblioteca no tiene: los ejercicios, series y calentamientos de tu deporte.",
+  "training.exercises.name": "Nombre",
+  "training.exercises.namePlaceholder": "p. ej. Giro y empuje",
+  "training.exercises.tips": "Cómo se hace · opcional",
+  "training.exercises.tipsPlaceholder": "Un consejo por línea",
+  "training.exercises.youtube": "Enlace o búsqueda de YouTube · opcional",
+  "training.exercises.youtubePlaceholder":
+    "Pega un enlace, o palabras para buscar",
+  "training.exercises.startPhoto": "Foto de inicio · opcional",
+  "training.exercises.endPhoto": "Foto final · opcional",
+  "training.exercises.photoHint": "Sin foto, sale un icono genérico.",
+  "training.exercises.upload": "Subir",
+  "training.exercises.removeStartPhoto": "Quitar la foto de inicio",
+  "training.exercises.removeEndPhoto": "Quitar la foto final",
+  "training.exercises.photoStartAlt": "{name}: posición inicial",
+  "training.exercises.photoEndAlt": "{name}: posición final",
+  "training.exercises.photoTooLarge":
+    "Esa foto pasa de 5 MB. Elige una más pequeña.",
+  "training.exercises.photoType": "Usa una foto JPEG, PNG o WebP.",
+  "training.exercises.add": "Añadir a los ejercicios del club",
+  "training.exercises.addHint":
+    "Sale al momento en la búsqueda de las rutinas.",
+  "training.exercises.save": "Guardar cambios",
+  "training.exercises.delete": "Borrar ejercicio",
+  "training.exercises.inUse":
+    "Está en {routines}. Sácalo de esas rutinas para borrarlo.",
+  "training.exercises.libraryReadOnly":
+    "De la biblioteca. No se puede cambiar.",
+  "training.exercises.created":
+    "{name} añadido. Sale al momento en la búsqueda de las rutinas.",
+  "training.exercises.saved": "{name} guardado",
+  "training.exercises.deleted": "{name} borrado",
+  "training.exercises.errorNameTaken": "Ya hay un ejercicio con ese nombre.",
+  "training.exercises.errorNameRequired": "Ponle un nombre al ejercicio.",
+  "training.exercises.errorNameTooLong": "Usa 80 caracteres como mucho.",
+  "training.exercises.errorTooManyTips": "Usa 20 consejos como mucho.",
+  "training.exercises.errorTipTooLong":
+    "Cada consejo tiene que tener menos de 300 caracteres.",
+  "training.exercises.errorYoutubeTooLong":
+    "El enlace o la búsqueda de YouTube tiene que tener menos de 300 caracteres.",
+  "training.exercises.errorLoadMore":
+    "No pudimos cargar más ejercicios. Vuelve a intentarlo.",
+  "training.exercises.errorInUse":
+    "Ese ejercicio ya está en una rutina. Sácalo de la rutina primero.",
   "training.manage.tabMarks": "Marcas",
   "training.marks.lead":
     'Los levantamientos que pueden registrar los miembros (su mejor levantamiento a una repetición, en kg). Las rutinas usan "% de" una marca para enseñarle a cada uno sus kilos. Los miembros solo ven las marcas de esta lista.',

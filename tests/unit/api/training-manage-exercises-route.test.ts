@@ -60,6 +60,7 @@ function clubExercisesGateways(): ClubExercisesGateways {
             exercise.clubId === null || exercise.clubId === query.clubId,
         );
       },
+      countExercises: async () => ({ library: 1, club: 1 }),
       findExercise: async (id) =>
         exercises.find((exercise) => exercise.id === id) ?? null,
       isNameTaken: async ({ name, exceptId }) =>
@@ -241,7 +242,9 @@ describe("GET /api/v1/training/manage/exercises", () => {
     expect(searchQueries).toHaveBeenCalledWith({
       clubId: CLUB_ID,
       text: "squat",
-      limit: 20,
+      source: null,
+      limit: 21,
+      offset: 0,
     });
     const body = await response.json();
     expect(body.data.exercises[0]).toMatchObject({
@@ -260,6 +263,34 @@ describe("GET /api/v1/training/manage/exercises", () => {
       expect.objectContaining({ text: "" }),
     );
   });
+
+  it("responde las cuentas de cada origen y si hay otra página", async () => {
+    const response = await searchExercises("");
+
+    const body = await response.json();
+    expect(body.data).toMatchObject({
+      counts: { library: 1, club: 1 },
+      nextOffset: null,
+    });
+  });
+
+  it("pasa el origen y el desplazamiento pedidos", async () => {
+    const response = await searchExercises("?source=club&offset=40");
+
+    expect(response.status).toBe(200);
+    expect(searchQueries).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "club", offset: 40 }),
+    );
+  });
+
+  it.each(["?source=gym", "?offset=-2", "?offset=abc", "?offset=1.5"])(
+    "responde 400 a %s",
+    async (query) => {
+      const response = await searchExercises(query);
+
+      expect(response.status).toBe(400);
+    },
+  );
 
   it("responde 400 a una búsqueda de más de 80 caracteres", async () => {
     const response = await searchExercises(`?q=${"x".repeat(81)}`);
