@@ -118,6 +118,8 @@ const requests: ApiRequest[] = [];
 let routines: ManagedRoutine[];
 let items: Map<string, readonly RoutineEditorItem[]>;
 let failWrites: boolean;
+/** Las respuestas a los PUT de filas esperan a que se suelte esta promesa. */
+let itemSavesHeld: Promise<void>;
 
 function ok(data: unknown, status = 200): ApiReply {
   return { status, body: { data } };
@@ -243,6 +245,9 @@ function stubApi(): void {
       };
       requests.push(request);
       const { status, body } = reply(request);
+      if (request.method === "PUT") {
+        await itemSavesHeld;
+      }
       return new Response(JSON.stringify(body), {
         status,
         headers: { "content-type": "application/json" },
@@ -269,6 +274,7 @@ beforeEach(() => {
   routines = [STRENGTH, MOBILITY];
   items = new Map([[STRENGTH.id, STRENGTH_ITEMS]]);
   failWrites = false;
+  itemSavesHeld = Promise.resolve();
   stubApi();
   stubScreenSize("desktop");
 });
@@ -520,6 +526,35 @@ describe("el editor", () => {
       ]),
     );
     expect(routineButton("Gym A · Heavy")).toBeInTheDocument();
+  });
+
+  it("un nombre nuevo no lo pisa la respuesta tardía de unas filas guardadas antes", async () => {
+    const user = userEvent.setup();
+    let releaseItemSaves = (): void => {};
+    itemSavesHeld = new Promise((resolve) => {
+      releaseItemSaves = resolve;
+    });
+    await openStrength(user);
+    const sets = screen.getByRole("textbox", { name: "Sets for Back squat" });
+    await user.clear(sets);
+    await user.type(sets, "5");
+    await user.tab();
+    const name = screen.getByRole("textbox", { name: "Routine name" });
+    await user.clear(name);
+    await user.type(name, "Gym A · Heavy");
+    await user.tab();
+
+    releaseItemSaves();
+
+    await waitFor(() =>
+      expect(writes().map((request) => request.method)).toEqual([
+        "PUT",
+        "PATCH",
+      ]),
+    );
+    await waitFor(() =>
+      expect(routineButton("Gym A · Heavy")).toBeInTheDocument(),
+    );
   });
 
   it("guarda las series al salir, y solo admite cifras", async () => {
@@ -946,6 +981,23 @@ describe("en el móvil", () => {
     await user.click(await screen.findByRole("button", { name: /^Gym A/ }));
 
     await user.click(await screen.findByRole("button", { name: "Routines" }));
+
+    expect(await screen.findByText("Mobility")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Routine name" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("cambiar el filtro con el editor abierto vuelve a la lista", async () => {
+    const user = userEvent.setup();
+    await openRoutinesTab(user);
+    await user.click(await screen.findByRole("button", { name: /^Gym A/ }));
+    await screen.findByRole("textbox", { name: "Routine name" });
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Routines of" }),
+      "Shared routines only",
+    );
 
     expect(await screen.findByText("Mobility")).toBeInTheDocument();
     expect(

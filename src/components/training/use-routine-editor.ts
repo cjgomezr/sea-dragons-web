@@ -144,6 +144,16 @@ export function useRoutineEditor(
     callbacks.onSaved(outcome.value);
   }
 
+  async function rename(name: string): Promise<boolean> {
+    const outcome = await renameRoutine(routineId, name);
+    if (outcome.kind === "failed") {
+      callbacks.onError({ reason: outcome.reason });
+      return false;
+    }
+    callbacks.onSaved(outcome.value);
+    return true;
+  }
+
   return {
     state: editor.state,
     retry: editor.retry,
@@ -154,15 +164,13 @@ export function useRoutineEditor(
       const savedGeneration = generation.current;
       queue.current = queue.current.then(() => save(rows, savedGeneration));
     },
-    rename: async (name) => {
+    rename: (name) => {
       callbacks.onError(null);
-      const outcome = await renameRoutine(routineId, name);
-      if (outcome.kind === "failed") {
-        callbacks.onError({ reason: outcome.reason });
-        return false;
-      }
-      callbacks.onSaved(outcome.value);
-      return true;
+      // En la misma cola que las filas: la respuesta de un guardado anterior
+      // trae el nombre viejo y, si llegara después, lo devolvería a la lista.
+      const renamed = queue.current.then(() => rename(name));
+      queue.current = renamed.then(() => undefined);
+      return renamed;
     },
   };
 }

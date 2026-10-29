@@ -28687,6 +28687,9 @@ async function stubPlannerRoutines(
   );
 }
 
+/** Desde este ancho la lista y el editor de rutinas salen juntos. */
+const PLANNER_ROUTINE_EDITOR_BESIDE_PX = 768;
+
 async function goToPlannerRoutines(
   page: Page,
   options: {
@@ -28710,6 +28713,13 @@ async function goToPlannerRoutines(
   await expect(
     page.getByRole("button", { name: /^Gym A · Strength/ }),
   ).toBeVisible();
+  // Desde la tableta, la primera rutina se abre sola en el editor: hay que
+  // esperarla, porque la captura mide el alto de la página.
+  if ((page.viewportSize()?.width ?? 0) >= PLANNER_ROUTINE_EDITOR_BESIDE_PX) {
+    await expect(
+      page.getByRole("combobox", { name: /^(Load for|Carga de) Back squat$/ }),
+    ).toBeVisible();
+  }
   await page.mouse.move(0, 0);
 }
 

@@ -382,6 +382,8 @@ export function PlannerRoutinesTab({
       </div>
       <RoutineMessages translate={translate} notice={notice} error={error} />
       <RoutinesBody
+        // Otro filtro es otra lista: en el móvil vuelve a ella, sin editor.
+        key={list.filter}
         translate={translate}
         list={list}
         onError={setError}
