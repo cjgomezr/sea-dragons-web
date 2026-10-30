@@ -67,10 +67,12 @@ function RoutineFilter({
   translate,
   cycles,
   list,
+  onChange,
 }: {
   readonly translate: Translator;
   readonly cycles: readonly ManagedCycle[];
   readonly list: RoutineList;
+  readonly onChange: (filter: string) => void;
 }): React.JSX.Element {
   const selectId = useId();
   const { current, archived } = routineFilterGroups(cycles);
@@ -82,7 +84,7 @@ function RoutineFilter({
       <select
         id={selectId}
         value={list.filter}
-        onChange={(event) => list.changeFilter(event.target.value)}
+        onChange={(event) => onChange(event.target.value)}
       >
         {current.map((cycle) => (
           <option key={cycle.id} value={cycle.id}>
@@ -233,28 +235,25 @@ function RoutineColumn({
 }): React.JSX.Element {
   return (
     <div className="training-routine-column">
-      {routines.length === 0 ? null : (
-        <ul
-          className="training-routine-list"
-          aria-label={translate("training.manage.routineList")}
-        >
-          {routines.map((routine) => (
-            <li key={routine.id}>
-              <RoutineButton
-                translate={translate}
-                routine={routine}
-                isSelected={routine.id === list.selected?.id}
-                isPhone={isPhone}
-                onOpen={() => {
-                  list.select(routine.id);
-                  onOpen();
-                }}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-      <NewRoutineButton translate={translate} list={list} onCreated={onOpen} />
+      <ul
+        className="training-routine-list"
+        aria-label={translate("training.manage.routineList")}
+      >
+        {routines.map((routine) => (
+          <li key={routine.id}>
+            <RoutineButton
+              translate={translate}
+              routine={routine}
+              isSelected={routine.id === list.selected?.id}
+              isPhone={isPhone}
+              onOpen={() => {
+                list.select(routine.id);
+                onOpen();
+              }}
+            />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -286,16 +285,17 @@ function RoutineMessages({
 function RoutinesBody({
   translate,
   list,
+  phoneEditor,
   onError,
   announce,
 }: {
   readonly translate: Translator;
   readonly list: RoutineList;
+  readonly phoneEditor: PhoneEditor;
   readonly onError: (error: PlannerError | null) => void;
   readonly announce: (notice: string) => void;
 }): React.JSX.Element {
-  const isPhone = useIsPhone();
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const { isPhone, isShown, open, close } = phoneEditor;
   const { state, selected } = list;
   if (state.kind === "loading") {
     return (
@@ -326,18 +326,28 @@ function RoutinesBody({
         onSaved={list.replace}
         onDeleted={(routine) => {
           list.remove(routine.id);
-          setIsEditorOpen(false);
+          close();
           announce(
             translate("training.manage.routineDeleted", { name: routine.name }),
           );
         }}
         onError={onError}
         onNotice={announce}
-        onBack={() => setIsEditorOpen(false)}
+        onBack={close}
       />
     );
-  if (isPhone && isEditorOpen && editor !== null) {
+  if (isShown && editor !== null) {
     return editor;
+  }
+  const empty = (
+    <EmptyRoutines
+      translate={translate}
+      isShared={list.filter === SHARED_ROUTINES_FILTER}
+    />
+  );
+  // Sin rutinas no queda columna: se crean con el botón de la fila del filtro.
+  if (state.routines.length === 0) {
+    return empty;
   }
   const column = (
     <RoutineColumn
@@ -345,22 +355,11 @@ function RoutinesBody({
       list={list}
       routines={state.routines}
       isPhone={isPhone}
-      onOpen={() => setIsEditorOpen(true)}
-    />
-  );
-  const empty = (
-    <EmptyRoutines
-      translate={translate}
-      isShared={list.filter === SHARED_ROUTINES_FILTER}
+      onOpen={open}
     />
   );
   if (isPhone) {
-    return (
-      <>
-        {state.routines.length === 0 ? empty : null}
-        {column}
-      </>
-    );
+    return column;
   }
   return (
     <div className="training-routine-layout">
@@ -368,6 +367,25 @@ function RoutinesBody({
       {editor ?? empty}
     </div>
   );
+}
+
+/** En el móvil, la lista o el editor a pantalla completa, uno cada vez. */
+type PhoneEditor = {
+  readonly isPhone: boolean;
+  readonly isShown: boolean;
+  readonly open: () => void;
+  readonly close: () => void;
+};
+
+function usePhoneEditor(list: RoutineList): PhoneEditor {
+  const isPhone = useIsPhone();
+  const [isOpen, setIsOpen] = useState(false);
+  return {
+    isPhone,
+    isShown: isPhone && isOpen && list.selected !== null,
+    open: () => setIsOpen(true),
+    close: () => setIsOpen(false),
+  };
 }
 
 export function PlannerRoutinesTab({
@@ -378,20 +396,37 @@ export function PlannerRoutinesTab({
   const [error, setError] = useState<PlannerError | null>(null);
   const { notice, announce } = useChangeNotice();
   const list = useRoutineList(defaultRoutineFilter(selectedCycleId), setError);
+  const phoneEditor = usePhoneEditor(list);
+  const canCreate = list.state.kind === "ready" && !phoneEditor.isShown;
   return (
     <>
       <div className="training-routine-filter-row">
-        <RoutineFilter translate={translate} cycles={cycles} list={list} />
+        <RoutineFilter
+          translate={translate}
+          cycles={cycles}
+          list={list}
+          onChange={(filter) => {
+            // Otro filtro es otra lista: en el móvil vuelve a ella, sin editor.
+            phoneEditor.close();
+            list.changeFilter(filter);
+          }}
+        />
         <p className="training-routine-filter-hint">
           {translate("training.manage.routinesHint")}
         </p>
+        {canCreate ? (
+          <NewRoutineButton
+            translate={translate}
+            list={list}
+            onCreated={phoneEditor.open}
+          />
+        ) : null}
       </div>
       <RoutineMessages translate={translate} notice={notice} error={error} />
       <RoutinesBody
-        // Otro filtro es otra lista: en el móvil vuelve a ella, sin editor.
-        key={list.filter}
         translate={translate}
         list={list}
+        phoneEditor={phoneEditor}
         onError={setError}
         announce={announce}
       />

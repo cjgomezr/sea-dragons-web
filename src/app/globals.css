@@ -27050,6 +27050,10 @@ a.dashboard-club-cell-body:focus-visible {
 }
 
 .training-routine-filter-hint {
+  /* Se encoge y parte su texto antes que empujar "+ New routine" a otra
+     línea (#944). */
+  flex: 1 1 16rem;
+  min-width: 0;
   margin: 0;
   font-size: 13px;
   color: var(--color-text-secondary);
@@ -27153,9 +27157,13 @@ a.dashboard-club-cell-body:focus-visible {
   color: var(--color-text-secondary);
 }
 
+/* Arriba, en la fila del filtro y a su derecha (#944): si no cabe, baja a
+   una segunda línea de la fila. */
 .training-routine-new {
-  width: 100%;
-  min-height: 48px;
+  width: auto;
+  min-height: var(--touch-target-min);
+  margin-inline-start: auto;
+  padding: 0 var(--space-4);
 }
 
 .training-routine-editor {
@@ -27773,6 +27781,13 @@ a.dashboard-club-cell-body:focus-visible {
 
   .training-routine-filter-hint {
     display: none;
+  }
+
+  /* Bajo la fila del filtro y a todo el ancho. */
+  .training-routine-new {
+    width: 100%;
+    min-height: 48px;
+    margin-inline-start: 0;
   }
 
   .training-routine-list {

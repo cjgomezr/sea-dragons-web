@@ -28864,12 +28864,35 @@ const PLANNER_STRENGTH_ITEMS = [
   }),
 ];
 
+/** Los colores de rutina del tema (`--color-routine-0` a `-5`). */
+const ROUTINE_COLOR_COUNT = 6;
+
+/** Las rutinas del ciclo de muestra UWR. */
+const UWR_SAMPLE_ROUTINE_COUNT = 48;
+
+/** Un ciclo como el de muestra UWR (#944). */
+const MANY_ROUTINES = [
+  ...ROUTINES_TAB_ROUTINES,
+  ...Array.from(
+    { length: UWR_SAMPLE_ROUTINE_COUNT - ROUTINES_TAB_ROUTINES.length },
+    (_, index) => ({
+      id: `cccccccc-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      name: `Session ${index + 1}`,
+      cycleId: PLANNER_ACTIVE_CYCLE.id,
+      colorIndex: index % ROUTINE_COLOR_COUNT,
+      itemCount: 4,
+      daysUsed: 1,
+    }),
+  ),
+];
+
 type PlannerSavedItems = { items: unknown[] };
 
 /** Sirve las rutinas y guarda lo que se le manda en `saved`. */
 async function stubPlannerRoutines(
   page: Page,
   saved: PlannerSavedItems[] = [],
+  listed: readonly unknown[] = ROUTINES_TAB_ROUTINES,
 ): Promise<void> {
   await page.route(
     (url) => url.pathname === PLANNER_MARKS_ENDPOINT,
@@ -28880,7 +28903,7 @@ async function stubPlannerRoutines(
   );
   await page.route(
     (url) => url.pathname === PLANNER_ROUTINES_ENDPOINT,
-    (route) => route.fulfill(jsonBody({ routines: ROUTINES_TAB_ROUTINES })),
+    (route) => route.fulfill(jsonBody({ routines: listed })),
   );
   await page.route(
     (url) => url.pathname.endsWith("/items"),
@@ -28910,10 +28933,11 @@ async function goToPlannerRoutines(
     readonly theme?: (typeof themes)[number];
     readonly isSpanish?: boolean;
     readonly saved?: PlannerSavedItems[];
+    readonly routines?: readonly unknown[];
   } = {},
 ): Promise<void> {
   await stubPlannerCycles(page);
-  await stubPlannerRoutines(page, options.saved);
+  await stubPlannerRoutines(page, options.saved, options.routines);
   await openPlanner(
     page,
     { name: "planificar-rutinas", isSpanish: options.isSpanish },
@@ -29041,6 +29065,51 @@ test.describe("planificar-rutinas", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await goToPlannerRoutines(page, { isSpanish: true });
     await expectNoAxeViolations(page);
+  });
+
+  // #944: el botón de crear va arriba, en la fila del filtro, y se ve al
+  // entrar aunque el ciclo traiga muchas rutinas.
+  for (const size of [
+    { width: 1440, height: 900 },
+    { width: 375, height: 812 },
+  ]) {
+    test(`con ${MANY_ROUTINES.length} rutinas, el botón de crear se ve sin scroll a ${size.width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(size);
+      await goToPlannerRoutines(page, { routines: MANY_ROUTINES });
+
+      const create = page.getByRole("button", {
+        name: "New routine in this cycle",
+      });
+      await expect(create).toHaveCount(1);
+      await expect(create).toBeInViewport({ ratio: 1 });
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    });
+  }
+
+  test("en el móvil, el botón de crear ocupa todo el ancho y mide al menos 44 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPlannerRoutines(page);
+
+    const create = page.getByRole("button", {
+      name: "New routine in this cycle",
+    });
+    const filter = page.getByRole("combobox", { name: "Routines of" });
+    const createBox = await create.boundingBox();
+    const filterBox = await filter.boundingBox();
+    const listBox = await page
+      .getByRole("list", { name: "Routines" })
+      .boundingBox();
+    if (createBox === null || filterBox === null || listBox === null) {
+      throw new Error("El filtro, el botón o la lista no están a la vista");
+    }
+    expect(createBox.height).toBeGreaterThanOrEqual(44);
+    expect(Math.round(createBox.width)).toBe(Math.round(filterBox.width));
+    expect(createBox.y).toBeGreaterThan(filterBox.y + filterBox.height);
+    expect(createBox.y + createBox.height).toBeLessThan(listBox.y);
   });
 
   // §5.1: el porcentaje en un campo de 48 px y el texto en uno de 86 px.
