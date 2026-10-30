@@ -206,6 +206,7 @@ function routinesGateways(): ClubRoutinesGateways {
       },
       exerciseVisible: async () => true,
       findLastDose: async () => null,
+      listItems: notUsed,
     },
   };
 }
