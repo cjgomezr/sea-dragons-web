@@ -25745,8 +25745,10 @@ a.dashboard-club-cell-body:focus-visible {
   background: color-mix(in srgb, var(--color-warning) 30%, transparent);
 }
 
+/* El texto secundario sobre --color-hover no llega a 4.5:1 en el tema claro
+   (#952, la primera captura con un archivado elegido). */
 .training-plan-status-archived {
-  color: var(--color-text-secondary);
+  color: var(--color-text-soft);
   background: var(--color-hover);
 }
 

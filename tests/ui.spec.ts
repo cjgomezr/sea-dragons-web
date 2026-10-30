@@ -27890,6 +27890,9 @@ type PlannerState = {
   readonly isConfirmingDelete?: boolean;
   /** Con la semana abierta y la confirmación de Clear week abierta (#943). */
   readonly isConfirmingClearWeek?: boolean;
+  /** Con el archivado elegido y la confirmación de volver a activarlo
+   * abierta (#952). */
+  readonly isConfirmingReactivate?: boolean;
 };
 
 /** Como la captura del handoff: un activo elegido, un borrador y un
@@ -27899,6 +27902,7 @@ const PLANNER_STATES: readonly PlannerState[] = [
   { name: "planificar-ciclo-es", isSpanish: true },
   { name: "planificar-semana-abierta", openWeek: 2 },
   { name: "planificar-ciclo-borrar", isConfirmingDelete: true },
+  { name: "planificar-ciclo-reactivar", isConfirmingReactivate: true },
   {
     name: "planificar-semana-vaciar",
     openWeek: 2,
@@ -27907,6 +27911,7 @@ const PLANNER_STATES: readonly PlannerState[] = [
 ];
 
 const PLANNER_DRAFT_CYCLE_NAME = "Summer base 2027";
+const PLANNER_ARCHIVED_CYCLE_NAME = "Winter 2026";
 
 /* La cuadrícula del ciclo activo (#907): rutinas del ciclo y una compartida,
    dos rutinas el lunes, y la nota y la dosis de algunas semanas. */
@@ -28098,6 +28103,9 @@ async function openPlanner(
   if (state.isConfirmingDelete === true) {
     await openCycleDeleteConfirm(page);
   }
+  if (state.isConfirmingReactivate === true) {
+    await openCycleReactivateConfirm(page);
+  }
   if (state.isConfirmingClearWeek === true && state.openWeek !== undefined) {
     await openClearWeekConfirm(page, state.openWeek);
   }
@@ -28137,6 +28145,29 @@ async function openCycleDeleteConfirm(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+/** Elige el archivado (detrás de Show archived en el escritorio, en el
+ * selector en el móvil) y pulsa Make active: terminó en julio, así que la
+ * confirmación lo dice (#952). */
+async function openCycleReactivateConfirm(page: Page): Promise<void> {
+  const select = page.getByRole("combobox", { name: "Cycle", exact: true });
+  if (await select.isVisible()) {
+    await select.selectOption({ label: PLANNER_ARCHIVED_CYCLE_NAME });
+  } else {
+    await page.getByRole("button", { name: "Show archived · 1" }).click();
+    await page
+      .getByRole("button", {
+        name: new RegExp(`^${PLANNER_ARCHIVED_CYCLE_NAME}`),
+      })
+      .click();
+  }
+  await page.getByRole("button", { name: "Make active" }).click();
+  await expect(
+    page.getByRole("group", {
+      name: `Make "${PLANNER_ARCHIVED_CYCLE_NAME}" active again? Road to Nationals 2027 will be archived. It ended on 12 Jul. Members will see a finished cycle.`,
+    }),
+  ).toBeVisible();
+}
+
 /** La captura de página entera pasa la ventana por 1 × 1 px un momento: la
  * pestaña cruza al móvil, se vuelve a montar y la semana abierta o la
  * confirmación de borrar se cierran. Con una de las dos abierta, la ventana
@@ -28146,7 +28177,9 @@ async function plannerCaptureFullPage(
   page: Page,
   state: PlannerState,
 ): Promise<boolean> {
-  if (state.openWeek === undefined && state.isConfirmingDelete !== true) {
+  const hasOpenConfirm =
+    state.isConfirmingDelete === true || state.isConfirmingReactivate === true;
+  if (state.openWeek === undefined && !hasOpenConfirm) {
     return true;
   }
   const viewport = page.viewportSize();
