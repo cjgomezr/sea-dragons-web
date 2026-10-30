@@ -16,10 +16,12 @@ import {
   activateCycle,
   archiveCycle,
   createCycle,
+  deleteCycle,
   duplicateCycle,
   loadCycles,
   updateCycle,
 } from "./planner-client";
+import { CYCLE_IS_ACTIVE_REASON } from "./planner-format";
 
 /**
  * Los ciclos de Planificar (#906): la lista, el elegido, y lo que se les
@@ -65,6 +67,9 @@ export type PlannerCycles = {
   readonly activate: (cycle: ManagedCycle) => void;
   readonly archive: (cycle: ManagedCycle) => void;
   readonly duplicate: (cycle: ManagedCycle) => void;
+  /** Termina cuando la API responde, para que quien lo pidió sepa cuándo
+   * devolver el foco. */
+  readonly remove: (cycle: ManagedCycle) => Promise<void>;
 };
 
 function replaceCycle(cycles: CycleList, cycle: ManagedCycle): CycleList {
@@ -77,6 +82,7 @@ function useCycleList(): {
     update: (state: PlannerCyclesState) => PlannerCyclesState,
   ) => void;
   readonly retry: () => void;
+  readonly reload: () => void;
 } {
   const [state, setState] = useState<PlannerCyclesState>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
@@ -109,6 +115,16 @@ function useCycleList(): {
       setState({ kind: "loading" });
       setAttempt((previous) => previous + 1);
     },
+    // Sin pasar por "cargando": la pestaña sigue a la vista con el error que
+    // explica por qué se recarga. Si la lista no llega, se queda la que hay
+    // y ese error sigue diciendo qué pasó.
+    reload: () => {
+      void loadCycles().then((outcome) => {
+        if (outcome.kind === "ok") {
+          setState(withCycles(outcome.value));
+        }
+      });
+    },
   };
 }
 
@@ -135,6 +151,7 @@ export function usePlannerCycles(translate: Translator): PlannerCycles {
   async function run<Value>(
     action: () => Promise<PlannerOutcome<Value>>,
     onDone: (value: Value) => void,
+    onFailed?: (reason: string | null) => void,
   ): Promise<void> {
     setIsBusy(true);
     setError(null);
@@ -142,6 +159,7 @@ export function usePlannerCycles(translate: Translator): PlannerCycles {
     setIsBusy(false);
     if (outcome.kind === "failed") {
       setError({ reason: outcome.reason });
+      onFailed?.(outcome.reason);
       return;
     }
     onDone(outcome.value);
@@ -229,6 +247,23 @@ export function usePlannerCycles(translate: Translator): PlannerCycles {
               count: duplicated.routinesCopied,
             }),
           );
+        },
+      ),
+    remove: (cycle) =>
+      run(
+        () => deleteCycle(cycle.id),
+        (cycles) => {
+          list.setState(() => ({
+            kind: "ready",
+            cycles: sortCycles(cycles),
+            selectedId: defaultCycleId(cycles),
+          }));
+          announce(translate("training.manage.deleted"));
+        },
+        (reason) => {
+          if (reason === CYCLE_IS_ACTIVE_REASON) {
+            list.reload();
+          }
         },
       ),
   };

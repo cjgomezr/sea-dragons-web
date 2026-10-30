@@ -3088,6 +3088,18 @@ export const englishMessages = {
   "training.manage.makeActive": "Make active",
   "training.manage.duplicate": "Duplicate",
   "training.manage.archive": "Archive",
+  "training.manage.delete": "Delete",
+  "training.manage.deleteCycle": "Delete cycle",
+  "training.manage.confirmDeleteCycle": {
+    one: 'Delete "{name}"? Its {count} own routine and its grid go with it. This can\'t be undone.',
+    other:
+      'Delete "{name}"? Its {count} own routines and its grid go with it. This can\'t be undone.',
+  },
+  "training.manage.confirmDeleteEmptyCycle":
+    'Delete "{name}"? This can\'t be undone.',
+  "training.manage.deleted": "Cycle deleted.",
+  "training.manage.errorCycleIsActive":
+    "This cycle is active now. Archive it first.",
   "training.manage.cycleName": "Cycle name",
   "training.manage.targetEvent": "Target event · optional",
   "training.manage.eventDate": "Event first day",
