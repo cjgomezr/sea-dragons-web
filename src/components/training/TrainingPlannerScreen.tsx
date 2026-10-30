@@ -6,8 +6,10 @@ import { ListChecks } from "@phosphor-icons/react/dist/ssr/ListChecks";
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { Trophy } from "@phosphor-icons/react/dist/ssr/Trophy";
 import { useMemo, useState } from "react";
+import { BackLink } from "@/components/BackLink";
 import { Icon } from "@/components/Icon";
 import { useIsPhone } from "@/components/use-is-phone";
+import { TRAINING_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import type { ManagedCycle } from "@/lib/training/club-cycles";
@@ -361,6 +363,9 @@ export function TrainingPlannerScreen({
   const translate = useMemo(() => createTranslator(locale), [locale]);
   return (
     <div className="training training-plan">
+      <BackLink href={TRAINING_PATH}>
+        {translate("training.manage.back")}
+      </BackLink>
       <PlannerHeader translate={translate} />
       <PlannerContent translate={translate} />
     </div>

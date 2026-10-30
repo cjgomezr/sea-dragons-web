@@ -28473,6 +28473,17 @@ test.describe("planificar en el navegador", () => {
     expect(Math.round((await card.boundingBox())?.width ?? 0)).toBe(270);
   });
 
+  // #936: en el móvil Entrenamiento no tiene pestaña abajo; el enlace es la
+  // vuelta corta.
+  test("Back to Training lleva a Entrenamiento", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPlanner(page, { name: "planificar-ciclo" });
+
+    await page.getByRole("link", { name: "Back to Training" }).click();
+
+    await expect(page).toHaveURL(`${APP_URL}/entrenamiento`);
+  });
+
   test("Duplicate enseña el aviso verde y se va solo", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.route(
