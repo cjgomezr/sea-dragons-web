@@ -74,7 +74,7 @@ type ExerciseOptions = {
   readonly note?: string | null;
   readonly tips?: readonly string[];
   readonly photoUrls?: readonly string[];
-  readonly youtubeUrl?: string;
+  readonly youtubeUrl?: string | null;
 };
 
 function exercise(options: ExerciseOptions): TrainingRoutineItem {
@@ -87,8 +87,9 @@ function exercise(options: ExerciseOptions): TrainingRoutineItem {
       tips: options.tips ?? [],
       photoUrls: options.photoUrls ?? [],
       youtubeUrl:
-        options.youtubeUrl ??
-        `https://www.youtube.com/results?search_query=${encodeURIComponent(options.name)}`,
+        options.youtubeUrl === undefined
+          ? `https://www.youtube.com/results?search_query=${encodeURIComponent(options.name)}`
+          : options.youtubeUrl,
     },
     sets: options.sets === undefined ? 3 : options.sets,
     reps: options.reps === undefined ? "8" : options.reps,
@@ -144,6 +145,21 @@ const GYM_A: TrainingRoutine = {
       photoUrls: ["https://cdn.example/pull-up-start.jpg"],
     }),
     exercise({ name: "Band pull-apart", sets: null, reps: "15" }),
+    // Dos ejercicios del club con el campo YouTube vacío (#937).
+    exercise({
+      name: "ESC interval",
+      sets: null,
+      reps: "6 x 25 m",
+      tips: ["Exhale slowly on the way down."],
+      youtubeUrl: null,
+    }),
+    exercise({
+      name: "Swim set",
+      sets: null,
+      reps: "8 x 50 m",
+      note: "Fins on, 20 s rest",
+      youtubeUrl: null,
+    }),
   ],
 };
 
@@ -519,6 +535,29 @@ describe("abrir una fila", () => {
       "href",
       "https://www.youtube.com/results?search_query=Band%20pull-apart",
     );
+  });
+
+  it("sin YouTube, enseña los consejos y ningún enlace", async () => {
+    stubApi(week3Plan());
+    await renderScreen();
+
+    const panel = await openRow("ESC interval");
+
+    expect(
+      within(panel).getByText("Exhale slowly on the way down."),
+    ).toBeVisible();
+    expect(within(panel).queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("sin YouTube, fotos, consejos ni marca, se abre sin pintar un panel vacío", async () => {
+    stubApi(week3Plan());
+    await renderScreen();
+
+    await userEvent.click(row("Swim set"));
+
+    expect(row("Swim set")).toHaveAttribute("aria-expanded", "true");
+    expect(row("Swim set")).not.toHaveAttribute("aria-controls");
+    expect(row("Swim set").nextElementSibling).toBeNull();
   });
 
   it("con % de una marca que tiene, el campo de la fila lleva su valor", async () => {

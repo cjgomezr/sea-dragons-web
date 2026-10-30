@@ -7,6 +7,7 @@ import {
   membershipBlockOf,
   readMembership,
 } from "@/lib/membership/membership";
+import type { ExerciseSource } from "./club-exercises";
 import {
   type CycleWeekPosition,
   cycleDayDate,
@@ -51,9 +52,10 @@ export type TrainingCycleRecord = {
 export type ExerciseRecord = {
   readonly id: string;
   readonly name: string;
+  readonly source: ExerciseSource;
   readonly tips: readonly string[];
-  /** Un enlace `https://`, un texto que buscar, o nulo para buscar el
-   * nombre (D13). */
+  /** Un enlace `https://`, un texto que buscar, o nulo: la biblioteca busca
+   * entonces el nombre y el club no tiene botón (D13). */
   readonly youtube: string | null;
   readonly imageStartPath: string | null;
   readonly imageEndPath: string | null;
@@ -147,8 +149,9 @@ export type TrainingExercise = {
   readonly tips: readonly string[];
   /** Las de inicio y fin que tenga: 0, 1 o 2. */
   readonly photoUrls: readonly string[];
-  /** El enlace del ejercicio, o la búsqueda que toca (D13). */
-  readonly youtubeUrl: string;
+  /** El enlace del ejercicio, la búsqueda que toca, o nulo si no tiene
+   * botón (D13). */
+  readonly youtubeUrl: string | null;
 };
 
 export type TrainingRoutineItem =
@@ -229,13 +232,21 @@ function toTrainingCycle(record: TrainingCycleRecord): TrainingCycle {
   };
 }
 
-function youtubeUrlOf(exercise: ExerciseRecord): string {
+function youtubeSearchUrl(query: string): string {
+  return `${YOUTUBE_SEARCH_URL}${encodeURIComponent(query)}`;
+}
+
+/** A dónde lleva "Watch on YouTube" (D13). Un ejercicio del club con el campo
+ * vacío no tiene botón: su nombre ("Swim set") no encuentra nada útil. */
+export function youtubeUrlOf(exercise: ExerciseRecord): string | null {
   const youtube = exercise.youtube?.trim() ?? "";
   if (youtube.startsWith(YOUTUBE_LINK_PREFIX)) {
     return youtube;
   }
-  const query = youtube === "" ? exercise.name : youtube;
-  return `${YOUTUBE_SEARCH_URL}${encodeURIComponent(query)}`;
+  if (youtube !== "") {
+    return youtubeSearchUrl(youtube);
+  }
+  return exercise.source === "club" ? null : youtubeSearchUrl(exercise.name);
 }
 
 function toTrainingExercise(

@@ -27104,6 +27104,8 @@ function detailedTrainingRow(
     readonly rest: string | null;
     readonly note?: string;
     readonly load: unknown;
+    /** Nulo para un ejercicio del club sin YouTube (#937). */
+    readonly youtubeUrl?: string | null;
   },
 ): unknown {
   return {
@@ -27114,7 +27116,10 @@ function detailedTrainingRow(
       name,
       tips: row.tips ?? [],
       photoUrls: row.photos ?? [],
-      youtubeUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(name)}`,
+      youtubeUrl:
+        row.youtubeUrl === undefined
+          ? `https://www.youtube.com/results?search_query=${encodeURIComponent(name)}`
+          : row.youtubeUrl,
     },
     sets: row.sets,
     reps: row.reps,
@@ -27186,6 +27191,61 @@ const TRAINING_DAY_WITH_KILOS_PLAN = {
     ),
   },
 };
+
+/* Ejercicios del club con el campo YouTube vacío (#937): sin botón. Uno con
+   consejos y otro sin nada que enseñar al abrirse. */
+const TRAINING_POOL_CLUB = {
+  id: "routine-pool-club",
+  name: "Pool · Endurance",
+  colorIndex: 0,
+  items: [
+    detailedTrainingRow("ESC interval", {
+      tips: [
+        "Exhale slowly on the way down.",
+        "Hold the bottom for a full second.",
+      ],
+      sets: null,
+      reps: "6 x 25 m",
+      rest: "0:30",
+      load: { kind: "none" },
+      youtubeUrl: null,
+    }),
+    detailedTrainingRow("Swim set", {
+      sets: null,
+      reps: "8 x 50 m",
+      rest: null,
+      note: "Fins on, 20 s rest",
+      load: { kind: "none" },
+      youtubeUrl: null,
+    }),
+  ],
+};
+
+const TRAINING_CLUB_WITHOUT_YOUTUBE_PLAN = {
+  ...TRAINING_ACTIVE_PLAN,
+  week: {
+    ...TRAINING_ACTIVE_PLAN.week,
+    days: TRAINING_ACTIVE_PLAN.week.days.map((day) =>
+      day.weekday === 1 ? { ...day, routines: [TRAINING_POOL_CLUB] } : day,
+    ),
+  },
+};
+
+/** Abre las dos filas del club sin YouTube: la de los consejos y la que no
+ * tiene nada que enseñar. */
+async function openTrainingClubRows(page: Page): Promise<void> {
+  await waitForTrainingWeek(page);
+  const pool = page.getByRole("region", { name: "Pool · Endurance" });
+  for (const name of ["ESC interval", "Swim set"]) {
+    const row = pool.getByRole("button", { name: new RegExp(`^${name}`) });
+    await row.click();
+    await expect(row).toHaveAttribute("aria-expanded", "true");
+  }
+  await expect(
+    pool.getByText(/^Exhale slowly on the way down\.$/),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
 
 /** Abre la fila del back squat y espera a que sus fotos carguen, para que
  * la captura no salga con un hueco donde iba una foto. */
@@ -27311,6 +27371,13 @@ const TRAINING_STATES: readonly TrainingState[] = [
     storageState: E2E_STORAGE_STATE_PATH,
     isSpanish: true,
     ready: openTrainingSquatRow,
+  },
+  // Dos ejercicios del club sin YouTube, abiertos (#937).
+  {
+    name: "entrenamiento-club-sin-youtube",
+    plan: TRAINING_CLUB_WITHOUT_YOUTUBE_PLAN,
+    storageState: E2E_STORAGE_STATE_PATH,
+    ready: openTrainingClubRows,
   },
   {
     name: "entrenamiento-diez-marcas",
@@ -27552,6 +27619,31 @@ test.describe("entrenamiento en el navegador", () => {
     expect(youtube?.height).toBeGreaterThanOrEqual(44);
     expect(youtube?.x).toBe(tips?.x);
     expect(youtube?.width).toBeGreaterThanOrEqual(tips?.width ?? Infinity);
+  });
+
+  test("un ejercicio del club sin YouTube no tiene botón ni panel vacío", async ({
+    page,
+  }) => {
+    await stubTrainingMarksAndPhotos(page);
+    await page.route(
+      (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
+      (route) => route.fulfill(jsonBody(TRAINING_CLUB_WITHOUT_YOUTUBE_PLAN)),
+    );
+    await page.goto(`${APP_URL}${TRAINING_SCREEN_PATH}`);
+    await waitForTrainingWeek(page);
+    const pool = page.getByRole("region", { name: "Pool · Endurance" });
+    const swimSet = pool.getByRole("button", { name: /^Swim set/ });
+    const swimSetItem = swimSet.locator("..");
+    const closedHeight = (await swimSetItem.boundingBox())?.height;
+
+    await openTrainingClubRows(page);
+
+    await expect(
+      pool.getByRole("link", { name: /Watch on YouTube/ }),
+    ).toHaveCount(0);
+    await expect(swimSet).not.toHaveAttribute("aria-controls");
+    // Abierta sin nada que enseñar, la fila mide lo mismo que cerrada.
+    expect((await swimSetItem.boundingBox())?.height).toBe(closedHeight);
   });
 
   test("la marca escrita en la fila cambia los kilos al momento", async ({

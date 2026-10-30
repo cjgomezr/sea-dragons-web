@@ -265,6 +265,8 @@ describeRls("La semana del socio contra Supabase", () => {
               exercise: {
                 name: "Back squat",
                 tips: ["Brace"],
+                // Del club y sin YouTube: sin botón (#937).
+                youtubeUrl: null,
                 photoUrls: [
                   expect.stringMatching(
                     /\/storage\/v1\/object\/public\/training-exercise-images\/club\/squat-start\.webp$/,
