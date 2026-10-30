@@ -29092,7 +29092,9 @@ test.describe("planificar-rutina-anadir", () => {
     await goToPlannerRoutines(page);
     await searchToAddExercise(page, "squat");
 
-    const options = page.getByRole("option");
+    const options = page
+      .getByRole("listbox", { name: "Add exercise" })
+      .getByRole("option");
     await expect(options).toHaveCount(6);
     const last = options.last();
     await last.scrollIntoViewIfNeeded();
@@ -29119,7 +29121,11 @@ test.describe("planificar-rutina-anadir", () => {
     await openPhoneRoutineEditor(page);
     await searchToAddExercise(page, "squat");
 
-    for (const option of await page.getByRole("option").all()) {
+    const options = page
+      .getByRole("listbox", { name: "Add exercise" })
+      .getByRole("option");
+    await expect(options).toHaveCount(6);
+    for (const option of await options.all()) {
       expect(Math.round((await option.boundingBox())?.height ?? 0)).toBe(56);
     }
     await page.getByRole("combobox", { name: "Add exercise" }).blur();
