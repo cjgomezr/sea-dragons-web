@@ -10,6 +10,7 @@ import type {
   ClubCyclesGateways,
   CycleDayChange,
   CycleDayRecord,
+  CycleDeletion,
   CycleFields,
   CycleTarget,
   CycleWeekRecord,
@@ -26,8 +27,9 @@ import type { DoseIntensity } from "./training-load";
  * Los ciclos de Planificar contra Supabase (#904), con la llave de servicio
  * como todo lo que escribe Entrenamiento (D4). Cada consulta filtra por el
  * club de quien llama. Cambiar, activar, duplicar, poner un día y copiar la
- * semana 1 son funciones de `0085_training_cycles_manage.sql`, para que cada
- * una sea una transacción.
+ * semana 1 son funciones de `0085_training_cycles_manage.sql`, y borrar es
+ * la de `0088_training_cycle_delete.sql`, para que cada una sea una
+ * transacción.
  */
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -68,6 +70,17 @@ const updateRowsSchema = z.array(z.object({ days_removed: z.number().int() }));
 
 const activationRowsSchema = z.array(
   z.object({ archived_cycle_id: z.string().nullable() }),
+);
+
+const deletionRowsSchema = z.array(
+  z.discriminatedUnion("deleted", [
+    z.object({
+      deleted: z.literal(true),
+      previous_status: z.enum(["draft", "archived"]),
+      routines_deleted: z.number().int(),
+    }),
+    z.object({ deleted: z.literal(false) }),
+  ]),
 );
 
 const duplicateRowsSchema = z.array(
@@ -272,6 +285,32 @@ async function archiveCycle(
   }
 }
 
+/** Mirar que no esté activo y borrar, en una transacción (`0088`). */
+async function deleteCycle(
+  serviceClient: SupabaseClient,
+  target: CycleTarget,
+): Promise<CycleDeletion> {
+  const { data, error } = await serviceClient.rpc("delete_training_cycle", {
+    p_club_id: target.clubId,
+    p_cycle_id: target.cycleId,
+  });
+  if (error) {
+    throw failure(`borrar el ciclo ${target.cycleId}`, error.message);
+  }
+  const [row] = deletionRowsSchema.parse(data);
+  if (row === undefined) {
+    return { kind: "missing" };
+  }
+  if (!row.deleted) {
+    return { kind: "active" };
+  }
+  return {
+    kind: "deleted",
+    status: row.previous_status,
+    routinesDeleted: row.routines_deleted,
+  };
+}
+
 async function duplicateCycle(
   serviceClient: SupabaseClient,
   target: CycleTarget,
@@ -412,6 +451,7 @@ export function createClubCyclesGateways(
         updateCycle(serviceClient, target, fields),
       activateCycle: (target) => activateCycle(serviceClient, target),
       archiveCycle: (target) => archiveCycle(serviceClient, target),
+      deleteCycle: (target) => deleteCycle(serviceClient, target),
       duplicateCycle: (target, copy) =>
         duplicateCycle(serviceClient, target, copy),
       findRoutineScope: (clubId, routineId) =>

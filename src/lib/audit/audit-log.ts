@@ -152,7 +152,9 @@ export const AUDIT_ACTIONS = [
   // (`{ daysRemoved }`), el ciclo que se archivó (`{ archivedCycleId }`), de
   // cuál sale la copia (`{ sourceCycleId, routinesCopied }`), o qué semana,
   // día y ranura (`{ weekNo, weekday, slot }`). Ni nombres, ni notas, ni
-  // dosis.
+  // dosis. Al borrar (#935) sí va el nombre, con el estado que tenía y
+  // cuántas rutinas propias se fueron (`{ name, status, routinesDeleted }`):
+  // el ciclo ya no existe y sin él la entrada no diría qué se borró.
   "training_cycle.created",
   "training_cycle.updated",
   "training_cycle.activated",
@@ -161,6 +163,7 @@ export const AUDIT_ACTIONS = [
   "training_cycle.week_updated",
   "training_cycle.day_updated",
   "training_cycle.week_one_copied",
+  "training_cycle.deleted",
   // RF-9 de E35 (#905): un Admin o un Coach crea, renombra o borra una rutina,
   // o guarda sus filas. La entidad es la rutina (`training_routine`). Sin
   // metadata salvo al borrar, que lleva cuántos días quedaron en descanso

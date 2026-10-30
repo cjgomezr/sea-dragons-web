@@ -22,6 +22,7 @@ import {
   type CycleInput,
   type CycleWeekRecord,
   CycleDaysWouldBeRemovedError,
+  CycleIsActiveError,
   CycleNotFoundError,
 } from "./club-cycles";
 import {
@@ -68,6 +69,7 @@ export const EXERCISE_NAME_TAKEN_REASON = "exercise_name_taken";
 export const EXERCISE_IN_USE_REASON = "exercise_in_use";
 export const LIBRARY_EXERCISE_REASON = "library_exercise";
 export const CYCLE_DAYS_WOULD_BE_REMOVED_REASON = "cycle_days_would_be_removed";
+export const CYCLE_IS_ACTIVE_REASON = "cycle_is_active";
 export const ROUTINE_IN_USE_REASON = "routine_in_use";
 export const ROUTINE_UNKNOWN_REFERENCE_REASON = "unknown_reference";
 
@@ -287,6 +289,9 @@ function asCycleApiError(error: unknown): void {
   }
   if (error instanceof CycleNotFoundError) {
     throw new ApiError("not_found", error.message);
+  }
+  if (error instanceof CycleIsActiveError) {
+    throw new ApiError("conflict", error.message, CYCLE_IS_ACTIVE_REASON);
   }
   if (error instanceof CycleDaysWouldBeRemovedError) {
     throw new ApiErrorWithDetails("conflict", error.message, {
