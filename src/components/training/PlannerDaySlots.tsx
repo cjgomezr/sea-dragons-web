@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
+import { X } from "@phosphor-icons/react/dist/ssr/X";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import type { Translator } from "@/lib/i18n/translator";
@@ -12,7 +13,7 @@ import { routineColorStyle } from "./training-format";
 /**
  * Las rutinas de un día de la cuadrícula (#907, D7): un `<select>` con
  * "Rest" y las rutinas, y con una puesta, un "+" que abre el segundo. Con
- * dos no hay "+": no cabe una tercera.
+ * dos no hay "+": no cabe una tercera; la "×" quita la segunda.
  */
 
 /** Las opciones del `<select>`, pintadas una vez para toda la cuadrícula:
@@ -73,6 +74,52 @@ function SlotSelect({
   );
 }
 
+/** El segundo `<select>` y, si el ciclo se puede cambiar, la "×" que lo
+ * cierra o quita la segunda rutina (#942): elegir "Rest" otra vez sobre un
+ * selector recién abierto no dispara `change`. */
+function SecondSlot({
+  label,
+  removeLabel,
+  options,
+  routineId,
+  isReadOnly,
+  selectRef,
+  onChoose,
+  onRemove,
+}: {
+  readonly label: string;
+  readonly removeLabel: string;
+  readonly options: GridOptions;
+  readonly routineId: string | null;
+  readonly isReadOnly: boolean;
+  readonly selectRef: React.Ref<HTMLSelectElement>;
+  readonly onChoose: (routineId: string | null) => void;
+  readonly onRemove: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="training-grid-slot">
+      <SlotSelect
+        label={label}
+        options={options}
+        routineId={routineId}
+        isReadOnly={isReadOnly}
+        selectRef={selectRef}
+        onChoose={onChoose}
+      />
+      {isReadOnly ? null : (
+        <button
+          type="button"
+          className="training-grid-add"
+          aria-label={removeLabel}
+          onClick={onRemove}
+        >
+          <Icon glyph={X} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function PlannerDaySlots({
   translate,
   options,
@@ -83,6 +130,9 @@ export function PlannerDaySlots({
 }: DaySlotsProps): React.JSX.Element {
   const [isAddingSecond, setIsAddingSecond] = useState(false);
   const secondRef = useRef<HTMLSelectElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+  // Al quitar la segunda, el foco vuelve al "+" en cuanto este reaparece.
+  const shouldFocusAdd = useRef(false);
   const names = {
     week: day.weekNo,
     day: gridWeekdayName(translate, day.weekday),
@@ -97,11 +147,27 @@ export function PlannerDaySlots({
     }
   }, [isAddingSecond]);
 
+  useEffect(() => {
+    if (canAddSecond && shouldFocusAdd.current) {
+      shouldFocusAdd.current = false;
+      addRef.current?.focus();
+    }
+  }, [canAddSecond]);
+
   function choose(slot: CycleDaySlot, routineId: string | null): void {
     if (slot === 2 || routineId === null) {
       setIsAddingSecond(false);
     }
     onChange({ weekNo: day.weekNo, weekday: day.weekday, slot, routineId });
+  }
+
+  function removeSecond(): void {
+    shouldFocusAdd.current = true;
+    if (routines.second === null) {
+      setIsAddingSecond(false);
+      return;
+    }
+    choose(2, null);
   }
 
   return (
@@ -116,6 +182,7 @@ export function PlannerDaySlots({
         />
         {canAddSecond ? (
           <button
+            ref={addRef}
             type="button"
             className="training-grid-add"
             aria-label={translate("training.manage.addSecondRoutine", names)}
@@ -126,13 +193,15 @@ export function PlannerDaySlots({
         ) : null}
       </div>
       {hasSecond ? (
-        <SlotSelect
+        <SecondSlot
           label={translate("training.manage.daySecondSlot", names)}
+          removeLabel={translate("training.manage.removeSecondRoutine", names)}
           options={options}
           routineId={routines.second}
           isReadOnly={isReadOnly}
           selectRef={secondRef}
           onChoose={(routineId) => choose(2, routineId)}
+          onRemove={removeSecond}
         />
       ) : null}
     </div>
