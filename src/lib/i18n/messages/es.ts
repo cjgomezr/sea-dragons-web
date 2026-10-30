@@ -3116,6 +3116,11 @@ export const spanishMessages: MessageCatalog = {
   "training.manage.confirmDeleteEmptyCycle":
     '¿Borrar "{name}"? No se puede deshacer.',
   "training.manage.deleted": "Ciclo borrado.",
+  "training.manage.confirmReactivate":
+    '¿Volver a activar "{name}"? {active} pasará a archivado.',
+  "training.manage.confirmReactivateNoActive": '¿Volver a activar "{name}"?',
+  "training.manage.reactivateEnded":
+    "Terminó el {end}. Los miembros verán un ciclo terminado.",
   "training.manage.errorCycleIsActive":
     "Este ciclo ya está activo. Archívalo antes.",
   "training.manage.cycleName": "Nombre del ciclo",
@@ -3130,7 +3135,7 @@ export const spanishMessages: MessageCatalog = {
   "training.manage.lineDraft":
     "La semana 1 empezaría el {start} · borrador: los miembros no lo ven hasta que lo actives.",
   "training.manage.lineArchived":
-    "Corrió del {start} al {end} · archivado. Duplícalo para reutilizarlo.",
+    "Corrió del {start} al {end} · archivado. Actívalo de nuevo o duplícalo.",
   "training.manage.cycleSelect": "Ciclo",
   "training.manage.optionActive": "{name} · activo",
   "training.manage.optionDraft": "{name} · borrador",

@@ -25851,9 +25851,17 @@ a.dashboard-club-cell-body:focus-visible {
 }
 
 /* La confirmación de borrar un ciclo va en su propia línea, debajo de las
-   acciones: en el escritorio la franja la parte al hacer wrap. */
-.training-plan-cycle-delete {
+   acciones: en el escritorio la franja la parte al hacer wrap. La de volver
+   a activar un archivado (#952) también, pero en el color de Make active:
+   no borra nada. */
+.training-plan-cycle-delete,
+.training-plan-cycle-reactivate {
   flex: 1 0 100%;
+}
+
+.training-plan-cycle-reactivate {
+  background: color-mix(in srgb, var(--color-success) 12%, var(--color-panel));
+  border-color: var(--color-success);
 }
 
 .training-plan-fields {

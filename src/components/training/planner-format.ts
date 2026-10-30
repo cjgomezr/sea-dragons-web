@@ -10,7 +10,11 @@ import type {
 import type { ManagedRoutine } from "@/lib/training/club-routines";
 import type { CycleIssueCode } from "@/lib/training/club-cycle-input";
 import type { CycleSummary } from "@/lib/training/cycle-planner-view";
-import { cycleDayDate, cycleEndDate } from "@/lib/training/cycle-week";
+import {
+  cycleDayDate,
+  cycleEndDate,
+  cycleWeekAt,
+} from "@/lib/training/cycle-week";
 import type { DoseIntensity, WeekDose } from "@/lib/training/training-load";
 import { formatShortDate } from "./training-format";
 import type { PlannerError } from "./use-planner-cycles";
@@ -69,6 +73,36 @@ export function summaryLine(
         end: formatShortDate(translate.locale, summary.endDate),
       });
   }
+}
+
+/** Lo que pregunta volver a activar un archivado (#952): qué activo se
+ * archiva y, si sus fechas ya pasaron en Melbourne, que los miembros verán un
+ * ciclo terminado. */
+export function reactivateConfirmText(
+  translate: Translator,
+  request: {
+    readonly cycle: ManagedCycle;
+    readonly activeName: string | null;
+    readonly now: Date;
+  },
+): string {
+  const { cycle, activeName, now } = request;
+  const question =
+    activeName === null
+      ? translate("training.manage.confirmReactivateNoActive", {
+          name: cycle.name,
+        })
+      : translate("training.manage.confirmReactivate", {
+          name: cycle.name,
+          active: activeName,
+        });
+  if (cycleWeekAt(cycle, now).phase !== "finished") {
+    return question;
+  }
+  const ended = translate("training.manage.reactivateEnded", {
+    end: formatShortDate(translate.locale, cycleEndDate(cycle)),
+  });
+  return `${question} ${ended}`;
 }
 
 /** El motivo que dice la pantalla sin preguntar a la API. */

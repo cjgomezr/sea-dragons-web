@@ -29,6 +29,11 @@ type CycleTabProps = {
   readonly selected: ManagedCycle;
 };
 
+function activeCycleName(cycles: readonly ManagedCycle[]): string | null {
+  const active = cycles.find((cycle) => cycle.status === "active");
+  return active === undefined ? null : active.name;
+}
+
 function SummaryLine({
   translate,
   cycle,
@@ -92,6 +97,7 @@ export function DesktopCycleTab({
           translate={translate}
           cycle={selected}
           planner={planner}
+          activeName={activeCycleName(cycles)}
           isCompact={false}
           className="training-plan-actions"
         />
@@ -224,6 +230,7 @@ export function PhoneCycleTab({
           translate={translate}
           cycle={selected}
           planner={planner}
+          activeName={activeCycleName(cycles)}
           isCompact
           className="training-plan-actions training-plan-phone-actions"
         >
