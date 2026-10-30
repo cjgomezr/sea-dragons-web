@@ -3056,6 +3056,7 @@ export const englishMessages = {
     "Training is for members with an active membership. Renew and you'll pick up the cycle where the club is now.",
   "training.member.renewMembership": "Renew membership",
   "training.manage.metaTitle": "Plan training · {club}",
+  "training.manage.back": "Back to Training",
   "training.manage.eyebrow": "Training · Manage",
   "training.manage.title": "Plan training",
   "training.manage.lead": "Members with an active membership see it.",

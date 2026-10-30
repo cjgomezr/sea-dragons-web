@@ -2,6 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrainingPlannerScreen } from "@/components/training/TrainingPlannerScreen";
+import { TRAINING_PATH } from "@/lib/auth/routes";
 import type { ManagedCycle } from "@/lib/training/club-cycles";
 import { stubScreenWidth } from "../../support/screen-width";
 
@@ -194,6 +195,46 @@ describe("la cabecera y las pestañas", () => {
     expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Cycle 28 wk");
   });
 
+  it("pone encima del antetítulo el enlace de volver a Entrenamiento (#936)", async () => {
+    stubCycles();
+
+    await renderPlanner();
+
+    const back = screen.getByRole("link", { name: "Back to Training" });
+    expect(back).toHaveAttribute("href", TRAINING_PATH);
+    expect(back).toHaveClass("back-link");
+    const eyebrow = screen.getByText("Training · Manage");
+    expect(
+      back.compareDocumentPosition(eyebrow) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("deja el enlace de volver en Ciclo, Exercises y Marks (#936)", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+
+    for (const tabName of [/^Exercises/, /^Marks/, /^Cycle/]) {
+      await user.click(screen.getByRole("tab", { name: tabName }));
+
+      expect(
+        screen.getByRole("link", { name: "Back to Training" }),
+      ).toHaveAttribute("href", TRAINING_PATH);
+    }
+  });
+
+  it("da el foco al enlace de volver antes que a las pestañas (#936)", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+
+    await user.tab();
+
+    expect(
+      screen.getByRole("link", { name: "Back to Training" }),
+    ).toHaveFocus();
+  });
+
   it("habla en español con tú", async () => {
     stubCycles();
 
@@ -202,6 +243,9 @@ describe("la cabecera y las pestañas", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Planificar" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Volver a Entrenamiento" }),
+    ).toHaveAttribute("href", TRAINING_PATH);
     expect(
       screen.getByText("Lo ven los miembros con la membresía activa."),
     ).toBeInTheDocument();
