@@ -2,16 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import type {
+  LastDose,
   ManagedRoutine,
   RoutineEditorItem,
+  RoutineExerciseSummary,
 } from "@/lib/training/club-routines";
 import {
   type EditorRow,
+  newExerciseRow,
   toEditorRows,
   toItemDrafts,
 } from "@/lib/training/routine-editor";
 import {
   type RoutineMark,
+  loadLastDose,
   loadMarks,
   loadRoutineEditor,
   renameRoutine,
@@ -48,6 +52,11 @@ export type RoutineEditorControls = {
   readonly rename: (name: string) => Promise<boolean>;
   /** Una clave nueva para una fila que se añade. */
   readonly makeKey: () => string;
+  /** Añade al final una fila del ejercicio con la última dosis del club
+   * (#909). Verdadero si llegó la dosis y la fila entró. */
+  readonly addExercise: (exercise: RoutineExerciseSummary) => Promise<boolean>;
+  /** Añade vacía la fila de un ejercicio recién creado: nunca se usó. */
+  readonly addNewExercise: (exercise: RoutineExerciseSummary) => void;
 };
 
 type EditorCallbacks = {
@@ -126,6 +135,44 @@ export function useRoutineEditor(
     return rows;
   });
 
+  /** Las filas en pantalla, para lo que se añade después de esperar a la
+   * API: el cierre de entonces ya no las tiene. */
+  const shownRows = useRef<readonly EditorRow[]>([]);
+  useEffect(() => {
+    if (editor.state.kind === "ready") {
+      shownRows.current = editor.state.rows;
+    }
+  }, [editor.state]);
+
+  function saveRows(rows: readonly EditorRow[]): void {
+    callbacks.onError(null);
+    shownRows.current = rows;
+    editor.setRows(rows);
+    const savedGeneration = generation.current;
+    queue.current = queue.current.then(() => save(rows, savedGeneration));
+  }
+
+  function appendExerciseRow(
+    exercise: RoutineExerciseSummary,
+    dose: LastDose | null,
+  ): void {
+    const row = newExerciseRow({ key: makeKey(), exercise, dose });
+    saveRows([...shownRows.current, row]);
+  }
+
+  async function addExercise(
+    exercise: RoutineExerciseSummary,
+  ): Promise<boolean> {
+    callbacks.onError(null);
+    const dose = await loadLastDose(exercise.id);
+    if (dose.kind === "failed") {
+      callbacks.onError({ reason: dose.reason });
+      return false;
+    }
+    appendExerciseRow(exercise, dose.value);
+    return true;
+  }
+
   async function save(
     rows: readonly EditorRow[],
     savedGeneration: number,
@@ -158,12 +205,9 @@ export function useRoutineEditor(
     state: editor.state,
     retry: editor.retry,
     makeKey,
-    saveRows: (rows) => {
-      callbacks.onError(null);
-      editor.setRows(rows);
-      const savedGeneration = generation.current;
-      queue.current = queue.current.then(() => save(rows, savedGeneration));
-    },
+    saveRows,
+    addExercise,
+    addNewExercise: (exercise) => appendExerciseRow(exercise, null),
     rename: (name) => {
       callbacks.onError(null);
       // En la misma cola que las filas: la respuesta de un guardado anterior

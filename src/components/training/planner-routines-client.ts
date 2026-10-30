@@ -2,10 +2,12 @@ import { z } from "zod";
 import {
   TRAINING_MANAGE_MARKS_API_PATH,
   TRAINING_MANAGE_ROUTINES_API_PATH,
+  trainingManageExerciseLastDoseApiPath,
   trainingManageRoutineApiPath,
   trainingManageRoutineItemsApiPath,
 } from "@/lib/auth/routes";
 import type {
+  LastDose,
   ManagedRoutine,
   RoutineEditor,
   RoutineEditorItem,
@@ -73,6 +75,19 @@ const editorItemSchema: z.ZodType<RoutineEditorItem> = z.discriminatedUnion(
     }),
   ],
 );
+
+const lastDoseResponseSchema = z.object({
+  data: z.object({
+    dose: z
+      .object({
+        sets: z.number().int().nullable(),
+        reps: z.string().nullable(),
+        rest: z.string().nullable(),
+        load: loadSchema,
+      })
+      .nullable(),
+  }),
+});
 
 const routinesResponseSchema = z.object({
   data: z.object({ routines: z.array(managedRoutineSchema) }),
@@ -181,6 +196,20 @@ export function saveRoutineItems(
     {
       schema: routineResponseSchema,
       pick: (response) => response.data.routine,
+    },
+  );
+}
+
+/** Lo que el club usó la última vez con el ejercicio, o nulo si nunca. */
+export function loadLastDose(
+  exerciseId: string,
+): Promise<PlannerOutcome<LastDose | null>> {
+  return requestAndRead(
+    trainingManageExerciseLastDoseApiPath(exerciseId),
+    undefined,
+    {
+      schema: lastDoseResponseSchema,
+      pick: (response) => response.data.dose,
     },
   );
 }

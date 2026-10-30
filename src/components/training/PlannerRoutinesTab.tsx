@@ -22,6 +22,7 @@ import {
 import { PlannerRoutineEditor } from "./PlannerRoutineEditor";
 import { routineColorStyle } from "./training-format";
 import type { PlannerError } from "./use-planner-cycles";
+import { EXERCISE_NAME_TAKEN_REASON } from "./use-planner-exercises";
 import { type RoutineList, useRoutineList } from "./use-routine-list";
 
 /**
@@ -42,7 +43,11 @@ type RoutinesTabProps = {
 const ERROR_KEYS = {
   name_required: "training.manage.errorRoutineName",
   name_too_long: "training.manage.errorRoutineNameTooLong",
-} as const satisfies Partial<Record<RoutineIssueCode, MessageKey>>;
+  // Crear un ejercicio desde la fila de añadir (#909).
+  [EXERCISE_NAME_TAKEN_REASON]: "training.exercises.errorNameTaken",
+} as const satisfies Partial<
+  Record<RoutineIssueCode | typeof EXERCISE_NAME_TAKEN_REASON, MessageKey>
+>;
 
 type ExplainedReason = keyof typeof ERROR_KEYS;
 
@@ -327,6 +332,7 @@ function RoutinesBody({
           );
         }}
         onError={onError}
+        onNotice={announce}
         onBack={() => setIsEditorOpen(false)}
       />
     );

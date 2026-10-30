@@ -1,5 +1,6 @@
 import type { ManagedCycle } from "./club-cycles";
 import type {
+  LastDose,
   RoutineEditorItem,
   RoutineExerciseSummary,
 } from "./club-routines";
@@ -79,6 +80,32 @@ export function toItemDrafts(
           load: row.load,
         },
   );
+}
+
+/** Un ejercicio que el club nunca usó entra sin dosis. */
+const BLANK_DOSE: LastDose = {
+  sets: null,
+  reps: null,
+  rest: null,
+  load: { kind: "none" },
+};
+
+/** La fila de un ejercicio que se añade (#909): con la última dosis que el
+ * club usó con él, o vacía si nunca lo usó. La nota es de cada fila y no se
+ * copia. */
+export function newExerciseRow(request: {
+  readonly key: string;
+  readonly exercise: RoutineExerciseSummary;
+  readonly dose: LastDose | null;
+}): ExerciseEditorRow {
+  const { key, exercise, dose } = request;
+  return {
+    key,
+    kind: "exercise",
+    exercise,
+    ...(dose ?? BLANK_DOSE),
+    note: null,
+  };
 }
 
 /** La lista con la fila un puesto más arriba o más abajo; nula si ya está en
