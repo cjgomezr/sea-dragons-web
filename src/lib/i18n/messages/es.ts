@@ -3073,6 +3073,7 @@ export const spanishMessages: MessageCatalog = {
     "El entrenamiento es para miembros con la membresía activa. Renuévala y retomarás el ciclo donde está ahora el club.",
   "training.member.renewMembership": "Renovar membresía",
   "training.manage.metaTitle": "Planificar · {club}",
+  "training.manage.back": "Volver a Entrenamiento",
   "training.manage.eyebrow": "Entrenamiento · Gestión",
   "training.manage.title": "Planificar",
   "training.manage.lead": "Lo ven los miembros con la membresía activa.",
