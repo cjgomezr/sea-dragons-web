@@ -3269,6 +3269,8 @@ export const spanishMessages: MessageCatalog = {
   "training.manage.daySecondSlot": "Semana {week}, {day}, segunda rutina",
   "training.manage.addSecondRoutine":
     "Añadir una segunda rutina a la semana {week}, {day}",
+  "training.manage.removeSecondRoutine":
+    "Quitar la segunda rutina, semana {week} {day}",
   "training.manage.weekToggle": "Semana {week}: nota y dosis",
   "training.manage.weekEditor": "Semana {week}",
   "training.manage.weekNote": "Nota",
