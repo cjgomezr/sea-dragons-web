@@ -87,10 +87,18 @@ async function main(): Promise<void> {
     );
     return;
   }
+  for (const missing of report.missingLibraryKeys) {
+    console.warn(
+      `aviso: la biblioteca no tiene ${missing.libraryKey}, la foto de "${missing.name}" en la guía; se buscó por nombre.`,
+    );
+  }
+  const { exercises } = report;
   console.log(
     `Ciclo ${report.cycleId} en borrador: ${report.routines} rutinas, ` +
       `${report.days} días con sesión. Marcas nuevas: ${report.marksCreated}. ` +
-      `Ejercicios del club nuevos: ${report.exercisesCreated}.`,
+      `Ejercicios enlazados por la guía: ${exercises.linkedByGuide}; ` +
+      `por nombre: ${exercises.foundByName}; ` +
+      `del club nuevos: ${exercises.created}.`,
   );
 }
 
