@@ -7,7 +7,8 @@ import { Icon } from "@/components/Icon";
  * alta vuelven al directorio, las categorías a Evaluaciones y las noticias a
  * su lista o a la publicación. Se pinta como un botón discreto, con la flecha
  * de icono, en vez de un enlace subrayado. En el móvil cada pantalla tiene
- * su barra con volver, y ésta no sale.
+ * su barra con volver, y ésta no sale; Planificar no tiene esa barra y lo
+ * pinta también ahí, para volver a Entrenamiento (#936).
  */
 export function BackLink({
   href,

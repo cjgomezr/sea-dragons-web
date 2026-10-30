@@ -25570,6 +25570,13 @@ a.dashboard-club-cell-body:focus-visible {
    (§5.1 y §5.2, d04-coach-cycle.png y m03-coach-cycle.png): la cabecera, las
    pestañas, las tarjetas de los ciclos, la franja de acciones, los campos y
    la línea calculada. En el móvil, un selector y una tarjeta. */
+/* Volver a Entrenamiento (#936) deja debajo el mismo hueco que "Back to
+   News" en publicar noticia: el space-6 de .member-record, no el space-4
+   de Entrenamiento. */
+.training-plan > .back-link {
+  margin-bottom: calc(var(--space-6) - var(--space-4));
+}
+
 .training-plan-header {
   display: flex;
   flex-wrap: wrap;
