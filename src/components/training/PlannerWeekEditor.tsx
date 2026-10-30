@@ -36,11 +36,15 @@ const INTENSITY_KEYS = {
 
 const INTENSITY_KINDS = Object.keys(INTENSITY_KEYS) as IntensityKind[];
 
+/** Lo que el editor le pide a Planificar: decir un fallo y avisar al
+ * vaciar la semana. */
+export type WeekEditorReporter = Pick<PlannerCycles, "showError" | "announce">;
+
 export type WeekEditorProps = {
   readonly translate: Translator;
   readonly week: CycleWeekRecord;
   readonly isReadOnly: boolean;
-  readonly reporter: Pick<PlannerCycles, "showError" | "announce">;
+  readonly reporter: WeekEditorReporter;
   /** Los días de esta semana con alguna rutina. */
   readonly routineDays: number;
   /** Verdadero si se guardó. */

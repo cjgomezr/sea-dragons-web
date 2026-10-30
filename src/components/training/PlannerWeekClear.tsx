@@ -57,7 +57,7 @@ function ClearConfirm({
       role="group"
       aria-labelledby={textId}
       onKeyDown={(event) => {
-        if (event.key === "Escape") {
+        if (event.key === "Escape" && !isBusy) {
           onCancel();
         }
       }}
@@ -68,6 +68,7 @@ function ClearConfirm({
           ref={cancelRef}
           type="button"
           className="training-plan-action"
+          disabled={isBusy}
           onClick={onCancel}
         >
           {translate("training.manage.cancel")}

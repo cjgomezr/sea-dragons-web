@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { CyclePlan } from "@/components/training/planner-client";
 import {
   type CycleGrid,
   type CycleGridState,
@@ -76,7 +77,7 @@ async function readyGrid(): Promise<{ readonly current: CycleGrid }> {
   return result;
 }
 
-function planOf(state: CycleGridState) {
+function planOf(state: CycleGridState): CyclePlan {
   if (state.kind !== "ready") {
     throw new Error("la cuadrícula no está lista");
   }
