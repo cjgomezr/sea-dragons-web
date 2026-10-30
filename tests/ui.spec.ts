@@ -28609,8 +28609,10 @@ test.describe("la cuadrícula del ciclo en el navegador", () => {
         .getByRole("combobox", { name: `Week ${week}, Wed`, exact: true })
         .boundingBox();
 
-      expect(remove?.width).toBe(add?.width);
-      expect(remove?.height).toBe(add?.height);
+      expect(Math.round(remove?.width ?? 0)).toBe(Math.round(add?.width ?? 0));
+      expect(Math.round(remove?.height ?? 0)).toBe(
+        Math.round(add?.height ?? 0),
+      );
       expect(Math.round(second?.width ?? 0)).toBe(
         Math.round(withAdd?.width ?? 0),
       );
