@@ -3,11 +3,13 @@ import type { CycleDayRecord, ManagedCycle } from "@/lib/training/club-cycles";
 import {
   applyDayChange,
   canCopyWeekOne,
+  countRoutineDays,
   currentGridWeek,
   dayRoutines,
   draftOfWeek,
   initialPhoneWeek,
   lastCopyTarget,
+  hasWeekContent,
   readWeekDraft,
   weekRecordOf,
 } from "@/lib/training/cycle-grid-view";
@@ -235,5 +237,41 @@ describe("el editor de la semana", () => {
         intensityValue: "mucho",
       }),
     ).toEqual({ kind: "invalid", reason: "dose_pct_out_of_range" });
+  });
+});
+
+describe("countRoutineDays", () => {
+  it("cuenta los días de esa semana con alguna rutina, una vez cada uno", () => {
+    const days: readonly CycleDayRecord[] = [
+      { weekNo: 2, weekday: 0, slot: 1, routineId: "a" },
+      { weekNo: 2, weekday: 0, slot: 2, routineId: "b" },
+      { weekNo: 2, weekday: 3, slot: 1, routineId: "a" },
+      { weekNo: 3, weekday: 1, slot: 1, routineId: "a" },
+    ];
+
+    expect(countRoutineDays(days, 2)).toBe(2);
+    expect(countRoutineDays(days, 4)).toBe(0);
+  });
+});
+
+describe("hasWeekContent", () => {
+  const EMPTY = { weekNo: 2, note: null, dose: null };
+
+  it("una semana sin rutinas, sin nota y sin dosis no tiene nada", () => {
+    expect(hasWeekContent(EMPTY, 0)).toBe(false);
+  });
+
+  it("con un día con rutina, una nota o una dosis tiene algo", () => {
+    expect(hasWeekContent(EMPTY, 1)).toBe(true);
+    expect(hasWeekContent({ ...EMPTY, note: "Load" }, 0)).toBe(true);
+    expect(
+      hasWeekContent(
+        {
+          ...EMPTY,
+          dose: { sets: 3, reps: null, intensity: { kind: "none" } },
+        },
+        0,
+      ),
+    ).toBe(true);
   });
 });

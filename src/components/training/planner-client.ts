@@ -8,6 +8,7 @@ import {
   TRAINING_MANAGE_CYCLES_API_PATH,
   TRAINING_MANAGE_ROUTINES_API_PATH,
   trainingManageCycleActionApiPath,
+  trainingManageCycleWeekClearApiPath,
   trainingManageCycleApiPath,
 } from "@/lib/auth/routes";
 import type {
@@ -320,6 +321,17 @@ export function copyCycleWeekOne(
 ): Promise<PlannerOutcome<CyclePlan>> {
   return requestAndRead(
     trainingManageCycleActionApiPath(cycleId, "copy-week-one"),
+    jsonInit("POST"),
+    { schema: cyclePlanResponseSchema, pick: readCyclePlan },
+  );
+}
+
+export function clearCycleWeek(
+  cycleId: string,
+  weekNo: number,
+): Promise<PlannerOutcome<CyclePlan>> {
+  return requestAndRead(
+    trainingManageCycleWeekClearApiPath(cycleId, weekNo),
     jsonInit("POST"),
     { schema: cyclePlanResponseSchema, pick: readCyclePlan },
   );

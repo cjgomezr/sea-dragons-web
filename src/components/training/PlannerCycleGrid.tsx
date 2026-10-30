@@ -10,6 +10,7 @@ import type { ManagedRoutine } from "@/lib/training/club-routines";
 import {
   GRID_WEEKDAYS,
   canCopyWeekOne,
+  countRoutineDays,
   currentGridWeek,
   dayRoutines,
   lastCopyTarget,
@@ -150,7 +151,9 @@ function GridWeekRow({
               week={record}
               isReadOnly={context.isReadOnly}
               reporter={planner}
+              routineDays={countRoutineDays(plan.days, week)}
               onSave={grid.saveWeek}
+              onClear={grid.clearWeek}
             />
           </td>
         </tr>

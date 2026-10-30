@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Icon } from "@/components/Icon";
 import {
   GRID_WEEKDAYS,
+  countRoutineDays,
   dayRoutines,
   initialPhoneWeek,
   weekRecordOf,
@@ -73,7 +74,9 @@ export function PlannerPhoneWeek({
         week={weekRecordOf(plan.weeks, week)}
         isReadOnly={context.isReadOnly}
         reporter={context.planner}
+        routineDays={countRoutineDays(plan.days, week)}
         onSave={grid.saveWeek}
+        onClear={grid.clearWeek}
       />
       <ul className="training-grid-phone-days">
         {GRID_WEEKDAYS.map((weekday) => (

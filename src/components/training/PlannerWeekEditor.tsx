@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { MessageKey } from "@/lib/i18n/message";
 import type { Translator } from "@/lib/i18n/translator";
 import type { CycleWeekRecord } from "@/lib/training/club-cycles";
@@ -13,16 +13,19 @@ import {
   type IntensityKind,
   type WeekDraft,
   draftOfWeek,
+  hasWeekContent,
   readWeekDraft,
 } from "@/lib/training/cycle-grid-view";
 import type { DoseIntensity, WeekDose } from "@/lib/training/training-load";
-import type { GridReporter } from "./use-cycle-grid";
+import { PlannerWeekClear } from "./PlannerWeekClear";
+import type { PlannerCycles } from "./use-planner-cycles";
 
 /**
  * La nota y la dosis de una semana (#907, D6): la nota de hasta 140, y las
  * series, las repeticiones y la intensidad (ninguna, % de la marca o un
  * texto). Cada campo se guarda al salir; si no se guarda, vuelve a lo que
- * tenía y Planificar dice por qué.
+ * tenía y Planificar dice por qué. Clear week (#943) la deja en blanco
+ * si tiene algo y el ciclo se puede cambiar.
  */
 
 const INTENSITY_KEYS = {
@@ -37,9 +40,13 @@ export type WeekEditorProps = {
   readonly translate: Translator;
   readonly week: CycleWeekRecord;
   readonly isReadOnly: boolean;
-  readonly reporter: GridReporter;
+  readonly reporter: Pick<PlannerCycles, "showError" | "announce">;
+  /** Los días de esta semana con alguna rutina. */
+  readonly routineDays: number;
   /** Verdadero si se guardó. */
   readonly onSave: (week: CycleWeekRecord) => Promise<boolean>;
+  /** Verdadero si se vació. */
+  readonly onClear: (weekNo: number) => Promise<boolean>;
   readonly id?: string;
 };
 
@@ -141,10 +148,13 @@ export function PlannerWeekEditor({
   week,
   isReadOnly,
   reporter,
+  routineDays,
   onSave,
+  onClear,
   id,
 }: WeekEditorProps): React.JSX.Element {
   const [draft, setDraft] = useState(() => draftOfWeek(week));
+  const editorRef = useRef<HTMLFieldSetElement>(null);
 
   function change(patch: Partial<WeekDraft>): WeekDraft {
     const next = { ...draft, ...patch };
@@ -171,12 +181,30 @@ export function PlannerWeekEditor({
     }
   }
 
+  async function clear(): Promise<boolean> {
+    if (!(await onClear(week.weekNo))) {
+      return false;
+    }
+    setDraft(draftOfWeek({ weekNo: week.weekNo, note: null, dose: null }));
+    reporter.announce(
+      translate("training.manage.weekCleared", { week: week.weekNo }),
+    );
+    // Clear week se va con lo que había: el foco se queda en la semana.
+    editorRef.current?.focus();
+    return true;
+  }
+
   const fieldProps = {
     isReadOnly,
     onCommit: () => void commit(draft),
   };
   return (
-    <fieldset id={id} className="training-grid-week-editor">
+    <fieldset
+      ref={editorRef}
+      id={id}
+      className="training-grid-week-editor"
+      tabIndex={-1}
+    >
       <legend>
         {translate("training.manage.weekEditor", { week: week.weekNo })}
       </legend>
@@ -236,6 +264,14 @@ export function PlannerWeekEditor({
           />
         )}
       </div>
+      {isReadOnly || !hasWeekContent(week, routineDays) ? null : (
+        <PlannerWeekClear
+          translate={translate}
+          weekNo={week.weekNo}
+          routineDays={routineDays}
+          onClear={clear}
+        />
+      )}
     </fieldset>
   );
 }

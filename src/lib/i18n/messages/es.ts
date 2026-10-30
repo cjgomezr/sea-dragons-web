@@ -3299,6 +3299,15 @@ export const spanishMessages: MessageCatalog = {
   "training.manage.copyWeekOne": "Copiar la semana 1 a todas",
   "training.manage.weekOneCopied":
     "Semana 1 copiada a las semanas 2–{last} · las 2 últimas no cambian",
+  "training.manage.clearWeek": "Vaciar semana",
+  "training.manage.confirmClearWeek": {
+    one: "¿Vaciar la semana {week}? Su {count} día con rutinas vuelve a descanso, y se quitan su nota y su dosis.",
+    other:
+      "¿Vaciar la semana {week}? Sus {count} días con rutinas vuelven a descanso, y se quitan su nota y su dosis.",
+  },
+  "training.manage.confirmClearEmptyWeek":
+    "¿Vaciar la semana {week}? Se quitan su nota y su dosis.",
+  "training.manage.weekCleared": "Semana {week} vaciada.",
   "training.manage.errorNoteTooLong": "Usa 140 caracteres como mucho.",
   "training.manage.errorDoseSets": "Las series van de 1 a 99.",
   "training.manage.errorDoseTextTooLong": "Usa 20 caracteres como mucho.",

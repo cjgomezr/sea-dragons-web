@@ -107,6 +107,24 @@ export function weekRecordOf(
   );
 }
 
+/** Los días de la semana con alguna rutina: uno con dos cuenta una vez. */
+export function countRoutineDays(
+  days: readonly CycleDayRecord[],
+  weekNo: number,
+): number {
+  return new Set(
+    days.filter((day) => day.weekNo === weekNo).map((day) => day.weekday),
+  ).size;
+}
+
+/** Hay algo que vaciar (#943): un día con rutina, una nota o una dosis. */
+export function hasWeekContent(
+  week: CycleWeekRecord,
+  routineDays: number,
+): boolean {
+  return routineDays > 0 || week.note !== null || week.dose !== null;
+}
+
 export function canCopyWeekOne(weeks: number): boolean {
   return weeks >= MIN_WEEKS_TO_COPY_WEEK_ONE;
 }

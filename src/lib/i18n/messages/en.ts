@@ -3279,6 +3279,15 @@ export const englishMessages = {
   "training.manage.copyWeekOne": "Copy week 1 to all weeks",
   "training.manage.weekOneCopied":
     "Week 1 copied to weeks 2–{last} · the last 2 weeks were kept",
+  "training.manage.clearWeek": "Clear week",
+  "training.manage.confirmClearWeek": {
+    one: "Clear week {week}? Its {count} day with routines goes back to Rest, and its note and dose are removed.",
+    other:
+      "Clear week {week}? Its {count} days with routines go back to Rest, and its note and dose are removed.",
+  },
+  "training.manage.confirmClearEmptyWeek":
+    "Clear week {week}? Its note and dose are removed.",
+  "training.manage.weekCleared": "Week {week} cleared.",
   "training.manage.errorNoteTooLong": "Use 140 characters at most.",
   "training.manage.errorDoseSets": "Sets go from 1 to 99.",
   "training.manage.errorDoseTextTooLong": "Use 20 characters at most.",

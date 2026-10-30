@@ -26904,6 +26904,22 @@ a.dashboard-club-cell-body:focus-visible {
   align-self: flex-start;
 }
 
+.training-grid-week-clear {
+  display: flex;
+  flex-direction: column;
+  grid-column: 1 / -1;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.training-grid-week-clear-confirm {
+  align-self: stretch;
+}
+
+.training-grid-week-editor:focus {
+  outline: none;
+}
+
 .training-grid-week:focus-visible,
 .training-grid-select:focus-visible,
 .training-grid-add:focus-visible {

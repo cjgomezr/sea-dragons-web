@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrainingPlannerScreen } from "@/components/training/TrainingPlannerScreen";
@@ -719,5 +719,211 @@ describe("en el móvil", () => {
     expect(
       screen.getByRole("button", { name: "Previous week" }),
     ).toBeDisabled();
+  });
+});
+
+describe("PlannerWeekEditor: Clear week", () => {
+  const CLEARED_PLAN: Plan = { weeks: [WEEK_TWO], days: [] };
+
+  async function openWeek(week: number): Promise<HTMLElement> {
+    const user = userEvent.setup();
+    await user.click(weekToggle(week));
+    return screen.getByRole("group", { name: `Week ${week}` });
+  }
+
+  function clearButton(editor: HTMLElement): HTMLElement {
+    return within(editor).getByRole("button", { name: "Clear week" });
+  }
+
+  it("está en una semana con rutinas o con nota y dosis", async () => {
+    stubGrid();
+    await renderGrid();
+
+    expect(clearButton(await openWeek(1))).toBeInTheDocument();
+    expect(clearButton(await openWeek(2))).toBeInTheDocument();
+  });
+
+  it("no está en una semana vacía", async () => {
+    stubGrid();
+    await renderGrid();
+
+    const editor = await openWeek(4);
+
+    expect(
+      within(editor).queryByRole("button", { name: "Clear week" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("no está en un ciclo de solo lectura", async () => {
+    stubGrid({ cycle: { ...ACTIVE, status: "archived" } });
+    await renderGrid();
+
+    const editor = await openWeek(1);
+
+    expect(
+      within(editor).queryByRole("button", { name: "Clear week" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("pide confirmarlo con los días con rutina y pasa el foco a Cancel", async () => {
+    stubGrid();
+    const user = userEvent.setup();
+    await renderGrid();
+    const editor = await openWeek(1);
+
+    await user.click(clearButton(editor));
+
+    const confirm = within(editor).getByRole("group", {
+      name: "Clear week 1? Its 2 days with routines go back to Rest, and its note and dose are removed.",
+    });
+    expect(
+      within(confirm).getByRole("button", { name: "Cancel" }),
+    ).toHaveFocus();
+    expect(
+      within(confirm).getByRole("button", { name: "Clear week" }),
+    ).toBeInTheDocument();
+    expect(writes()).toEqual([]);
+  });
+
+  it("sin días con rutina solo nombra la nota y la dosis", async () => {
+    stubGrid();
+    const user = userEvent.setup();
+    await renderGrid();
+    const editor = await openWeek(2);
+
+    await user.click(clearButton(editor));
+
+    expect(
+      within(editor).getByRole("group", {
+        name: "Clear week 2? Its note and dose are removed.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      "Cancel",
+      (user: ReturnType<typeof userEvent.setup>) =>
+        user.click(screen.getByRole("button", { name: "Cancel" })),
+    ],
+    [
+      "Escape",
+      (user: ReturnType<typeof userEvent.setup>) => user.keyboard("{Escape}"),
+    ],
+  ])(
+    "con %s se cierra sin cambiar nada y el foco vuelve",
+    async (_key, close) => {
+      stubGrid();
+      const user = userEvent.setup();
+      await renderGrid();
+      const editor = await openWeek(1);
+      await user.click(clearButton(editor));
+
+      await close(user);
+
+      expect(
+        within(editor).queryByRole("button", { name: "Cancel" }),
+      ).not.toBeInTheDocument();
+      expect(clearButton(editor)).toHaveFocus();
+      expect(writes()).toEqual([]);
+    },
+  );
+
+  it("al confirmar la vacía, deja las demás y lo dice", async () => {
+    stubGrid({
+      write: () => ok({ cycle: ACTIVE, weeks: [WEEK_TWO], days: [] }),
+    });
+    const user = userEvent.setup();
+    await renderGrid();
+    const editor = await openWeek(1);
+    await user.click(clearButton(editor));
+
+    await user.click(
+      within(
+        within(editor).getByRole("group", { name: /^Clear week 1\?/ }),
+      ).getByRole("button", { name: "Clear week" }),
+    );
+
+    expect(writes()).toEqual([
+      {
+        method: "POST",
+        path: `${CYCLES_PATH}/${ACTIVE.id}/weeks/1/clear`,
+        body: undefined,
+      },
+    ]);
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Week 1 cleared."),
+    );
+    expect(selectedText(daySelect("Week 1, Mon"))).toBe("Rest");
+    expect(weekRow(2)).toHaveTextContent("Camp · 4 × 5 · 80%");
+  });
+
+  it("al vaciar la nota y la dosis, sus campos quedan en blanco", async () => {
+    stubGrid({
+      write: () => ok({ cycle: ACTIVE, ...CLEARED_PLAN, weeks: [] }),
+    });
+    const user = userEvent.setup();
+    await renderGrid();
+    const editor = await openWeek(2);
+    await user.click(clearButton(editor));
+
+    await user.click(
+      within(
+        within(editor).getByRole("group", { name: /^Clear week 2\?/ }),
+      ).getByRole("button", { name: "Clear week" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Week 2 cleared."),
+    );
+    expect(within(editor).getByLabelText("Note")).toHaveValue("");
+    expect(within(editor).getByLabelText("Sets")).toHaveValue("");
+  });
+
+  it("si no se vacía, la semana sigue como estaba y lo dice", async () => {
+    stubGrid();
+    const user = userEvent.setup();
+    await renderGrid();
+    const editor = await openWeek(1);
+    await user.click(clearButton(editor));
+
+    await user.click(
+      within(
+        within(editor).getByRole("group", { name: /^Clear week 1\?/ }),
+      ).getByRole("button", { name: "Clear week" }),
+    );
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(selectedText(daySelect("Week 1, Mon"))).toBe("Gym A");
+  });
+
+  it("en español todo está traducido", async () => {
+    stubGrid({
+      write: () => ok({ cycle: ACTIVE, weeks: [WEEK_TWO], days: [] }),
+    });
+    const user = userEvent.setup();
+    render(<TrainingPlannerScreen locale="es" />);
+    await screen.findAllByRole("combobox", { name: /^Semana 1, lun/ });
+    await user.click(
+      screen.getByRole("button", { name: "Semana 1: nota y dosis" }),
+    );
+    const editor = screen.getByRole("group", { name: "Semana 1" });
+
+    await user.click(
+      within(editor).getByRole("button", { name: "Vaciar semana" }),
+    );
+    const confirm = within(editor).getByRole("group", {
+      name: "¿Vaciar la semana 1? Sus 2 días con rutinas vuelven a descanso, y se quitan su nota y su dosis.",
+    });
+    expect(
+      within(confirm).getByRole("button", { name: "Cancelar" }),
+    ).toHaveFocus();
+    await user.click(
+      within(confirm).getByRole("button", { name: "Vaciar semana" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Semana 1 vaciada."),
+    );
   });
 });
