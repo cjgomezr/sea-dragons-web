@@ -3343,4 +3343,12 @@ export const englishMessages = {
     '"% of" a mark shows each member their own kilos. Members without that mark see the %.',
   "training.manage.errorRoutineName": "Give the routine a name.",
   "training.manage.errorRoutineNameTooLong": "Use 60 characters at most.",
+  "training.manage.addExercise": "Add exercise",
+  "training.manage.addExercisePlaceholder":
+    "Add exercise: search the library or your club's",
+  "training.manage.searchingExercises": "Searching…",
+  "training.manage.searchFailed": "We couldn't search the exercises.",
+  "training.manage.createExercise": 'Create "{name}"',
+  "training.manage.exerciseCreated":
+    '"{name}" created as a club exercise and added. Add tips or a photo in Exercises.',
 } as const satisfies Readonly<Record<string, Message>>;

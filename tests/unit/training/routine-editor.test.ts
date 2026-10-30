@@ -7,6 +7,7 @@ import {
   defaultRoutineFilter,
   loadOptionValue,
   moveRow,
+  newExerciseRow,
   parseLoadOption,
   parseLoadPct,
   parseSets,
@@ -180,5 +181,50 @@ describe("el filtro de las rutinas", () => {
 
   it("sin ciclos abre en las compartidas", () => {
     expect(defaultRoutineFilter(null)).toBe(SHARED_ROUTINES_FILTER);
+  });
+});
+
+describe("newExerciseRow", () => {
+  const exercise = { id: EXERCISE_ID, name: "Back squat", photoUrl: null };
+
+  it("copia la última dosis del club en la fila nueva, sin nota", () => {
+    const dose = {
+      sets: 4,
+      reps: "6",
+      rest: "2:00",
+      load: { kind: "pct", markId: MARK_ID, pct: 75 },
+    } as const;
+
+    const row = newExerciseRow({ key: "row-9", exercise, dose });
+
+    expect(row).toEqual({
+      key: "row-9",
+      kind: "exercise",
+      exercise,
+      sets: 4,
+      reps: "6",
+      rest: "2:00",
+      note: null,
+      load: { kind: "pct", markId: MARK_ID, pct: 75 },
+    });
+  });
+
+  it("deja la fila vacía si el club nunca usó el ejercicio", () => {
+    const row = newExerciseRow({
+      key: "row-9",
+      exercise,
+      dose: null,
+    });
+
+    expect(row).toEqual({
+      key: "row-9",
+      kind: "exercise",
+      exercise,
+      sets: null,
+      reps: null,
+      rest: null,
+      note: null,
+      load: { kind: "none" },
+    });
   });
 });

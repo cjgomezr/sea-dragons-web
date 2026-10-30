@@ -3364,4 +3364,12 @@ export const spanishMessages: MessageCatalog = {
     '"% de" una marca le enseña a cada miembro sus kilos. Quien no tiene esa marca ve el %.',
   "training.manage.errorRoutineName": "Ponle un nombre a la rutina.",
   "training.manage.errorRoutineNameTooLong": "Usa 60 caracteres como mucho.",
+  "training.manage.addExercise": "Añadir ejercicio",
+  "training.manage.addExercisePlaceholder":
+    "Añadir ejercicio: busca en la biblioteca o en los del club",
+  "training.manage.searchingExercises": "Buscando…",
+  "training.manage.searchFailed": "No pudimos buscar los ejercicios.",
+  "training.manage.createExercise": 'Crear "{name}"',
+  "training.manage.exerciseCreated":
+    '"{name}" se creó como ejercicio del club y se añadió. Ponle consejos o una foto en Ejercicios.',
 };
