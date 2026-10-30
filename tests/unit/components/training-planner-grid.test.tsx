@@ -368,6 +368,148 @@ describe("guardar un día", () => {
   });
 });
 
+describe("PlannerDaySlots: la × de la segunda rutina", () => {
+  function removeButton(name: string): HTMLElement {
+    return screen.getByRole("button", {
+      name: `Remove second routine, ${name}`,
+    });
+  }
+
+  it("está junto a una segunda rutina guardada y no en un día con una", async () => {
+    stubGrid();
+
+    await renderGrid();
+
+    expect(removeButton("week 1 Mon")).toBeVisible();
+    expect(
+      screen.queryByRole("button", {
+        name: "Remove second routine, week 1 Tue",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("aparece al abrir el segundo selector con el +", async () => {
+    stubGrid();
+    const user = userEvent.setup();
+    await renderGrid();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Add a second routine to week 1, Tue",
+      }),
+    );
+
+    expect(removeButton("week 1 Tue")).toBeVisible();
+  });
+
+  it("cierra el selector abierto sin rutina, sin llamar a la API, y enfoca el +", async () => {
+    stubGrid();
+    const user = userEvent.setup();
+    await renderGrid();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Add a second routine to week 1, Tue",
+      }),
+    );
+
+    await user.click(removeButton("week 1 Tue"));
+
+    expect(
+      screen.queryByRole("combobox", { name: "Week 1, Tue, second routine" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Add a second routine to week 1, Tue",
+      }),
+    ).toHaveFocus();
+    expect(writes()).toEqual([]);
+  });
+
+  it("quita la segunda guardada en la ranura 2, deja la primera y enfoca el +", async () => {
+    stubGrid({
+      write: () => ok({ cycle: ACTIVE, weeks: [], days: DAYS.slice(0, 1) }),
+    });
+    const user = userEvent.setup();
+    await renderGrid();
+
+    await user.click(removeButton("week 1 Mon"));
+
+    expect(writes()).toEqual([
+      {
+        method: "PUT",
+        path: `${CYCLES_PATH}/${ACTIVE.id}/days`,
+        body: { weekNo: 1, weekday: 0, slot: 2, routineId: null },
+      },
+    ]);
+    expect(selectedText(daySelect("Week 1, Mon"))).toBe("Gym A");
+    expect(
+      screen.queryByRole("combobox", { name: "Week 1, Mon, second routine" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Add a second routine to week 1, Mon",
+      }),
+    ).toHaveFocus();
+  });
+
+  it("devuelve la segunda y lo dice si no se quita", async () => {
+    stubGrid({ write: () => FAILURE });
+    const user = userEvent.setup();
+    await renderGrid();
+
+    await user.click(removeButton("week 1 Mon"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't save that change. Try again.",
+    );
+    expect(selectedText(daySelect("Week 1, Mon, second routine"))).toBe(
+      "Pool B",
+    );
+  });
+
+  it("sigue quitando la segunda al elegir Rest en su selector", async () => {
+    stubGrid({
+      write: () => ok({ cycle: ACTIVE, weeks: [], days: DAYS.slice(0, 1) }),
+    });
+    const user = userEvent.setup();
+    await renderGrid();
+
+    await user.selectOptions(daySelect("Week 1, Mon, second routine"), "Rest");
+
+    expect(writes().at(0)?.body).toEqual({
+      weekNo: 1,
+      weekday: 0,
+      slot: 2,
+      routineId: null,
+    });
+    expect(
+      screen.queryByRole("combobox", { name: "Week 1, Mon, second routine" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("no está en un ciclo de solo lectura", async () => {
+    stubGrid({ cycle: { ...ACTIVE, status: "archived" } });
+
+    await renderGrid();
+
+    expect(daySelect("Week 1, Mon, second routine")).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: /^Remove second routine/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("lleva su nombre en español", async () => {
+    stubGrid();
+    render(<TrainingPlannerScreen locale="es" />);
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Quitar la segunda rutina, semana 1 lun",
+      }),
+    ).toBeVisible();
+  });
+});
+
 describe("la nota y la dosis de una semana", () => {
   it("abre el editor bajo la fila al pulsar el número de la semana", async () => {
     stubGrid();
@@ -719,6 +861,34 @@ describe("en el móvil", () => {
     expect(
       screen.getByRole("button", { name: "Previous week" }),
     ).toBeDisabled();
+  });
+
+  it("quita la segunda rutina de un día con la ×", async () => {
+    stubGrid({
+      write: () => ok({ cycle: ACTIVE, weeks: [], days: DAYS.slice(0, 1) }),
+    });
+    const user = userEvent.setup();
+    await renderPhoneGrid();
+    await user.click(screen.getByRole("button", { name: "Previous week" }));
+    await user.click(screen.getByRole("button", { name: "Previous week" }));
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Remove second routine, week 1 Mon",
+      }),
+    );
+
+    expect(writes().at(0)?.body).toEqual({
+      weekNo: 1,
+      weekday: 0,
+      slot: 2,
+      routineId: null,
+    });
+    expect(
+      screen.getByRole("button", {
+        name: "Add a second routine to week 1, Mon",
+      }),
+    ).toHaveFocus();
   });
 });
 
