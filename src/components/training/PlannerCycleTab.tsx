@@ -87,14 +87,14 @@ export function DesktopCycleTab({
           {translate("training.manage.editing")}{" "}
           <strong>{selected.name}</strong>
         </p>
-        <div className="training-plan-actions">
-          <PlannerCycleActions
-            translate={translate}
-            cycle={selected}
-            planner={planner}
-            isCompact={false}
-          />
-        </div>
+        <PlannerCycleActions
+          key={`actions-${selected.id}`}
+          translate={translate}
+          cycle={selected}
+          planner={planner}
+          isCompact={false}
+          className="training-plan-actions"
+        />
       </div>
       <PlannerCycleFields
         key={selected.id}
@@ -219,15 +219,16 @@ export function PhoneCycleTab({
           planner={planner}
           selected={selected}
         />
-        <div className="training-plan-actions training-plan-phone-actions">
-          <PlannerCycleActions
-            translate={translate}
-            cycle={selected}
-            planner={planner}
-            isCompact
-          />
+        <PlannerCycleActions
+          key={`actions-${selected.id}`}
+          translate={translate}
+          cycle={selected}
+          planner={planner}
+          isCompact
+          className="training-plan-actions training-plan-phone-actions"
+        >
           <NewCycleButton translate={translate} planner={planner} />
-        </div>
+        </PlannerCycleActions>
       </div>
       <SummaryLine translate={translate} cycle={selected} />
       <PlannerCycleGrid

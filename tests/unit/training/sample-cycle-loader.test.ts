@@ -150,6 +150,7 @@ function cyclesGateways(): ClubCyclesGateways {
       updateCycle: notUsed,
       activateCycle: notUsed,
       archiveCycle: notUsed,
+      deleteCycle: notUsed,
       duplicateCycle: notUsed,
       findRoutineScope: async (_clubId, routineId) => {
         const routine = database.routines.find(

@@ -8,11 +8,13 @@ import {
   type CycleFields,
   type CycleWeekRecord,
   type RoutineScope,
+  CycleIsActiveError,
   CycleNotFoundError,
   activateManagedCycle,
   archiveManagedCycle,
   copyManagedCycleWeekOne,
   createManagedCycle,
+  deleteManagedCycle,
   duplicateManagedCycle,
   listManagedCycles,
   readManagedCycle,
@@ -126,6 +128,21 @@ function gateways(): ClubCyclesGateways {
             ? { ...candidate, status: "archived" }
             : candidate,
         );
+      },
+      deleteCycle: async ({ cycleId }) => {
+        const target = findCycle(cycleId);
+        if (target === null) {
+          return { kind: "missing" };
+        }
+        if (target.status === "active") {
+          return { kind: "active" };
+        }
+        cycles = cycles.filter((candidate) => candidate.id !== cycleId);
+        return {
+          kind: "deleted",
+          status: target.status,
+          routinesDeleted: target.ownRoutines,
+        };
       },
       duplicateCycle: async ({ cycleId }, copy) => {
         duplicateNames.push(copy.name);
@@ -543,6 +560,76 @@ describe("archiveManagedCycle", () => {
       action: "training_cycle.archived",
       entity_id: WINTER_ID,
     });
+  });
+});
+
+describe("deleteManagedCycle", () => {
+  it("borra un borrador y responde los ciclos que quedan", async () => {
+    const result = await deleteManagedCycle(gateways(), {
+      callerId: COACH_ID,
+      cycleId: SUMMER_ID,
+    });
+
+    expect(result.cycles.map(({ id }) => id)).toEqual([WINTER_ID]);
+  });
+
+  it("borra un archivado", async () => {
+    cycles = [cycle(WINTER_ID, { status: "archived" })];
+
+    const result = await deleteManagedCycle(gateways(), {
+      callerId: COACH_ID,
+      cycleId: WINTER_ID,
+    });
+
+    expect(result.cycles).toEqual([]);
+  });
+
+  it("rechaza el activo y no lo borra ni lo anota", async () => {
+    await expect(
+      deleteManagedCycle(gateways(), {
+        callerId: COACH_ID,
+        cycleId: WINTER_ID,
+      }),
+    ).rejects.toThrow(CycleIsActiveError);
+    expect(findCycle(WINTER_ID)).not.toBeNull();
+    expect(auditRows).toEqual([]);
+  });
+
+  it("un ciclo que no es del club no existe", async () => {
+    await expect(
+      deleteManagedCycle(gateways(), {
+        callerId: COACH_ID,
+        cycleId: UNKNOWN_CYCLE_ID,
+      }),
+    ).rejects.toThrow(CycleNotFoundError);
+  });
+
+  it("anota el nombre, el estado que tenía y las rutinas propias borradas", async () => {
+    cycles = [cycle(SUMMER_ID, { name: "Summer", ownRoutines: 3 })];
+
+    await deleteManagedCycle(gateways(), {
+      callerId: COACH_ID,
+      cycleId: SUMMER_ID,
+    });
+
+    expect(lastAudit()).toMatchObject({
+      action: "training_cycle.deleted",
+      entity_type: "training_cycle",
+      entity_id: SUMMER_ID,
+      metadata: { name: "Summer", status: "draft", routinesDeleted: 3 },
+    });
+  });
+
+  it("un Player no puede borrar", async () => {
+    callerRole = "Player";
+
+    await expect(
+      deleteManagedCycle(gateways(), {
+        callerId: COACH_ID,
+        cycleId: SUMMER_ID,
+      }),
+    ).rejects.toThrow(TrainingPlannerForbiddenError);
+    expect(findCycle(SUMMER_ID)).not.toBeNull();
   });
 });
 

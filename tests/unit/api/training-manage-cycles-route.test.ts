@@ -100,6 +100,21 @@ function clubCyclesGateways(): ClubCyclesGateways {
       archiveCycle: async ({ cycleId }) => {
         replaceCycle(cycleId, { status: "archived" });
       },
+      deleteCycle: async ({ cycleId }) => {
+        const target = cycles.find((candidate) => candidate.id === cycleId);
+        if (target === undefined) {
+          return { kind: "missing" };
+        }
+        if (target.status === "active") {
+          return { kind: "active" };
+        }
+        cycles = cycles.filter((candidate) => candidate.id !== cycleId);
+        return {
+          kind: "deleted",
+          status: target.status,
+          routinesDeleted: target.ownRoutines,
+        };
+      },
       duplicateCycle: async (_target, copy) => {
         cycles.push(cycle(NEW_CYCLE_ID, { name: copy.name }));
         return { cycleId: NEW_CYCLE_ID, routinesCopied: 1 };
@@ -229,6 +244,16 @@ function patchCycle(cycleId: string, body: unknown): Promise<Response> {
   );
 }
 
+function deleteCycle(cycleId: string): Promise<Response> {
+  const request = new NextRequest(
+    new URL(trainingManageCycleApiPath(cycleId), ORIGIN),
+    { method: "DELETE" },
+  );
+  return throughProxy(request, () =>
+    cycleRoute.DELETE(request, context(cycleId)),
+  );
+}
+
 function postAction(cycleId: string, action: PostAction): Promise<Response> {
   const request = new NextRequest(
     new URL(trainingManageCycleActionApiPath(cycleId, action), ORIGIN),
@@ -343,6 +368,7 @@ describe.each<Role>(["Player", "Committee"])("un %s", (role) => {
       (await patchCycle(WINTER_ID, { name: "X" })).status,
       (await postAction(WINTER_ID, "activate")).status,
       (await postAction(WINTER_ID, "archive")).status,
+      (await deleteCycle(SUMMER_ID)).status,
       (await postAction(WINTER_ID, "duplicate")).status,
       (await postAction(WINTER_ID, "copy-week-one")).status,
       (
@@ -374,6 +400,7 @@ describe("un ciclo de otro club", () => {
       (await patchCycle(OTHER_CLUBS_CYCLE_ID, { name: "X" })).status,
       (await postAction(OTHER_CLUBS_CYCLE_ID, "activate")).status,
       (await postAction(OTHER_CLUBS_CYCLE_ID, "archive")).status,
+      (await deleteCycle(OTHER_CLUBS_CYCLE_ID)).status,
       (await postAction(OTHER_CLUBS_CYCLE_ID, "duplicate")).status,
       (await postAction(OTHER_CLUBS_CYCLE_ID, "copy-week-one")).status,
       (
@@ -613,6 +640,53 @@ describe("las acciones de un ciclo", () => {
     );
 
     expect(response.status).toBe(405);
+  });
+});
+
+describe("DELETE /api/v1/training/manage/cycles/[cycleId]", () => {
+  it("borra un borrador y responde la lista como al archivar", async () => {
+    const response = await deleteCycle(SUMMER_ID);
+
+    expect(response.status).toBe(200);
+    expect((await dataOf(response)).cycles).toEqual([
+      expect.objectContaining({ id: WINTER_ID, status: "active" }),
+    ]);
+  });
+
+  it("borra un archivado y lo anota con nombre, estado y rutinas propias", async () => {
+    cycles = [
+      cycle(WINTER_ID, { status: "archived", ownRoutines: 2 }),
+      cycle(SUMMER_ID, { status: "active" }),
+    ];
+
+    const response = await deleteCycle(WINTER_ID);
+
+    expect(response.status).toBe(200);
+    expect(insertAuditLogRow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "training_cycle.deleted",
+        entity_id: WINTER_ID,
+        metadata: { name: "Winter", status: "archived", routinesDeleted: 2 },
+      }),
+    );
+  });
+
+  it("el activo responde 409 cycle_is_active y no borra nada", async () => {
+    const response = await deleteCycle(WINTER_ID);
+
+    expect(response.status).toBe(409);
+    const body = (await response.json()) as { error: { reason: string } };
+    expect(body.error.reason).toBe("cycle_is_active");
+    expect(cycles.map(({ id }) => id)).toEqual([WINTER_ID, SUMMER_ID]);
+    expect(insertAuditLogRow).not.toHaveBeenCalled();
+  });
+
+  it("un ciclo que ya no existe responde 404", async () => {
+    await deleteCycle(SUMMER_ID);
+
+    const again = await deleteCycle(SUMMER_ID);
+
+    expect(again.status).toBe(404);
   });
 });
 

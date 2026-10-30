@@ -3106,6 +3106,18 @@ export const spanishMessages: MessageCatalog = {
   "training.manage.makeActive": "Activar",
   "training.manage.duplicate": "Duplicar",
   "training.manage.archive": "Archivar",
+  "training.manage.delete": "Borrar",
+  "training.manage.deleteCycle": "Borrar ciclo",
+  "training.manage.confirmDeleteCycle": {
+    one: '¿Borrar "{name}"? Se van con él su {count} rutina propia y su cuadrícula. No se puede deshacer.',
+    other:
+      '¿Borrar "{name}"? Se van con él sus {count} rutinas propias y su cuadrícula. No se puede deshacer.',
+  },
+  "training.manage.confirmDeleteEmptyCycle":
+    '¿Borrar "{name}"? No se puede deshacer.',
+  "training.manage.deleted": "Ciclo borrado.",
+  "training.manage.errorCycleIsActive":
+    "Este ciclo ya está activo. Archívalo antes.",
   "training.manage.cycleName": "Nombre del ciclo",
   "training.manage.targetEvent": "Evento objetivo · opcional",
   "training.manage.eventDate": "Primer día del evento",

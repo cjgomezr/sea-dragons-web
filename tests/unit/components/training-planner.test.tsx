@@ -983,3 +983,316 @@ describe("en el móvil", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("PlannerCycleActions", () => {
+  function confirmGroup(): HTMLElement {
+    return screen.getByRole("group", { name: /^Delete "/ });
+  }
+
+  it("el borrador tiene Delete junto a Duplicate y Archive", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+
+    await user.click(cycleCard("Summer base 2027"));
+
+    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Duplicate" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Archive" })).toBeVisible();
+  });
+
+  it("el archivado tiene Delete", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+
+    await user.click(screen.getByRole("button", { name: "Show archived · 1" }));
+    await user.click(cycleCard("Winter 2026"));
+
+    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+  });
+
+  it("el activo no tiene Delete", async () => {
+    stubCycles();
+
+    await renderPlanner();
+
+    expect(
+      screen.queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Delete abre la confirmación con cuántas rutinas propias se van y enfoca Cancel", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+    await user.click(screen.getByRole("button", { name: "Show archived · 1" }));
+    await user.click(cycleCard("Winter 2026"));
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(confirmGroup()).toHaveTextContent(
+      'Delete "Winter 2026"? Its 3 own routines and its grid go with it. This can\'t be undone.',
+    );
+    expect(
+      within(confirmGroup()).getByRole("button", { name: "Cancel" }),
+    ).toHaveFocus();
+    expect(
+      within(confirmGroup()).getByRole("button", { name: "Delete cycle" }),
+    ).toBeVisible();
+  });
+
+  it("sin rutinas propias la confirmación sólo pide confirmar", async () => {
+    stubCycles([ACTIVE, { ...DRAFT, ownRoutines: 0 }]);
+    const user = userEvent.setup();
+    await renderPlanner();
+    await user.click(cycleCard("Summer base 2027"));
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(confirmGroup()).toHaveTextContent(
+      'Delete "Summer base 2027"? This can\'t be undone.',
+    );
+  });
+
+  it("Cancel cierra sin borrar y devuelve el foco a Delete", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+    await user.click(cycleCard("Summer base 2027"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(
+      screen.queryByRole("group", { name: /^Delete "/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toHaveFocus();
+    expect(writes()).toEqual([]);
+  });
+
+  it("Escape cierra sin borrar y devuelve el foco a Delete", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+    await user.click(cycleCard("Summer base 2027"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await user.keyboard("{Escape}");
+
+    expect(
+      screen.queryByRole("group", { name: /^Delete "/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toHaveFocus();
+    expect(writes()).toEqual([]);
+  });
+
+  it("Delete cycle pide borrar el ciclo", async () => {
+    stubCycles(undefined, () => ok({ cycles: [ACTIVE, ARCHIVED] }));
+    const user = userEvent.setup();
+    await renderPlanner();
+    await user.click(cycleCard("Summer base 2027"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await user.click(screen.getByRole("button", { name: "Delete cycle" }));
+
+    await waitFor(() =>
+      expect(writes()).toEqual([
+        {
+          method: "DELETE",
+          path: `${CYCLES_PATH}/${DRAFT.id}`,
+          body: undefined,
+        },
+      ]),
+    );
+  });
+
+  it("en el móvil Delete es sólo el icono, con su nombre", async () => {
+    stubScreenWidth(true);
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Cycle" }),
+      DRAFT.id,
+    );
+
+    const deleteButton = screen.getByRole("button", { name: "Delete cycle" });
+    expect(deleteButton).toBeVisible();
+    expect(deleteButton).toHaveTextContent("");
+  });
+
+  it("en español todo está traducido", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner("es");
+    await user.click(cycleCard("Summer base 2027"));
+
+    await user.click(screen.getByRole("button", { name: "Borrar" }));
+
+    const group = screen.getByRole("group", { name: /^¿Borrar "/ });
+    expect(group).toHaveTextContent(
+      '¿Borrar "Summer base 2027"? Se van con él su 1 rutina propia y su cuadrícula. No se puede deshacer.',
+    );
+    expect(
+      within(group).getByRole("button", { name: "Cancelar" }),
+    ).toBeVisible();
+    expect(
+      within(group).getByRole("button", { name: "Borrar ciclo" }),
+    ).toBeVisible();
+  });
+});
+
+describe("usePlannerCycles", () => {
+  async function deleteSelected(
+    user: ReturnType<typeof userEvent.setup>,
+  ): Promise<void> {
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Delete cycle" }));
+  }
+
+  it("tras borrar quita la tarjeta, elige el activo y avisa", async () => {
+    stubCycles(undefined, () => ok({ cycles: [ACTIVE, DRAFT] }));
+    const user = userEvent.setup();
+    await renderPlanner();
+    await user.click(screen.getByRole("button", { name: "Show archived · 1" }));
+    await user.click(cycleCard("Winter 2026"));
+
+    await deleteSelected(user);
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Cycle deleted."),
+    );
+    expect(screen.getByText(/^Editing/)).toHaveTextContent(
+      "Editing Road to Nationals 2027",
+    );
+    expect(
+      screen.queryByRole("button", { name: /^Winter 2026/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Show archived/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("baja en uno la cuenta de Show archived", async () => {
+    const older: ManagedCycle = {
+      ...ARCHIVED,
+      id: "aaaaaaaa-0000-4000-8000-000000000006",
+      name: "Autumn 2025",
+    };
+    stubCycles([ACTIVE, ARCHIVED, older], () =>
+      ok({ cycles: [ACTIVE, older] }),
+    );
+    const user = userEvent.setup();
+    await renderPlanner();
+    await user.click(screen.getByRole("button", { name: "Show archived · 2" }));
+    await user.click(cycleCard("Winter 2026"));
+
+    await deleteSelected(user);
+
+    await screen.findByText("Cycle deleted.");
+    await user.click(screen.getByRole("button", { name: "Hide archived" }));
+    expect(
+      screen.getByRole("button", { name: "Show archived · 1" }),
+    ).toBeVisible();
+  });
+
+  it("sin activo elige el primero que quede", async () => {
+    stubCycles([DRAFT, ARCHIVED], () => ok({ cycles: [ARCHIVED] }));
+    const user = userEvent.setup();
+    await renderPlanner();
+
+    await deleteSelected(user);
+
+    await waitFor(() =>
+      expect(screen.getByText(/^Editing/)).toHaveTextContent(
+        "Editing Winter 2026",
+      ),
+    );
+  });
+
+  it("al borrar el último sale el estado vacío", async () => {
+    stubCycles([DRAFT], () => ok({ cycles: [] }));
+    const user = userEvent.setup();
+    await renderPlanner();
+
+    await deleteSelected(user);
+
+    expect(await screen.findByText("No cycles yet")).toBeInTheDocument();
+  });
+
+  it("con 409 cycle_is_active lo dice y recarga los ciclos", async () => {
+    let cycles: readonly ManagedCycle[] = [ACTIVE, DRAFT];
+    stubApi((request) => {
+      if (request.method === "DELETE") {
+        cycles = [
+          { ...ACTIVE, status: "archived" },
+          { ...DRAFT, status: "active" },
+        ];
+        return {
+          status: 409,
+          body: {
+            error: {
+              code: "conflict",
+              message: "x",
+              reason: "cycle_is_active",
+            },
+          },
+        };
+      }
+      if (request.path === CYCLES_PATH) {
+        return listReply(cycles);
+      }
+      const cycle = cycles.find(
+        (candidate) => request.path === `${CYCLES_PATH}/${candidate.id}`,
+      );
+      return cycle === undefined ? ok({ routines: [] }) : ok(detailOf(cycle));
+    });
+    const user = userEvent.setup();
+    await renderPlanner();
+    await user.click(cycleCard("Summer base 2027"));
+
+    await deleteSelected(user);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This cycle is active now. Archive it first.",
+    );
+    await waitFor(() =>
+      expect(cycleCard("Summer base 2027")).toHaveTextContent("Active"),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("con un error de red el ciclo sigue y se dice el error", async () => {
+    stubCycles(undefined, () => {
+      throw new TypeError("Failed to fetch");
+    });
+    const user = userEvent.setup();
+    await renderPlanner();
+    await user.click(cycleCard("Summer base 2027"));
+
+    await deleteSelected(user);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't save that change. Try again.",
+    );
+    expect(cycleCard("Summer base 2027")).toBeVisible();
+  });
+
+  it("con un 500 el ciclo sigue y se dice el error", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+    await user.click(cycleCard("Summer base 2027"));
+
+    await deleteSelected(user);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't save that change. Try again.",
+    );
+    expect(cycleCard("Summer base 2027")).toBeVisible();
+  });
+});

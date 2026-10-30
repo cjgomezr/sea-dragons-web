@@ -242,6 +242,17 @@ export function archiveCycle(
   );
 }
 
+/** Sólo un borrador o un archivado (#935); el activo responde 409. */
+export function deleteCycle(
+  cycleId: string,
+): Promise<PlannerOutcome<CycleList>> {
+  return requestAndRead(
+    trainingManageCycleApiPath(cycleId),
+    jsonInit("DELETE"),
+    { schema: cyclesResponseSchema, pick: (response) => response.data.cycles },
+  );
+}
+
 export function duplicateCycle(
   cycleId: string,
 ): Promise<PlannerOutcome<DuplicateOutcome>> {
