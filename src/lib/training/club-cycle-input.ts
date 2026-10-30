@@ -122,7 +122,11 @@ export function validCycleSchedule(schedule: CycleSchedule): CycleSchedule {
 
 /** Una semana que el ciclo tiene: de la 1 a la última. */
 export function validWeekNo(weekNo: number, cycleWeeks: number): number {
-  if (weekNo < CYCLE_MIN_WEEKS || weekNo > cycleWeeks) {
+  const isInCycle =
+    Number.isInteger(weekNo) &&
+    weekNo >= CYCLE_MIN_WEEKS &&
+    weekNo <= cycleWeeks;
+  if (!isInCycle) {
     throw new CycleValidationError("week_out_of_range");
   }
   return weekNo;

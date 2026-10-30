@@ -27888,6 +27888,8 @@ type PlannerState = {
   readonly openWeek?: number;
   /** Con el borrador elegido y la confirmación de borrarlo abierta (#935). */
   readonly isConfirmingDelete?: boolean;
+  /** Con la semana abierta y la confirmación de Clear week abierta (#943). */
+  readonly isConfirmingClearWeek?: boolean;
 };
 
 /** Como la captura del handoff: un activo elegido, un borrador y un
@@ -27897,6 +27899,11 @@ const PLANNER_STATES: readonly PlannerState[] = [
   { name: "planificar-ciclo-es", isSpanish: true },
   { name: "planificar-semana-abierta", openWeek: 2 },
   { name: "planificar-ciclo-borrar", isConfirmingDelete: true },
+  {
+    name: "planificar-semana-vaciar",
+    openWeek: 2,
+    isConfirmingClearWeek: true,
+  },
 ];
 
 const PLANNER_DRAFT_CYCLE_NAME = "Summer base 2027";
@@ -28091,7 +28098,24 @@ async function openPlanner(
   if (state.isConfirmingDelete === true) {
     await openCycleDeleteConfirm(page);
   }
+  if (state.isConfirmingClearWeek === true && state.openWeek !== undefined) {
+    await openClearWeekConfirm(page, state.openWeek);
+  }
   await page.mouse.move(0, 0);
+}
+
+/** Pulsa Clear week en la semana abierta: sus cuatro días con rutina vuelven
+ * a descanso (#943). */
+async function openClearWeekConfirm(page: Page, week: number): Promise<void> {
+  await page
+    .getByRole("group", { name: `Week ${week}`, exact: true })
+    .getByRole("button", { name: "Clear week" })
+    .click();
+  await expect(
+    page.getByRole("group", {
+      name: `Clear week ${week}? Its 4 days with routines go back to Rest, and its note and dose are removed.`,
+    }),
+  ).toBeVisible();
 }
 
 /** Elige el borrador (con su tarjeta en el escritorio, con el selector en el

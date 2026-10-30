@@ -12,6 +12,7 @@ import { applyDayChange } from "@/lib/training/cycle-grid-view";
 import {
   type CyclePlan,
   type PlannerFailure,
+  clearCycleWeek,
   copyCycleWeekOne,
   loadCyclePlan,
   loadCycleRoutines,
@@ -23,7 +24,8 @@ import type { PlannerCycles } from "./use-planner-cycles";
 /**
  * La cuadrícula de un ciclo (#907): sus semanas, sus días y las rutinas que
  * se pueden elegir. Un día se pinta al elegirlo y vuelve atrás si la API no
- * lo guarda; la nota, la dosis y la copia de la semana 1 esperan a la API.
+ * lo guarda; la nota, la dosis, la copia de la semana 1 y vaciar una semana
+ * (#943) esperan a la API.
  */
 
 export type CycleGridState =
@@ -43,6 +45,8 @@ export type CycleGrid = {
   /** Verdadero si se guardó. */
   readonly saveWeek: (week: CycleWeekRecord) => Promise<boolean>;
   readonly copyWeekOne: () => Promise<boolean>;
+  /** Verdadero si se vació. */
+  readonly clearWeek: (weekNo: number) => Promise<boolean>;
 };
 
 /** Lo que la cuadrícula le pide a Planificar: decir un fallo. */
@@ -205,6 +209,17 @@ export function useCycleGrid(
     return true;
   }
 
+  async function clearWeek(weekNo: number): Promise<boolean> {
+    reporter.showError(null);
+    const outcome = await clearCycleWeek(cycle.id, weekNo);
+    if (outcome.kind === "failed") {
+      report(outcome);
+      return false;
+    }
+    setState(updatePlan(() => outcome.value));
+    return true;
+  }
+
   return {
     state,
     isCopying,
@@ -212,5 +227,6 @@ export function useCycleGrid(
     setDay: (change) => void setDay(change),
     saveWeek,
     copyWeekOne,
+    clearWeek,
   };
 }

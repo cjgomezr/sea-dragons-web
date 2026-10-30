@@ -12,6 +12,7 @@ import {
   CycleNotFoundError,
   activateManagedCycle,
   archiveManagedCycle,
+  clearManagedCycleWeek,
   copyManagedCycleWeekOne,
   createManagedCycle,
   deleteManagedCycle,
@@ -54,6 +55,7 @@ let auditRows: AuditLogInsertRow[];
 let updates: CycleFields[];
 let savedDays: unknown[];
 let copiedWeeks: (readonly number[])[];
+let clearedWeeks: number[];
 let duplicateNames: string[];
 
 function cycle(
@@ -164,6 +166,11 @@ function gateways(): ClubCyclesGateways {
       copyWeekOne: async (_target, targetWeeks) => {
         copiedWeeks.push(targetWeeks);
       },
+      clearWeek: async (_target, weekNo) => {
+        clearedWeeks.push(weekNo);
+        days = days.filter((candidate) => candidate.weekNo !== weekNo);
+        weeks = weeks.filter((candidate) => candidate.weekNo !== weekNo);
+      },
     },
     audit: {
       insertAuditLogRow: async (row) => {
@@ -194,6 +201,7 @@ beforeEach(() => {
   updates = [];
   savedDays = [];
   copiedWeeks = [];
+  clearedWeeks = [];
   duplicateNames = [];
 });
 
@@ -905,5 +913,84 @@ describe("copyManagedCycleWeekOne", () => {
       }),
     ).rejects.toMatchObject({ code: "too_few_weeks_to_copy" });
     expect(copiedWeeks).toEqual([]);
+  });
+});
+
+describe("clearManagedCycleWeek", () => {
+  function clearWeek(cycleId: string, weekNo: number) {
+    return clearManagedCycleWeek(gateways(), {
+      callerId: COACH_ID,
+      cycleId,
+      weekNo,
+    });
+  }
+
+  beforeEach(() => {
+    days = [day(2, 0, 1), day(2, 3, 2), day(3, 0, 1)];
+    weeks = [
+      { weekNo: 2, note: "Load", dose: null },
+      {
+        weekNo: 3,
+        note: "Peak",
+        dose: { sets: 3, reps: "3", intensity: { kind: "none" } },
+      },
+    ];
+  });
+
+  it("vacía los días, la nota y la dosis de esa semana y lo anota", async () => {
+    const detail = await clearWeek(SUMMER_ID, 2);
+
+    expect(clearedWeeks).toEqual([2]);
+    expect(detail.days.filter((d) => d.weekNo === 2)).toEqual([]);
+    expect(detail.weeks[1]).toEqual({ weekNo: 2, note: null, dose: null });
+    expect(lastAudit()).toMatchObject({
+      action: "training_cycle.week_cleared",
+      entity_id: SUMMER_ID,
+      metadata: { weekNo: 2 },
+    });
+  });
+
+  it("deja intactas las demás semanas y el número de semanas", async () => {
+    const detail = await clearWeek(SUMMER_ID, 2);
+
+    expect(detail.cycle.weeks).toBe(4);
+    expect(detail.weeks).toHaveLength(4);
+    expect(detail.weeks[2]?.note).toBe("Peak");
+    expect(detail.days).toEqual([day(3, 0, 1)]);
+  });
+
+  it.each([0, 5, 1.5])("rechaza la semana %s", async (weekNo) => {
+    await expect(clearWeek(SUMMER_ID, weekNo)).rejects.toMatchObject({
+      code: "week_out_of_range",
+    });
+    expect(clearedWeeks).toEqual([]);
+  });
+
+  it("con un ciclo que no es del club no existe", async () => {
+    await expect(clearWeek(UNKNOWN_CYCLE_ID, 2)).rejects.toThrow(
+      CycleNotFoundError,
+    );
+    expect(clearedWeeks).toEqual([]);
+  });
+
+  it("vacía un archivado igual que guarda un día de un archivado", async () => {
+    cycles = [cycle(SUMMER_ID, { status: "archived" })];
+
+    await expect(clearWeek(SUMMER_ID, 2)).resolves.toBeDefined();
+    await expect(
+      setManagedCycleDay(gateways(), {
+        callerId: COACH_ID,
+        cycleId: SUMMER_ID,
+        day: { weekNo: 1, weekday: 0, slot: 1, routineId: SHARED_ROUTINE_ID },
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it("a un Player lo rechaza", async () => {
+    callerRole = "Player";
+
+    await expect(clearWeek(SUMMER_ID, 2)).rejects.toThrow(
+      TrainingPlannerForbiddenError,
+    );
   });
 });

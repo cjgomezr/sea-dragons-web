@@ -324,6 +324,14 @@ export function trainingManageCycleActionApiPath(
   return `${trainingManageCycleApiPath(cycleId)}/${action}`;
 }
 
+/** Vaciar una semana del ciclo (#943). */
+export function trainingManageCycleWeekClearApiPath(
+  cycleId: string,
+  weekNo: number | string,
+): string {
+  return `${trainingManageCycleActionApiPath(cycleId, "weeks")}/${encodeURIComponent(weekNo)}/clear`;
+}
+
 /** La búsqueda global (#425, RF-7 del PRD de E14). La alcanza cualquier
  * cuenta activa: qué encuentra cada rol lo decide cada sección (D3), así que
  * no aparece en `RESTRICTED_ROUTES`. */
