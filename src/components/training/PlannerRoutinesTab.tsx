@@ -67,10 +67,12 @@ function RoutineFilter({
   translate,
   cycles,
   list,
+  onChange,
 }: {
   readonly translate: Translator;
   readonly cycles: readonly ManagedCycle[];
   readonly list: RoutineList;
+  readonly onChange: (filter: string) => void;
 }): React.JSX.Element {
   const selectId = useId();
   const { current, archived } = routineFilterGroups(cycles);
@@ -82,7 +84,7 @@ function RoutineFilter({
       <select
         id={selectId}
         value={list.filter}
-        onChange={(event) => list.changeFilter(event.target.value)}
+        onChange={(event) => onChange(event.target.value)}
       >
         {current.map((cycle) => (
           <option key={cycle.id} value={cycle.id}>
@@ -377,14 +379,12 @@ type PhoneEditor = {
 
 function usePhoneEditor(list: RoutineList): PhoneEditor {
   const isPhone = useIsPhone();
-  // Se recuerda con qué filtro se abrió: otro filtro es otra lista, y en el
-  // móvil vuelve a ella, sin editor.
-  const [openedFilter, setOpenedFilter] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
   return {
     isPhone,
-    isShown: isPhone && openedFilter === list.filter && list.selected !== null,
-    open: () => setOpenedFilter(list.filter),
-    close: () => setOpenedFilter(null),
+    isShown: isPhone && isOpen && list.selected !== null,
+    open: () => setIsOpen(true),
+    close: () => setIsOpen(false),
   };
 }
 
@@ -401,7 +401,16 @@ export function PlannerRoutinesTab({
   return (
     <>
       <div className="training-routine-filter-row">
-        <RoutineFilter translate={translate} cycles={cycles} list={list} />
+        <RoutineFilter
+          translate={translate}
+          cycles={cycles}
+          list={list}
+          onChange={(filter) => {
+            // Otro filtro es otra lista: en el móvil vuelve a ella, sin editor.
+            phoneEditor.close();
+            list.changeFilter(filter);
+          }}
+        />
         <p className="training-routine-filter-hint">
           {translate("training.manage.routinesHint")}
         </p>

@@ -1118,6 +1118,23 @@ describe("en el móvil", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("volver al filtro de antes enseña la lista, no el editor", async () => {
+    const user = userEvent.setup();
+    await openRoutinesTab(user);
+    await user.click(await screen.findByRole("button", { name: /^Gym A/ }));
+    await screen.findByRole("textbox", { name: "Routine name" });
+    const filter = screen.getByRole("combobox", { name: "Routines of" });
+    await user.selectOptions(filter, "Shared routines only");
+    await screen.findByText("Mobility");
+
+    await user.selectOptions(filter, "Road to Nationals 2027 · active");
+
+    expect(await screen.findByText("Gym A · Strength")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Routine name" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("el botón de crear va antes de la lista y no al final", async () => {
     const user = userEvent.setup();
     await openRoutinesTab(user);
