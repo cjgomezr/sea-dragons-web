@@ -723,6 +723,14 @@ describe("en el móvil", () => {
 });
 
 describe("PlannerWeekEditor: Clear week", () => {
+  const scrollIntoView = vi.fn();
+
+  beforeEach(() => {
+    scrollIntoView.mockReset();
+    // jsdom no desplaza nada: basta con ver que se pide.
+    Element.prototype.scrollIntoView = scrollIntoView;
+  });
+
   const CLEARED_PLAN: Plan = { weeks: [WEEK_TWO], days: [] };
 
   async function openWeek(week: number): Promise<HTMLElement> {
@@ -783,6 +791,17 @@ describe("PlannerWeekEditor: Clear week", () => {
       within(confirm).getByRole("button", { name: "Clear week" }),
     ).toBeInTheDocument();
     expect(writes()).toEqual([]);
+  });
+
+  it("trae la confirmación entera a la vista", async () => {
+    stubGrid();
+    const user = userEvent.setup();
+    await renderGrid();
+    const editor = await openWeek(1);
+
+    await user.click(clearButton(editor));
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
   });
 
   it("sin días con rutina solo nombra la nota y la dosis", async () => {

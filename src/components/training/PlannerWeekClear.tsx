@@ -45,14 +45,19 @@ function ClearConfirm({
   readonly onConfirm: () => void;
 }): React.JSX.Element {
   const textId = useId();
+  const confirmRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    cancelRef.current?.focus();
+    // En el escritorio el editor vive dentro de la cuadrícula, que tiene su
+    // propio scroll: llevar el foco a Cancel no basta para ver la caja entera.
+    confirmRef.current?.scrollIntoView({ block: "nearest" });
+    cancelRef.current?.focus({ preventScroll: true });
   }, []);
 
   return (
     <div
+      ref={confirmRef}
       className="training-plan-confirm training-grid-week-clear-confirm"
       role="group"
       aria-labelledby={textId}
