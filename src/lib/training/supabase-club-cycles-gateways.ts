@@ -431,6 +431,24 @@ async function copyWeekOne(
   }
 }
 
+async function clearWeek(
+  serviceClient: SupabaseClient,
+  target: CycleTarget,
+  weekNo: number,
+): Promise<void> {
+  const { error } = await serviceClient.rpc("clear_training_cycle_week", {
+    p_club_id: target.clubId,
+    p_cycle_id: target.cycleId,
+    p_week_no: weekNo,
+  });
+  if (error) {
+    throw failure(
+      `vaciar la semana ${weekNo} del ciclo ${target.cycleId}`,
+      error.message,
+    );
+  }
+}
+
 export function createClubCyclesGateways(
   serviceClient: SupabaseClient,
 ): ClubCyclesGateways {
@@ -460,6 +478,7 @@ export function createClubCyclesGateways(
       saveWeek: (target, week) => saveWeek(serviceClient, target, week),
       copyWeekOne: (target, targetWeeks) =>
         copyWeekOne(serviceClient, target, targetWeeks),
+      clearWeek: (target, weekNo) => clearWeek(serviceClient, target, weekNo),
     },
     audit: createSupabaseAuditLogWriter(serviceClient),
   };

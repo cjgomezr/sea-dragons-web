@@ -6,6 +6,7 @@ import {
   type TrainingCycleAction,
   trainingManageCycleActionApiPath,
   trainingManageCycleApiPath,
+  trainingManageCycleWeekClearApiPath,
 } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
 import type {
@@ -39,6 +40,7 @@ const readAuthenticatedUserId = vi.fn();
 const insertAuditLogRow = vi.fn();
 const setDay = vi.fn();
 const copyWeekOne = vi.fn();
+const clearWeek = vi.fn();
 let cycles: ClubCycleRecord[];
 let days: CycleDayRecord[];
 let weeks: CycleWeekRecord[];
@@ -130,6 +132,11 @@ function clubCyclesGateways(): ClubCyclesGateways {
       copyWeekOne: async (_target, targetWeeks) => {
         copyWeekOne(targetWeeks);
       },
+      clearWeek: async (_target, weekNo) => {
+        clearWeek(weekNo);
+        days = days.filter((candidate) => candidate.weekNo !== weekNo);
+        weeks = weeks.filter((candidate) => candidate.weekNo !== weekNo);
+      },
     },
     audit: {
       insertAuditLogRow: async (row) => {
@@ -181,6 +188,8 @@ const weeksRoute =
   await import("@/app/api/v1/training/manage/cycles/[cycleId]/weeks/route");
 const daysRoute =
   await import("@/app/api/v1/training/manage/cycles/[cycleId]/days/route");
+const clearWeekRoute =
+  await import("@/app/api/v1/training/manage/cycles/[cycleId]/weeks/[weekNo]/clear/route");
 
 type PostAction = keyof typeof actionRoutes;
 
@@ -276,6 +285,18 @@ function putPart(
   );
   const route = part === "weeks" ? weeksRoute : daysRoute;
   return throughProxy(request, () => route.PUT(request, context(cycleId)));
+}
+
+function postClearWeek(cycleId: string, weekNo: string): Promise<Response> {
+  const request = new NextRequest(
+    new URL(trainingManageCycleWeekClearApiPath(cycleId, weekNo), ORIGIN),
+    { method: "POST" },
+  );
+  return throughProxy(request, () =>
+    clearWeekRoute.POST(request, {
+      params: Promise.resolve({ cycleId, weekNo }),
+    }),
+  );
 }
 
 async function dataOf(response: Response): Promise<Record<string, unknown>> {
@@ -817,4 +838,81 @@ describe("PUT /api/v1/training/manage/cycles/{id}/weeks", () => {
 
     expect(response.status).toBe(400);
   });
+});
+
+describe("POST /api/v1/training/manage/cycles/{id}/weeks/{n}/clear", () => {
+  beforeEach(() => {
+    days = [
+      { weekNo: 2, weekday: 0, slot: 1, routineId: OWN_ROUTINE_ID },
+      { weekNo: 3, weekday: 0, slot: 1, routineId: OWN_ROUTINE_ID },
+    ];
+    weeks = [{ weekNo: 2, note: "Load", dose: null }];
+  });
+
+  it("vacía la semana y responde 200 con los días y las semanas del ciclo", async () => {
+    const response = await postClearWeek(WINTER_ID, "2");
+
+    expect(response.status).toBe(200);
+    expect(clearWeek).toHaveBeenCalledWith(2);
+    const data = await dataOf(response);
+    expect(data.days).toEqual([
+      { weekNo: 3, weekday: 0, slot: 1, routineId: OWN_ROUTINE_ID },
+    ]);
+    expect(data.weeks).toContainEqual({ weekNo: 2, note: null, dose: null });
+    expect(data.cycle).toMatchObject({ id: WINTER_ID, weeks: 4 });
+  });
+
+  it("lo anota en la bitácora con la semana", async () => {
+    await postClearWeek(WINTER_ID, "2");
+
+    expect(insertAuditLogRow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "training_cycle.week_cleared",
+        metadata: { weekNo: 2 },
+      }),
+    );
+  });
+
+  it.each(["0", "5", "1.5", "two"])(
+    "con la semana %s responde 400 y no borra nada",
+    async (weekNo) => {
+      const response = await postClearWeek(WINTER_ID, weekNo);
+
+      expect(response.status).toBe(400);
+      expect(clearWeek).not.toHaveBeenCalled();
+    },
+  );
+
+  it("con un ciclo de otro club responde 404", async () => {
+    const response = await postClearWeek(OTHER_CLUBS_CYCLE_ID, "2");
+
+    expect(response.status).toBe(404);
+    expect(clearWeek).not.toHaveBeenCalled();
+  });
+
+  it("con un ciclo archivado responde lo mismo que al guardar un día", async () => {
+    replaceCycle(SUMMER_ID, { status: "archived" });
+
+    const cleared = await postClearWeek(SUMMER_ID, "2");
+    const daySaved = await putPart(SUMMER_ID, "days", {
+      weekNo: 1,
+      weekday: 0,
+      slot: 1,
+      routineId: null,
+    });
+
+    expect(cleared.status).toBe(daySaved.status);
+  });
+
+  it.each<Role>(["Player", "Committee"])(
+    "a un %s le responde 403",
+    async (role) => {
+      givenCaller(role);
+
+      const response = await postClearWeek(WINTER_ID, "2");
+
+      expect(response.status).toBe(403);
+      expect(clearWeek).not.toHaveBeenCalled();
+    },
+  );
 });

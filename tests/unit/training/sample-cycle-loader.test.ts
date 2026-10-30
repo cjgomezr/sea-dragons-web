@@ -163,6 +163,7 @@ function cyclesGateways(): ClubCyclesGateways {
       setDay: async () => undefined,
       saveWeek: async () => undefined,
       copyWeekOne: notUsed,
+      clearWeek: notUsed,
     },
   };
 }

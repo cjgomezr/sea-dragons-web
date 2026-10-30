@@ -140,6 +140,9 @@ export type ClubCyclesGateway = {
     target: CycleTarget,
     targetWeeks: readonly number[],
   ): Promise<void>;
+  /** Borra los días y la fila de nota y dosis de esa semana, en la misma
+   * transacción. */
+  clearWeek(target: CycleTarget, weekNo: number): Promise<void>;
 };
 
 export type ClubCyclesGateways = {
@@ -544,6 +547,24 @@ export async function copyManagedCycleWeekOne(
     actor,
     action: "training_cycle.week_one_copied",
     cycleId: target.cycleId,
+  });
+  return readDetail(gateways, target);
+}
+
+/** Los siete días a descanso y sin nota ni dosis (#943); las demás semanas,
+ * sus fechas y las rutinas no cambian. */
+export async function clearManagedCycleWeek(
+  gateways: ClubCyclesGateways,
+  request: CycleRequest & { readonly weekNo: number },
+): Promise<ManagedCycleDetail> {
+  const { actor, target, cycle } = await openCycle(gateways, request);
+  const weekNo = validWeekNo(request.weekNo, cycle.weeks);
+  await gateways.cycles.clearWeek(target, weekNo);
+  await recordCycleEvent(gateways, {
+    actor,
+    action: "training_cycle.week_cleared",
+    cycleId: target.cycleId,
+    metadata: { weekNo },
   });
   return readDetail(gateways, target);
 }
