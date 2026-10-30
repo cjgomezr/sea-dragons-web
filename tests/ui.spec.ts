@@ -27966,6 +27966,16 @@ async function goToPlanner(
   theme?: (typeof themes)[number],
 ): Promise<void> {
   await stubPlannerCycles(page);
+  await openPlanner(page, state, theme);
+}
+
+/** Abre Planificar con lo que ya sirve la prueba: las rutas que se añaden
+ * después de `stubPlannerCycles` mandan sobre las suyas. */
+async function openPlanner(
+  page: Page,
+  state: PlannerState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
   if (state.isSpanish === true) {
     await chooseSpanish(page);
   }
@@ -28544,5 +28554,356 @@ test.describe("planificar no es para un Committee", () => {
     await page.goto(`${APP_URL}${PLANNER_SCREEN_PATH}`);
 
     await expect(page).toHaveURL(/\/dashboard$/);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+   Planificar → Rutinas (#908, RF-9 del PRD de E35), contra
+   docs/design/design_handoff_training/ (§5.1 y §5.2, d03-coach-routines.png,
+   m04-coach-routines.png y m05-coach-routine-editor.png). La fila de sección
+   y la carga "Week dose" no están dibujadas: siguen el PRD §7. Las rutinas,
+   sus filas y las marcas las sirve la prueba; qué se guarda lo decide la API
+   (#905), que tiene sus propias pruebas contra la base.
+   --------------------------------------------------------------------------- */
+
+const PLANNER_SQUAT_MARK = {
+  id: "1b2c3d4e-0000-4000-8000-000000000001",
+  name: "Back squat",
+};
+const PLANNER_BENCH_MARK = {
+  id: "1b2c3d4e-0000-4000-8000-000000000002",
+  name: "Bench press",
+};
+
+const PLANNER_STRENGTH_ROUTINE = {
+  id: "bbbbbbbb-0000-4000-8000-000000000001",
+  name: "Gym A · Strength",
+  cycleId: PLANNER_ACTIVE_CYCLE.id,
+  colorIndex: 1,
+  itemCount: 5,
+  daysUsed: 27,
+};
+
+const ROUTINES_TAB_ROUTINES = [
+  PLANNER_STRENGTH_ROUTINE,
+  {
+    id: "bbbbbbbb-0000-4000-8000-000000000002",
+    name: "Pool · Endurance",
+    cycleId: PLANNER_ACTIVE_CYCLE.id,
+    colorIndex: 0,
+    itemCount: 5,
+    daysUsed: 53,
+  },
+  {
+    id: "bbbbbbbb-0000-4000-8000-000000000003",
+    name: "Mobility",
+    cycleId: null,
+    colorIndex: 4,
+    itemCount: 2,
+    daysUsed: 46,
+  },
+];
+
+function plannerExerciseRow(
+  name: string,
+  index: number,
+  dose: { sets: number; reps: string; rest: string; load: unknown },
+) {
+  return {
+    kind: "exercise",
+    exercise: {
+      id: `e0e0e0e0-0000-4000-8000-00000000000${index}`,
+      name,
+      photoUrl: null,
+    },
+    note: null,
+    ...dose,
+  };
+}
+
+/** Una sección y las cuatro cargas: %, la dosis de la semana, texto y nada. */
+const PLANNER_STRENGTH_ITEMS = [
+  { kind: "section", title: "Main" },
+  plannerExerciseRow("Back squat", 1, {
+    sets: 4,
+    reps: "6",
+    rest: "2:00",
+    load: { kind: "pct", markId: PLANNER_SQUAT_MARK.id, pct: 75 },
+  }),
+  plannerExerciseRow("Bench press", 2, {
+    sets: 4,
+    reps: "6",
+    rest: "2:00",
+    load: { kind: "week", markId: PLANNER_BENCH_MARK.id },
+  }),
+  plannerExerciseRow("Pull-up", 3, {
+    sets: 3,
+    reps: "max",
+    rest: "1:30",
+    load: { kind: "text", text: "Bodyweight" },
+  }),
+  plannerExerciseRow("Band pull-apart", 4, {
+    sets: 2,
+    reps: "15",
+    rest: "0:45",
+    load: { kind: "none" },
+  }),
+];
+
+type PlannerSavedItems = { items: unknown[] };
+
+/** Sirve las rutinas y guarda lo que se le manda en `saved`. */
+async function stubPlannerRoutines(
+  page: Page,
+  saved: PlannerSavedItems[] = [],
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === PLANNER_MARKS_ENDPOINT,
+    (route) =>
+      route.fulfill(
+        jsonBody({ marks: [PLANNER_SQUAT_MARK, PLANNER_BENCH_MARK] }),
+      ),
+  );
+  await page.route(
+    (url) => url.pathname === PLANNER_ROUTINES_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ routines: ROUTINES_TAB_ROUTINES })),
+  );
+  await page.route(
+    (url) => url.pathname.endsWith("/items"),
+    (route) => {
+      if (route.request().method() === "PUT") {
+        saved.push(route.request().postDataJSON() as PlannerSavedItems);
+        return route.fulfill(
+          jsonBody({ routine: PLANNER_STRENGTH_ROUTINE, items: [] }),
+        );
+      }
+      return route.fulfill(
+        jsonBody({
+          routine: PLANNER_STRENGTH_ROUTINE,
+          items: PLANNER_STRENGTH_ITEMS,
+        }),
+      );
+    },
+  );
+}
+
+/** Desde este ancho la lista y el editor de rutinas salen juntos. */
+const PLANNER_ROUTINE_EDITOR_BESIDE_PX = 768;
+
+async function goToPlannerRoutines(
+  page: Page,
+  options: {
+    readonly theme?: (typeof themes)[number];
+    readonly isSpanish?: boolean;
+    readonly saved?: PlannerSavedItems[];
+  } = {},
+): Promise<void> {
+  await stubPlannerCycles(page);
+  await stubPlannerRoutines(page, options.saved);
+  await openPlanner(
+    page,
+    { name: "planificar-rutinas", isSpanish: options.isSpanish },
+    options.theme,
+  );
+  await page
+    .getByRole("tab", {
+      name: options.isSpanish === true ? "Rutinas" : "Routines",
+    })
+    .click();
+  await expect(
+    page.getByRole("button", { name: /^Gym A · Strength/ }),
+  ).toBeVisible();
+  // Desde la tableta, la primera rutina se abre sola en el editor: hay que
+  // esperarla, porque la captura mide el alto de la página.
+  if ((page.viewportSize()?.width ?? 0) >= PLANNER_ROUTINE_EDITOR_BESIDE_PX) {
+    await expect(
+      page.getByRole("combobox", { name: /^(Load for|Carga de) Back squat$/ }),
+    ).toBeVisible();
+  }
+  await page.mouse.move(0, 0);
+}
+
+/** En el móvil, con la rutina de fuerza abierta en el editor. */
+async function openPhoneRoutineEditor(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /^Gym A · Strength/ }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Load for Back squat" }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+/** Toda la página sin `fullPage`: al capturarla entera, Chromium encoge la
+ * ventana un instante, la pantalla cruza al móvil y el editor se monta de
+ * nuevo vacío. Se crece la ventana hasta el alto de la página. */
+async function capturePlannerRoutines(
+  page: Page,
+  snapshot: string,
+): Promise<void> {
+  const width = page.viewportSize()?.width ?? 0;
+  const height = await page.evaluate(
+    () => document.documentElement.scrollHeight,
+  );
+  await page.setViewportSize({ width, height });
+  await expect(
+    page.getByText(/^(Opening the routine|Loading the routines)/),
+  ).toHaveCount(0);
+  await createMissingLocalBaseline(snapshot, () =>
+    page.screenshot(SCREENSHOT_OPTIONS),
+  );
+  await expect(page).toHaveScreenshot(snapshot, {
+    ...SCREENSHOT_OPTIONS,
+    maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+  });
+}
+
+test.describe("planificar-rutinas", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const vp of viewports) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToPlannerRoutines(page, { theme });
+          await capturePlannerRoutines(
+            page,
+            `planificar-rutinas-${vp.name}-${theme}.png`,
+          );
+        });
+      }
+    });
+  }
+
+  test.describe("@ mobile, el editor", () => {
+    test.use({ viewport: { width: 375, height: 812 } });
+
+    for (const theme of themes) {
+      test(`matches approved baseline (${theme})`, async ({ page }) => {
+        await goToPlannerRoutines(page, { theme });
+        await openPhoneRoutineEditor(page);
+        await capturePlannerRoutines(
+          page,
+          `planificar-rutina-movil-mobile-${theme}.png`,
+        );
+      });
+    }
+  });
+
+  for (const width of PLANNER_NARROW_WIDTHS) {
+    test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 812 });
+      await goToPlannerRoutines(page);
+      expect(await hasHorizontalScroll(page)).toBe(false);
+      if (width < 768) {
+        await openPhoneRoutineEditor(page);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      }
+    });
+  }
+
+  for (const theme of themes) {
+    test(`has no accessibility violations on the desktop (axe-core, ${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await goToPlannerRoutines(page, { theme });
+      await expectNoAxeViolations(page);
+    });
+
+    test(`has no accessibility violations on the phone editor (axe-core, ${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await goToPlannerRoutines(page, { theme });
+      await openPhoneRoutineEditor(page);
+      await expectNoAxeViolations(page);
+    });
+  }
+
+  test("has no accessibility violations in Spanish", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlannerRoutines(page, { isSpanish: true });
+    await expectNoAxeViolations(page);
+  });
+
+  // §5.1: el porcentaje en un campo de 48 px y el texto en uno de 86 px.
+  test("en el escritorio, el campo del % mide 48 px y el del texto 86 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlannerRoutines(page);
+
+    const pct = page.getByRole("textbox", {
+      name: "Percentage for Back squat",
+    });
+    expect(Math.round((await pct.boundingBox())?.width ?? 0)).toBe(48);
+    const text = page.getByRole("textbox", { name: "Load text for Pull-up" });
+    expect(Math.round((await text.boundingBox())?.width ?? 0)).toBe(86);
+  });
+
+  test("arrastrar una fila por el asa la cambia de sitio y lo guarda", async ({
+    page,
+  }) => {
+    const saved: PlannerSavedItems[] = [];
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlannerRoutines(page, { saved });
+
+    const handle = page.getByRole("button", {
+      name: "Reorder Pull-up, position 4 of 5",
+    });
+    const target = page.getByRole("button", {
+      name: "Reorder Back squat, position 2 of 5",
+    });
+    const from = await handle.boundingBox();
+    const to = await target.boundingBox();
+    if (from === null || to === null) {
+      throw new Error("Las asas no están a la vista");
+    }
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2, to.y + 2, { steps: 12 });
+    await page.mouse.up();
+
+    await expect(
+      page.getByRole("button", { name: "Reorder Pull-up, position 2 of 5" }),
+    ).toBeVisible();
+    await expect.poll(() => saved.length).toBe(1);
+    const order = (saved[0]?.items ?? []).map(
+      (item) =>
+        (item as { title?: string; exerciseId?: string }).title ??
+        (item as { exerciseId?: string }).exerciseId,
+    );
+    expect(order).toEqual([
+      "Main",
+      "e0e0e0e0-0000-4000-8000-000000000003",
+      "e0e0e0e0-0000-4000-8000-000000000001",
+      "e0e0e0e0-0000-4000-8000-000000000002",
+      "e0e0e0e0-0000-4000-8000-000000000004",
+    ]);
+  });
+
+  // §5.2: el nombre de 48 px, campos de 44 px con texto de 16 px y la
+  // papelera de 44 px.
+  test("en el móvil, el editor tiene sus tamaños", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPlannerRoutines(page);
+    await openPhoneRoutineEditor(page);
+
+    const name = page.getByRole("textbox", { name: "Routine name" });
+    expect(Math.round((await name.boundingBox())?.height ?? 0)).toBe(48);
+    const sets = page.getByRole("textbox", { name: "Sets for Back squat" });
+    expect(Math.round((await sets.boundingBox())?.height ?? 0)).toBe(44);
+    await expect(sets).toHaveCSS("font-size", "16px");
+    for (const control of [
+      page.getByRole("button", { name: "Delete Back squat" }),
+      page.getByRole("button", { name: "Reorder Back squat, position 2 of 5" }),
+      page.getByRole("combobox", { name: "Load for Back squat" }),
+    ]) {
+      expect(Math.round((await control.boundingBox())?.height ?? 0)).toBe(44);
+    }
+    await expect(page.getByRole("button", { name: "Routines" })).toBeVisible();
   });
 });

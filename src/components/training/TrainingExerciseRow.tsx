@@ -36,7 +36,7 @@ export type RowContext = {
   readonly onSaveMark: SaveMark;
 };
 
-function ExercisePhoto({
+export function ExercisePhoto({
   url,
   alt,
 }: {

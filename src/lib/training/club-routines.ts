@@ -61,6 +61,32 @@ export type SavedRoutineItems = {
   readonly items: readonly RoutineItemDraft[];
 };
 
+/** El ejercicio de una fila como lo pinta el editor: su nombre y la
+ * primera foto, si tiene. */
+export type RoutineExerciseSummary = {
+  readonly id: string;
+  readonly name: string;
+  readonly photoUrl: string | null;
+};
+
+/** Una fila guardada, con su ejercicio ya nombrado (#908). */
+export type RoutineEditorItem =
+  | { readonly kind: "section"; readonly title: string }
+  | {
+      readonly kind: "exercise";
+      readonly exercise: RoutineExerciseSummary;
+      readonly sets: number | null;
+      readonly reps: string | null;
+      readonly rest: string | null;
+      readonly note: string | null;
+      readonly load: RoutineLoadDraft;
+    };
+
+export type RoutineEditor = {
+  readonly routine: ManagedRoutine;
+  readonly items: readonly RoutineEditorItem[];
+};
+
 /** Lo que se copia en una fila nueva del mismo ejercicio (RF-9). */
 export type LastDose = {
   readonly sets: number | null;
@@ -135,6 +161,8 @@ export type ClubRoutinesGateway = {
   /** Si es de la biblioteca o del club. */
   exerciseVisible(clubId: string, exerciseId: string): Promise<boolean>;
   findLastDose(clubId: string, exerciseId: string): Promise<LastDose | null>;
+  /** Las filas de la rutina en su orden; vacío si no tiene. */
+  listItems(target: RoutineTarget): Promise<readonly RoutineEditorItem[]>;
 };
 
 export type ClubRoutinesGateways = {
@@ -371,6 +399,17 @@ async function assertReferencesInClub(
   if (unknown.exerciseIds.length > 0 || unknown.markIds.length > 0) {
     throw new RoutineItemReferenceError();
   }
+}
+
+/** La rutina y sus filas, para abrirla en el editor de Planificar (#908). */
+export async function readRoutineEditor(
+  gateways: ClubRoutinesGateways,
+  request: { readonly callerId: string; readonly routineId: string },
+): Promise<RoutineEditor> {
+  const actor = await findTrainingPlanner(gateways.members, request.callerId);
+  const target = { clubId: actor.clubId, routineId: request.routineId };
+  const routine = await findRoutineInClub(gateways, target);
+  return { routine, items: await gateways.routines.listItems(target) };
 }
 
 /** Sustituye las filas por `rawItems`, en ese orden. La bitácora anota

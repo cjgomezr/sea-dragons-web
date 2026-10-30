@@ -7,6 +7,7 @@ import {
   deleteClubRoutine,
   findLastExerciseDose,
   listClubRoutines,
+  readRoutineEditor,
   saveRoutineItems,
 } from "@/lib/training/club-routines";
 import { createClubRoutinesGateways } from "@/lib/training/supabase-club-routines-gateways";
@@ -248,6 +249,35 @@ describeRls("Planificar: las rutinas contra Supabase (#905)", () => {
             section_title: null,
             load_kind: "text",
             load_pct: null,
+          },
+        ]);
+
+        const editor = await readRoutineEditor(gateways, {
+          callerId,
+          routineId,
+        });
+        expect(editor.items).toEqual([
+          { kind: "section", title: "Main" },
+          {
+            kind: "exercise",
+            exercise: expect.objectContaining({
+              id: exerciseId,
+              photoUrl: null,
+            }),
+            sets: 5,
+            reps: "5",
+            rest: "3'",
+            note: null,
+            load: { kind: "pct", markId, pct: 72.5 },
+          },
+          {
+            kind: "exercise",
+            exercise: expect.objectContaining({ id: exerciseId }),
+            sets: null,
+            reps: null,
+            rest: null,
+            note: null,
+            load: { kind: "text", text: "Bodyweight" },
           },
         ]);
       });

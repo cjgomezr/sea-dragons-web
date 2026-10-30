@@ -10,11 +10,13 @@ import type {
   LastDose,
   ManagedRoutine,
   RoutineDeleteResult,
+  RoutineEditorItem,
   RoutineInsertResult,
   RoutineItemsReplaceResult,
   RoutineTarget,
 } from "./club-routines";
 import type { RoutineItemDraft, RoutineLoadDraft } from "./routine-items";
+import { TRAINING_EXERCISE_IMAGES_BUCKET } from "./supabase-training-plan-gateways";
 
 /**
  * Las rutinas de Planificar contra Supabase (#905), con la llave de servicio
@@ -62,6 +64,31 @@ const doseRowSchema = z.object({
 
 type DoseRow = z.infer<typeof doseRowSchema>;
 
+// La clave se nombra: PostgREST no adivina entre los caminos posibles.
+const EDITOR_ITEM_COLUMNS = `
+  kind, section_title, sets, reps, rest, note,
+  load_kind, load_mark_id, load_pct, load_text,
+  exercise:training_exercises!training_routine_items_exercise_id_fkey (
+    id, name, image_start_path
+  )`;
+
+const editorItemRowsSchema = z.array(
+  doseRowSchema.extend({
+    kind: z.enum(["exercise", "section"]),
+    section_title: z.string().nullable(),
+    note: z.string().nullable(),
+    exercise: z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        image_start_path: z.string().nullable(),
+      })
+      .nullable(),
+  }),
+);
+
+type EditorItemRow = z.infer<typeof editorItemRowsSchema>[number];
+
 function failure(action: string, message: string): Error {
   return new Error(`No se pudo ${action}: ${message}`);
 }
@@ -88,8 +115,7 @@ function requirePresent<T>(value: T | null, context: string): T {
   return value;
 }
 
-function toLoadDraft(row: DoseRow): RoutineLoadDraft {
-  const context = "La última fila del ejercicio";
+function toLoadDraft(row: DoseRow, context: string): RoutineLoadDraft {
   switch (row.load_kind) {
     case "none":
       return { kind: "none" };
@@ -358,8 +384,63 @@ async function findLastDose(
     sets: row.sets,
     reps: row.reps,
     rest: row.rest,
-    load: toLoadDraft(row),
+    load: toLoadDraft(row, "La última fila del ejercicio"),
   };
+}
+
+function toEditorItem(
+  row: EditorItemRow,
+  photoUrl: (path: string) => string,
+): RoutineEditorItem {
+  const context = "Una fila de la rutina";
+  if (row.kind === "section") {
+    return {
+      kind: "section",
+      title: requirePresent(row.section_title, context),
+    };
+  }
+  const exercise = requirePresent(row.exercise, context);
+  return {
+    kind: "exercise",
+    exercise: {
+      id: exercise.id,
+      name: exercise.name,
+      photoUrl:
+        exercise.image_start_path === null
+          ? null
+          : photoUrl(exercise.image_start_path),
+    },
+    sets: row.sets,
+    reps: row.reps,
+    rest: row.rest,
+    note: row.note,
+    load: toLoadDraft(row, context),
+  };
+}
+
+async function listItems(
+  serviceClient: SupabaseClient,
+  target: RoutineTarget,
+): Promise<readonly RoutineEditorItem[]> {
+  const { data, error } = await serviceClient
+    .from(ITEMS_TABLE)
+    .select(EDITOR_ITEM_COLUMNS)
+    .eq("club_id", target.clubId)
+    .eq("routine_id", target.routineId)
+    .order("position");
+  if (error) {
+    throw failure(
+      `leer las filas de la rutina ${target.routineId}`,
+      error.message,
+    );
+  }
+  const bucket = serviceClient.storage.from(TRAINING_EXERCISE_IMAGES_BUCKET);
+  // El bucket es público: la dirección se deduce de la ruta, sin llamar.
+  const photoUrl = (path: string): string =>
+    bucket.getPublicUrl(path).data.publicUrl;
+  return editorItemRowsSchema
+    .parse(data)
+    .map((row) => toEditorItem(row, photoUrl));
 }
 
 export function createClubRoutinesGateways(
@@ -385,6 +466,7 @@ export function createClubRoutinesGateways(
         exerciseVisible(serviceClient, clubId, exerciseId),
       findLastDose: (clubId, exerciseId) =>
         findLastDose(serviceClient, clubId, exerciseId),
+      listItems: (target) => listItems(serviceClient, target),
     },
     audit: createSupabaseAuditLogWriter(serviceClient),
   };
