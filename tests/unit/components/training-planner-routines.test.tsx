@@ -120,6 +120,8 @@ let items: Map<string, readonly RoutineEditorItem[]>;
 let failWrites: boolean;
 /** Las respuestas a los PUT de filas esperan a que se suelte esta promesa. */
 let itemSavesHeld: Promise<void>;
+/** La respuesta al POST que crea una rutina espera a esta otra. */
+let createsHeld: Promise<void>;
 
 function ok(data: unknown, status = 200): ApiReply {
   return { status, body: { data } };
@@ -248,6 +250,9 @@ function stubApi(): void {
       if (request.method === "PUT") {
         await itemSavesHeld;
       }
+      if (request.method === "POST") {
+        await createsHeld;
+      }
       return new Response(JSON.stringify(body), {
         status,
         headers: { "content-type": "application/json" },
@@ -275,6 +280,7 @@ beforeEach(() => {
   items = new Map([[STRENGTH.id, STRENGTH_ITEMS]]);
   failWrites = false;
   itemSavesHeld = Promise.resolve();
+  createsHeld = Promise.resolve();
   stubApi();
   stubScreenSize("desktop");
 });
@@ -487,6 +493,113 @@ describe("la lista", () => {
         }),
       ]),
     );
+  });
+});
+
+/** El botón de crear arriba, en la fila del filtro (#944). */
+describe("el botón de crear", () => {
+  const CREATE_NAME = /^New (routine in this cycle|shared routine)$/;
+
+  function isBefore(first: Node, second: Node): boolean {
+    return Boolean(
+      first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  }
+
+  it("hay uno solo, tras el filtro y antes de la lista, fuera de ella", async () => {
+    const user = userEvent.setup();
+
+    await openStrength(user);
+
+    const buttons = screen.getAllByRole("button", { name: CREATE_NAME });
+    expect(buttons).toHaveLength(1);
+    const [create] = buttons;
+    const filter = screen.getByRole("combobox", { name: "Routines of" });
+    const list = screen.getByRole("list", { name: "Routines" });
+    if (create === undefined) {
+      throw new Error("Falta el botón de crear");
+    }
+    expect(isBefore(filter, create)).toBe(true);
+    expect(isBefore(create, list)).toBe(true);
+    expect(list.parentElement).not.toContainElement(create);
+  });
+
+  it("con el teclado va del filtro al botón y después a la lista", async () => {
+    const user = userEvent.setup();
+    await openStrength(user);
+
+    screen.getByRole("combobox", { name: "Routines of" }).focus();
+    await user.tab();
+
+    expect(
+      screen.getByRole("button", { name: "New routine in this cycle" }),
+    ).toHaveFocus();
+    await user.tab();
+    expect(routineButton("Gym A · Strength")).toHaveFocus();
+  });
+
+  it("con la lista vacía sigue ahí, junto al estado vacío", async () => {
+    routines = [];
+    const user = userEvent.setup();
+
+    await openRoutinesTab(user);
+
+    expect(await screen.findByText("No routines here yet")).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("button", { name: CREATE_NAME })
+        .map((button) => button.textContent),
+    ).toEqual(["New routine in this cycle"]);
+  });
+
+  it("está desactivado mientras crea", async () => {
+    let releaseCreate = (): void => undefined;
+    createsHeld = new Promise((resolve) => {
+      releaseCreate = resolve;
+    });
+    const user = userEvent.setup();
+    await openStrength(user);
+    const create = screen.getByRole("button", {
+      name: "New routine in this cycle",
+    });
+
+    await user.click(create);
+
+    await waitFor(() => expect(create).toBeDisabled());
+    releaseCreate();
+    await waitFor(() => expect(create).toBeEnabled());
+  });
+
+  it("con el filtro de un ciclo archivado la crea en ese ciclo", async () => {
+    const user = userEvent.setup();
+    await openRoutinesTab(user);
+    await user.selectOptions(
+      await screen.findByRole("combobox", { name: "Routines of" }),
+      "Winter 2026",
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "New routine in this cycle" }),
+    );
+
+    await waitFor(() =>
+      expect(writes()).toEqual([
+        expect.objectContaining({
+          method: "POST",
+          body: { name: "New routine", cycleId: ARCHIVED.id },
+        }),
+      ]),
+    );
+  });
+
+  it("habla en español", async () => {
+    const user = userEvent.setup();
+
+    await openRoutinesTab(user, "es");
+
+    expect(
+      await screen.findByRole("button", { name: "Nueva rutina en este ciclo" }),
+    ).toBeInTheDocument();
   });
 });
 
@@ -1002,6 +1115,33 @@ describe("en el móvil", () => {
     expect(await screen.findByText("Mobility")).toBeInTheDocument();
     expect(
       screen.queryByRole("textbox", { name: "Routine name" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("el botón de crear va antes de la lista y no al final", async () => {
+    const user = userEvent.setup();
+    await openRoutinesTab(user);
+
+    const list = await screen.findByRole("list", { name: "Routines" });
+
+    const create = screen.getByRole("button", {
+      name: "New routine in this cycle",
+    });
+    expect(
+      create.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(list.parentElement).not.toContainElement(create);
+  });
+
+  it("con el editor abierto no enseña el botón de crear", async () => {
+    const user = userEvent.setup();
+    await openRoutinesTab(user);
+
+    await user.click(await screen.findByRole("button", { name: /^Gym A/ }));
+
+    await screen.findByRole("textbox", { name: "Routine name" });
+    expect(
+      screen.queryByRole("button", { name: "New routine in this cycle" }),
     ).not.toBeInTheDocument();
   });
 
