@@ -29213,6 +29213,79 @@ test.describe("planificar-rutinas", () => {
     }
     await expect(page.getByRole("button", { name: "Routines" })).toBeVisible();
   });
+
+  // #945: "Search routines" filtra la lista; con "pool" la abierta (Gym A)
+  // queda fuera de la lista y el editor la sigue enseñando.
+  async function searchRoutines(page: Page, text: string): Promise<void> {
+    await page.getByRole("searchbox", { name: "Search routines" }).fill(text);
+    await expect(
+      page.getByRole("button", { name: /^Gym A · Strength/ }),
+    ).toHaveCount(0);
+    await page.mouse.move(0, 0);
+  }
+
+  for (const vp of viewports.filter((entry) => entry.name !== "tablet")) {
+    test.describe(`@ ${vp.name}, con una búsqueda`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToPlannerRoutines(page, { theme });
+          await searchRoutines(page, "pool");
+          await capturePlannerRoutines(
+            page,
+            `planificar-rutinas-buscar-${vp.name}-${theme}.png`,
+          );
+        });
+      }
+    });
+  }
+
+  for (const vp of viewports) {
+    test(`con una búsqueda a ${vp.width}px, el campo ocupa el ancho de la lista, sin scroll horizontal`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await goToPlannerRoutines(page);
+      await searchRoutines(page, "pool");
+
+      const field = await page
+        .getByRole("searchbox", { name: "Search routines" })
+        .boundingBox();
+      const list = await page
+        .getByRole("list", { name: "Routines" })
+        .boundingBox();
+      if (field === null || list === null) {
+        throw new Error("La búsqueda o la lista no están a la vista");
+      }
+      expect(Math.round(field.width)).toBe(Math.round(list.width));
+      if (vp.width < 768) {
+        expect(field.height).toBeGreaterThanOrEqual(44);
+      }
+      expect(await hasHorizontalScroll(page)).toBe(false);
+    });
+  }
+
+  for (const theme of themes) {
+    test(`con una búsqueda sin coincidencias no hay violaciones de accesibilidad (axe-core, ${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await goToPlannerRoutines(page, { theme });
+      await searchRoutines(page, "yoga");
+      await expect(page.getByText('No routine called "yoga".')).toBeVisible();
+      await expectNoAxeViolations(page);
+    });
+  }
+
+  test("con una búsqueda no hay violaciones de accesibilidad en el escritorio", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlannerRoutines(page);
+    await searchRoutines(page, "pool");
+    await expectNoAxeViolations(page);
+  });
 });
 
 /* ---------------------------------------------------------------------------

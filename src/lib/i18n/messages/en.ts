@@ -3315,6 +3315,12 @@ export const englishMessages = {
   "training.manage.noRoutines": "No routines here yet",
   "training.manage.noRoutinesCycle": "Create one for this cycle.",
   "training.manage.noRoutinesShared": "Create one to use in every cycle.",
+  "training.manage.searchRoutines": "Search routines",
+  "training.manage.noRoutineMatch": 'No routine called "{query}".',
+  "training.manage.routinesFound": {
+    one: "{count} routine",
+    other: "{count} routines",
+  },
   "training.manage.backToRoutines": "Routines",
   "training.manage.routineLoading": "Opening the routine…",
   "training.manage.routineFailed": "We couldn't open this routine.",

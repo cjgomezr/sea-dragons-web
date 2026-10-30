@@ -2,6 +2,7 @@
 
 import { CaretRight } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import { ListChecks } from "@phosphor-icons/react/dist/ssr/ListChecks";
+import { MagnifyingGlass } from "@phosphor-icons/react/dist/ssr/MagnifyingGlass";
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { useId, useState } from "react";
 import { useChangeNotice } from "@/components/groups/use-change-notice";
@@ -19,6 +20,7 @@ import {
   defaultRoutineFilter,
   routineFilterGroups,
 } from "@/lib/training/routine-editor";
+import { filterRoutinesByName } from "@/lib/training/routine-search";
 import { PlannerRoutineEditor } from "./PlannerRoutineEditor";
 import { routineColorStyle } from "./training-format";
 import type { PlannerError } from "./use-planner-cycles";
@@ -220,26 +222,71 @@ function EmptyRoutines({
   );
 }
 
+/** El texto de "Search routines" (#945); vive en la pestaña para que cambiar
+ * el filtro o crear una rutina lo vacíen. */
+type RoutineSearch = {
+  readonly text: string;
+  readonly change: (text: string) => void;
+};
+
+function RoutineSearchField({
+  translate,
+  search,
+}: {
+  readonly translate: Translator;
+  readonly search: RoutineSearch;
+}): React.JSX.Element {
+  return (
+    <span className="training-exercises-search training-routine-search">
+      <Icon glyph={MagnifyingGlass} />
+      <input
+        type="search"
+        value={search.text}
+        aria-label={translate("training.manage.searchRoutines")}
+        placeholder={translate("training.manage.searchRoutines")}
+        autoComplete="off"
+        onChange={(event) => search.change(event.target.value)}
+      />
+    </span>
+  );
+}
+
 function RoutineColumn({
   translate,
   list,
   routines,
+  search,
   isPhone,
   onOpen,
 }: {
   readonly translate: Translator;
   readonly list: RoutineList;
   readonly routines: readonly ManagedRoutine[];
+  readonly search: RoutineSearch;
   readonly isPhone: boolean;
   readonly onOpen: () => void;
 }): React.JSX.Element {
+  const shown = filterRoutinesByName(routines, search.text);
   return (
     <div className="training-routine-column">
+      <RoutineSearchField translate={translate} search={search} />
+      {/* Cuántas quedan, para el lector de pantalla: al montar no se lee,
+          solo cuando la búsqueda cambia la cuenta. */}
+      <p className="visually-hidden" aria-live="polite">
+        {translate("training.manage.routinesFound", { count: shown.length })}
+      </p>
+      {shown.length === 0 ? (
+        <p className="admin-empty">
+          {translate("training.manage.noRoutineMatch", {
+            query: search.text.trim(),
+          })}
+        </p>
+      ) : null}
       <ul
         className="training-routine-list"
         aria-label={translate("training.manage.routineList")}
       >
-        {routines.map((routine) => (
+        {shown.map((routine) => (
           <li key={routine.id}>
             <RoutineButton
               translate={translate}
@@ -285,12 +332,14 @@ function RoutineMessages({
 function RoutinesBody({
   translate,
   list,
+  search,
   phoneEditor,
   onError,
   announce,
 }: {
   readonly translate: Translator;
   readonly list: RoutineList;
+  readonly search: RoutineSearch;
   readonly phoneEditor: PhoneEditor;
   readonly onError: (error: PlannerError | null) => void;
   readonly announce: (notice: string) => void;
@@ -354,6 +403,7 @@ function RoutinesBody({
       translate={translate}
       list={list}
       routines={state.routines}
+      search={search}
       isPhone={isPhone}
       onOpen={open}
     />
@@ -397,6 +447,8 @@ export function PlannerRoutinesTab({
   const { notice, announce } = useChangeNotice();
   const list = useRoutineList(defaultRoutineFilter(selectedCycleId), setError);
   const phoneEditor = usePhoneEditor(list);
+  const [searchText, setSearchText] = useState("");
+  const search = { text: searchText, change: setSearchText };
   const canCreate = list.state.kind === "ready" && !phoneEditor.isShown;
   return (
     <>
@@ -408,6 +460,7 @@ export function PlannerRoutinesTab({
           onChange={(filter) => {
             // Otro filtro es otra lista: en el móvil vuelve a ella, sin editor.
             phoneEditor.close();
+            setSearchText("");
             list.changeFilter(filter);
           }}
         />
@@ -418,7 +471,11 @@ export function PlannerRoutinesTab({
           <NewRoutineButton
             translate={translate}
             list={list}
-            onCreated={phoneEditor.open}
+            onCreated={() => {
+              // La nueva se ve en la lista aunque no case con la búsqueda.
+              setSearchText("");
+              phoneEditor.open();
+            }}
           />
         ) : null}
       </div>
@@ -426,6 +483,7 @@ export function PlannerRoutinesTab({
       <RoutinesBody
         translate={translate}
         list={list}
+        search={search}
         phoneEditor={phoneEditor}
         onError={setError}
         announce={announce}

@@ -524,7 +524,7 @@ describe("el botón de crear", () => {
     expect(list.parentElement).not.toContainElement(create);
   });
 
-  it("con el teclado va del filtro al botón y después a la lista", async () => {
+  it("con el teclado va del filtro al botón, a la búsqueda y después a la lista", async () => {
     const user = userEvent.setup();
     await openStrength(user);
 
@@ -533,6 +533,11 @@ describe("el botón de crear", () => {
 
     expect(
       screen.getByRole("button", { name: "New routine in this cycle" }),
+    ).toHaveFocus();
+    await user.tab();
+    // La búsqueda (#945) va encima de la lista.
+    expect(
+      screen.getByRole("searchbox", { name: "Search routines" }),
     ).toHaveFocus();
     await user.tab();
     expect(routineButton("Gym A · Strength")).toHaveFocus();
@@ -1173,5 +1178,156 @@ describe("en el móvil", () => {
     expect(
       await screen.findByRole("textbox", { name: "Routine name" }),
     ).toHaveValue("New routine");
+  });
+});
+
+/** "Search routines" sobre la lista (#945): filtra por nombre en el
+ * navegador, sin pedir nada a la API. */
+describe("PlannerRoutinesTab", () => {
+  function searchBox(): HTMLElement {
+    return screen.getByRole("searchbox", { name: "Search routines" });
+  }
+
+  function listedNames(): string[] {
+    const list = screen.getByRole("list", { name: "Routines" });
+    return within(list)
+      .queryAllByRole("button")
+      .map(
+        (row) =>
+          row.querySelector(".training-routine-item-name")?.textContent ?? "",
+      );
+  }
+
+  it("enseña el campo con su etiqueta y su placeholder sobre la lista", async () => {
+    const user = userEvent.setup();
+
+    await openRoutinesTab(user);
+
+    await screen.findByRole("list", { name: "Routines" });
+    expect(searchBox()).toHaveAttribute("placeholder", "Search routines");
+    expect(searchBox()).toHaveValue("");
+  });
+
+  it("habla en español", async () => {
+    const user = userEvent.setup();
+
+    await openRoutinesTab(user, "es");
+
+    expect(
+      await screen.findByRole("searchbox", { name: "Buscar rutinas" }),
+    ).toHaveAttribute("placeholder", "Buscar rutinas");
+  });
+
+  it("filtra la lista por nombre sin mayúsculas ni tildes, sin pedir nada a la API", async () => {
+    routines = [STRENGTH, { ...MOBILITY, name: "Movilidad · Cadéra" }];
+    const user = userEvent.setup();
+    await openRoutinesTab(user);
+    await screen.findByRole("list", { name: "Routines" });
+    const readsBefore = requests.length;
+
+    await user.type(searchBox(), "CADERA");
+
+    expect(listedNames()).toEqual(["Movilidad · Cadéra"]);
+    expect(requests).toHaveLength(readsBefore);
+  });
+
+  it("con solo espacios enseña todas", async () => {
+    const user = userEvent.setup();
+    await openRoutinesTab(user);
+    await screen.findByRole("list", { name: "Routines" });
+
+    await user.type(searchBox(), "   ");
+
+    expect(listedNames()).toEqual(["Gym A · Strength", "Mobility"]);
+  });
+
+  it("sin coincidencias dice el mensaje con el texto y deja el botón de crear", async () => {
+    const user = userEvent.setup();
+    await openRoutinesTab(user);
+    await screen.findByRole("list", { name: "Routines" });
+
+    await user.type(searchBox(), "yoga");
+
+    expect(screen.getByText('No routine called "yoga".')).toBeInTheDocument();
+    expect(listedNames()).toEqual([]);
+    expect(
+      screen.getByRole("button", { name: "New routine in this cycle" }),
+    ).toBeEnabled();
+  });
+
+  it("cambiar el filtro vacía la búsqueda", async () => {
+    const user = userEvent.setup();
+    await openRoutinesTab(user);
+    await screen.findByRole("list", { name: "Routines" });
+    await user.type(searchBox(), "gym");
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Routines of" }),
+      "Shared routines only",
+    );
+
+    await waitFor(() => expect(listedNames()).toEqual(["Mobility"]));
+    expect(searchBox()).toHaveValue("");
+  });
+
+  it("crear una rutina vacía la búsqueda, la enseña en la lista y la abre", async () => {
+    const user = userEvent.setup();
+    await openStrength(user);
+    await user.type(searchBox(), "mob");
+
+    await user.click(
+      screen.getByRole("button", { name: "New routine in this cycle" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Routine name" })).toHaveValue(
+        "New routine",
+      ),
+    );
+    expect(searchBox()).toHaveValue("");
+    expect(routineButton("New routine")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("el editor sigue con la abierta aunque la búsqueda la saque de la lista", async () => {
+    const user = userEvent.setup();
+    await openStrength(user);
+
+    await user.type(searchBox(), "mob");
+
+    expect(listedNames()).toEqual(["Mobility"]);
+    expect(screen.getByRole("textbox", { name: "Routine name" })).toHaveValue(
+      "Gym A · Strength",
+    );
+  });
+
+  it("sin rutinas no hay campo de búsqueda", async () => {
+    routines = [];
+    const user = userEvent.setup();
+
+    await openRoutinesTab(user);
+
+    expect(await screen.findByText("No routines here yet")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("searchbox", { name: "Search routines" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("dice cuántas quedan por una región aria-live educada, sin mover el foco", async () => {
+    const user = userEvent.setup();
+    await openRoutinesTab(user);
+    await screen.findByRole("list", { name: "Routines" });
+
+    await user.type(searchBox(), "gym");
+
+    const count = screen.getByText("1 routine");
+    expect(count.closest("[aria-live]")).toHaveAttribute("aria-live", "polite");
+    expect(searchBox()).toHaveFocus();
+
+    await user.clear(searchBox());
+
+    expect(screen.getByText("2 routines")).toBeInTheDocument();
   });
 });

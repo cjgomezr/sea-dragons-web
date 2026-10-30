@@ -3336,6 +3336,12 @@ export const spanishMessages: MessageCatalog = {
   "training.manage.noRoutinesCycle": "Crea una para este ciclo.",
   "training.manage.noRoutinesShared":
     "Crea una para usarla en todos los ciclos.",
+  "training.manage.searchRoutines": "Buscar rutinas",
+  "training.manage.noRoutineMatch": 'Ninguna rutina se llama "{query}".',
+  "training.manage.routinesFound": {
+    one: "{count} rutina",
+    other: "{count} rutinas",
+  },
   "training.manage.backToRoutines": "Rutinas",
   "training.manage.routineLoading": "Abriendo la rutina…",
   "training.manage.routineFailed": "No pudimos abrir esta rutina.",

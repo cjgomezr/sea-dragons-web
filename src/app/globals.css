@@ -27089,6 +27089,12 @@ a.dashboard-club-cell-body:focus-visible {
   min-width: 0;
 }
 
+/* El campo de Ejercicios (#945); en la columna, que va en vertical, su
+   base de 240 px sería la altura. */
+.training-routine-search {
+  flex: none;
+}
+
 .training-routine-list {
   display: flex;
   flex-direction: column;
