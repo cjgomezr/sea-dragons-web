@@ -28999,3 +28999,150 @@ test.describe("planificar-rutinas", () => {
     await expect(page.getByRole("button", { name: "Routines" })).toBeVisible();
   });
 });
+
+/* ---------------------------------------------------------------------------
+   La fila de añadir del editor de rutinas (#909, RF-9 del PRD de E35), contra
+   docs/design/design_handoff_training/ (§5.1 "Add row" y §5.2). En el
+   escritorio los resultados cuelgan del campo y la tabla no los recorta; en
+   el móvil van en línea, en filas de 56 px, con la fila de Create. Los
+   ejercicios los sirve `stubPlannerCycles`, sea cual sea el texto.
+   --------------------------------------------------------------------------- */
+
+const ADD_EXERCISE_NO_MATCH = "Sled push";
+
+/** Escribe en la fila de añadir y espera lo que responde la búsqueda. */
+async function searchToAddExercise(page: Page, text: string): Promise<void> {
+  await page.route(
+    (url) =>
+      url.pathname === PLANNER_EXERCISES_ENDPOINT &&
+      url.searchParams.get("q") === ADD_EXERCISE_NO_MATCH,
+    (route) =>
+      route.fulfill(
+        jsonBody({
+          exercises: [],
+          counts: { library: 0, club: 0 },
+          nextOffset: null,
+        }),
+      ),
+  );
+  await page.getByRole("combobox", { name: "Add exercise" }).fill(text);
+  await expect(
+    text === ADD_EXERCISE_NO_MATCH
+      ? page.getByRole("button", { name: `Create "${text}"` })
+      : page.getByRole("listbox", { name: "Add exercise" }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+test.describe("planificar-rutina-anadir", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const theme of themes) {
+    test(`matches approved baseline on the desktop (${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await goToPlannerRoutines(page, { theme });
+      await searchToAddExercise(page, "squat");
+      await capturePlannerRoutines(
+        page,
+        `planificar-rutina-anadir-desktop-${theme}.png`,
+      );
+    });
+
+    test(`matches approved baseline on the phone (${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await goToPlannerRoutines(page, { theme });
+      await openPhoneRoutineEditor(page);
+      await searchToAddExercise(page, "squat");
+      await capturePlannerRoutines(
+        page,
+        `planificar-rutina-anadir-mobile-${theme}.png`,
+      );
+    });
+
+    test(`has no accessibility violations with the results open (axe-core, ${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await goToPlannerRoutines(page, { theme });
+      await searchToAddExercise(page, "squat");
+      await expectNoAxeViolations(page);
+    });
+
+    test(`has no accessibility violations with Create on the phone (axe-core, ${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await goToPlannerRoutines(page, { theme });
+      await openPhoneRoutineEditor(page);
+      await searchToAddExercise(page, ADD_EXERCISE_NO_MATCH);
+      await expectNoAxeViolations(page);
+    });
+  }
+
+  test("en el escritorio, la tabla no recorta el desplegable", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlannerRoutines(page);
+    await searchToAddExercise(page, "squat");
+
+    const options = page.getByRole("option");
+    await expect(options).toHaveCount(6);
+    const last = options.last();
+    await last.scrollIntoViewIfNeeded();
+    const box = await last.boundingBox();
+    const table = await page.locator(".training-routine-table").boundingBox();
+    if (box === null || table === null) {
+      throw new Error("El desplegable no está a la vista");
+    }
+    expect(box.y + box.height).toBeGreaterThan(table.y + table.height);
+    const hit = await page.evaluate(
+      ([x, y]) =>
+        document.elementFromPoint(x, y)?.closest('[role="option"]')
+          ?.textContent ?? null,
+      [box.x + box.width / 2, box.y + box.height / 2] as const,
+    );
+    expect(hit).toContain("Fin kick");
+  });
+
+  test("en el móvil, los resultados van en línea en filas de 56 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPlannerRoutines(page);
+    await openPhoneRoutineEditor(page);
+    await searchToAddExercise(page, "squat");
+
+    for (const option of await page.getByRole("option").all()) {
+      expect(Math.round((await option.boundingBox())?.height ?? 0)).toBe(56);
+    }
+    await page.getByRole("combobox", { name: "Add exercise" }).blur();
+    await expect(
+      page.getByRole("listbox", { name: "Add exercise" }),
+    ).toBeVisible();
+    expect(await hasHorizontalScroll(page)).toBe(false);
+  });
+
+  test("en el móvil, sin resultados la fila de Create mide 56 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPlannerRoutines(page);
+    await openPhoneRoutineEditor(page);
+    await searchToAddExercise(page, ADD_EXERCISE_NO_MATCH);
+
+    const create = page.getByRole("button", {
+      name: `Create "${ADD_EXERCISE_NO_MATCH}"`,
+    });
+    expect(Math.round((await create.boundingBox())?.height ?? 0)).toBe(56);
+    await expect(
+      page.getByText(`No exercise called "${ADD_EXERCISE_NO_MATCH}".`),
+    ).toBeVisible();
+  });
+});

@@ -75,10 +75,7 @@ function ResultOption({
         <ExercisePhoto url={exercise.thumbnailUrl ?? undefined} alt="" />
       </span>
       <span className="training-routine-add-option-name">{exercise.name}</span>
-      <span
-        className="training-routine-add-source"
-        data-source={exercise.source}
-      >
+      <span className="training-exercises-tag">
         {translate(
           exercise.source === "library"
             ? "training.exercises.sourceLibrary"
