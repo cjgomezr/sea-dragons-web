@@ -23,16 +23,18 @@ import {
   saveRoutineItems,
 } from "./club-routines";
 import type { RoutineItemDraft, RoutineLoadDraft } from "./routine-items";
-import type {
-  SampleCyclePlan,
-  SampleExercise,
-  SampleItem,
-  SampleLoad,
+import {
+  type SampleCyclePlan,
+  type SampleExercise,
+  type SampleItem,
+  type SampleLoad,
+  rowNoteFor,
 } from "./sample-cycle";
 import { createClubCyclesGateways } from "./supabase-club-cycles-gateways";
 import { createClubExercisesGateways } from "./supabase-club-exercises-gateways";
 import { createClubMarksGateways } from "./supabase-club-marks-gateways";
 import { createClubRoutinesGateways } from "./supabase-club-routines-gateways";
+import { findLibraryExerciseByKey } from "./supabase-exercise-library-gateways";
 
 /**
  * Carga el plan de muestra como un ciclo en borrador (#912, RF-13 y D16 del
@@ -44,11 +46,33 @@ import { createClubRoutinesGateways } from "./supabase-club-routines-gateways";
  * nada.
  */
 
+/** El ejercicio en que queda una fila del plan, con el nombre que tiene en
+ * la base. */
+export type LinkedExercise = { readonly id: string; readonly name: string };
+
+export type SampleLibraryGateway = {
+  findLibraryExercise(libraryKey: string): Promise<LinkedExercise | null>;
+};
+
 export type SampleCycleGateways = {
   readonly cycles: ClubCyclesGateways;
   readonly routines: ClubRoutinesGateways;
   readonly marks: ClubMarksGateways;
   readonly exercises: ClubExercisesGateways;
+  readonly library: SampleLibraryGateway;
+};
+
+/** Cuántos ejercicios del plan se enlazaron por cada vía. */
+export type ExerciseLinkCounts = {
+  readonly linkedByGuide: number;
+  readonly foundByName: number;
+  readonly created: number;
+};
+
+/** Una foto de la guía cuya clave no está en la biblioteca de esa base. */
+export type MissingLibraryKey = {
+  readonly name: string;
+  readonly libraryKey: string;
 };
 
 export type SampleCycleReport =
@@ -60,7 +84,8 @@ export type SampleCycleReport =
       /** Los días con alguna sesión; uno con dos cuenta una vez. */
       readonly days: number;
       readonly marksCreated: number;
-      readonly exercisesCreated: number;
+      readonly exercises: ExerciseLinkCounts;
+      readonly missingLibraryKeys: readonly MissingLibraryKey[];
     };
 
 type LoadRequest = {
@@ -68,10 +93,27 @@ type LoadRequest = {
   readonly plan: SampleCyclePlan;
 };
 
-/** Los ids por nombre, sin contar mayúsculas ni tildes. */
-type IdsByName = ReadonlyMap<string, string>;
+/** Por nombre, sin contar mayúsculas ni tildes. */
+type ByName<T> = ReadonlyMap<string, T>;
 
-type Ensured = { readonly ids: IdsByName; readonly created: number };
+type LinkRoute = keyof ExerciseLinkCounts;
+
+type ExerciseLink = {
+  readonly exercise: LinkedExercise;
+  readonly route: LinkRoute;
+  readonly missingLibraryKey: string | null;
+};
+
+type EnsuredExercises = {
+  readonly links: ByName<LinkedExercise>;
+  readonly counts: ExerciseLinkCounts;
+  readonly missingLibraryKeys: readonly MissingLibraryKey[];
+};
+
+type LoadedIds = {
+  readonly exercises: ByName<LinkedExercise>;
+  readonly marks: ByName<string>;
+};
 
 const NO_PHOTO_CHANGES = {
   start: { kind: "keep" },
@@ -86,22 +128,30 @@ export function createSampleCycleGateways(
     routines: createClubRoutinesGateways(serviceClient),
     marks: createClubMarksGateways(serviceClient),
     exercises: createClubExercisesGateways(serviceClient),
+    library: {
+      findLibraryExercise: (libraryKey) =>
+        findLibraryExerciseByKey(serviceClient, libraryKey),
+    },
   };
 }
 
-function idOf(ids: IdsByName, name: string): string {
-  const id = ids.get(normalizeForSearch(name.trim()));
-  if (id === undefined) {
+function nameKey(name: string): string {
+  return normalizeForSearch(name.trim());
+}
+
+function entryOf<T>(entries: ByName<T>, name: string): T {
+  const entry = entries.get(nameKey(name));
+  if (entry === undefined) {
     throw new Error(`No se encontró "${name}" entre lo que se cargó.`);
   }
-  return id;
+  return entry;
 }
 
 /** Las marcas que faltan se crean al final de la lista del club. */
 async function ensureMarks(
   gateways: SampleCycleGateways,
   request: LoadRequest,
-): Promise<Ensured> {
+): Promise<{ readonly ids: ByName<string>; readonly created: number }> {
   const { callerId } = request;
   let { marks } = await listClubMarks(gateways.marks, callerId);
   const missing = request.plan.marks.filter(
@@ -110,17 +160,15 @@ async function ensureMarks(
   for (const name of missing) {
     ({ marks } = await createClubMark(gateways.marks, { callerId, name }));
   }
-  const ids = new Map(
-    marks.map((mark) => [normalizeForSearch(mark.name.trim()), mark.id]),
-  );
+  const ids = new Map(marks.map((mark) => [nameKey(mark.name), mark.id]));
   return { ids, created: missing.length };
 }
 
 /** El de la biblioteca o del club que se llame igual, o nulo. */
-async function findExerciseId(
+async function findExerciseByName(
   gateways: SampleCycleGateways,
   request: { readonly callerId: string; readonly name: string },
-): Promise<string | null> {
+): Promise<LinkedExercise | null> {
   const { exercises } = await searchExercises(gateways.exercises, {
     callerId: request.callerId,
     query: request.name,
@@ -128,13 +176,13 @@ async function findExerciseId(
   const match = exercises.find((exercise) =>
     isSameName(exercise.name, request.name),
   );
-  return match === undefined ? null : match.id;
+  return match === undefined ? null : { id: match.id, name: match.name };
 }
 
 async function createExercise(
   gateways: SampleCycleGateways,
   request: { readonly callerId: string; readonly exercise: SampleExercise },
-): Promise<string> {
+): Promise<LinkedExercise> {
   const { exercise } = request;
   const created = await createClubExercise(gateways.exercises, {
     callerId: request.callerId,
@@ -145,50 +193,81 @@ async function createExercise(
     },
     photos: NO_PHOTO_CHANGES,
   });
-  return created.id;
+  return { id: created.id, name: exercise.name };
 }
 
-/** Los que no están en la biblioteca ni en el club se crean del club. */
+/** Primero el de la biblioteca con la clave de la foto de su guía; si la
+ * biblioteca de esta base no la tiene, como sin foto: por nombre o del
+ * club. */
+async function linkExercise(
+  gateways: SampleCycleGateways,
+  request: { readonly callerId: string; readonly exercise: SampleExercise },
+): Promise<ExerciseLink> {
+  const { libraryKey } = request.exercise;
+  if (libraryKey !== null) {
+    const linked = await gateways.library.findLibraryExercise(libraryKey);
+    if (linked !== null) {
+      return {
+        exercise: linked,
+        route: "linkedByGuide",
+        missingLibraryKey: null,
+      };
+    }
+  }
+  const found = await findExerciseByName(gateways, {
+    callerId: request.callerId,
+    name: request.exercise.name,
+  });
+  return {
+    exercise: found ?? (await createExercise(gateways, request)),
+    route: found === null ? "created" : "foundByName",
+    missingLibraryKey: libraryKey,
+  };
+}
+
 async function ensureExercises(
   gateways: SampleCycleGateways,
   request: LoadRequest,
-): Promise<Ensured> {
-  const { callerId } = request;
-  const ids = new Map<string, string>();
-  let created = 0;
+): Promise<EnsuredExercises> {
+  const links = new Map<string, LinkedExercise>();
+  const counts = { linkedByGuide: 0, foundByName: 0, created: 0 };
+  const missingLibraryKeys: MissingLibraryKey[] = [];
   for (const exercise of request.plan.exercises) {
-    const found = await findExerciseId(gateways, {
-      callerId,
-      name: exercise.name,
+    const link = await linkExercise(gateways, {
+      callerId: request.callerId,
+      exercise,
     });
-    if (found === null) {
-      created += 1;
+    links.set(nameKey(exercise.name), link.exercise);
+    counts[link.route] += 1;
+    if (link.missingLibraryKey !== null) {
+      missingLibraryKeys.push({
+        name: exercise.name,
+        libraryKey: link.missingLibraryKey,
+      });
     }
-    ids.set(
-      normalizeForSearch(exercise.name.trim()),
-      found ?? (await createExercise(gateways, { callerId, exercise })),
-    );
   }
-  return { ids, created };
+  return { links, counts, missingLibraryKeys };
 }
 
-function loadDraft(load: SampleLoad, markIds: IdsByName): RoutineLoadDraft {
+function loadDraft(
+  load: SampleLoad,
+  markIds: ByName<string>,
+): RoutineLoadDraft {
   return load.kind === "week"
-    ? { kind: "week", markId: idOf(markIds, load.markName) }
+    ? { kind: "week", markId: entryOf(markIds, load.markName) }
     : load;
 }
 
-function itemDraft(
-  item: SampleItem,
-  ids: { readonly exercises: IdsByName; readonly marks: IdsByName },
-): RoutineItemDraft {
+function itemDraft(item: SampleItem, ids: LoadedIds): RoutineItemDraft {
   if (item.kind === "section") {
     return item;
   }
-  const { exerciseName, load, ...dose } = item;
+  const { exerciseName, load, note, ...dose } = item;
+  const exercise = entryOf(ids.exercises, exerciseName);
   return {
     ...dose,
-    exerciseId: idOf(ids.exercises, exerciseName),
+    exerciseId: exercise.id,
+    note: rowNoteFor({ exerciseName, note }, exercise.name),
     load: loadDraft(load, ids.marks),
   };
 }
@@ -199,7 +278,7 @@ async function createRoutines(
   gateways: SampleCycleGateways,
   request: LoadRequest & {
     readonly cycleId: string;
-    readonly ids: { readonly exercises: IdsByName; readonly marks: IdsByName };
+    readonly ids: LoadedIds;
   },
 ): Promise<readonly string[]> {
   const { callerId, cycleId } = request;
@@ -252,7 +331,7 @@ async function fillCycle(
   gateways: SampleCycleGateways,
   request: LoadRequest & {
     readonly cycleId: string;
-    readonly ids: { readonly exercises: IdsByName; readonly marks: IdsByName };
+    readonly ids: LoadedIds;
   },
 ): Promise<readonly string[]> {
   try {
@@ -304,7 +383,7 @@ export async function loadSampleCycle(
   const routineIds = await fillCycle(gateways, {
     ...request,
     cycleId: cycle.id,
-    ids: { exercises: exercises.ids, marks: marks.ids },
+    ids: { exercises: exercises.links, marks: marks.ids },
   });
   return {
     kind: "loaded",
@@ -312,6 +391,7 @@ export async function loadSampleCycle(
     routines: routineIds.length,
     days: countDaysWithSessions(request.plan),
     marksCreated: marks.created,
-    exercisesCreated: exercises.created,
+    exercises: exercises.counts,
+    missingLibraryKeys: exercises.missingLibraryKeys,
   };
 }

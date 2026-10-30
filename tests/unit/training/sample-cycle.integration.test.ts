@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, it } from "vitest";
-import { buildSampleCyclePlan } from "@/lib/training/sample-cycle";
+import {
+  type SampleCyclePlan,
+  buildSampleCyclePlan,
+} from "@/lib/training/sample-cycle";
 import {
   createSampleCycleGateways,
   loadSampleCycle,
@@ -174,10 +177,93 @@ describeRls("El ciclo de muestra contra Supabase (#912)", () => {
         expect(await countRows(seed, "training_cycle_weeks")).toBe(15);
         expect(await countRows(seed, "training_marks")).toBe(4);
         expect(await countRows(seed, "training_exercises")).toBe(
-          first.exercisesCreated,
+          first.exercises.created,
         );
       });
     },
     LOAD_TEST_TIMEOUT_MS,
   );
+
+  it("usa los ejercicios de la biblioteca con la clave de la guía y no crea sus equivalentes del club (#938)", async () => {
+    const suffix = randomUUID();
+    const squat = { key: `Squat_${suffix}`, name: `Library squat ${suffix}` };
+    const row = { key: `Row_${suffix}`, name: `Library row ${suffix}` };
+    const library = [squat, row];
+    const plan = planLinkedTo([
+      { name: "Paused Squat", libraryKey: squat.key },
+      { name: "Inverted Rows", libraryKey: row.key },
+    ]);
+    const serviceClient = createServiceRoleTestClient(process.env);
+
+    await withSeededRows(
+      serviceClient,
+      "training_exercises",
+      library.map((entry) => ({
+        source: "library",
+        club_id: null,
+        library_key: entry.key,
+        name: entry.name,
+      })),
+      async (seeded) => {
+        await withClub(async (seed) => {
+          const report = await loadSampleCycle(
+            createSampleCycleGateways(seed.serviceClient.client),
+            { callerId: seed.admin.id, plan },
+          );
+
+          expect(report).toMatchObject({
+            kind: "loaded",
+            exercises: { linkedByGuide: 2, foundByName: 0, created: 0 },
+          });
+          expect(await countRows(seed, "training_exercises")).toBe(0);
+          const { data: rows, error } = await seed.serviceClient.client
+            .from("training_routine_items")
+            .select("exercise_id, note")
+            .eq("club_id", seed.clubId)
+            .order("position");
+          expect(error).toBeNull();
+          expect(rows).toEqual([
+            { exercise_id: seeded[0]?.id, note: "Paused Squat" },
+            { exercise_id: seeded[1]?.id, note: "Inverted Rows" },
+          ]);
+        });
+      },
+    );
+  });
 });
+
+/** Un plan de una rutina con una fila por ejercicio, enlazados por su
+ * clave de la biblioteca. */
+function planLinkedTo(
+  exercises: readonly { readonly name: string; readonly libraryKey: string }[],
+): SampleCyclePlan {
+  return {
+    cycle: {
+      name: `Linked ${randomUUID()}`,
+      startDate: "2026-09-14",
+      weeks: 1,
+    },
+    marks: [],
+    exercises: exercises.map((exercise) => ({
+      ...exercise,
+      tips: [],
+      youtube: "",
+    })),
+    routines: [
+      {
+        name: "Gym",
+        items: exercises.map((exercise) => ({
+          kind: "exercise",
+          exerciseName: exercise.name,
+          sets: 3,
+          reps: "5",
+          rest: null,
+          note: null,
+          load: { kind: "none" },
+        })),
+      },
+    ],
+    weeks: [],
+    days: [{ weekNo: 1, weekday: 0, slot: 1, routineIndex: 0 }],
+  };
+}

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import type {
   LibraryExercise,
   StoredLibraryExercise,
@@ -27,6 +28,8 @@ type StoredRow = {
   readonly image_start_path: string | null;
   readonly image_end_path: string | null;
 };
+
+const libraryExerciseSchema = z.object({ id: z.string(), name: z.string() });
 
 function toStored(row: StoredRow): StoredLibraryExercise {
   return {
@@ -134,6 +137,26 @@ async function saveExercise(
       `No se pudo guardar ${exercise.libraryKey}: ${error.message}`,
     );
   }
+}
+
+/** El ejercicio de la biblioteca con esa clave de free-exercise-db, o nulo
+ * si esta base no lo tiene (#938). */
+export async function findLibraryExerciseByKey(
+  client: SupabaseClient,
+  libraryKey: string,
+): Promise<{ readonly id: string; readonly name: string } | null> {
+  const { data, error } = await client
+    .from(EXERCISES_TABLE)
+    .select("id, name")
+    .eq("source", LIBRARY_SOURCE)
+    .eq("library_key", libraryKey)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo buscar ${libraryKey} en la biblioteca: ${error.message}`,
+    );
+  }
+  return data === null ? null : libraryExerciseSchema.parse(data);
 }
 
 export function createSupabaseExerciseLibraryStore(

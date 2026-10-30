@@ -9,6 +9,7 @@ import {
   SWIM_SET_EXERCISE,
   ESC_INTERVAL_EXERCISE,
   buildSampleCyclePlan,
+  rowNoteFor,
 } from "@/lib/training/sample-cycle";
 import { WEEK_NOTE_MAX_LENGTH } from "@/lib/training/club-cycle-input";
 import { ROUTINE_NAME_MAX_LENGTH } from "@/lib/training/club-routines";
@@ -280,6 +281,106 @@ describe("buildSampleCyclePlan: las rutinas", () => {
 
     expect(squat?.youtube).toBe("barbell back squat technique");
     expect(squat?.tips).toHaveLength(3);
+  });
+});
+
+type MutableSample = {
+  guide: Record<string, { img: string[] }>;
+  gmap: Record<string, string>;
+};
+
+function sampleWithImg(exerciseName: string, img: string[]): unknown {
+  const sample = readSample() as MutableSample;
+  const guideKey = sample.gmap[exerciseName];
+  const guide = guideKey === undefined ? undefined : sample.guide[guideKey];
+  if (guide === undefined) {
+    throw new Error(`La muestra cambió: "${exerciseName}" no tiene guía`);
+  }
+  guide.img = img;
+  return sample;
+}
+
+function exerciseNamed(
+  source: SampleCyclePlan,
+  name: string,
+): SampleCyclePlan["exercises"][number] {
+  const found = source.exercises.find((exercise) => exercise.name === name);
+  if (found === undefined) {
+    throw new Error(`No hay ejercicio "${name}"`);
+  }
+  return found;
+}
+
+describe("buildSampleCyclePlan: la clave de la biblioteca", () => {
+  it("saca la clave de la foto de la guía: img/Barbell_Squat-0.jpg es Barbell_Squat", () => {
+    expect(exerciseNamed(plan, "Back Squat").libraryKey).toBe("Barbell_Squat");
+  });
+
+  it("da la misma clave a dos ejercicios cuya guía trae la misma foto", () => {
+    expect(exerciseNamed(plan, "Deadlift").libraryKey).toBe("Barbell_Deadlift");
+    expect(exerciseNamed(plan, "Paused Deadlift").libraryKey).toBe(
+      "Barbell_Deadlift",
+    );
+  });
+
+  it("deja la clave nula al ejercicio sin foto en la guía", () => {
+    expect(exerciseNamed(plan, SWIM_SET_EXERCISE).libraryKey).toBeNull();
+    expect(exerciseNamed(plan, ESC_INTERVAL_EXERCISE).libraryKey).toBeNull();
+  });
+
+  it("deja la clave nula, sin romper, a una foto con otra forma de ruta", () => {
+    const changed = buildSampleCyclePlan(
+      sampleWithImg("Back Squat", ["photos/squat.png"]),
+    );
+
+    expect(exerciseNamed(changed, "Back Squat").libraryKey).toBeNull();
+  });
+
+  it("enlaza por la guía 38 de los 82 ejercicios del plan real, con 29 claves", () => {
+    const linked = plan.exercises.filter(
+      (exercise) => exercise.libraryKey !== null,
+    );
+
+    expect(plan.exercises).toHaveLength(82);
+    expect(linked).toHaveLength(38);
+    expect(new Set(linked.map((exercise) => exercise.libraryKey)).size).toBe(
+      29,
+    );
+  });
+});
+
+describe("rowNoteFor", () => {
+  const row = {
+    exerciseName: "Paused Deadlift",
+    note: "RPE 8 · 2 sec pause",
+  };
+
+  it("pone delante de la nota el nombre del plan cuando el ejercicio enlazado se llama de otra forma", () => {
+    expect(rowNoteFor(row, "Barbell Deadlift")).toBe(
+      "Paused Deadlift · RPE 8 · 2 sec pause",
+    );
+  });
+
+  it("deja la nota sólo con el nombre del plan si la fila no traía nota", () => {
+    expect(rowNoteFor({ ...row, note: null }, "Barbell Deadlift")).toBe(
+      "Paused Deadlift",
+    );
+  });
+
+  it("no repite el nombre cuando se lee igual sin mayúsculas ni tildes", () => {
+    expect(rowNoteFor(row, "paused deadlíft")).toBe("RPE 8 · 2 sec pause");
+    expect(rowNoteFor({ ...row, note: null }, "PAUSED DEADLIFT")).toBeNull();
+  });
+
+  it("recorta la nota con el nombre al máximo de la nota", () => {
+    const note = rowNoteFor(
+      { ...row, note: "x".repeat(ITEM_NOTE_MAX_LENGTH) },
+      "Barbell Deadlift",
+    );
+
+    expect([...(note ?? "")]).toHaveLength(ITEM_NOTE_MAX_LENGTH);
+    expect(note?.startsWith("Paused Deadlift · x")).toBe(true);
+    expect(note?.endsWith("…")).toBe(true);
   });
 });
 
