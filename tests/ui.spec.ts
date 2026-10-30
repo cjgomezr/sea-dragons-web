@@ -28583,6 +28583,87 @@ test.describe("la cuadrícula del ciclo en el navegador", () => {
     ).toBeFocused();
   });
 
+  // #942: la × ocupa lo que el +, así que la columna no se ensancha.
+  for (const width of [768, 1440]) {
+    test(`a ${width} px la × de la segunda rutina mide lo que el +`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await goToPlanner(page, { name: "planificar-ciclo" });
+      const week = width < PLANNER_WEEK_AT_A_TIME_BELOW_PX ? 3 : 1;
+
+      const remove = await page
+        .getByRole("button", {
+          name: `Remove second routine, week ${week} Mon`,
+        })
+        .boundingBox();
+      const add = await page
+        .getByRole("button", {
+          name: `Add a second routine to week ${week}, Wed`,
+        })
+        .boundingBox();
+      const second = await page
+        .getByRole("combobox", { name: `Week ${week}, Mon, second routine` })
+        .boundingBox();
+      const withAdd = await page
+        .getByRole("combobox", { name: `Week ${week}, Wed`, exact: true })
+        .boundingBox();
+
+      expect(remove?.width).toBe(add?.width);
+      expect(remove?.height).toBe(add?.height);
+      expect(Math.round(second?.width ?? 0)).toBe(
+        Math.round(withAdd?.width ?? 0),
+      );
+      expect(await hasHorizontalScroll(page)).toBe(false);
+    });
+  }
+
+  test("la × cierra el segundo selector sin elegir y devuelve el foco al +", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlanner(page, { name: "planificar-ciclo" });
+    const add = page.getByRole("button", {
+      name: "Add a second routine to week 1, Wed",
+    });
+    await add.click();
+
+    await page
+      .getByRole("button", { name: "Remove second routine, week 1 Wed" })
+      .click();
+
+    await expect(
+      page.getByRole("combobox", { name: "Week 1, Wed, second routine" }),
+    ).toHaveCount(0);
+    await expect(add).toBeFocused();
+  });
+
+  test("en el móvil, la × de 44 px quita la segunda rutina", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPlanner(page, { name: "planificar-ciclo" });
+    const remove = page.getByRole("button", {
+      name: "Remove second routine, week 3 Mon",
+    });
+    const box = await remove.boundingBox();
+    expect(Math.round(box?.width ?? 0)).toBe(44);
+    expect(Math.round(box?.height ?? 0)).toBe(44);
+    const saved = page.waitForRequest(
+      (request) =>
+        request.method() === "PUT" && request.url().endsWith("/days"),
+    );
+
+    await remove.click();
+
+    expect((await saved).postDataJSON()).toEqual({
+      weekNo: 3,
+      weekday: 0,
+      slot: 2,
+      routineId: null,
+    });
+  });
+
   test("elegir una rutina la guarda al momento", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await goToPlanner(page, { name: "planificar-ciclo" });
