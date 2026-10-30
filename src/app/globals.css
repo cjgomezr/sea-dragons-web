@@ -27050,6 +27050,10 @@ a.dashboard-club-cell-body:focus-visible {
 }
 
 .training-routine-filter-hint {
+  /* Se encoge y parte su texto antes que empujar "+ New routine" a otra
+     línea (#944). */
+  flex: 1 1 16rem;
+  min-width: 0;
   margin: 0;
   font-size: 13px;
   color: var(--color-text-secondary);
