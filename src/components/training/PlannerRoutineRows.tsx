@@ -422,7 +422,7 @@ export function PlannerRoutineRows({
   }
 
   return (
-    <div ref={containerRef} className="training-routine-table">
+    <div ref={containerRef}>
       {isCompact ? null : <ColumnHeader translate={translate} />}
       <SortableList
         translate={translate}

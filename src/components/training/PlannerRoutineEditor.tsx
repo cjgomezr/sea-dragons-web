@@ -11,7 +11,9 @@ import {
   type ManagedRoutine,
   ROUTINE_NAME_MAX_LENGTH,
 } from "@/lib/training/club-routines";
+import { createNamedExercise } from "./planner-exercises-client";
 import { deleteRoutine } from "./planner-routines-client";
+import { PlannerRoutineAddExercise } from "./PlannerRoutineAddExercise";
 import { PlannerRoutineRows } from "./PlannerRoutineRows";
 import { SavedTextField } from "./SavedTextField";
 import type { PlannerError } from "./use-planner-cycles";
@@ -23,8 +25,8 @@ import {
 /**
  * El editor de una rutina en Planificar → Rutinas (#908, RF-9, D8 y D9 del
  * PRD de E35; §5.1 y §5.2 del handoff): su nombre, sus filas y los títulos
- * de sección. Borrar una rutina que usa la cuadrícula pide confirmar.
- * Buscar y añadir ejercicios llega con #909.
+ * de sección. Borrar una rutina que usa la cuadrícula pide confirmar. La
+ * fila de añadir (#909) busca un ejercicio o lo crea con el nombre escrito.
  */
 
 export type RoutineEditorProps = {
@@ -34,6 +36,8 @@ export type RoutineEditorProps = {
   readonly onSaved: (routine: ManagedRoutine) => void;
   readonly onDeleted: (routine: ManagedRoutine) => void;
   readonly onError: (error: PlannerError | null) => void;
+  /** Dice un cambio que no se ve en la tabla, como un ejercicio creado. */
+  readonly onNotice: (notice: string) => void;
   /** En el móvil, "‹ Routines" vuelve a la lista. */
   readonly onBack: () => void;
 };
@@ -169,13 +173,45 @@ function DeleteRoutine({
   );
 }
 
-function EditorRows({
+type EditorRowsProps = Pick<
+  RoutineEditorProps,
+  "translate" | "isPhone" | "onError" | "onNotice"
+> & { readonly editor: RoutineEditorControls };
+
+/** Crea el ejercicio del club con el nombre escrito y lo añade (#909). */
+function makeCreateAndAdd({
   translate,
   editor,
-}: {
-  readonly translate: Translator;
-  readonly editor: RoutineEditorControls;
-}): React.JSX.Element {
+  onError,
+  onNotice,
+}: Omit<EditorRowsProps, "isPhone">): (name: string) => Promise<boolean> {
+  return async (name) => {
+    onError(null);
+    const created = await createNamedExercise(name);
+    if (created.kind === "failed") {
+      onError({ reason: created.reason });
+      return false;
+    }
+    const { id, thumbnailUrl } = created.value;
+    const isAdded = await editor.addExercise({
+      id,
+      name: created.value.name,
+      photoUrl: thumbnailUrl,
+    });
+    if (isAdded) {
+      onNotice(
+        translate("training.manage.exerciseCreated", {
+          name: created.value.name,
+        }),
+      );
+    }
+    return isAdded;
+  };
+}
+
+function EditorRows(props: EditorRowsProps): React.JSX.Element {
+  const { translate, editor, isPhone } = props;
+  const createAndAdd = makeCreateAndAdd(props);
   // La tabla solo cabe en el escritorio; por debajo, una tarjeta por fila.
   const isCompact = useIsBelowDesktop();
   const { state } = editor;
@@ -201,17 +237,28 @@ function EditorRows({
   const { rows } = state;
   return (
     <>
-      {rows.length === 0 ? (
-        <p className="admin-empty">{translate("training.manage.noRows")}</p>
-      ) : (
-        <PlannerRoutineRows
+      {/* La tabla no recorta el desplegable de la fila de añadir (§5.1). */}
+      <div className="training-routine-table">
+        {rows.length === 0 ? (
+          <p className="admin-empty training-routine-no-rows">
+            {translate("training.manage.noRows")}
+          </p>
+        ) : (
+          <PlannerRoutineRows
+            translate={translate}
+            rows={rows}
+            marks={state.marks}
+            isCompact={isCompact}
+            onSave={editor.saveRows}
+          />
+        )}
+        <PlannerRoutineAddExercise
           translate={translate}
-          rows={rows}
-          marks={state.marks}
-          isCompact={isCompact}
-          onSave={editor.saveRows}
+          placement={isPhone ? "inline" : "popover"}
+          onChoose={editor.addExercise}
+          onCreate={createAndAdd}
         />
-      )}
+      </div>
       <button
         type="button"
         className="training-routine-add-section"
@@ -236,7 +283,7 @@ function EditorRows({
 export function PlannerRoutineEditor(
   props: RoutineEditorProps,
 ): React.JSX.Element {
-  const { translate, routine, isPhone, onSaved, onError } = props;
+  const { translate, routine, isPhone, onSaved, onError, onNotice } = props;
   const editor = useRoutineEditor(routine.id, { onSaved, onError });
   return (
     <section className="training-routine-editor" aria-label={routine.name}>
@@ -259,7 +306,13 @@ export function PlannerRoutineEditor(
         />
         <DeleteRoutine {...props} />
       </div>
-      <EditorRows translate={translate} editor={editor} />
+      <EditorRows
+        translate={translate}
+        editor={editor}
+        isPhone={isPhone}
+        onError={onError}
+        onNotice={onNotice}
+      />
       <p className="training-routine-hint">
         {translate("training.manage.loadHint")}
       </p>

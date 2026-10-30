@@ -93,6 +93,16 @@ export function createExercise(
   );
 }
 
+/** Uno del club con solo el nombre, como lo crea la fila de añadir de una
+ * rutina (#909): los consejos y la foto se ponen después en Ejercicios. */
+export function createNamedExercise(
+  name: string,
+): Promise<PlannerOutcome<ManagedExercise>> {
+  const form = new FormData();
+  form.append("name", name);
+  return createExercise(form);
+}
+
 export function updateExercise(
   exerciseId: string,
   form: FormData,
