@@ -3261,6 +3261,8 @@ export const englishMessages = {
   "training.manage.daySecondSlot": "Week {week}, {day}, second routine",
   "training.manage.addSecondRoutine":
     "Add a second routine to week {week}, {day}",
+  "training.manage.removeSecondRoutine":
+    "Remove second routine, week {week} {day}",
   "training.manage.weekToggle": "Week {week}: note and dose",
   "training.manage.weekEditor": "Week {week}",
   "training.manage.weekNote": "Note",
