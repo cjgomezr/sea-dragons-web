@@ -192,20 +192,12 @@ function makeCreateAndAdd({
       onError({ reason: created.reason });
       return false;
     }
-    const { id, thumbnailUrl } = created.value;
-    const isAdded = await editor.addExercise({
-      id,
-      name: created.value.name,
-      photoUrl: thumbnailUrl,
-    });
-    if (isAdded) {
-      onNotice(
-        translate("training.manage.exerciseCreated", {
-          name: created.value.name,
-        }),
-      );
-    }
-    return isAdded;
+    const { id, name: createdName, thumbnailUrl } = created.value;
+    editor.addNewExercise({ id, name: createdName, photoUrl: thumbnailUrl });
+    onNotice(
+      translate("training.manage.exerciseCreated", { name: createdName }),
+    );
+    return true;
   };
 }
 

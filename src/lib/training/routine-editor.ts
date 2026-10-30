@@ -99,7 +99,13 @@ export function newExerciseRow(request: {
   readonly dose: LastDose | null;
 }): ExerciseEditorRow {
   const { key, exercise, dose } = request;
-  return { key, kind: "exercise", exercise, ...(dose ?? BLANK_DOSE), note: null };
+  return {
+    key,
+    kind: "exercise",
+    exercise,
+    ...(dose ?? BLANK_DOSE),
+    note: null,
+  };
 }
 
 /** La lista con la fila un puesto más arriba o más abajo; nula si ya está en

@@ -93,6 +93,7 @@ type ApiRequest = {
 const requests: ApiRequest[] = [];
 let failSearch: boolean;
 let failLastDose: boolean;
+let isNameTaken: boolean;
 
 function ok(data: unknown, status = 200): ApiReply {
   return { status, body: { data } };
@@ -118,7 +119,17 @@ function searchExercises(params: URLSearchParams): ApiReply {
   });
 }
 
+const NAME_TAKEN: ApiReply = {
+  status: 409,
+  body: {
+    error: { code: "conflict", message: "x", reason: "exercise_name_taken" },
+  },
+};
+
 function createExercise(body: unknown): ApiReply {
+  if (isNameTaken) {
+    return NAME_TAKEN;
+  }
   const { name } = body as { name: string };
   return ok({ ...exercise(9, name, "club"), id: CREATED_ID }, 201);
 }
@@ -207,6 +218,7 @@ beforeEach(() => {
   requests.length = 0;
   failSearch = false;
   failLastDose = false;
+  isNameTaken = false;
   stubApi();
   stubScreenSize("desktop");
 });
@@ -411,6 +423,50 @@ describe("sin resultados", () => {
         '"Sled push" created as a club exercise and added. Add tips or a photo in Exercises.',
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe("crear sin resultados", () => {
+  it("añade la fila vacía sin pedir la última dosis", async () => {
+    const user = userEvent.setup();
+    await search(user, "Sled push");
+
+    await user.click(
+      await screen.findByRole("button", { name: 'Create "Sled push"' }),
+    );
+
+    await waitFor(() =>
+      expect(savedItems()).toEqual([
+        {
+          kind: "exercise",
+          exerciseId: CREATED_ID,
+          sets: null,
+          reps: null,
+          rest: null,
+          note: null,
+          load: { kind: "none" },
+        },
+      ]),
+    );
+    expect(
+      requests.some((request) => request.path.endsWith("/last-dose")),
+    ).toBe(false);
+  });
+
+  it("si el nombre ya existe, lo dice, no añade la fila y deja lo escrito", async () => {
+    isNameTaken = true;
+    const user = userEvent.setup();
+    const field = await search(user, "Sled push");
+
+    await user.click(
+      await screen.findByRole("button", { name: 'Create "Sled push"' }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "There is already an exercise with that name.",
+    );
+    expect(requests.some((request) => request.method === "PUT")).toBe(false);
+    expect(field).toHaveValue("Sled push");
   });
 });
 

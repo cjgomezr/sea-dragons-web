@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type {
+  LastDose,
   ManagedRoutine,
   RoutineEditorItem,
   RoutineExerciseSummary,
@@ -54,6 +55,8 @@ export type RoutineEditorControls = {
   /** Añade al final una fila del ejercicio con la última dosis del club
    * (#909). Verdadero si llegó la dosis y la fila entró. */
   readonly addExercise: (exercise: RoutineExerciseSummary) => Promise<boolean>;
+  /** Añade vacía la fila de un ejercicio recién creado: nunca se usó. */
+  readonly addNewExercise: (exercise: RoutineExerciseSummary) => void;
 };
 
 type EditorCallbacks = {
@@ -149,6 +152,14 @@ export function useRoutineEditor(
     queue.current = queue.current.then(() => save(rows, savedGeneration));
   }
 
+  function appendExerciseRow(
+    exercise: RoutineExerciseSummary,
+    dose: LastDose | null,
+  ): void {
+    const row = newExerciseRow({ key: makeKey(), exercise, dose });
+    saveRows([...shownRows.current, row]);
+  }
+
   async function addExercise(
     exercise: RoutineExerciseSummary,
   ): Promise<boolean> {
@@ -158,8 +169,7 @@ export function useRoutineEditor(
       callbacks.onError({ reason: dose.reason });
       return false;
     }
-    const row = newExerciseRow({ key: makeKey(), exercise, dose: dose.value });
-    saveRows([...shownRows.current, row]);
+    appendExerciseRow(exercise, dose.value);
     return true;
   }
 
@@ -197,6 +207,7 @@ export function useRoutineEditor(
     makeKey,
     saveRows,
     addExercise,
+    addNewExercise: (exercise) => appendExerciseRow(exercise, null),
     rename: (name) => {
       callbacks.onError(null);
       // En la misma cola que las filas: la respuesta de un guardado anterior

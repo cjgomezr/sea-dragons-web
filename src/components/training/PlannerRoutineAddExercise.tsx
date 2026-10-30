@@ -219,6 +219,7 @@ export function PlannerRoutineAddExercise({
           aria-label={translate("training.manage.addExercise")}
           placeholder={translate("training.manage.addExercisePlaceholder")}
           aria-autocomplete="list"
+          aria-busy={isAdding}
           aria-expanded={isExpanded}
           aria-controls={listboxId}
           aria-activedescendant={
