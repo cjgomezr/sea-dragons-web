@@ -25844,6 +25844,18 @@ a.dashboard-club-cell-body:focus-visible {
   border-color: var(--color-success);
 }
 
+/* Delete de un ciclo (#935): el icono y el texto en color de peligro, el
+   borde neutro como las demás acciones hasta que se abre la confirmación. */
+.training-plan-action-delete {
+  color: var(--color-danger);
+}
+
+/* La confirmación de borrar un ciclo va en su propia línea, debajo de las
+   acciones: en el escritorio la franja la parte al hacer wrap. */
+.training-plan-cycle-delete {
+  flex: 1 0 100%;
+}
+
 .training-plan-fields {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) 100px;
@@ -25959,6 +25971,7 @@ a.dashboard-club-cell-body:focus-visible {
 }
 
 .training-plan-phone-actions .training-plan-action-archive,
+.training-plan-phone-actions .training-plan-action-delete,
 .training-plan-phone-actions .training-plan-action-new {
   flex: none;
   width: var(--touch-target-min);

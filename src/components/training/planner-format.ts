@@ -74,8 +74,13 @@ export function summaryLine(
 /** El motivo que dice la pantalla sin preguntar a la API. */
 export const DATE_REQUIRED_REASON = "date_required";
 
+/** Otra pestaña activó el ciclo entre que se pintó y se pidió borrarlo
+ * (#935). */
+export const CYCLE_IS_ACTIVE_REASON = "cycle_is_active";
+
 /** Los motivos que se explican al cambiar un ciclo desde sus campos; los
- * demás dicen el error general. */
+ * demás dicen el error general. También el de borrar un ciclo que ya está
+ * activo, que no viene de los campos pero lo dice el mismo aviso. */
 const ERROR_KEYS = {
   name_required: "training.manage.errorNameRequired",
   name_too_long: "training.manage.errorNameTooLong",
@@ -88,8 +93,14 @@ const ERROR_KEYS = {
   dose_text_too_long: "training.manage.errorDoseTextTooLong",
   dose_pct_out_of_range: "training.manage.errorDosePct",
   [DATE_REQUIRED_REASON]: "training.manage.errorDate",
+  [CYCLE_IS_ACTIVE_REASON]: "training.manage.errorCycleIsActive",
 } as const satisfies Partial<
-  Record<CycleIssueCode | typeof DATE_REQUIRED_REASON, MessageKey>
+  Record<
+    | CycleIssueCode
+    | typeof DATE_REQUIRED_REASON
+    | typeof CYCLE_IS_ACTIVE_REASON,
+    MessageKey
+  >
 >;
 
 type ExplainedReason = keyof typeof ERROR_KEYS;

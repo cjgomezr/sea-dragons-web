@@ -394,6 +394,7 @@ funcion create_member_evaluation(acting_club_id uuid, acting_user_id uuid, targe
 funcion credit_session_pack(user_id uuid, club_id uuid, sessions integer, payment_id uuid)
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
 funcion delete_rows_older_than(target_table regclass, age_column name, cutoff timestamp with time zone)
+funcion delete_training_cycle(p_club_id uuid, p_cycle_id uuid)
 funcion delete_training_routine(p_club_id uuid, p_routine_id uuid, p_confirm boolean)
 funcion duplicate_training_cycle(p_club_id uuid, p_cycle_id uuid, p_name text, p_created_by uuid)
 funcion evaluation_category_name_taken(acting_club_id uuid, own_category_id uuid, category_name text)

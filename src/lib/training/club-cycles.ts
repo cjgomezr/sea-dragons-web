@@ -93,6 +93,16 @@ export type RoutineScope =
 
 export type CycleTarget = { readonly clubId: string; readonly cycleId: string };
 
+/** Qué pasó al intentar borrar un ciclo. El activo no se borra nunca. */
+export type CycleDeletion =
+  | { readonly kind: "missing" }
+  | { readonly kind: "active" }
+  | {
+      readonly kind: "deleted";
+      readonly status: Exclude<CycleStatus, "active">;
+      readonly routinesDeleted: number;
+    };
+
 export type ClubCyclesGateway = {
   listCycles(clubId: string): Promise<readonly ClubCycleRecord[]>;
   findCycle(target: CycleTarget): Promise<ClubCycleRecord | null>;
@@ -115,6 +125,10 @@ export type ClubCyclesGateway = {
     target: CycleTarget,
   ): Promise<{ readonly archivedCycleId: string | null }>;
   archiveCycle(target: CycleTarget): Promise<void>;
+  /** Mira el estado y borra en la misma transacción, para que una
+   * activación a la vez no se cuele entre los dos. Se lleva las semanas, los
+   * días y las rutinas propias con sus filas. */
+  deleteCycle(target: CycleTarget): Promise<CycleDeletion>;
   duplicateCycle(
     target: CycleTarget,
     copy: { readonly name: string; readonly createdBy: string },
@@ -165,6 +179,14 @@ export class CycleNotFoundError extends Error {
   constructor() {
     super("No existe ese ciclo en tu club.");
     this.name = "CycleNotFoundError";
+  }
+}
+
+/** El activo es el que siguen los socios: primero se archiva. */
+export class CycleIsActiveError extends Error {
+  constructor() {
+    super("El ciclo está activo: archívalo antes de borrarlo.");
+    this.name = "CycleIsActiveError";
   }
 }
 
@@ -376,6 +398,33 @@ export async function archiveManagedCycle(
     actor,
     action: "training_cycle.archived",
     cycleId: target.cycleId,
+  });
+  return readCycles(gateways, actor.clubId);
+}
+
+/** Un borrador o un archivado (#935). La bitácora lleva el nombre: después
+ * no queda ciclo que lo diga. */
+export async function deleteManagedCycle(
+  gateways: ClubCyclesGateways,
+  request: CycleRequest,
+): Promise<ManagedCycles> {
+  const { actor, target, cycle } = await openCycle(gateways, request);
+  const deletion = await gateways.cycles.deleteCycle(target);
+  if (deletion.kind === "missing") {
+    throw new CycleNotFoundError();
+  }
+  if (deletion.kind === "active") {
+    throw new CycleIsActiveError();
+  }
+  await recordCycleEvent(gateways, {
+    actor,
+    action: "training_cycle.deleted",
+    cycleId: target.cycleId,
+    metadata: {
+      name: cycle.name,
+      status: deletion.status,
+      routinesDeleted: deletion.routinesDeleted,
+    },
   });
   return readCycles(gateways, actor.clubId);
 }

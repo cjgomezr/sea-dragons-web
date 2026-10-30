@@ -27886,6 +27886,8 @@ type PlannerState = {
   /** La semana cuya nota y dosis se abren (#907): en el escritorio, con su
    * número; en el móvil, yendo a ella con ‹. */
   readonly openWeek?: number;
+  /** Con el borrador elegido y la confirmación de borrarlo abierta (#935). */
+  readonly isConfirmingDelete?: boolean;
 };
 
 /** Como la captura del handoff: un activo elegido, un borrador y un
@@ -27894,7 +27896,10 @@ const PLANNER_STATES: readonly PlannerState[] = [
   { name: "planificar-ciclo" },
   { name: "planificar-ciclo-es", isSpanish: true },
   { name: "planificar-semana-abierta", openWeek: 2 },
+  { name: "planificar-ciclo-borrar", isConfirmingDelete: true },
 ];
+
+const PLANNER_DRAFT_CYCLE_NAME = "Summer base 2027";
 
 /* La cuadrícula del ciclo activo (#907): rutinas del ciclo y una compartida,
    dos rutinas el lunes, y la nota y la dosis de algunas semanas. */
@@ -28083,18 +28088,41 @@ async function openPlanner(
   if (state.openWeek !== undefined) {
     await openPlannerWeek(page, state.openWeek);
   }
+  if (state.isConfirmingDelete === true) {
+    await openCycleDeleteConfirm(page);
+  }
   await page.mouse.move(0, 0);
 }
 
+/** Elige el borrador (con su tarjeta en el escritorio, con el selector en el
+ * móvil) y pulsa Delete, que en el móvil es sólo el icono. */
+async function openCycleDeleteConfirm(page: Page): Promise<void> {
+  const select = page.getByRole("combobox", { name: "Cycle", exact: true });
+  if (await select.isVisible()) {
+    await select.selectOption({ label: `${PLANNER_DRAFT_CYCLE_NAME} · draft` });
+  } else {
+    await page
+      .getByRole("button", { name: new RegExp(`^${PLANNER_DRAFT_CYCLE_NAME}`) })
+      .click();
+  }
+  await page.getByRole("button", { name: /^Delete( cycle)?$/ }).click();
+  await expect(
+    page.getByRole("group", {
+      name: `Delete "${PLANNER_DRAFT_CYCLE_NAME}"? Its 1 own routine and its grid go with it. This can't be undone.`,
+    }),
+  ).toBeVisible();
+}
+
 /** La captura de página entera pasa la ventana por 1 × 1 px un momento: la
- * pestaña cruza al móvil, se vuelve a montar y la semana abierta se cierra.
- * Con una semana abierta, la ventana crece hasta la página y se captura tal
- * cual. Devuelve si la captura tiene que ser de página entera. */
+ * pestaña cruza al móvil, se vuelve a montar y la semana abierta o la
+ * confirmación de borrar se cierran. Con una de las dos abierta, la ventana
+ * crece hasta la página y se captura tal cual. Devuelve si la captura tiene
+ * que ser de página entera. */
 async function plannerCaptureFullPage(
   page: Page,
   state: PlannerState,
 ): Promise<boolean> {
-  if (state.openWeek === undefined) {
+  if (state.openWeek === undefined && state.isConfirmingDelete !== true) {
     return true;
   }
   const viewport = page.viewportSize();
