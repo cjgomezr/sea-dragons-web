@@ -29884,9 +29884,12 @@ test.describe("cabecera fija en el móvil", () => {
   const ANCHOR_ID = "ancla-bajo-la-cabecera";
   const LONGEST_CLUB_NAME =
     "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania";
-  // La cabecera con el nombre en una línea mide unos 77 px; partido en dos
-  // junto al logo, bastante más.
-  const ONE_LINE_HEADER_MAX_PX = 80;
+  // La cabecera mide 77 px: el nombre partido en dos líneas (40 px) cabe en
+  // el alto de los botones (44). Lo que sí la agranda es el texto escalado
+  // del navegador (Chrome de Android escala también los px): con él, el
+  // nombre en dos líneas pasa de los botones.
+  const DEFAULT_HEADER_PX = 77;
+  const SCALED_BRAND_CSS = ".app-brand { font-size: 24px; }";
 
   async function scrollPageTo(page: Page, pixels: number): Promise<void> {
     await page.evaluate((y) => window.scrollTo(0, y), pixels);
@@ -30097,7 +30100,7 @@ test.describe("cabecera fija en el móvil", () => {
       );
     });
 
-    test("con logo y un nombre en dos líneas, la barra de una noticia se pega bajo la cabecera más alta", async ({
+    test("con logo, un nombre en dos líneas y el texto escalado, la barra de una noticia se pega bajo la cabecera más alta", async ({
       page,
     }) => {
       await serveClubLogos(page);
@@ -30106,8 +30109,9 @@ test.describe("cabecera fija en el móvil", () => {
       await page.locator(".app-brand").evaluate((element, name) => {
         element.textContent = name;
       }, LONGEST_CLUB_NAME);
+      await page.addStyleTag({ content: SCALED_BRAND_CSS });
       expect((await boxOf(phoneHeader(page))).height).toBeGreaterThan(
-        ONE_LINE_HEADER_MAX_PX,
+        DEFAULT_HEADER_PX + 1,
       );
 
       await expectStuckBelowPhoneHeader(page, page.locator(".news-post-bar"));
