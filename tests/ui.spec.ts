@@ -29813,6 +29813,9 @@ test.describe("barra de arriba fija", () => {
         element.scrollTop = element.scrollHeight;
       });
 
+      expect(
+        await grid.evaluate((element) => element.scrollTop),
+      ).toBeGreaterThan(0);
       const gridBox = await boxOf(grid);
       const header = await boxOf(
         page.locator(".training-grid thead th").first(),
