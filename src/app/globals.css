@@ -116,6 +116,10 @@
   --sidebar-logo-max-width: calc(var(--space-8) * 2.5);
   --sidebar-brand-name-min-width: 120px;
   --sidebar-width: 240px;
+  /* La barra de arriba de tableta y escritorio: 12 px de relleno arriba y
+     abajo, los botones de 44 px y su borde. Lo que se pega arriba al hacer
+     scroll empieza por debajo de ella (#932). */
+  --app-topbar-height: calc(2 * var(--space-3) + var(--touch-target-min) + 1px);
   /* La barra de pestañas del móvil: su borde, su relleno, el icono de 20px y
      una línea de 12px. Lo fijo encima la usa para no quedar debajo (#719). */
   --tabbar-height: calc(
@@ -1336,7 +1340,19 @@ button.notification-item-content:hover {
     display: none;
   }
 
+  /* Las anclas de la página no quedan tapadas por la barra fija (#932). */
+  html {
+    scroll-padding-top: var(--app-topbar-height);
+  }
+
+  /* Fija mientras la página hace scroll (#932), como la barra lateral. El 10
+     la deja encima de lo que se pega en el contenido (hasta 6) y de las
+     barras fijas de abajo (9), que su menú de la cuenta llega a alcanzar. Los
+     desplegables del contenido (20) quedan por encima, como pide el ticket. */
   .app-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     display: flex;
     align-items: center;
     gap: var(--space-4);
@@ -8695,12 +8711,12 @@ a.groups-icon-button {
 
 .directory-panel-inner {
   position: sticky;
-  top: var(--space-4);
+  top: calc(var(--app-topbar-height) + var(--space-4));
   display: flex;
   flex-direction: column;
   gap: 18px;
   min-width: 0;
-  max-height: calc(100vh - 2 * var(--space-4));
+  max-height: calc(100vh - var(--app-topbar-height) - 2 * var(--space-4));
   overflow-y: auto;
   padding: 20px;
   background: var(--color-panel);
@@ -12114,7 +12130,7 @@ a.groups-icon-button {
 
   .club-general-preview {
     position: sticky;
-    top: var(--space-6);
+    top: calc(var(--app-topbar-height) + var(--space-6));
   }
 }
 
@@ -15557,7 +15573,7 @@ a.groups-icon-button {
   .evaluation-sheet,
   .evaluation-overview {
     position: sticky;
-    top: var(--space-4);
+    top: calc(var(--app-topbar-height) + var(--space-4));
   }
 
   .evaluation-overview {
@@ -16431,11 +16447,11 @@ a.groups-icon-button {
 
   .agenda-panel-slot {
     position: sticky;
-    top: var(--space-4);
+    top: calc(var(--app-topbar-height) + var(--space-4));
   }
 
   .agenda-panel {
-    max-height: calc(100vh - 2 * var(--space-4));
+    max-height: calc(100vh - var(--app-topbar-height) - 2 * var(--space-4));
     overflow-y: auto;
   }
 }
@@ -25471,7 +25487,7 @@ a.dashboard-club-cell-body:focus-visible {
 
   .training-panel {
     position: sticky;
-    top: var(--space-4);
+    top: calc(var(--app-topbar-height) + var(--space-4));
   }
 }
 
