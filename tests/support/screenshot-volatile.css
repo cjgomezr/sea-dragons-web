@@ -28,3 +28,11 @@
 .app-sidebar {
   position: static !important;
 }
+
+/* La barra de arriba fija (#932), por lo mismo que la lateral: con la página
+   bajada salía a media altura en la captura de página entera y dejaba un
+   hueco arriba. En la captura se queda arriba, como al cargar. Que se quede
+   fija lo prueban los tests de "barra de arriba fija". */
+.app-topbar {
+  position: static !important;
+}
