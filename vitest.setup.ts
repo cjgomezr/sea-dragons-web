@@ -26,6 +26,21 @@ if (typeof window !== "undefined") {
     }),
   });
 
+  // jsdom ships no ResizeObserver, and the phone header (#957) watches its own
+  // height with one. jsdom has no layout, so nothing ever resizes: an inert
+  // observer is faithful. Tests that need a resize stub their own.
+  if (!("ResizeObserver" in window)) {
+    Object.defineProperty(window, "ResizeObserver", {
+      writable: true,
+      configurable: true,
+      value: class {
+        observe(): void {}
+        unobserve(): void {}
+        disconnect(): void {}
+      },
+    });
+  }
+
   // jsdom has HTMLDialogElement and its `open`, but not `showModal` nor `close`
   // (jsdom/jsdom#3294). The photo viewer (#355) opens a modal `<dialog>`: this
   // gives tests the open/close half. The top layer and the inert page behind it

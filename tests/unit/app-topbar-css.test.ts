@@ -123,18 +123,67 @@ describe("lo que se pega arriba al hacer scroll", () => {
   });
 });
 
-/* Sólo existen en el móvil, donde no hay barra de arriba: se quedan en 0. */
-const PHONE_ONLY_BARS = [
-  ".news-post-bar",
-  ".news-publish-bar",
-  ".agenda-screen-bar",
-  ".event-form-bar",
+const PHONE_QUERY = "@media (width < 768px)";
+
+describe("la medida de la cabecera del móvil", () => {
+  it("vive en :root como --app-phone-header-height", () => {
+    const rootProperties = cssCustomProperties(declarationsIn(":root", null));
+
+    expect(rootProperties["app-phone-header-height"]).toBeDefined();
+  });
+});
+
+describe("la cabecera por debajo de 768 px (#957)", () => {
+  it("se pega arriba del todo", () => {
+    const block = declarationsIn(".app-sidebar", PHONE_QUERY);
+
+    expect(block).toContain("position: sticky;");
+    expect(block).toContain("top: 0;");
+  });
+
+  // Por encima de lo pegado en el contenido (6) y de la barra de pestañas
+  // (10), porque la búsqueda y los avisos que abre son pantallas enteras
+  // dentro de ella; por debajo de los desplegables del contenido (20).
+  it("queda entre la barra de pestañas y los desplegables", () => {
+    const zIndex = Number(
+      /z-index: (\d+);/.exec(declarationsIn(".app-sidebar", PHONE_QUERY))?.[1],
+    );
+    const tabBarZIndex = Number(
+      /z-index: (\d+);/.exec(declarationsIn(".app-tabbar", null))?.[1],
+    );
+
+    expect(zIndex).toBeGreaterThan(tabBarZIndex);
+    expect(zIndex).toBeLessThan(20);
+  });
+
+  it("las anclas de la página quedan por debajo de la cabecera", () => {
+    expect(declarationsIn("html", PHONE_QUERY)).toContain(
+      "scroll-padding-top: var(--app-phone-header-height);",
+    );
+  });
+});
+
+/* Las barras de pantallas del móvil que se pegan arriba: con la cabecera
+   fija, empiezan justo debajo de ella (#957). */
+const PHONE_BARS = [
+  { selector: ".profile-phone-bar", media: PHONE_QUERY },
+  { selector: ".news-post-bar", media: null },
+  { selector: ".news-publish-bar", media: null },
+  { selector: ".agenda-screen-bar", media: null },
 ] as const;
 
 describe("las barras que sólo existen en el móvil", () => {
-  for (const selector of PHONE_ONLY_BARS) {
-    it(`${selector} sigue pegada a 0`, () => {
-      expect(declarationsIn(selector, null)).toContain("top: 0;");
+  for (const bar of PHONE_BARS) {
+    it(`${bar.selector} se pega justo bajo la cabecera`, () => {
+      expect(declarationsIn(bar.selector, bar.media)).toContain(
+        "top: var(--app-phone-header-height);",
+      );
     });
   }
+
+  // Va dentro de un <dialog> a pantalla completa, en la capa superior: se
+  // pega arriba del diálogo, no de la página.
+  it(".event-form-bar sigue pegada a 0", () => {
+    expect(declarationsIn(".event-form-bar", null)).toContain("top: 0;");
+  });
 });

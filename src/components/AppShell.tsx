@@ -9,6 +9,7 @@ import { ClubBrandMark } from "@/components/ClubBrandMark";
 import { ClubNameProvider } from "@/components/club/ClubNameProvider";
 import { FailedPaymentNotice } from "@/components/FailedPaymentNotice";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { PhoneHeader } from "@/components/PhoneHeader";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { MobileSearch } from "@/components/search/MobileSearch";
@@ -94,7 +95,7 @@ export function AppShell({
   };
   return (
     <div className="app-shell">
-      <aside className="app-sidebar">
+      <PhoneHeader>
         <div className="app-sidebar-header">
           {/* Un nombre largo se recorta: el título lo deja leer entero, y el
               texto sigue completo para un lector de pantalla. La marca lleva
@@ -122,7 +123,7 @@ export function AppShell({
           </div>
         </div>
         <SidebarNav locale={locale} access={access} />
-      </aside>
+      </PhoneHeader>
       <div className="app-content">
         {/* La barra de arriba de escritorio: el cuadro de búsqueda del mockup
             del panel (#427) a la izquierda, y la campana y la cuenta a la
