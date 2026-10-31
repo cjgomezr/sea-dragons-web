@@ -15669,8 +15669,10 @@ async function waitForManagedPost(page: Page): Promise<void> {
 const WITHDRAW_BUTTON = /^(Withdraw|Retirar)$/;
 const WITHDRAW_QUESTION = /^(Withdraw this post\?|¿Retirar esta publicación\?)/;
 
-/** Cuántas veces se alarga la ventana antes de rendirse. */
-const MAX_VIEWPORT_FITS = 5;
+/** Cuántas veces se alarga la ventana antes de rendirse. Con la barra de
+ * arriba fija (#932) el panel del calendario descuenta su alto, así que cada
+ * vuelta alarga la página 69 px menos que antes y hacen falta más vueltas. */
+const MAX_VIEWPORT_FITS = 12;
 
 /** Lecturas iguales seguidas para dar por quieta la altura de la página. */
 const STABLE_HEIGHT_READINGS = 5;
@@ -29473,3 +29475,380 @@ test.describe("planificar-rutina-anadir", () => {
     ).toBeVisible();
   });
 });
+
+/* ---------------------------------------------------------------------------
+   La barra de arriba fija (#932): desde 768 px la búsqueda, la campana y la
+   cuenta se quedan arriba al hacer scroll, y lo que ya se pegaba arriba baja
+   hasta quedar justo debajo de ella. En el móvil nada cambia.
+   --------------------------------------------------------------------------- */
+
+test.describe("barra de arriba fija", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  const TOP_BAR_SCROLL_PX = 1000;
+  const MOBILE_SCROLL_PX = 300;
+  // Lo que se pega tiene que tener por dónde bajar: su contenedor se alarga
+  // lo bastante para que la página haga scroll más allá de donde empieza.
+  const STRETCHED_CONTAINER_PX = 4000;
+  // El inicio del socio de prueba cabe en la ventana: se alarga con un
+  // relleno para tener siempre algo que bajar.
+  const TALL_MAIN_CSS =
+    ".app-main::after { content: ''; display: block; height: 3000px; }";
+  const ANCHOR_ID = "ancla-bajo-la-barra";
+  // El salto a un ancla deja el destino en una fracción de píxel: 68,84
+  // frente a una barra de 69.
+  const SUBPIXEL_SCROLL_PX = 0.5;
+  // Los desplegables cuelgan entre 6 y 8 px por debajo de la barra: "justo
+  // bajo su botón" es no más de esto.
+  const DROPDOWN_MAX_DROP_PX = 16;
+
+  const TOP_BAR_VIEWPORTS = [
+    { width: 1440, height: 900 },
+    { width: 768, height: 1024 },
+  ] as const;
+
+  function topBar(page: Page): Locator {
+    return page.locator(".app-topbar");
+  }
+
+  async function scrollPageTo(page: Page, pixels: number): Promise<void> {
+    await page.evaluate((y) => window.scrollTo(0, y), pixels);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(0);
+  }
+
+  async function goToLongHome(page: Page): Promise<void> {
+    await page.goto(`${APP_URL}/dashboard`);
+    await waitForSectionsLoaded(page, []);
+    await page.addStyleTag({ content: TALL_MAIN_CSS });
+  }
+
+  /** Si lo que hay en el centro de `locator` es él mismo (o algo suyo), y no
+   * la barra ni el contenido que pasa por encima. */
+  async function isOnTopAt(
+    locator: Locator,
+    point: { readonly x: number; readonly y: number },
+  ): Promise<boolean> {
+    return locator.evaluate((element, at) => {
+      const hit = document.elementFromPoint(at.x, at.y);
+      return hit !== null && element.contains(hit);
+    }, point);
+  }
+
+  async function isOnTopAtCenter(locator: Locator): Promise<boolean> {
+    const box = await boxOf(locator);
+    return isOnTopAt(locator, {
+      x: box.x + box.width / 2,
+      y: box.y + box.height / 2,
+    });
+  }
+
+  /** El margen de hoy, leído del token para no repetir su valor. */
+  async function spacingPx(page: Page, token: string): Promise<number> {
+    return page.evaluate(
+      (name) =>
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue(name),
+        ),
+      token,
+    );
+  }
+
+  /** Alarga el contenedor de la pieza, baja la página y comprueba que la
+   * pieza se pega a su margen por debajo de la barra, sin quedar tapada. */
+  async function expectStuckBelowTopBar(
+    page: Page,
+    piece: { readonly selector: string; readonly gapToken: string },
+  ): Promise<void> {
+    const stuck = page.locator(piece.selector).first();
+    await expect(stuck).toBeVisible();
+    await stuck.evaluate((element, height) => {
+      const container = element.parentElement;
+      if (container === null) {
+        throw new Error("La pieza pegada no tiene contenedor");
+      }
+      container.style.minHeight = `${height}px`;
+    }, STRETCHED_CONTAINER_PX);
+
+    await scrollPageTo(page, TOP_BAR_SCROLL_PX);
+
+    const bar = await boxOf(topBar(page));
+    const gap = await spacingPx(page, piece.gapToken);
+    await expect
+      .poll(async () => (await boxOf(stuck)).y)
+      .toBeCloseTo(bar.y + bar.height + gap, 0);
+    const box = await boxOf(stuck);
+    expect(
+      await isOnTopAt(stuck, { x: box.x + box.width / 2, y: box.y + 1 }),
+    ).toBe(true);
+  }
+
+  for (const viewport of TOP_BAR_VIEWPORTS) {
+    test(`a ${viewport.width}×${viewport.height}, tras bajar, la barra sigue arriba y la cuenta recibe el clic`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await goToLongHome(page);
+
+      await scrollPageTo(page, TOP_BAR_SCROLL_PX);
+
+      expect((await boxOf(topBar(page))).y).toBe(0);
+      await expect(
+        page.getByRole("combobox", { name: SEARCH_NAME }),
+      ).toBeInViewport();
+      await expect(
+        page.getByRole("button", { name: BELL_NAME }),
+      ).toBeInViewport();
+      await openAccountMenu(page);
+    });
+  }
+
+  test("tras bajar, la barra conserva su fondo y su borde", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToLongHome(page);
+
+    await scrollPageTo(page, TOP_BAR_SCROLL_PX);
+
+    const look = await topBar(page).evaluate((bar) => {
+      const probe = document.createElement("div");
+      probe.style.background = "var(--color-panel)";
+      probe.style.borderColor = "var(--color-border)";
+      document.body.append(probe);
+      const expected = getComputedStyle(probe);
+      const style = getComputedStyle(bar);
+      const result = {
+        background: style.backgroundColor,
+        expectedBackground: expected.backgroundColor,
+        border: style.borderBottomColor,
+        expectedBorder: expected.borderColor,
+        borderWidth: style.borderBottomWidth,
+      };
+      probe.remove();
+      return result;
+    });
+    expect(look.background).toBe(look.expectedBackground);
+    expect(look.border).toBe(look.expectedBorder);
+    expect(look.borderWidth).toBe("1px");
+  });
+
+  const TOP_BAR_DROPDOWNS = [
+    { name: "el menú de la cuenta", open: openAccountMenu },
+    {
+      name: "la lista de la campana",
+      open: async (page: Page): Promise<Locator> => {
+        await openNotifications(page);
+        return notificationsRegion(page);
+      },
+    },
+    {
+      name: "los resultados de la búsqueda",
+      open: async (page: Page): Promise<Locator> => {
+        await serveSearch(page, SEARCH_RESULTS);
+        await searchGlobally(page, "Geelong");
+        await waitForSearchAnswer(page, SEARCH_RESULTS);
+        return page.getByRole("listbox");
+      },
+    },
+  ] as const;
+
+  for (const dropdown of TOP_BAR_DROPDOWNS) {
+    test(`con la página bajada, ${dropdown.name} se abre bajo su botón y por encima del contenido`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await goToLongHome(page);
+      await scrollPageTo(page, TOP_BAR_SCROLL_PX);
+
+      const opened = await dropdown.open(page);
+
+      const bar = await boxOf(topBar(page));
+      expect((await boxOf(opened)).y).toBeLessThanOrEqual(
+        bar.y + bar.height + DROPDOWN_MAX_DROP_PX,
+      );
+      expect(await isOnTopAtCenter(opened)).toBe(true);
+    });
+  }
+
+  test("un enlace a un ancla deja su destino debajo de la barra", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToLongHome(page);
+    await page.evaluate((id) => {
+      const target = document.createElement("h2");
+      target.id = id;
+      target.textContent = "Destino";
+      document.querySelector(".app-main")?.append(target);
+    }, ANCHOR_ID);
+
+    await page.evaluate((id) => {
+      window.location.hash = id;
+    }, ANCHOR_ID);
+
+    const target = page.locator(`#${ANCHOR_ID}`);
+    const bar = await boxOf(topBar(page));
+    await expect
+      .poll(async () => (await boxOf(target)).y)
+      .toBeGreaterThanOrEqual(bar.y + bar.height - SUBPIXEL_SCROLL_PX);
+    expect(await isOnTopAtCenter(target)).toBe(true);
+  });
+
+  test("a 375 px la cabecera del móvil se va con la página como siempre", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToLongHome(page);
+
+    await scrollPageTo(page, MOBILE_SCROLL_PX);
+
+    const scrollY = await page.evaluate(() => window.scrollY);
+    expect((await boxOf(page.locator(".app-sidebar"))).y).toBe(-scrollY);
+    await expect(topBar(page)).toBeHidden();
+  });
+
+  test.describe("con un cobro fallido", () => {
+    test.use({ storageState: PAST_DUE_MEMBER_STORAGE_STATE_PATH });
+
+    test("el aviso empieza bajo la barra y se va con el contenido", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await serveDashboard(page, PAST_DUE_DASHBOARD);
+      await page.goto(`${APP_URL}${HOME_SCREEN_PATH}`);
+      const notice = page.getByRole("region", { name: "Payment failed" });
+      await expect(notice).toBeVisible();
+      await page.addStyleTag({ content: TALL_MAIN_CSS });
+
+      const bar = await boxOf(topBar(page));
+      expect((await boxOf(notice)).y).toBeGreaterThanOrEqual(
+        bar.y + bar.height,
+      );
+      await scrollPageTo(page, TOP_BAR_SCROLL_PX);
+
+      expect((await boxOf(topBar(page))).y).toBe(0);
+      await expect(notice).not.toBeInViewport();
+    });
+  });
+
+  test.describe("lo que se pega arriba, con la sesión de administración", () => {
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    test("el panel del directorio se pega a 16 px bajo la barra", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await goToDirectory(page, stateNamed(PANEL_STATES, "directorio-resumen"));
+
+      await expectStuckBelowTopBar(page, {
+        selector: ".directory-panel-inner",
+        gapToken: "--space-4",
+      });
+    });
+
+    for (const viewport of TOP_BAR_VIEWPORTS) {
+      test(`a ${viewport.width} px la vista previa del club se pega a 24 px bajo la barra`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        await goToClubSettings(
+          page,
+          stateNamed(CLUB_SETTINGS_STATES, "club-general"),
+        );
+
+        await expectStuckBelowTopBar(page, {
+          selector: ".club-general-preview",
+          gapToken: "--space-6",
+        });
+      });
+    }
+
+    for (const evaluation of [
+      { name: "evaluaciones-ficha", selector: ".evaluation-sheet" },
+      { name: "evaluaciones-lista", selector: ".evaluation-overview" },
+    ] as const) {
+      test(`${evaluation.selector} se pega a 16 px bajo la barra`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await goToEvaluations(
+          page,
+          stateNamed(EVALUATIONS_STATES, evaluation.name),
+        );
+
+        await expectStuckBelowTopBar(page, {
+          selector: evaluation.selector,
+          gapToken: "--space-4",
+        });
+      });
+    }
+
+    test("el panel de la agenda se pega a 16 px bajo la barra y su final sigue a la vista", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await goToCalendar(
+        page,
+        stateNamed(EVENT_PANEL_STATES, "calendario-panel-social"),
+      );
+
+      await expectStuckBelowTopBar(page, {
+        selector: ".agenda-panel-slot",
+        gapToken: "--space-4",
+      });
+      const panel = await boxOf(page.locator(".agenda-panel"));
+      expect(panel.y + panel.height).toBeLessThanOrEqual(900);
+    });
+
+    test("las cabeceras de la cuadrícula de Planificar se pegan dentro de ella", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await goToPlanner(page, { name: "planificar-ciclo" });
+      const grid = page.locator(".training-grid");
+
+      await grid.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+
+      expect(
+        await grid.evaluate((element) => element.scrollTop),
+      ).toBeGreaterThan(0);
+      const gridBox = await boxOf(grid);
+      const header = await boxOf(
+        page.locator(".training-grid thead th").first(),
+      );
+      expect(header.y).toBeCloseTo(gridBox.y + 1, 0);
+    });
+  });
+
+  test("el panel de Entrenamiento se pega a 16 px bajo la barra", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToTraining(
+      page,
+      stateNamed(TRAINING_STATES, "entrenamiento-semana"),
+    );
+
+    await expectStuckBelowTopBar(page, {
+      selector: ".training-panel",
+      gapToken: "--space-4",
+    });
+  });
+});
+
+function stateNamed<State extends { readonly name: string }>(
+  states: readonly State[],
+  name: string,
+): State {
+  const found = states.find((state) => state.name === name);
+  if (found === undefined) {
+    throw new Error(`No hay un estado llamado ${name}`);
+  }
+  return found;
+}
