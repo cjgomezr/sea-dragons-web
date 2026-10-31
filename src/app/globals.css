@@ -25745,8 +25745,10 @@ a.dashboard-club-cell-body:focus-visible {
   background: color-mix(in srgb, var(--color-warning) 30%, transparent);
 }
 
+/* El texto secundario sobre --color-hover no llega a 4.5:1 en el tema claro
+   (#952, la primera captura con un archivado elegido). */
 .training-plan-status-archived {
-  color: var(--color-text-secondary);
+  color: var(--color-text-soft);
   background: var(--color-hover);
 }
 
@@ -25851,9 +25853,17 @@ a.dashboard-club-cell-body:focus-visible {
 }
 
 /* La confirmación de borrar un ciclo va en su propia línea, debajo de las
-   acciones: en el escritorio la franja la parte al hacer wrap. */
-.training-plan-cycle-delete {
+   acciones: en el escritorio la franja la parte al hacer wrap. La de volver
+   a activar un archivado (#952) también, pero en el color de Make active:
+   no borra nada. */
+.training-plan-cycle-delete,
+.training-plan-cycle-reactivate {
   flex: 1 0 100%;
+}
+
+.training-plan-confirm.training-plan-cycle-reactivate {
+  background: color-mix(in srgb, var(--color-success) 12%, var(--color-panel));
+  border-color: var(--color-success);
 }
 
 .training-plan-fields {

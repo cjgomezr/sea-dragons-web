@@ -237,6 +237,67 @@ describeRls("Planificar: los ciclos contra Supabase (#904)", () => {
   );
 
   it(
+    "reactivar un archivado archiva el activo, y activar el activo no cambia nada (#952)",
+    async () => {
+      await withClub(async (seed) => {
+        const gateways = createClubCyclesGateways(seed.serviceClient.client);
+        const callerId = seed.coach.id;
+        const [winter, summer] = await Promise.all(
+          ["Winter", "Summer"].map((name) =>
+            createManagedCycle(gateways, {
+              callerId,
+              input: { name, weeks: 8, schedule: EVENT_SCHEDULE },
+            }),
+          ),
+        );
+        if (winter === undefined || summer === undefined) {
+          throw new Error("No se crearon los dos ciclos");
+        }
+        await activateManagedCycle(gateways, {
+          callerId,
+          cycleId: winter.cycle.id,
+        });
+        await activateManagedCycle(gateways, {
+          callerId,
+          cycleId: summer.cycle.id,
+        });
+
+        const reactivated = await activateManagedCycle(gateways, {
+          callerId,
+          cycleId: winter.cycle.id,
+        });
+        const unchanged = await activateManagedCycle(gateways, {
+          callerId,
+          cycleId: winter.cycle.id,
+        });
+
+        const statusesOf = (cycles: typeof reactivated.cycles) =>
+          Object.fromEntries(cycles.map((cycle) => [cycle.id, cycle.status]));
+        const expected = {
+          [winter.cycle.id]: "active",
+          [summer.cycle.id]: "archived",
+        };
+        expect(statusesOf(reactivated.cycles)).toEqual(expected);
+        expect(statusesOf(unchanged.cycles)).toEqual(expected);
+        const { data, error } = await seed.serviceClient.client
+          .from("audit_log")
+          .select("metadata")
+          .eq("club_id", seed.clubId)
+          .eq("action", "training_cycle.activated")
+          .order("created_at");
+        if (error) {
+          throw new Error(`No se pudo leer la bitácora: ${error.message}`);
+        }
+        expect(data.slice(-2).map((row) => row.metadata)).toEqual([
+          { archivedCycleId: summer.cycle.id },
+          { archivedCycleId: null },
+        ]);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "duplicar copia las rutinas propias con sus filas, reapunta los días y deja las compartidas",
     async () => {
       await withClub(async (seed) => {

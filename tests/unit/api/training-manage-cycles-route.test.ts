@@ -607,6 +607,19 @@ describe("las acciones de un ciclo", () => {
     );
   });
 
+  it("activar un archivado lo pasa a activo y deja uno solo activo (#952)", async () => {
+    replaceCycle(SUMMER_ID, { status: "archived" });
+
+    const response = await postAction(SUMMER_ID, "activate");
+
+    expect(response.status).toBe(200);
+    const data = await dataOf(response);
+    expect(data.cycles).toEqual([
+      expect.objectContaining({ id: WINTER_ID, status: "archived" }),
+      expect.objectContaining({ id: SUMMER_ID, status: "active" }),
+    ]);
+  });
+
   it("archivar pasa el ciclo a archivado", async () => {
     const response = await postAction(SUMMER_ID, "archive");
 

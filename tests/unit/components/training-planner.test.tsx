@@ -330,7 +330,7 @@ describe("las acciones según el estado", () => {
     expect(screen.getByRole("button", { name: "Archive" })).toBeVisible();
   });
 
-  it("al archivado solo le ofrece Duplicate, y sus campos son de lectura", async () => {
+  it("al archivado le ofrece Make active y Duplicate, y sus campos son de lectura", async () => {
     stubCycles();
     const user = userEvent.setup();
     await renderPlanner();
@@ -338,12 +338,10 @@ describe("las acciones según el estado", () => {
     await user.click(screen.getByRole("button", { name: "Show archived · 1" }));
     await user.click(cycleCard("Winter 2026"));
 
+    expect(screen.getByRole("button", { name: "Make active" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Duplicate" })).toBeVisible();
     expect(
       screen.queryByRole("button", { name: "Archive" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Make active" }),
     ).not.toBeInTheDocument();
     expect(field("Cycle name")).toHaveAttribute("readonly");
   });
@@ -408,7 +406,7 @@ describe("los campos y la línea calculada", () => {
 
     expect(
       screen.getByText(
-        "Ran 4 May – 12 Jul · archived. Duplicate it to reuse it.",
+        "Ran 4 May – 12 Jul · archived. Make it active again or duplicate it.",
       ),
     ).toBeInTheDocument();
   });
@@ -1140,6 +1138,208 @@ describe("PlannerCycleActions", () => {
     ).toBeVisible();
     expect(
       within(group).getByRole("button", { name: "Borrar ciclo" }),
+    ).toBeVisible();
+  });
+});
+
+describe("volver a activar un archivado", () => {
+  const REACTIVATED: readonly ManagedCycle[] = [
+    { ...ACTIVE, status: "archived" },
+    DRAFT,
+    { ...ARCHIVED, status: "active" },
+  ];
+
+  function reactivateGroup(): HTMLElement {
+    return screen.getByRole("group", { name: /^Make "/ });
+  }
+
+  async function openArchived(
+    user: ReturnType<typeof userEvent.setup>,
+  ): Promise<void> {
+    await user.click(screen.getByRole("button", { name: "Show archived · 1" }));
+    await user.click(cycleCard("Winter 2026"));
+  }
+
+  it("el borrador se activa sin confirmación", async () => {
+    stubCycles(undefined, () =>
+      ok({ cycles: [{ ...ACTIVE, status: "archived" }, ARCHIVED] }),
+    );
+    const user = userEvent.setup();
+    await renderPlanner();
+    await user.click(cycleCard("Summer base 2027"));
+
+    await user.click(screen.getByRole("button", { name: "Make active" }));
+
+    expect(
+      screen.queryByRole("group", { name: /^Make "/ }),
+    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(writes()[0]?.path).toBe(`${CYCLES_PATH}/${DRAFT.id}/activate`),
+    );
+  });
+
+  it("un archivado terminado pide confirmar, dice cuándo terminó y enfoca Cancel", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+    await openArchived(user);
+
+    await user.click(screen.getByRole("button", { name: "Make active" }));
+
+    expect(reactivateGroup()).toHaveTextContent(
+      'Make "Winter 2026" active again? Road to Nationals 2027 will be archived. It ended on 12 Jul. Members will see a finished cycle.',
+    );
+    expect(
+      within(reactivateGroup()).getByRole("button", { name: "Cancel" }),
+    ).toHaveFocus();
+    expect(
+      within(reactivateGroup()).getByRole("button", { name: "Make active" }),
+    ).toBeVisible();
+    expect(writes()).toEqual([]);
+  });
+
+  it("un archivado que no ha terminado no dice que terminó", async () => {
+    stubCycles([ACTIVE, { ...ARCHIVED, startDate: "2026-10-19" }]);
+    const user = userEvent.setup();
+    await renderPlanner();
+    await openArchived(user);
+
+    await user.click(screen.getByRole("button", { name: "Make active" }));
+
+    expect(reactivateGroup()).toHaveAccessibleName(
+      'Make "Winter 2026" active again? Road to Nationals 2027 will be archived.',
+    );
+  });
+
+  it("sin ciclo activo no nombra a ninguno", async () => {
+    stubCycles([DRAFT, ARCHIVED]);
+    const user = userEvent.setup();
+    await renderPlanner();
+    await openArchived(user);
+
+    await user.click(screen.getByRole("button", { name: "Make active" }));
+
+    expect(reactivateGroup()).toHaveAccessibleName(
+      'Make "Winter 2026" active again? It ended on 12 Jul. Members will see a finished cycle.',
+    );
+  });
+
+  it("Cancel cierra sin cambiar nada y devuelve el foco a Make active", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+    await openArchived(user);
+    await user.click(screen.getByRole("button", { name: "Make active" }));
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(
+      screen.queryByRole("group", { name: /^Make "/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Make active" })).toHaveFocus();
+    expect(writes()).toEqual([]);
+  });
+
+  it("Escape cierra sin cambiar nada y devuelve el foco a Make active", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+    await openArchived(user);
+    await user.click(screen.getByRole("button", { name: "Make active" }));
+
+    await user.keyboard("{Escape}");
+
+    expect(
+      screen.queryByRole("group", { name: /^Make "/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Make active" })).toHaveFocus();
+    expect(writes()).toEqual([]);
+  });
+
+  it("confirmar lo activa, archiva el anterior y lo avisa", async () => {
+    stubCycles(undefined, () => ok({ cycles: REACTIVATED }));
+    const user = userEvent.setup();
+    await renderPlanner();
+    await openArchived(user);
+    await user.click(screen.getByRole("button", { name: "Make active" }));
+
+    await user.click(
+      within(reactivateGroup()).getByRole("button", { name: "Make active" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Winter 2026 is active · members see it now",
+      ),
+    );
+    expect(writes()).toEqual([
+      {
+        method: "POST",
+        path: `${CYCLES_PATH}/${ARCHIVED.id}/activate`,
+        body: undefined,
+      },
+    ]);
+    expect(cycleCard("Winter 2026")).toHaveTextContent("Active");
+    expect(
+      screen.queryByRole("group", { name: /^Make "/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ya activo, sus campos dejan de ser de lectura", async () => {
+    stubCycles(undefined, () => ok({ cycles: REACTIVATED }));
+    const user = userEvent.setup();
+    await renderPlanner();
+    await openArchived(user);
+    await user.click(screen.getByRole("button", { name: "Make active" }));
+
+    await user.click(
+      within(reactivateGroup()).getByRole("button", { name: "Make active" }),
+    );
+
+    await waitFor(() =>
+      expect(field("Cycle name")).not.toHaveAttribute("readonly"),
+    );
+    expect(field("Cycle name")).toHaveValue("Winter 2026");
+  });
+
+  it("con un error los ciclos siguen como estaban y sale el aviso", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner();
+    await openArchived(user);
+    await user.click(screen.getByRole("button", { name: "Make active" }));
+
+    await user.click(
+      within(reactivateGroup()).getByRole("button", { name: "Make active" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't save that change. Try again.",
+    );
+    expect(cycleCard("Winter 2026")).toHaveTextContent("Archived");
+    expect(cycleCard("Road to Nationals 2027")).toHaveTextContent("Active");
+  });
+
+  it("en español todo está traducido", async () => {
+    stubCycles();
+    const user = userEvent.setup();
+    await renderPlanner("es");
+    await user.click(
+      screen.getByRole("button", { name: "Ver archivados · 1" }),
+    );
+    await user.click(cycleCard("Winter 2026"));
+
+    await user.click(screen.getByRole("button", { name: "Activar" }));
+
+    const group = screen.getByRole("group", { name: /^¿Volver a activar "/ });
+    expect(group).toHaveTextContent(
+      '¿Volver a activar "Winter 2026"? Road to Nationals 2027 pasará a archivado. Terminó el 12 jul. Los miembros verán un ciclo terminado.',
+    );
+    expect(
+      within(group).getByRole("button", { name: "Cancelar" }),
+    ).toBeVisible();
+    expect(
+      within(group).getByRole("button", { name: "Activar" }),
     ).toBeVisible();
   });
 });

@@ -110,7 +110,8 @@ function gateways(): ClubCyclesGateways {
       },
       activateCycle: async ({ cycleId }) => {
         const previous = cycles.find(
-          (candidate) => candidate.status === "active",
+          (candidate) =>
+            candidate.status === "active" && candidate.id !== cycleId,
         );
         cycles = cycles.map((candidate) => {
           if (candidate.id === cycleId) {
@@ -543,6 +544,43 @@ describe("activateManagedCycle", () => {
       action: "training_cycle.activated",
       entity_id: SUMMER_ID,
       metadata: { archivedCycleId: WINTER_ID },
+    });
+  });
+
+  it("reactiva un archivado, archiva el activo y lo anota (#952)", async () => {
+    cycles = [
+      cycle(WINTER_ID, { status: "active" }),
+      cycle(SUMMER_ID, { status: "archived" }),
+    ];
+
+    const result = await activateManagedCycle(gateways(), {
+      callerId: COACH_ID,
+      cycleId: SUMMER_ID,
+    });
+
+    expect(result.cycles.map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: WINTER_ID, status: "archived" },
+      { id: SUMMER_ID, status: "active" },
+    ]);
+    expect(lastAudit()).toMatchObject({
+      action: "training_cycle.activated",
+      entity_id: SUMMER_ID,
+      metadata: { archivedCycleId: WINTER_ID },
+    });
+  });
+
+  it("sobre el activo no archiva nada", async () => {
+    const result = await activateManagedCycle(gateways(), {
+      callerId: COACH_ID,
+      cycleId: WINTER_ID,
+    });
+
+    expect(result.cycles.map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: WINTER_ID, status: "active" },
+      { id: SUMMER_ID, status: "draft" },
+    ]);
+    expect(lastAudit()).toMatchObject({
+      metadata: { archivedCycleId: null },
     });
   });
 

@@ -3099,6 +3099,11 @@ export const englishMessages = {
   "training.manage.confirmDeleteEmptyCycle":
     'Delete "{name}"? This can\'t be undone.',
   "training.manage.deleted": "Cycle deleted.",
+  "training.manage.confirmReactivate":
+    'Make "{name}" active again? {active} will be archived.',
+  "training.manage.confirmReactivateNoActive": 'Make "{name}" active again?',
+  "training.manage.reactivateEnded":
+    "It ended on {end}. Members will see a finished cycle.",
   "training.manage.errorCycleIsActive":
     "This cycle is active now. Archive it first.",
   "training.manage.cycleName": "Cycle name",
@@ -3113,7 +3118,7 @@ export const englishMessages = {
   "training.manage.lineDraft":
     "Week 1 would start {start} · draft: members don't see it until you make it active.",
   "training.manage.lineArchived":
-    "Ran {start} – {end} · archived. Duplicate it to reuse it.",
+    "Ran {start} – {end} · archived. Make it active again or duplicate it.",
   "training.manage.cycleSelect": "Cycle",
   "training.manage.optionActive": "{name} · active",
   "training.manage.optionDraft": "{name} · draft",
