@@ -24,11 +24,11 @@ function declarations(selector: string): string {
 }
 
 describe("la barra de la publicación en el móvil", () => {
-  it("se pega arriba al hacer scroll", () => {
+  it("se pega justo bajo la cabecera de la app al hacer scroll (#957)", () => {
     const block = declarations(".news-post-bar");
 
     expect(block).toContain("position: sticky;");
-    expect(block).toContain("top: 0;");
+    expect(block).toContain("top: var(--app-phone-header-height);");
   });
 
   it("volver y ⋯ miden 44 px", () => {

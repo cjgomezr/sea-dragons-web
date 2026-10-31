@@ -4599,7 +4599,6 @@ test.describe("barra lateral fija", () => {
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   const SIDEBAR_SCROLL_PX = 1000;
-  const MOBILE_SCROLL_PX = 300;
   const SIDEBAR_NAV_NAME = /^(Main|Principal)$/;
   // Esconde el contenido del inicio para tener una página más corta que la
   // ventana sin depender de qué pantalla queda casi vacía en dev.
@@ -4778,18 +4777,6 @@ test.describe("barra lateral fija", () => {
       expect(isOnTop).toBe(true);
     });
   }
-
-  test("a 375 px la cabecera del móvil se va con la página como siempre", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await goToLongHome(page);
-
-    await scrollPageBy(page, MOBILE_SCROLL_PX);
-
-    const scrollY = await page.evaluate(() => window.scrollY);
-    expect((await sidebarGeometry(page)).top).toBe(-scrollY);
-  });
 
   test("con el teclado, el foco va de la marca a las secciones, la barra de arriba y el contenido", async ({
     page,
@@ -16251,7 +16238,7 @@ test.describe(`${MOBILE_POST_STATE}: la barra`, () => {
   quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE, viewport: MOBILE_VIEWPORT });
 
-  test("se queda arriba al hacer scroll", async ({ page }) => {
+  test("se queda justo bajo la cabecera al hacer scroll", async ({ page }) => {
     await goToNews(page, MOBILE_POST);
     const bar = page.getByRole("navigation", { name: /^(Post|Publicación)$/ });
 
@@ -16261,7 +16248,7 @@ test.describe(`${MOBILE_POST_STATE}: la barra`, () => {
       .toBeGreaterThan(0);
 
     const box = await bar.boundingBox();
-    expect(box?.y).toBe(0);
+    expect(box?.y).toBeCloseTo(await phoneHeaderBottom(page), 0);
     await expect(bar).toBeInViewport();
   });
 
@@ -17384,7 +17371,9 @@ test.describe("publicar en el móvil: la barra y las medidas (#602)", () => {
 
   const writing = MOBILE_PUBLISH_STATES[0] as PublishState;
 
-  test("la barra se queda arriba al hacer scroll", async ({ page }) => {
+  test("la barra se queda justo bajo la cabecera al hacer scroll", async ({
+    page,
+  }) => {
     await goToPublish(page, writing);
     const bar = page.getByRole("group", { name: PUBLISH_BAR_NAME });
 
@@ -17396,7 +17385,10 @@ test.describe("publicar en el móvil: la barra y las medidas (#602)", () => {
       .poll(() => page.evaluate(() => window.scrollY))
       .toBeGreaterThan(0);
 
-    expect((await bar.boundingBox())?.y).toBe(0);
+    expect((await bar.boundingBox())?.y).toBeCloseTo(
+      await phoneHeaderBottom(page),
+      0,
+    );
     await expect(bar.getByRole("button", { name: "Cancel" })).toBeInViewport();
     await expect(
       bar.getByRole("button", { name: PUBLISH_BUTTON }),
@@ -29488,7 +29480,6 @@ test.describe("barra de arriba fija", () => {
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   const TOP_BAR_SCROLL_PX = 1000;
-  const MOBILE_SCROLL_PX = 300;
   // Lo que se pega tiene que tener por dónde bajar: su contenedor se alarga
   // lo bastante para que la página haga scroll más allá de donde empieza.
   const STRETCHED_CONTAINER_PX = 4000;
@@ -29698,16 +29689,12 @@ test.describe("barra de arriba fija", () => {
     expect(await isOnTopAtCenter(target)).toBe(true);
   });
 
-  test("a 375 px la cabecera del móvil se va con la página como siempre", async ({
-    page,
-  }) => {
+  // Que en el móvil la cabecera se quede fija lo prueba "cabecera fija en el
+  // móvil" (#957); aquí, que la barra de arriba no aparece.
+  test("a 375 px la barra de arriba no se ve", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await goToLongHome(page);
 
-    await scrollPageTo(page, MOBILE_SCROLL_PX);
-
-    const scrollY = await page.evaluate(() => window.scrollY);
-    expect((await boxOf(page.locator(".app-sidebar"))).y).toBe(-scrollY);
     await expect(topBar(page)).toBeHidden();
   });
 
@@ -29852,3 +29839,307 @@ function stateNamed<State extends { readonly name: string }>(
   }
   return found;
 }
+
+/* ---------------------------------------------------------------------------
+   La cabecera fija del móvil (#957): por debajo de 768 px la marca, la lupa,
+   la campana y la cuenta se quedan arriba al hacer scroll, y las barras de
+   las pantallas que ya se pegaban arriba bajan hasta quedar justo debajo. La
+   página sigue haciendo scroll entera, como antes.
+   --------------------------------------------------------------------------- */
+
+function phoneHeader(page: Page): Locator {
+  return page.locator(".app-sidebar");
+}
+
+async function phoneHeaderBottom(page: Page): Promise<number> {
+  const header = await boxOf(phoneHeader(page));
+  return header.y + header.height;
+}
+
+/** Si lo que se ve en `point` es `locator` (o algo suyo), y no la cabecera
+ * ni el contenido que pasa por debajo. */
+async function isTopmostAt(
+  locator: Locator,
+  point: { readonly x: number; readonly y: number },
+): Promise<boolean> {
+  return locator.evaluate((element, at) => {
+    const hit = document.elementFromPoint(at.x, at.y);
+    return hit !== null && element.contains(hit);
+  }, point);
+}
+
+test.describe("cabecera fija en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ viewport: MOBILE_VIEWPORT });
+
+  const PHONE_HEADER_SCROLL_PX = 1000;
+  // Lo que se pega tiene que tener por dónde bajar: su contenedor se alarga
+  // lo bastante para que la página haga scroll más allá de donde empieza.
+  const STRETCHED_CONTAINER_PX = 4000;
+  // El inicio del socio de prueba cabe en la ventana: se alarga con un
+  // relleno para tener siempre algo que bajar.
+  const TALL_MAIN_CSS =
+    ".app-main::after { content: ''; display: block; height: 3000px; }";
+  const ANCHOR_ID = "ancla-bajo-la-cabecera";
+  const LONGEST_CLUB_NAME =
+    "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania";
+  // La cabecera mide 77 px: el nombre partido en dos líneas (40 px) cabe en
+  // el alto de los botones (44). Lo que sí la agranda es el texto escalado
+  // del navegador (Chrome de Android escala también los px): con él, el
+  // nombre en dos líneas pasa de los botones.
+  const DEFAULT_HEADER_PX = 77;
+  const SCALED_BRAND_CSS = ".app-brand { font-size: 24px; }";
+
+  async function scrollPageTo(page: Page, pixels: number): Promise<void> {
+    await page.evaluate((y) => window.scrollTo(0, y), pixels);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(0);
+  }
+
+  async function goToLongHome(page: Page): Promise<void> {
+    await page.goto(`${APP_URL}/dashboard`);
+    await waitForSectionsLoaded(page, []);
+    await page.addStyleTag({ content: TALL_MAIN_CSS });
+  }
+
+  async function isOnTopAtCenter(locator: Locator): Promise<boolean> {
+    const box = await boxOf(locator);
+    return isTopmostAt(locator, {
+      x: box.x + box.width / 2,
+      y: box.y + box.height / 2,
+    });
+  }
+
+  /** Alarga el contenedor de la barra, baja la página y comprueba que la
+   * barra se pega justo bajo la cabecera, sin quedar tapada por ella. */
+  async function expectStuckBelowPhoneHeader(
+    page: Page,
+    bar: Locator,
+  ): Promise<void> {
+    await expect(bar).toBeVisible();
+    await bar.evaluate((element, height) => {
+      const container = element.parentElement;
+      if (container === null) {
+        throw new Error("La barra pegada no tiene contenedor");
+      }
+      container.style.minHeight = `${height}px`;
+    }, STRETCHED_CONTAINER_PX);
+
+    await scrollPageTo(page, PHONE_HEADER_SCROLL_PX);
+
+    const headerBottom = await phoneHeaderBottom(page);
+    await expect
+      .poll(async () => (await boxOf(bar)).y)
+      .toBeCloseTo(headerBottom, 0);
+    const box = await boxOf(bar);
+    expect(
+      await isTopmostAt(bar, { x: box.x + box.width / 2, y: box.y + 1 }),
+    ).toBe(true);
+  }
+
+  test.describe("con el socio de prueba", () => {
+    test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+    test("tras bajar, la cabecera sigue arriba y la cuenta recibe el clic", async ({
+      page,
+    }) => {
+      await goToLongHome(page);
+
+      await scrollPageTo(page, PHONE_HEADER_SCROLL_PX);
+
+      expect((await boxOf(phoneHeader(page))).y).toBe(0);
+      await openAccountMenu(page);
+    });
+
+    test("tras bajar, la cabecera conserva su fondo y su borde y el contenido no se transparenta", async ({
+      page,
+    }) => {
+      await goToLongHome(page);
+
+      await scrollPageTo(page, PHONE_HEADER_SCROLL_PX);
+
+      const look = await phoneHeader(page).evaluate((header) => {
+        const probe = document.createElement("div");
+        probe.style.background = "var(--color-sidebar-background)";
+        probe.style.borderColor = "var(--color-sidebar-border)";
+        document.body.append(probe);
+        const expected = getComputedStyle(probe);
+        const style = getComputedStyle(header);
+        const result = {
+          background: style.backgroundColor,
+          expectedBackground: expected.backgroundColor,
+          border: style.borderBottomColor,
+          expectedBorder: expected.borderColor,
+          borderWidth: style.borderBottomWidth,
+        };
+        probe.remove();
+        return result;
+      });
+      expect(look.background).toBe(look.expectedBackground);
+      expect(look.border).toBe(look.expectedBorder);
+      expect(look.borderWidth).toBe("1px");
+      const header = await boxOf(phoneHeader(page));
+      expect(
+        await isTopmostAt(phoneHeader(page), {
+          x: header.width / 2,
+          y: header.y + header.height - 1,
+        }),
+      ).toBe(true);
+    });
+
+    const PHONE_HEADER_OPENERS = [
+      { name: "el menú de la cuenta", open: openAccountMenu },
+      {
+        name: "la lista de la campana",
+        open: async (page: Page): Promise<Locator> => {
+          await openNotifications(page);
+          return notificationsRegion(page);
+        },
+      },
+      { name: "la búsqueda", open: openSearch },
+    ] as const;
+
+    for (const opener of PHONE_HEADER_OPENERS) {
+      test(`con la página bajada, ${opener.name} se abre por encima del contenido`, async ({
+        page,
+      }) => {
+        await goToLongHome(page);
+        await scrollPageTo(page, PHONE_HEADER_SCROLL_PX);
+
+        const opened = await opener.open(page);
+
+        expect(await isOnTopAtCenter(opened)).toBe(true);
+      });
+    }
+
+    test("la barra de pestañas sigue abajo con la página bajada", async ({
+      page,
+    }) => {
+      await goToLongHome(page);
+
+      await scrollPageTo(page, PHONE_HEADER_SCROLL_PX);
+
+      const tabBar = await boxOf(page.locator(".app-tabbar"));
+      expect(tabBar.y + tabBar.height).toBeCloseTo(MOBILE_VIEWPORT.height, 0);
+    });
+
+    test("un enlace a un ancla deja su destino debajo de la cabecera", async ({
+      page,
+    }) => {
+      await goToLongHome(page);
+      await page.evaluate((id) => {
+        const target = document.createElement("h2");
+        target.id = id;
+        target.textContent = "Destino";
+        document.querySelector(".app-main")?.append(target);
+      }, ANCHOR_ID);
+
+      await page.evaluate((id) => {
+        window.location.hash = id;
+      }, ANCHOR_ID);
+
+      const target = page.locator(`#${ANCHOR_ID}`);
+      const headerBottom = await phoneHeaderBottom(page);
+      await expect
+        .poll(async () => (await boxOf(target)).y)
+        .toBeGreaterThanOrEqual(headerBottom - SUBPIXEL_TOLERANCE_PX);
+      expect(await isOnTopAtCenter(target)).toBe(true);
+    });
+
+    test("la barra de Mi perfil se pega justo bajo la cabecera", async ({
+      page,
+    }) => {
+      await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+      await expectStuckBelowPhoneHeader(
+        page,
+        page.locator(".profile-phone-bar"),
+      );
+    });
+  });
+
+  test.describe("con la sesión de administración", () => {
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    test("la barra de una noticia se pega justo bajo la cabecera", async ({
+      page,
+    }) => {
+      await goToNews(page, MOBILE_POST);
+
+      await expectStuckBelowPhoneHeader(page, page.locator(".news-post-bar"));
+    });
+
+    test("la barra de publicar se pega justo bajo la cabecera", async ({
+      page,
+    }) => {
+      await goToPublish(page, MOBILE_PUBLISH_STATES[0] as PublishState);
+
+      await expectStuckBelowPhoneHeader(
+        page,
+        page.locator(".news-publish-bar"),
+      );
+    });
+
+    test("la barra de la pantalla del evento se pega justo bajo la cabecera", async ({
+      page,
+    }) => {
+      const event = AGENDA_REDESIGN_EVENTS[0] ?? PANEL_SERIES_EVENT;
+      await goToCalendar(page, MOBILE_AGENDA_STATE);
+      await agendaRow(page, event.title)
+        .getByRole("button", { name: event.title })
+        .click();
+      await expect(
+        page.getByRole("article", { name: event.title }),
+      ).toBeVisible();
+
+      await expectStuckBelowPhoneHeader(
+        page,
+        page.locator(".agenda-screen-bar"),
+      );
+    });
+
+    test("con logo, un nombre en dos líneas y el texto escalado, la barra de una noticia se pega bajo la cabecera más alta", async ({
+      page,
+    }) => {
+      await serveClubLogos(page);
+      await goToNews(page, MOBILE_POST);
+      await showLogoOnServedPage(page, PHOTOGRAPHED_LOGO);
+      await page.locator(".app-brand").evaluate((element, name) => {
+        element.textContent = name;
+      }, LONGEST_CLUB_NAME);
+      await page.addStyleTag({ content: SCALED_BRAND_CSS });
+      expect((await boxOf(phoneHeader(page))).height).toBeGreaterThan(
+        DEFAULT_HEADER_PX + 1,
+      );
+
+      await expectStuckBelowPhoneHeader(page, page.locator(".news-post-bar"));
+    });
+  });
+
+  test.describe("a 1440 px", () => {
+    test.use({
+      storageState: E2E_STORAGE_STATE_PATH,
+      viewport: { width: 1440, height: 900 },
+    });
+
+    test("la barra lateral y la de arriba siguen arriba y la cabecera del móvil no publica su alto", async ({
+      page,
+    }) => {
+      await goToLongHome(page);
+
+      await scrollPageTo(page, PHONE_HEADER_SCROLL_PX);
+
+      expect((await boxOf(phoneHeader(page))).y).toBe(0);
+      expect((await boxOf(page.locator(".app-topbar"))).y).toBe(0);
+      expect(
+        await page.evaluate(() =>
+          document.documentElement.style.getPropertyValue(
+            "--app-phone-header-height",
+          ),
+        ),
+      ).toBe("");
+    });
+  });
+});

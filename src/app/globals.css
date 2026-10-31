@@ -120,6 +120,13 @@
      abajo, los botones de 44 px y su borde. Lo que se pega arriba al hacer
      scroll empieza por debajo de ella (#932). */
   --app-topbar-height: calc(2 * var(--space-3) + var(--touch-target-min) + 1px);
+  /* La cabecera del móvil con el nombre en una línea: 16 px de relleno arriba
+     y abajo, los botones de 44 px y su borde. Con un nombre largo junto al
+     logo sale más alta: PhoneHeader mide la de verdad y sustituye este valor.
+     Las barras que se pegan arriba en el móvil empiezan por debajo (#957). */
+  --app-phone-header-height: calc(
+    2 * var(--space-4) + var(--touch-target-min) + 1px
+  );
   /* La barra de pestañas del móvil: su borde, su relleno, el icono de 20px y
      una línea de 12px. Lo fijo encima la usa para no quedar debajo (#719). */
   --tabbar-height: calc(
@@ -266,6 +273,26 @@ h6 {
   padding: var(--space-4) var(--space-3);
   background: var(--color-sidebar-background);
   border-bottom: 1px solid var(--color-sidebar-border);
+}
+
+@media (width < 768px) {
+  /* Las anclas de la página no quedan tapadas por la cabecera fija (#957). */
+  html {
+    scroll-padding-top: var(--app-phone-header-height);
+  }
+
+  /* Fija mientras la página hace scroll (#957); la página sigue haciendo
+     scroll entera, para que el navegador esconda su barra y "tirar para
+     refrescar" funcione. El 11 la deja encima de lo que se pega en el
+     contenido (hasta 6) y de la barra de pestañas (10): la búsqueda y los
+     avisos que abre son pantallas enteras dentro de ella, y con menos la
+     barra de pestañas les quedaría encima. Los desplegables del contenido
+     (20) quedan por encima de ella. */
+  .app-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 11;
+  }
 }
 
 /* En el móvil la marca y los tres controles (lupa, campana y cuenta)
@@ -3431,7 +3458,7 @@ a.auth-brand-header:focus-visible {
      pega bajo la cabecera de la app. */
   .profile-phone-bar {
     position: sticky;
-    top: 0;
+    top: var(--app-phone-header-height);
     z-index: 2;
     display: grid;
     grid-template-columns:
@@ -13180,7 +13207,7 @@ a.groups-icon-button {
    en el centro. */
 .news-post-bar {
   position: sticky;
-  top: 0;
+  top: var(--app-phone-header-height);
   z-index: 2;
   display: grid;
   grid-template-columns:
@@ -14239,7 +14266,7 @@ a.groups-icon-button {
    pequeño que 44 px lleva su zona táctil alrededor (D11). */
 .news-publish-bar {
   position: sticky;
-  top: 0;
+  top: var(--app-phone-header-height);
   z-index: 2;
   display: grid;
   /* Cancelar y el botón nunca se encogen: "Publicando…" en español no cabe
@@ -17531,7 +17558,7 @@ a.groups-icon-button {
 
 .agenda-screen-bar {
   position: sticky;
-  top: 0;
+  top: var(--app-phone-header-height);
   z-index: 2;
   display: grid;
   grid-template-columns:
