@@ -15669,8 +15669,10 @@ async function waitForManagedPost(page: Page): Promise<void> {
 const WITHDRAW_BUTTON = /^(Withdraw|Retirar)$/;
 const WITHDRAW_QUESTION = /^(Withdraw this post\?|¿Retirar esta publicación\?)/;
 
-/** Cuántas veces se alarga la ventana antes de rendirse. */
-const MAX_VIEWPORT_FITS = 5;
+/** Cuántas veces se alarga la ventana antes de rendirse. Con la barra de
+ * arriba fija (#932) el panel del calendario descuenta su alto, así que cada
+ * vuelta alarga la página 69 px menos que antes y hacen falta más vueltas. */
+const MAX_VIEWPORT_FITS = 12;
 
 /** Lecturas iguales seguidas para dar por quieta la altura de la página. */
 const STABLE_HEIGHT_READINGS = 5;
