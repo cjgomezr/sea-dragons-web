@@ -229,6 +229,33 @@ describe("deleteNewsPost", () => {
   });
 });
 
+describe("si la bitácora falla después de borrar", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("deja en el log las rutas que quedaron sin limpiar y lanza el error", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const club = clubWithEverything();
+    const failingAudit = {
+      ...club.gateways,
+      audit: {
+        insertAuditLogRow: async () => ({
+          error: { message: "audit_log caído" },
+        }),
+      },
+    };
+
+    await expect(
+      deleteNewsPost(failingAudit, { callerId: CALLER_ID, postId: POST_ID }),
+    ).rejects.toThrow();
+
+    expect(club.posts).toEqual([]);
+    const logged = errorLog.mock.calls.map((call) => String(call[0])).join();
+    expect(logged).toContain(fakeAttachmentPathOf(POST_ID, ATTACHMENT_ID));
+  });
+});
+
 describe("removeDeletedNewsPostFiles", () => {
   afterEach(() => {
     vi.restoreAllMocks();

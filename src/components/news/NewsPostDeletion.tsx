@@ -79,6 +79,9 @@ export type NewsPostDeletionState = {
   readonly hasFailed: boolean;
   /** Borra y vuelve al feed. Devuelve si se borró. */
   readonly remove: () => Promise<boolean>;
+  /** Quita el error del intento anterior, al volver a abrir la
+   * confirmación. */
+  readonly dismissFailure: () => void;
 };
 
 export function useNewsPostDeletion(postId: string): NewsPostDeletionState {
@@ -107,5 +110,10 @@ export function useNewsPostDeletion(postId: string): NewsPostDeletionState {
     return true;
   }
 
-  return { isDeleting, hasFailed, remove };
+  return {
+    isDeleting,
+    hasFailed,
+    remove,
+    dismissFailure: () => setHasFailed(false),
+  };
 }

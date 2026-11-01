@@ -31,9 +31,9 @@ import { DeleteConfirmation, useNewsPostDeletion } from "./NewsPostDeletion";
  * E22) y la hoja que sube: Editar publicación y Retirar a quien la gestiona
  * (`canManage`), Fijar arriba o Desfijar sólo al Admin (D1), y Cancelar.
  * Fijar arriba cambia la hoja por las duraciones; Retirar, por la misma
- * confirmación que en escritorio. Una retirada ofrece además Eliminar (#958),
- * que cambia la hoja por su confirmación y, al borrar, vuelve al feed. Al cerrarse, por donde sea, el foco vuelve
- * al ⋯.
+ * confirmación que en escritorio. Una retirada ofrece además Eliminar
+ * (#958), que cambia la hoja por su confirmación y, al borrar, vuelve al
+ * feed. Al cerrarse, por donde sea, el foco vuelve al ⋯.
  */
 
 type SheetStep =

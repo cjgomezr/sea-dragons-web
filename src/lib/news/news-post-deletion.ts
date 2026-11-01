@@ -73,16 +73,26 @@ export async function deleteNewsPost(
   if (deletion.kind === "published") {
     throw new NewsPostIsPublishedError();
   }
-  await recordAuditEvent(gateways.audit, {
-    actor,
-    clubId: actor.clubId,
-    action: "news_post.deleted",
-    entityType: AUDITED_ENTITY_TYPE,
-    entityId: post.id,
-    result: "success",
-    metadata: { title: deletion.title },
-  });
-  return { storagePaths: storagePathsOf(actor.clubId, deletion.files) };
+  const storagePaths = storagePathsOf(actor.clubId, deletion.files);
+  try {
+    await recordAuditEvent(gateways.audit, {
+      actor,
+      clubId: actor.clubId,
+      action: "news_post.deleted",
+      entityType: AUDITED_ENTITY_TYPE,
+      entityId: post.id,
+      result: "success",
+      metadata: { title: deletion.title },
+    });
+  } catch (error) {
+    // Las filas ya no están y quien llama no llegará a limpiar los ficheros:
+    // sus rutas quedan en el log para no perderlas.
+    console.error(
+      `[news-post-deletion] la publicación ${post.id} se borró pero la bitácora falló; quedan sin limpiar: ${storagePaths.join(", ")}`,
+    );
+    throw error;
+  }
+  return { storagePaths };
 }
 
 /** Un fichero cada vez, para que uno que falla no se lleve a los demás. El

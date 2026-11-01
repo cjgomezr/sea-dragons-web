@@ -206,6 +206,18 @@ describe("NewsPostActions: Delete en escritorio", () => {
     ).toBeVisible();
   });
 
+  it("volver a abrir la confirmación tras un error quita el error", async () => {
+    responders[`DELETE ${MANAGE_PATH}`] = () =>
+      jsonResponse(500, { error: { code: "internal", message: "internal" } });
+    await openConfirmation();
+    await userEvent.click(screen.getByRole("button", { name: "Delete post" }));
+    await screen.findByRole("alert");
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("sin red, lo dice igual y la publicación sigue", async () => {
     responders[`DELETE ${MANAGE_PATH}`] = () => {
       throw new TypeError("Failed to fetch");

@@ -158,7 +158,10 @@ export function NewsPostActions({
             disabled={isSending}
             aria-expanded={isConfirmingDeletion}
             aria-label={translate("news.post.delete")}
-            onClick={() => setState({ kind: "confirmingDeletion" })}
+            onClick={() => {
+              deletion.dismissFailure();
+              setState({ kind: "confirmingDeletion" });
+            }}
           >
             <Trash aria-hidden="true" focusable="false" />
           </button>
