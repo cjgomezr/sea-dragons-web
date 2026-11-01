@@ -417,6 +417,10 @@ export const PAST_DUE_MEMBER_STORAGE_STATE_PATH = path.join(
 /** La fecha del cobro fallido sembrado, fija para que la captura no cambie. */
 export const SEEDED_FAILED_PAYMENT_AT = "2026-10-01T03:00:00.000Z";
 
+/** La fecha de alta de los socios sembrados, fija: con la de hoy, "Member
+ * since" cambiaba cada mes y caducaban las capturas del perfil y la cuenta. */
+const SEEDED_JOINED_ON = "2024-03-06";
+
 const APP_URL = process.env.APP_URL ?? "http://localhost:3417";
 
 const CLUB_SLUG = "victoria-seadragons";
@@ -650,6 +654,7 @@ async function seedMember(
         user_id: member.id,
         full_name: "Socio de prueba",
         email: member.email,
+        joined_on: SEEDED_JOINED_ON,
         ...columns,
       }),
   );
