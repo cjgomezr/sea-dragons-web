@@ -2752,6 +2752,12 @@ export const spanishMessages: MessageCatalog = {
   "news.post.error.withdraw": "No pudimos retirarla. Vuelve a intentarlo.",
   "news.post.error.republish":
     "No pudimos volver a publicarla. Vuelve a intentarlo.",
+  "news.post.delete": "Eliminar",
+  "news.post.deleteQuestion":
+    '¿Eliminar "{title}"? Se borra para siempre, con sus adjuntos e imágenes. No se puede deshacer.',
+  "news.post.deleteConfirm": "Eliminar publicación",
+  "news.post.deleting": "Eliminando…",
+  "news.post.error.delete": "No pudimos eliminarla. Vuelve a intentarlo.",
   // La barra y la hoja ⋯ de la publicación en el móvil (#601).
   "news.post.bar": "Publicación",
   "news.post.bar.back": "Volver a Noticias",
@@ -2766,6 +2772,7 @@ export const spanishMessages: MessageCatalog = {
   "news.post.announce.unpinned": "Desfijada.",
   "news.post.announce.withdrawn": "Publicación retirada.",
   "news.post.announce.published": "Publicada otra vez.",
+  "news.post.announce.deleted": "Publicación eliminada.",
   "news.edit.metaTitle": "Editar publicación · {club}",
   "news.edit.metaDescription": "Corrige una publicación tuya.",
   "news.edit.back": "Volver a la publicación",

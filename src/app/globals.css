@@ -12889,6 +12889,15 @@ a.groups-icon-button {
   color: var(--color-danger);
 }
 
+/* Borrar una retirada (#958): la confirmación lleva el color de peligro,
+   como la de borrar un ciclo (#935), porque no se puede deshacer. */
+.news-post-delete-confirm {
+  padding: var(--space-3) var(--space-4);
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-panel));
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+}
+
 /* El clip con el número de adjuntos, al final de la línea de la fila y en el
    pie de la destacada. */
 .news-attachment-mark {

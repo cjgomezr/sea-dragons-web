@@ -69,3 +69,18 @@ export function readPublishedNotice(): PublishedNotice | null {
 export function forgetPublishedNotice(): void {
   window.sessionStorage.removeItem(STORAGE_KEY);
 }
+
+/** Borrar una publicación (#958) también vuelve al feed sin recargar, y el
+ * feed dice "Post deleted.". No hay nada más que guardar que la marca. */
+const DELETED_STORAGE_KEY = "noticias-aviso-borrada";
+
+export function rememberDeletedNotice(): void {
+  window.sessionStorage.setItem(DELETED_STORAGE_KEY, "1");
+}
+
+/** Si hay aviso de borrada pendiente, y lo olvida: sale una sola vez. */
+export function takeDeletedNotice(): boolean {
+  const isPending = window.sessionStorage.getItem(DELETED_STORAGE_KEY) !== null;
+  window.sessionStorage.removeItem(DELETED_STORAGE_KEY);
+  return isPending;
+}

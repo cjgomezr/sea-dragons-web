@@ -117,6 +117,14 @@ export async function changeNewsStatus(
   );
 }
 
+export type NewsPostRemoval = { readonly kind: "deleted" } | ApiRequestFailure;
+
+/** Borrar para siempre una retirada (#958). Responde 204 sin cuerpo. */
+export async function deleteNewsPost(postId: string): Promise<NewsPostRemoval> {
+  const outcome = await requestApi(managePath(postId), { method: "DELETE" });
+  return outcome.kind === "failed" ? outcome : { kind: "deleted" };
+}
+
 /** Por qué no se guardó la edición, en el idioma de la pantalla. */
 export function describeEditFailure(
   translate: Translator,
