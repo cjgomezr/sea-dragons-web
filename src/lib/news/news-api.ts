@@ -5,6 +5,7 @@ import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { NEWS_ATTACHMENTS_MAX_PER_POST } from "./news-attachments";
 import { InvalidNewsFeedCursorError } from "./news-feed";
 import { NewsPostChangedError, NewsPostNotYoursError } from "./news-management";
+import { NewsPostIsPublishedError } from "./news-post-deletion";
 import {
   InvalidNewsPinUntilError,
   NEWS_POST_WITHDRAWN_REASON,
@@ -152,7 +153,10 @@ export function asNewsApiError(error: unknown): never {
   ) {
     throw new ApiError("forbidden", error.message);
   }
-  if (error instanceof NewsPostChangedError) {
+  if (
+    error instanceof NewsPostChangedError ||
+    error instanceof NewsPostIsPublishedError
+  ) {
     throw new ApiError("conflict", error.message);
   }
   if (error instanceof NewsPinWithdrawnPostError) {

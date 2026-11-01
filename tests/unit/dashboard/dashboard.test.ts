@@ -344,6 +344,7 @@ function gateways(): DashboardGateways {
         findFeedPage: async (query) => findFeedPage(query),
         findPost: async () => null,
         deletePost: async () => undefined,
+        deleteWithdrawnPost: async () => ({ kind: "missing" }),
         updatePost: async () => ({ kind: "updated" }),
         setPostStatus: async () => undefined,
         findPinnedFeedRow: async () => club.pinned,

@@ -128,13 +128,13 @@ export function createNewsCoversGateway(
       const { data, error } = await bucket.remove([...storagePaths]);
       if (error) {
         throw new Error(
-          `No se pudo borrar la portada ${listed}: ${error.message}`,
+          `No se pudo borrar del almacenamiento ${listed}: ${error.message}`,
         );
       }
       // Storage responde bien aunque no haya borrado nada: una lista más
       // corta es la única señal de que algún fichero sigue ahí.
       if (data.length < storagePaths.length) {
-        throw new Error(`Storage no borró toda la portada ${listed}.`);
+        throw new Error(`Storage no borró todo ${listed}.`);
       }
     },
 

@@ -93,6 +93,10 @@ export const AUDIT_ACTIONS = [
   "news_post.edited",
   "news_post.withdrawn",
   "news_post.republished",
+  // #958: quien publicó, o un Admin, borra para siempre una retirada. La
+  // metadata lleva el título (`{ title }`): después no queda publicación que
+  // lo diga. Ni el cuerpo ni la audiencia.
+  "news_post.deleted",
   // RF-3 de E22 (#592): un Admin fija o desfija una publicación, también
   // cuando fijar otra quita la anterior. La entidad es la publicación
   // (`news_post`) y la metadata lleva hasta cuándo (`{ until }`, nulo si no

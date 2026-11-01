@@ -82,7 +82,10 @@ export type EditableNewsPost = {
   readonly pinnedUntil: string | null;
 };
 
-type PostRequest = { readonly callerId: string; readonly postId: string };
+export type PostRequest = {
+  readonly callerId: string;
+  readonly postId: string;
+};
 
 export class NewsPostNotYoursError extends Error {
   constructor() {
@@ -100,7 +103,7 @@ export class NewsPostChangedError extends Error {
   }
 }
 
-type ManagedPost = {
+export type ManagedPost = {
   readonly actor: AuditActor;
   readonly role: Role;
   readonly post: NewsPost;
@@ -110,7 +113,7 @@ type ManagedPost = {
  * como una que no existe. Una ajena del club responde 403, como pide el
  * ticket: quien la pide ya es Admin o Committee, y los ids son uuid, así que
  * saber que existe no le sirve para recorrerlas. */
-async function findManagedPost(
+export async function findManagedPost(
   gateways: NewsGateways,
   request: PostRequest,
 ): Promise<ManagedPost> {
