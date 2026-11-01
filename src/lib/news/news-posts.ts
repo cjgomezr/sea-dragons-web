@@ -215,6 +215,27 @@ export type NewsPostEdit = NewsDraft & {
 export type NewsPostUpdate =
   { readonly kind: "updated" } | { readonly kind: "changed" };
 
+/** Lo que deja en el almacenamiento una publicación que se borró (#958): las
+ * rutas de sus adjuntos, que guarda su fila, y los ids de su portada y de sus
+ * imágenes del cuerpo, cuyas rutas se deducen del club y del id. */
+export type NewsPostFiles = {
+  readonly attachmentPaths: readonly string[];
+  readonly coverUploadId: string | null;
+  readonly inlineImageIds: readonly string[];
+};
+
+/** Lo que responde la base al borrar (#958). Una publicada no se borra:
+ * primero se retira. `missing` es la que no existe, o la que otro borrado se
+ * llevó antes. */
+export type NewsPostDeletion =
+  | {
+      readonly kind: "deleted";
+      readonly title: string;
+      readonly files: NewsPostFiles;
+    }
+  | { readonly kind: "published" }
+  | { readonly kind: "missing" };
+
 export type NewsPostsGateway = {
   /** Cuáles de estos grupos son del club. */
   findClubGroupIds(query: {
@@ -239,6 +260,13 @@ export type NewsPostsGateway = {
    * publicar para deshacerse cuando un adjunto no entra: retirar no borra
    * (decisión D1). */
   deletePost(postId: string): Promise<void>;
+  /** Borra para siempre una retirada (#958) con su audiencia, sus adjuntos,
+   * su portada y sus imágenes del cuerpo, en una sola transacción. Los
+   * ficheros quedan en el almacenamiento: los borra quien llama. */
+  deleteWithdrawnPost(target: {
+    readonly clubId: string;
+    readonly postId: string;
+  }): Promise<NewsPostDeletion>;
   /** Categoría, título, cuerpo, audiencia y la marca de editada. */
   updatePost(edit: NewsPostEdit): Promise<NewsPostUpdate>;
   /** Retirar o volver a publicar: cambia el estado y nada más. Retirar

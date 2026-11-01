@@ -15,6 +15,10 @@ import {
   editNewsPost,
   readEditableNewsPost,
 } from "@/lib/news/news-management";
+import {
+  deleteNewsPost,
+  removeDeletedNewsPostFiles,
+} from "@/lib/news/news-post-deletion";
 import type { NewsPostDetail } from "@/lib/news/news-posts";
 
 /**
@@ -27,6 +31,11 @@ import type { NewsPostDetail } from "@/lib/news/news-posts";
  * anterior se borra. Con `pin` fija (`{ until }`) o desfija (`null`), y sin
  * él la fijada sigue fijada (#592); solo un Admin puede mandarlo. Editar no
  * avisa a nadie (decisión D2).
+ *
+ * DELETE borra para siempre una retirada (#958) con su audiencia, sus
+ * adjuntos, su portada y sus imágenes del cuerpo, y responde 204. Una
+ * publicada da 409: primero se retira. Un fichero que no se pudo borrar del
+ * almacenamiento no deshace el borrado: queda en el log.
  *
  * La frontera lo reserva a Admin y Committee. El dominio exige además que la
  * publicación sea de quien llama, salvo al Admin, y responde 403 si no.
@@ -110,4 +119,30 @@ export function PATCH(
   return route(request);
 }
 
-export const { POST, PUT, DELETE } = createApiModule({});
+export function DELETE(
+  request: NextRequest,
+  context: NewsPostManageRouteContext,
+): Promise<NextResponse> {
+  const route = createApiRoute<null>({
+    handler: async ({ request: apiRequest, decorateResponse }) => {
+      const callerId = await identifyAccountCaller({
+        request: apiRequest,
+        decorateResponse,
+      });
+      const postId = readNewsPostId((await context.params).id);
+      const gateways = requireNewsGateways();
+      try {
+        const deleted = await deleteNewsPost(gateways, { callerId, postId });
+        // Los ficheros viven en el bucket de los adjuntos, el mismo de las
+        // portadas: su adaptador sabe borrar de él.
+        await removeDeletedNewsPostFiles(gateways.covers, deleted.storagePaths);
+        return { status: 204 };
+      } catch (error) {
+        asNewsApiError(error);
+      }
+    },
+  });
+  return route(request);
+}
+
+export const { POST, PUT } = createApiModule({});

@@ -3,12 +3,14 @@
 import { ArrowCounterClockwise } from "@phosphor-icons/react/dist/ssr/ArrowCounterClockwise";
 import { EyeSlash } from "@phosphor-icons/react/dist/ssr/EyeSlash";
 import { PencilSimple } from "@phosphor-icons/react/dist/ssr/PencilSimple";
+import { Trash } from "@phosphor-icons/react/dist/ssr/Trash";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { NEWS_EDIT_PATH } from "@/lib/auth/routes";
 import type { Translator } from "@/lib/i18n/translator";
 import type { NewsPostDetail, NewsPostStatus } from "@/lib/news/news-posts";
 import { changeNewsStatus } from "./news-manage-client";
+import { DeleteConfirmation, useNewsPostDeletion } from "./NewsPostDeletion";
 
 /**
  * Editar, retirar y volver a publicar desde la publicación abierta (#331).
@@ -17,13 +19,15 @@ import { changeNewsStatus } from "./news-manage-client";
  * línea del autor (#596): el nombre lo lleva `aria-label`.
  *
  * Retirar pide confirmación, porque afecta a lo que ya vio el club. Volver a
- * publicar no: deshace lo anterior y no avisa a nadie. Nada cambia en
- * pantalla hasta que el servidor responde.
+ * publicar no: deshace lo anterior y no avisa a nadie. Una retirada se
+ * puede además borrar para siempre (#958), con su propia confirmación. Nada
+ * cambia en pantalla hasta que el servidor responde.
  */
 
 type ActionState =
   | { readonly kind: "idle" }
   | { readonly kind: "confirmingWithdrawal" }
+  | { readonly kind: "confirmingDeletion" }
   | { readonly kind: "sending"; readonly status: NewsPostStatus }
   | { readonly kind: "failed"; readonly status: NewsPostStatus };
 
@@ -85,6 +89,20 @@ export function NewsPostActions({
   // El estado desactiva los botones en el siguiente pintado, pero un doble
   // clic llega antes. La referencia cambia en el acto.
   const isSendingRef = useRef(false);
+  const deleteRef = useRef<HTMLButtonElement>(null);
+  const deletion = useNewsPostDeletion(post.id);
+
+  function closeDeletion(): void {
+    setState({ kind: "idle" });
+    deleteRef.current?.focus();
+  }
+
+  async function confirmDeletion(): Promise<void> {
+    const isDeleted = await deletion.remove();
+    if (!isDeleted) {
+      closeDeletion();
+    }
+  }
 
   async function changeStatus(status: NewsPostStatus): Promise<void> {
     if (isSendingRef.current) {
@@ -103,6 +121,7 @@ export function NewsPostActions({
   }
 
   const isSending = state.kind === "sending";
+  const isConfirmingDeletion = state.kind === "confirmingDeletion";
   const isWithdrawn = post.status === "withdrawn";
   const isConfirming =
     state.kind === "confirmingWithdrawal" ||
@@ -122,13 +141,29 @@ export function NewsPostActions({
           <button
             type="button"
             className="news-icon-button"
-            disabled={isSending}
+            disabled={isSending || deletion.isDeleting}
             aria-label={translate(
               isSending ? "news.post.republishing" : "news.post.republish",
             )}
             onClick={() => void changeStatus("published")}
           >
             <ArrowCounterClockwise aria-hidden="true" focusable="false" />
+          </button>
+        ) : null}
+        {isWithdrawn ? (
+          <button
+            ref={deleteRef}
+            type="button"
+            className="news-icon-button news-icon-button-danger"
+            disabled={isSending}
+            aria-expanded={isConfirmingDeletion}
+            aria-label={translate("news.post.delete")}
+            onClick={() => {
+              deletion.dismissFailure();
+              setState({ kind: "confirmingDeletion" });
+            }}
+          >
+            <Trash aria-hidden="true" focusable="false" />
           </button>
         ) : (
           <button
@@ -150,6 +185,20 @@ export function NewsPostActions({
           onConfirm={() => void changeStatus("withdrawn")}
           onCancel={() => setState({ kind: "idle" })}
         />
+      ) : null}
+      {isConfirmingDeletion && isWithdrawn ? (
+        <DeleteConfirmation
+          translate={translate}
+          title={post.title}
+          isSending={deletion.isDeleting}
+          onConfirm={() => void confirmDeletion()}
+          onCancel={closeDeletion}
+        />
+      ) : null}
+      {deletion.hasFailed ? (
+        <p className="auth-error" role="alert">
+          {translate("news.post.error.delete")}
+        </p>
       ) : null}
       {state.kind === "failed" ? (
         <p className="auth-error" role="alert">

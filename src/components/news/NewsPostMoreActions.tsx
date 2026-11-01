@@ -6,6 +6,7 @@ import { EyeSlash } from "@phosphor-icons/react/dist/ssr/EyeSlash";
 import { PencilSimple } from "@phosphor-icons/react/dist/ssr/PencilSimple";
 import { PushPin } from "@phosphor-icons/react/dist/ssr/PushPin";
 import { PushPinSlash } from "@phosphor-icons/react/dist/ssr/PushPinSlash";
+import { Trash } from "@phosphor-icons/react/dist/ssr/Trash";
 import { WarningCircle } from "@phosphor-icons/react/dist/ssr/WarningCircle";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
@@ -23,17 +24,27 @@ import {
   useSheetRequest,
 } from "./news-post-sheet-actions";
 import { WithdrawConfirmation } from "./NewsPostActions";
+import { DeleteConfirmation, useNewsPostDeletion } from "./NewsPostDeletion";
 
 /**
  * El ⋯ de la barra de la publicación en el móvil (#601, "#2d" del handoff de
  * E22) y la hoja que sube: Editar publicación y Retirar a quien la gestiona
  * (`canManage`), Fijar arriba o Desfijar sólo al Admin (D1), y Cancelar.
  * Fijar arriba cambia la hoja por las duraciones; Retirar, por la misma
- * confirmación que en escritorio. Al cerrarse, por donde sea, el foco vuelve
- * al ⋯.
+ * confirmación que en escritorio. Una retirada ofrece además Eliminar
+ * (#958), que cambia la hoja por su confirmación y, al borrar, vuelve al
+ * feed. Al cerrarse, por donde sea, el foco vuelve al ⋯.
  */
 
-type SheetStep = "menu" | "choosingDuration" | "confirmingWithdrawal";
+type SheetStep =
+  "menu" | "choosingDuration" | "confirmingWithdrawal" | "confirmingDeletion";
+
+/** Los pasos que son una confirmación llevan sus propios botones de
+ * cancelar. */
+const CONFIRMATION_STEPS: readonly SheetStep[] = [
+  "confirmingWithdrawal",
+  "confirmingDeletion",
+];
 
 type ChangedHandler = (post: NewsPostDetail, announcement: string) => void;
 
@@ -92,6 +103,7 @@ function SheetMenu({
   onUnpin,
   onWithdraw,
   onRepublish,
+  onDelete,
 }: {
   readonly translate: Translator;
   readonly post: NewsPostDetail;
@@ -100,6 +112,7 @@ function SheetMenu({
   readonly onUnpin: () => void;
   readonly onWithdraw: () => void;
   readonly onRepublish: () => void;
+  readonly onDelete: () => void;
 }): React.JSX.Element {
   const isWithdrawn = post.status === "withdrawn";
   return (
@@ -140,6 +153,15 @@ function SheetMenu({
           )}
           isDisabled={isSending}
           onChoose={onRepublish}
+        />
+      ) : null}
+      {post.canManage && isWithdrawn ? (
+        <SheetRow
+          glyph={Trash}
+          title={translate("news.post.delete")}
+          isDanger
+          isDisabled={isSending}
+          onChoose={onDelete}
         />
       ) : null}
       {post.canManage && !isWithdrawn ? (
@@ -220,14 +242,21 @@ function SheetContent({
     close,
   });
   const replacesPinned = useReplacesPinned(post);
+  const deletion = useNewsPostDeletion(post.id);
   const stepRef = useRef<HTMLDivElement>(null);
   const hasChangedStep = useRef(false);
 
   // El botón que cambió de paso desaparece con él: el foco pasa al paso
-  // nuevo para no quedarse en el aire.
+  // nuevo para no quedarse en el aire. Si el paso ya lo tomó, como la
+  // confirmación de borrar con su Cancel, se queda donde está.
   useEffect(() => {
-    if (hasChangedStep.current) {
-      stepRef.current?.focus();
+    const stepElement = stepRef.current;
+    if (
+      hasChangedStep.current &&
+      stepElement !== null &&
+      !stepElement.contains(document.activeElement)
+    ) {
+      stepElement.focus();
     }
   }, [step]);
 
@@ -252,6 +281,7 @@ function SheetContent({
                 changeStatusFromSheet(translate, post, "published"),
               )
             }
+            onDelete={() => goTo("confirmingDeletion")}
           />
         ) : null}
         {step === "choosingDuration" ? (
@@ -276,13 +306,27 @@ function SheetContent({
             onCancel={() => goTo(MENU_STEP)}
           />
         ) : null}
+        {step === "confirmingDeletion" ? (
+          <DeleteConfirmation
+            translate={translate}
+            title={post.title}
+            isSending={deletion.isDeleting}
+            onConfirm={() => void deletion.remove()}
+            onCancel={() => goTo(MENU_STEP)}
+          />
+        ) : null}
       </div>
       {failure === null ? null : (
         <p className="auth-error" role="alert">
           {failure}
         </p>
       )}
-      {step === "confirmingWithdrawal" ? null : (
+      {deletion.hasFailed ? (
+        <p className="auth-error" role="alert">
+          {translate("news.post.error.delete")}
+        </p>
+      ) : null}
+      {CONFIRMATION_STEPS.includes(step) ? null : (
         <button
           type="button"
           className="admin-secondary directory-sheet-cancel"

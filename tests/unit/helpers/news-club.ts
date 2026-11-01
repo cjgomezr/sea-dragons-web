@@ -340,6 +340,24 @@ function createFakeInlineImages(
   };
 }
 
+/** Dónde guarda el doble el fichero de un adjunto. La ruta de verdad la
+ * guarda la fila (`news_post_attachments.storage_path`). */
+export function fakeAttachmentPathOf(
+  postId: string,
+  attachmentId: string,
+): string {
+  return `${CLUB_ID}/${postId}/${attachmentId}`;
+}
+
+function removeWhere<T>(items: T[], matches: (item: T) => boolean): void {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (item !== undefined && matches(item)) {
+      items.splice(index, 1);
+    }
+  }
+}
+
 function inlineImageFilesOf(images: readonly FakeInlineImage[]): Set<string> {
   return new Set(images.map((image) => newsInlineImagePathOf(image)));
 }
@@ -440,6 +458,34 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
         )) {
           replaceImage(inlineImages, image.id, { postId: null });
         }
+      },
+      // Como `delete_news_post` (0090): sólo una retirada, y con ella su
+      // portada y sus imágenes del cuerpo; sus ficheros los borra otro.
+      deleteWithdrawnPost: async ({ clubId, postId }) => {
+        const target = posts[indexOf(clubId, postId)];
+        if (target === undefined) {
+          return { kind: "missing" };
+        }
+        if (target.status === "published") {
+          return { kind: "published" };
+        }
+        const inlineImageIds = inlineImages
+          .filter((image) => image.postId === postId)
+          .map((image) => image.id);
+        removeWhere(posts, (post) => post.id === postId);
+        removeWhere(covers, (cover) => cover.id === target.coverUploadId);
+        removeWhere(inlineImages, (image) => image.postId === postId);
+        return {
+          kind: "deleted",
+          title: target.title,
+          files: {
+            attachmentPaths: target.attachments.map((attachment) =>
+              fakeAttachmentPathOf(postId, attachment.id),
+            ),
+            coverUploadId: target.coverUploadId,
+            inlineImageIds,
+          },
+        };
       },
       updatePost: async (edit) => {
         const index = indexOf(edit.clubId, edit.postId);

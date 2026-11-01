@@ -2738,6 +2738,12 @@ export const englishMessages = {
   "news.post.republishing": "Publishing…",
   "news.post.error.withdraw": "We couldn't withdraw it. Try again.",
   "news.post.error.republish": "We couldn't publish it again. Try again.",
+  "news.post.delete": "Delete",
+  "news.post.deleteQuestion":
+    "Delete \"{title}\"? It's removed for good, with its attachments and images. This can't be undone.",
+  "news.post.deleteConfirm": "Delete post",
+  "news.post.deleting": "Deleting…",
+  "news.post.error.delete": "We couldn't delete it. Try again.",
   // La barra y la hoja ⋯ de la publicación en el móvil (#601).
   "news.post.bar": "Post",
   "news.post.bar.back": "Back to News",
@@ -2752,6 +2758,7 @@ export const englishMessages = {
   "news.post.announce.unpinned": "Unpinned.",
   "news.post.announce.withdrawn": "Post withdrawn.",
   "news.post.announce.published": "Published again.",
+  "news.post.announce.deleted": "Post deleted.",
   "news.edit.metaTitle": "Edit post · {club}",
   "news.edit.metaDescription": "Correct a post you published.",
   "news.edit.back": "Back to the post",

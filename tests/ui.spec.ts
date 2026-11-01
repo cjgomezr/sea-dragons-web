@@ -15743,6 +15743,25 @@ async function openWithdrawConfirmation(page: Page): Promise<void> {
   }
 }
 
+const DELETE_BUTTON = /^(Delete|Eliminar)$/;
+const DELETE_QUESTION = /^(Delete "|¿Eliminar ")/;
+
+/** La confirmación de borrar una retirada (#958), en la línea del autor o,
+ * en el móvil, en la hoja ⋯. */
+async function openDeleteConfirmation(page: Page): Promise<void> {
+  await waitForManagedPost(page);
+  if (isPhoneViewport(page)) {
+    await page.getByRole("button", { name: MORE_ACTIONS_BUTTON }).click();
+  }
+  await page.getByRole("button", { name: DELETE_BUTTON }).click();
+  await expect(page.getByText(DELETE_QUESTION)).toBeVisible();
+  // En el móvil la ventana de 1×1 sigue siendo de móvil: la hoja no se cierra.
+  if (!isPhoneViewport(page)) {
+    await fitViewportToPage(page);
+    await expect(page.getByText(DELETE_QUESTION)).toBeVisible();
+  }
+}
+
 const FEED_HEADING = /Club feed|Novedades del club/;
 const postPath = (id: string): string => `${NEWS_SCREEN_PATH}/${id}`;
 
@@ -15859,6 +15878,13 @@ const NEWS_STATES: readonly NewsState[] = [
     heading: new RegExp(STUBBED_OWN_POST.title),
     beforeVisit: chooseSpanish,
     ready: openWithdrawConfirmation,
+  },
+  {
+    name: "noticia-borrar",
+    path: postPath(NEWS_OWN_WITHDRAWN_POST_ID),
+    feed: [],
+    heading: new RegExp(STUBBED_OWN_WITHDRAWN_POST.title),
+    ready: openDeleteConfirmation,
   },
   {
     name: "publicacion-retirada-propia",

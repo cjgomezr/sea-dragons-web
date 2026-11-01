@@ -70,6 +70,7 @@ function dashboardGateways(): DashboardGateways {
         findFeedPage: async () => [],
         findPost: async () => null,
         deletePost: unused,
+        deleteWithdrawnPost: unused,
         updatePost: unused,
         setPostStatus: unused,
         findPinnedFeedRow: async () => null,

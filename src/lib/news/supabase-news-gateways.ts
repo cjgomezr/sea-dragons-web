@@ -20,6 +20,7 @@ import {
   type NewsPinnedFeedRow,
   type NewsPinnedQuery,
   type NewsPost,
+  type NewsPostDeletion,
   type NewsPostEdit,
   type NewsPostStatus,
   type NewsPostUpdate,
@@ -79,6 +80,22 @@ const READER_GROUP_FILTER = "news_post_groups.group_id";
  * sustituyen la fijada en una transacción. */
 const PIN_FUNCTION = "pin_news_post";
 const UNPIN_FUNCTION = "unpin_news_post";
+
+/** La función de `0090_news_post_delete.sql`, que mira el estado y borra en
+ * una transacción (#958). */
+const DELETE_FUNCTION = "delete_news_post";
+
+/** Siempre una fila; sólo `deleted` trae el título y los ficheros. */
+const deletionRowSchema = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.literal("deleted"),
+    title: z.string(),
+    attachment_paths: z.array(z.string()),
+    cover_upload_id: z.string().nullable(),
+    inline_image_ids: z.array(z.string()),
+  }),
+  z.object({ outcome: z.enum(["published", "missing"]) }),
+]);
 
 /** Lo que va a todo el club o a alguno de sus grupos, y lo suyo esté como
  * esté (#331): quien publicó ve lo retirado, marcado, y nadie más. El id sale
@@ -543,6 +560,34 @@ async function setPostStatus(
   }
 }
 
+async function deleteWithdrawnPost(
+  serviceClient: SupabaseClient,
+  target: { readonly clubId: string; readonly postId: string },
+): Promise<NewsPostDeletion> {
+  const { data, error } = await serviceClient.rpc(DELETE_FUNCTION, {
+    p_club_id: target.clubId,
+    p_post_id: target.postId,
+  });
+  if (error) {
+    throw new Error(
+      `No se pudo borrar la publicación ${target.postId}: ${error.message}`,
+    );
+  }
+  const row = z.tuple([deletionRowSchema]).parse(data)[0];
+  if (row.outcome !== "deleted") {
+    return { kind: row.outcome };
+  }
+  return {
+    kind: "deleted",
+    title: row.title,
+    files: {
+      attachmentPaths: row.attachment_paths,
+      coverUploadId: row.cover_upload_id,
+      inlineImageIds: row.inline_image_ids,
+    },
+  };
+}
+
 export function createNewsGateways(
   serviceClient: SupabaseClient,
 ): NewsGateways {
@@ -606,6 +651,9 @@ export function createNewsGateways(
           );
         }
       },
+
+      deleteWithdrawnPost: (target) =>
+        deleteWithdrawnPost(serviceClient, target),
 
       updatePost: (edit) => updatePost(serviceClient, edit),
 

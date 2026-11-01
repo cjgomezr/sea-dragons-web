@@ -13,6 +13,9 @@ import type { NewsPinnedFeedItem } from "@/lib/news/news-feed";
 import type { NewsPinDuration } from "@/lib/news/news-pin-duration";
 import type { NewsPostDetail } from "@/lib/news/news-posts";
 
+// Borrar una retirada (#958) vuelve al feed con el router de la app.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
 /**
  * La publicación en el móvil (#601, RF-11 del PRD de E22): por debajo de
  * 768 px lleva su barra con volver, la categoría y ⋯, y el ⋯ sube una hoja

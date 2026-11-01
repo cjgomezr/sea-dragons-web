@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NewsAttachmentDownload } from "@/lib/news/news-attachments";
 import type { NewsPostDetail } from "@/lib/news/news-posts";
 
+// Borrar una retirada (#958) vuelve al feed con el router de la app.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
 /**
  * La publicación abierta en pantalla (#329, RF-5 del PRD de E11; #596, RF-7
  * del PRD de E22): la portada, la categoría y la audiencia, el autor con su

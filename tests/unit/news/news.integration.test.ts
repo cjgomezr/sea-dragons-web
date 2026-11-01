@@ -22,6 +22,10 @@ import {
   changeNewsPostStatus,
   editNewsPost,
 } from "@/lib/news/news-management";
+import {
+  deleteNewsPost,
+  removeDeletedNewsPostFiles,
+} from "@/lib/news/news-post-deletion";
 import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
 import { pinNewsPost, unpinNewsPost } from "@/lib/news/news-pins";
 import { NEWS_ATTACHMENTS_BUCKET } from "@/lib/news/supabase-news-attachment-gateways";
@@ -1316,6 +1320,76 @@ describeRls("fijar noticias contra seadragons-dev (#592)", () => {
         expect(memberFeed.pinned?.id).toBe(post.id);
         expect(outsiderFeed).toMatchObject({ pinned: null, posts: [] });
       });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+});
+
+describeRls("borrar una retirada contra seadragons-dev (#958)", () => {
+  it(
+    "tras borrar no quedan ni la fila, ni la portada, ni las imágenes, ni sus ficheros",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, (seeded) =>
+        withCoverCleanup(serviceClient, seeded.clubId, () =>
+          withInlineImageCleanup(serviceClient, seeded.clubId, async () => {
+            const coverId = await stageCover(seeded);
+            const imageId = await stageInlineImage(seeded);
+            const post = await publishNewsPostWithUploads(seeded.gateways, {
+              callerId: seeded.admin.id,
+              draft: {
+                category: "news",
+                title: "Prueba para borrar",
+                body: bodyWithImages(imageId),
+                audience: { kind: "club" },
+              },
+              uploadIds: [],
+              coverUploadId: coverId,
+              pin: { kind: "keep" },
+              now: new Date(),
+            });
+            const request = { callerId: seeded.admin.id, postId: post.id };
+            await changeNewsPostStatus(seeded.gateways, {
+              ...request,
+              status: "withdrawn",
+            });
+
+            const deleted = await deleteNewsPost(seeded.gateways, request);
+            await removeDeletedNewsPostFiles(
+              seeded.gateways.covers,
+              deleted.storagePaths,
+            );
+
+            const rows = await Promise.all(
+              [
+                serviceClient.client
+                  .from("news_posts")
+                  .select("id")
+                  .eq("id", post.id),
+                serviceClient.client
+                  .from("news_cover_uploads")
+                  .select("id")
+                  .eq("id", coverId),
+                serviceClient.client
+                  .from("news_inline_images")
+                  .select("id")
+                  .eq("id", imageId),
+              ].map(async (query) => (await query).data),
+            );
+            expect(rows).toEqual([[], [], []]);
+            expect(await listCoverFiles(serviceClient, seeded.clubId)).toEqual(
+              [],
+            );
+            expect(
+              await listInlineImageFiles(serviceClient, seeded.clubId),
+            ).toEqual([]);
+            await expect(
+              deleteNewsPost(seeded.gateways, request),
+            ).rejects.toBeInstanceOf(NewsPostNotFoundError);
+          }),
+        ),
+      );
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
