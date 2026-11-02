@@ -98,6 +98,8 @@ export function describeSocialLinkIssue(
         max: SOCIAL_LINK_MAX_LENGTH,
       });
     case "wrong_domain":
+      // La web del club acepta cualquier dominio, así que nunca llega aquí:
+      // la rama sólo estrecha el tipo para `socialNetworkDomain`.
       return network === "website"
         ? translate("clubSettings.socialLinks.issue.not_a_link")
         : translate("clubSettings.socialLinks.issue.wrong_domain", {

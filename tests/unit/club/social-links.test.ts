@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
+import type { AuditLogInsertRow } from "@/lib/audit/audit-log";
+import type { Role } from "@/lib/auth/roles";
+import { ClubSettingsForbiddenError } from "@/lib/club/club-settings";
 import {
   isSameSocialLinks,
   NO_SOCIAL_LINKS,
   SOCIAL_LINK_MAX_LENGTH,
   SOCIAL_NETWORKS,
   type SocialLinks,
+  type SocialLinksGateways,
+  SocialLinksValidationError,
   type SocialNetwork,
   socialNetworkDomain,
   toSocialLinks,
+  updateSocialLinks,
   validateSocialLinks,
 } from "@/lib/club/social-links";
 
@@ -205,5 +211,111 @@ describe("isSameSocialLinks", () => {
         only("facebook", "https://fb.com/b"),
       ),
     ).toBe(false);
+  });
+});
+
+const ADMIN_ID = "a0a0a0a0-0000-4000-8000-00000000000a";
+const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
+const INSTAGRAM = "https://www.instagram.com/victoriaseadragons";
+
+type Fake = {
+  readonly gateways: SocialLinksGateways;
+  readonly calls: string[];
+  readonly auditRows: AuditLogInsertRow[];
+};
+
+function fake(options: { callerRole?: Role; stored?: SocialLinks } = {}): Fake {
+  const calls: string[] = [];
+  const auditRows: AuditLogInsertRow[] = [];
+  let stored = options.stored ?? NO_SOCIAL_LINKS;
+  const gateways: SocialLinksGateways = {
+    members: {
+      findRoleRequestMember: async () => {
+        calls.push("member");
+        return {
+          clubId: CLUB_ID,
+          fullName: "Ana Admin",
+          role: options.callerRole ?? "Admin",
+        };
+      },
+    },
+    socialLinks: {
+      findClubIdBySlug: async () => CLUB_ID,
+      findSocialLinks: async () => {
+        calls.push("find");
+        return stored;
+      },
+      replaceSocialLinks: async (_clubId, links) => {
+        calls.push("replace");
+        stored = links;
+        return links;
+      },
+    },
+    audit: {
+      insertAuditLogRow: async (row) => {
+        auditRows.push(row);
+        return { error: null };
+      },
+    },
+  };
+  return { gateways, calls, auditRows };
+}
+
+describe("updateSocialLinks", () => {
+  it("rechaza a un Committee sin escribir nada", async () => {
+    const { gateways, calls, auditRows } = fake({ callerRole: "Committee" });
+
+    await expect(
+      updateSocialLinks(gateways, {
+        callerId: ADMIN_ID,
+        links: only("instagram", INSTAGRAM),
+      }),
+    ).rejects.toBeInstanceOf(ClubSettingsForbiddenError);
+    expect(calls).not.toContain("replace");
+    expect(auditRows).toEqual([]);
+  });
+
+  it("con un enlace que no vale falla antes de tocar la base", async () => {
+    const { gateways, calls } = fake();
+
+    await expect(
+      updateSocialLinks(gateways, {
+        callerId: ADMIN_ID,
+        links: only("instagram", "https://tiktok.com/x"),
+      }),
+    ).rejects.toBeInstanceOf(SocialLinksValidationError);
+    expect(calls).toEqual([]);
+  });
+
+  it("sin cambios no escribe ni anota", async () => {
+    const { gateways, calls, auditRows } = fake({
+      stored: only("instagram", INSTAGRAM),
+    });
+
+    await updateSocialLinks(gateways, {
+      callerId: ADMIN_ID,
+      links: only("instagram", `  ${INSTAGRAM}  `),
+    });
+
+    expect(calls).not.toContain("replace");
+    expect(auditRows).toEqual([]);
+  });
+
+  it("anota las redes que cambiaron, sin los enlaces", async () => {
+    const { gateways, auditRows } = fake({
+      stored: only("tiktok", "https://www.tiktok.com/@seadragons"),
+    });
+
+    await updateSocialLinks(gateways, {
+      callerId: ADMIN_ID,
+      links: only("instagram", INSTAGRAM),
+    });
+
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0]?.action).toBe("club.social_links_changed");
+    expect(auditRows[0]?.metadata).toEqual({
+      networks: ["instagram", "tiktok"],
+    });
+    expect(JSON.stringify(auditRows[0])).not.toContain("https://");
   });
 });
