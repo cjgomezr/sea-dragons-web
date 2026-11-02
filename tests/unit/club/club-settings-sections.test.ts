@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CLUB_SETTINGS_SECTIONS,
   readClubSettingsSection,
   searchWithClubSettingsSection,
 } from "@/lib/club/club-settings-sections";
@@ -10,10 +11,23 @@ import {
  * Committee sólo tiene Packs, diga lo que diga la dirección (D8).
  */
 
+describe("las secciones", () => {
+  it("pone Redes justo después del inicio de sesión (#963)", () => {
+    expect(CLUB_SETTINGS_SECTIONS).toEqual([
+      "general",
+      "sign-in",
+      "social",
+      "positions",
+      "packs",
+    ]);
+  });
+});
+
 describe("la sección de la dirección de un Admin", () => {
   it.each([
     ["general", "general"],
     ["sign-in", "sign-in"],
+    ["social", "social"],
     ["positions", "positions"],
     ["packs", "packs"],
   ] as const)("?tab=%s abre %s", (queryValue, section) => {
@@ -34,7 +48,7 @@ describe("la sección de la dirección de un Admin", () => {
 });
 
 describe("la sección de la dirección de un Committee", () => {
-  it.each([null, "general", "positions", "packs", "billing"])(
+  it.each([null, "general", "social", "positions", "packs", "billing"])(
     "con ?tab=%s abre Packs",
     (queryValue) => {
       expect(readClubSettingsSection(queryValue, false)).toBe("packs");

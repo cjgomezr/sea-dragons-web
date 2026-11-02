@@ -12463,6 +12463,75 @@ function signInTextsSection(page: Page): Locator {
   });
 }
 
+/* #963: las redes del club. El endpoint se finge, como el de los textos de
+   entrada: guardarlas de verdad cambiaría lo que ven las demás pruebas.
+   Guardar se queda colgado: los estados de aquí no esperan respuesta. */
+const CLUB_SOCIAL_LINKS_ENDPOINT = `${CLUB_SETTINGS_ENDPOINT}/social-links`;
+
+type StubbedSocialLinks = Readonly<
+  Record<
+    "instagram" | "tiktok" | "youtube" | "facebook" | "whatsapp" | "website",
+    string | null
+  >
+>;
+
+const NO_STUBBED_SOCIAL_LINKS: StubbedSocialLinks = {
+  instagram: null,
+  tiktok: null,
+  youtube: null,
+  facebook: null,
+  whatsapp: null,
+  website: null,
+};
+
+const ALL_STUBBED_SOCIAL_LINKS: StubbedSocialLinks = {
+  instagram: "https://www.instagram.com/victoriaseadragons",
+  tiktok: "https://www.tiktok.com/@victoriaseadragons",
+  youtube: "https://www.youtube.com/@victoriaseadragons",
+  facebook: "https://www.facebook.com/victoriaseadragons",
+  whatsapp: "https://wa.me/61400000000",
+  website: "https://www.victoriaseadragons.org.au/club/underwater-rugby",
+};
+
+async function stubSocialLinks(
+  page: Page,
+  links: StubbedSocialLinks,
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === CLUB_SOCIAL_LINKS_ENDPOINT,
+    async (route, request) => {
+      if (request.method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ data: links }),
+        });
+      }
+      // PUT: sin respuesta, la sección se queda guardando.
+    },
+  );
+}
+
+function socialLinksSection(page: Page): Locator {
+  return page.getByRole("region", { name: /^(Social links|Redes)$/ });
+}
+
+/** Pega un enlace de TikTok en Instagram y guarda: el campo lo rechaza con
+ * el dominio de su red (#963). */
+function pasteLinkOfAnotherNetwork(labels: {
+  readonly submit: string;
+  readonly issue: string;
+}) {
+  return async (page: Page): Promise<void> => {
+    const section = socialLinksSection(page);
+    await section
+      .getByRole("textbox", { name: "Instagram" })
+      .fill("https://www.tiktok.com/@victoriaseadragons");
+    await page.getByRole("button", { name: labels.submit }).click();
+    await expect(section.getByText(labels.issue)).toBeVisible();
+  };
+}
+
 const CLUB_SESSION_PACKS_ENDPOINT = "/api/v1/club/session-packs";
 
 /** Lo que diría Stripe de una sesión Casual (#469): el precio de verdad lo
@@ -12651,6 +12720,8 @@ type ClubSettingsState = {
   readonly save?: ClubSettingsSave;
   /** Lo que sirve el endpoint fingido de los textos de entrada (#301). */
   readonly signInTexts?: StubbedSignInTexts;
+  /** Lo que sirve el endpoint fingido de las redes (#963). */
+  readonly socialLinks?: StubbedSocialLinks;
   /** Los packs que sirve el endpoint fingido (#722). Sin ellos, los de
    * siempre. */
   readonly sessionPacks?: readonly number[];
@@ -12794,6 +12865,7 @@ const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
  * tiene: se espera a su campo del nombre. */
 const CLUB_SECTION_HEADINGS = {
   "sign-in": "clubSettings.signInTexts.title",
+  social: "clubSettings.socialLinks.title",
   positions: "clubSettings.positions.title",
   packs: "clubSettings.sessionPacks.title",
 } as const;
@@ -12843,6 +12915,7 @@ async function stubClubSettingsSections(
     create: state.createPosition ?? "hangs",
   });
   await stubSignInTexts(page, state.signInTexts ?? NO_STUBBED_SIGN_IN_TEXTS);
+  await stubSocialLinks(page, state.socialLinks ?? NO_STUBBED_SOCIAL_LINKS);
   await stubSessionPacks(page, state.sessionPacks);
 }
 
@@ -13719,6 +13792,91 @@ for (const state of CLUB_SIGN_IN_TEXTS_STATES) {
 
     test("has no accessibility violations (axe-core)", async ({ page }) => {
       await goToSignInTextsSection(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+const CLUB_SOCIAL_LINKS_STATES = inClubSection("social", [
+  { name: "club-redes-vacia" },
+  { name: "club-redes-vacia-es", beforeVisit: chooseSpanish },
+  { name: "club-redes-seis", socialLinks: ALL_STUBBED_SOCIAL_LINKS },
+  {
+    name: "club-redes-seis-es",
+    socialLinks: ALL_STUBBED_SOCIAL_LINKS,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "club-redes-error",
+    prepare: pasteLinkOfAnotherNetwork({
+      submit: ENGLISH_SAVE_SETTINGS,
+      issue: "Paste a link to instagram.com.",
+    }),
+  },
+  {
+    name: "club-redes-error-es",
+    beforeVisit: chooseSpanish,
+    prepare: pasteLinkOfAnotherNetwork({
+      submit: SPANISH_SAVE_SETTINGS,
+      issue: "Pega un enlace de instagram.com.",
+    }),
+  },
+]);
+
+async function goToSocialLinksSection(
+  page: Page,
+  state: ClubSettingsState,
+  theme?: (typeof themes)[number],
+): Promise<Locator> {
+  await goToClubSettings(page, state, theme);
+  const section = socialLinksSection(page);
+  await expect(section.getByRole("textbox").first()).toBeVisible();
+  return section;
+}
+
+/* Como los textos de entrada, la sección se fotografía sola, sin la barra
+   de pestañas del móvil encima. */
+for (const state of CLUB_SOCIAL_LINKS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              const section = await goToSocialLinksSection(page, state, theme);
+              await page.addStyleTag({ content: HIDDEN_TAB_BAR_STYLE });
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                section.screenshot(SCREENSHOT_OPTIONS),
+              );
+              await expect(section).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToSocialLinksSection(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToSocialLinksSection(page, state);
       await expectNoAxeViolations(page);
     });
   });

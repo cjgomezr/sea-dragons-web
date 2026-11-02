@@ -2,6 +2,7 @@ import type { Translator } from "@/lib/i18n/translator";
 import type { ClubSettings } from "./club-settings";
 import type { ManagedPositions } from "./manage-club-positions";
 import type { SignInTexts, SignInTextsInLocale } from "./sign-in-texts";
+import { SOCIAL_NETWORKS, type SocialLinks } from "./social-links";
 
 /**
  * Los resúmenes de una línea de la lista de la configuración en el móvil
@@ -63,6 +64,20 @@ export function summarizeSignInTexts(
       source: describeSignInSource(translate, texts.es),
     }),
   ].join(PART_SEPARATOR);
+}
+
+/** Las redes que el club tiene puestas, en el orden de la sección. */
+export function summarizeSocialLinks(
+  translate: Translator,
+  links: SocialLinks,
+): string {
+  const networks = SOCIAL_NETWORKS.filter((network) => links[network] !== null);
+  if (networks.length === 0) {
+    return translate("clubSettings.summary.social.none");
+  }
+  return networks
+    .map((network) => translate(`clubSettings.socialLinks.network.${network}`))
+    .join(LIST_SEPARATOR);
 }
 
 /** Cuántas activas y, si las hay, cuántas archivadas. */

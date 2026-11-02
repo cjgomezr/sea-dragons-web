@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClubSettingsScreen } from "@/components/club/ClubSettingsScreen";
 import type { ClubSettings } from "@/lib/club/club-settings";
 import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
+import { NO_SOCIAL_LINKS } from "@/lib/club/social-links";
 import { visit } from "../../support/location-search-params";
 import { stubScreenWidth } from "../../support/screen-width";
 
@@ -17,6 +18,7 @@ const SETTINGS_PATH = "/api/v1/club/settings";
 const LOGO_PATH = "/api/v1/club/settings/logo";
 const POSITIONS_PATH = "/api/v1/club/settings/positions";
 const SIGN_IN_TEXTS_PATH = `${SETTINGS_PATH}/sign-in-texts`;
+const SOCIAL_LINKS_PATH = `${SETTINGS_PATH}/social-links`;
 const SESSION_PACKS_PATH = "/api/v1/club/session-packs";
 const SESSION_PACKS = {
   packs: [5, 10].map((sessions) => ({
@@ -71,6 +73,10 @@ function stubApi(options: {
       // La de los textos de entrada (#301) también: aquí sin ninguno.
       if (url === SIGN_IN_TEXTS_PATH) {
         return jsonResponse(200, { data: NO_SIGN_IN_TEXTS });
+      }
+      // La de las redes (#963) también: aquí sin ninguna.
+      if (url === SOCIAL_LINKS_PATH) {
+        return jsonResponse(200, { data: NO_SOCIAL_LINKS });
       }
       // La de los packs de sesiones (#469) también: aquí los de inicio.
       if (url === SESSION_PACKS_PATH) {

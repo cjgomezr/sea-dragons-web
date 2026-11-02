@@ -9,6 +9,7 @@ import {
 } from "@/lib/club/accent-color";
 import type { ClubSettings } from "@/lib/club/club-settings";
 import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
+import { NO_SOCIAL_LINKS } from "@/lib/club/social-links";
 import { visit } from "../../support/location-search-params";
 import { stubScreenWidth } from "../../support/screen-width";
 
@@ -22,6 +23,7 @@ const SETTINGS_PATH = "/api/v1/club/settings";
 const LOGO_PATH = `${SETTINGS_PATH}/logo`;
 const POSITIONS_PATH = `${SETTINGS_PATH}/positions`;
 const SIGN_IN_TEXTS_PATH = `${SETTINGS_PATH}/sign-in-texts`;
+const SOCIAL_LINKS_PATH = `${SETTINGS_PATH}/social-links`;
 const SESSION_PACKS_PATH = "/api/v1/club/session-packs";
 const NEW_LOGO_URL = "https://storage.example.test/club-logos/club/nuevo.png";
 
@@ -57,6 +59,10 @@ function stubApi(settings: ClubSettings = STORED): void {
       }
       if (url === SIGN_IN_TEXTS_PATH) {
         return jsonResponse(200, { data: NO_SIGN_IN_TEXTS });
+      }
+      // La de las redes (#963) también: aquí sin ninguna.
+      if (url === SOCIAL_LINKS_PATH) {
+        return jsonResponse(200, { data: NO_SOCIAL_LINKS });
       }
       if (url === SESSION_PACKS_PATH) {
         return jsonResponse(200, {

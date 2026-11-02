@@ -26,6 +26,7 @@ import {
   clubSettingsTabId,
 } from "./ClubSettingsTabs";
 import { ClubSignInTextsSection } from "./ClubSignInTextsSection";
+import { ClubSocialLinksSection } from "./ClubSocialLinksSection";
 import { useClubSettingsSection } from "./use-club-settings-section";
 import { useConfirmLeaving } from "./use-confirm-leaving";
 
@@ -37,7 +38,8 @@ import { useConfirmLeaving } from "./use-confirm-leaving";
  * sesiones (#469, FR-080), que es lo único que la matriz le deja cambiar,
  * sin pestañas ni lista (D8).
  *
- * General, Inicio de sesión y Packs juntan un borrador (#719, D10 y D11):
+ * General, Inicio de sesión, Redes (#963) y Packs juntan un borrador (#719,
+ * D10 y D11):
  * su pestaña o su fila lo marca, y salir de la página con él pregunta.
  *
  * La frontera ya mandó al panel a quien no es ninguno de los dos; si alguien
@@ -80,6 +82,7 @@ function useDraftSections(): readonly [
     return {
       general: reportFor("general"),
       "sign-in": reportFor("sign-in"),
+      social: reportFor("social"),
       packs: reportFor("packs"),
     };
   }, []);
@@ -172,6 +175,13 @@ function SectionContent({
           translate={translate}
           club={club}
           onHasDraftChange={reporters["sign-in"]}
+        />
+      );
+    case "social":
+      return (
+        <ClubSocialLinksSection
+          translate={translate}
+          onHasDraftChange={reporters.social}
         />
       );
     case "positions":

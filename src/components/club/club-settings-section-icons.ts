@@ -1,5 +1,6 @@
 import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types";
 import { IdentificationCard } from "@phosphor-icons/react/dist/ssr/IdentificationCard";
+import { ShareNetwork } from "@phosphor-icons/react/dist/ssr/ShareNetwork";
 import { SignIn } from "@phosphor-icons/react/dist/ssr/SignIn";
 import { SoccerBall } from "@phosphor-icons/react/dist/ssr/SoccerBall";
 import { Ticket } from "@phosphor-icons/react/dist/ssr/Ticket";
@@ -13,6 +14,7 @@ export const CLUB_SETTINGS_SECTION_ICONS: Readonly<
 > = {
   general: IdentificationCard,
   "sign-in": SignIn,
+  social: ShareNetwork,
   positions: SoccerBall,
   packs: Ticket,
 };

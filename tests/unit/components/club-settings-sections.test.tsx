@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClubSettingsScreen } from "@/components/club/ClubSettingsScreen";
 import type { ClubSettings } from "@/lib/club/club-settings";
+import { NO_SOCIAL_LINKS } from "@/lib/club/social-links";
 import type { Locale } from "@/lib/i18n/locale";
 import { visit } from "../../support/location-search-params";
 import { stubScreenWidth } from "../../support/screen-width";
@@ -28,6 +29,7 @@ vi.mock("next/navigation", async () => ({
 const SETTINGS_PATH = "/api/v1/club/settings";
 const POSITIONS_PATH = `${SETTINGS_PATH}/positions`;
 const SIGN_IN_TEXTS_PATH = `${SETTINGS_PATH}/sign-in-texts`;
+const SOCIAL_LINKS_PATH = `${SETTINGS_PATH}/social-links`;
 const SESSION_PACKS_PATH = "/api/v1/club/session-packs";
 
 const CLUB = {
@@ -73,7 +75,13 @@ const SESSION_PACKS = {
   sessionPrice: { amountCents: null, reason: "not_configured" },
 };
 
-const TAB_NAMES = ["General", "Sign-in page", "Positions", "Session packs"];
+const TAB_NAMES = [
+  "General",
+  "Sign-in page",
+  "Social links",
+  "Positions",
+  "Session packs",
+];
 
 type FailingPath = typeof SETTINGS_PATH | typeof POSITIONS_PATH;
 
@@ -88,6 +96,7 @@ const PAYLOADS: Readonly<Record<string, unknown>> = {
   [SETTINGS_PATH]: SETTINGS,
   [POSITIONS_PATH]: { positions: POSITIONS },
   [SIGN_IN_TEXTS_PATH]: SIGN_IN_TEXTS,
+  [SOCIAL_LINKS_PATH]: NO_SOCIAL_LINKS,
   [SESSION_PACKS_PATH]: SESSION_PACKS,
 };
 
@@ -143,7 +152,7 @@ afterEach(() => {
 describe("las pestañas de un Admin en escritorio", () => {
   beforeEach(() => stubScreenWidth(false));
 
-  it("enseña el título, la entrada y las cuatro pestañas, y abre en General", async () => {
+  it("enseña el título, la entrada y las cinco pestañas, y abre en General", async () => {
     renderScreen();
 
     expect(
@@ -216,6 +225,17 @@ describe("las pestañas de un Admin en escritorio", () => {
     ).toBeVisible();
   });
 
+  it("?tab=social abre Redes (#963)", async () => {
+    visit("/club?tab=social");
+
+    renderScreen();
+
+    expect(tab("Social links")).toHaveAttribute("aria-selected", "true");
+    expect(
+      await screen.findByRole("textbox", { name: "Instagram" }),
+    ).toBeVisible();
+  });
+
   it("con un tab que no existe abre General", async () => {
     visit("/club?tab=billing");
 
@@ -256,6 +276,7 @@ describe("las pestañas de un Admin en escritorio", () => {
     expect(tabs.map((item) => item.textContent)).toEqual([
       "General",
       "Página de inicio de sesión",
+      "Redes",
       "Posiciones",
       "Packs de sesiones",
     ]);
@@ -331,6 +352,19 @@ describe("una sección que falla al cargar", () => {
 });
 
 describe("el Committee", () => {
+  it("con ?tab=social ve Packs y no las redes (#963)", async () => {
+    stubScreenWidth(false);
+    visit("/club?tab=social");
+
+    renderScreen({ canManageClub: false });
+
+    expect(
+      await screen.findByRole("region", { name: "Session packs" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("textbox", { name: "Instagram" })).toBeNull();
+    expect(requested).not.toContain(SOCIAL_LINKS_PATH);
+  });
+
   it.each([false, true])(
     "ve Packs sin pestañas y sin pedir lo del Admin (móvil: %s)",
     async (isPhone) => {
@@ -359,7 +393,7 @@ describe("la lista de un Admin en el móvil", () => {
     return screen.getByRole("button", { name: new RegExp(`^${name}`) });
   }
 
-  it("enseña la cabecera, la fila del club y las cuatro secciones", () => {
+  it("enseña la cabecera, la fila del club y las cinco secciones", () => {
     renderScreen();
 
     expect(
@@ -383,6 +417,7 @@ describe("la lista de un Admin en el móvil", () => {
     expect(
       await screen.findByText("English: app text · Español: custom"),
     ).toBeVisible();
+    expect(await screen.findByText("No links yet")).toBeVisible();
     expect(await screen.findByText("6 positions · 1 archived")).toBeVisible();
     expect(
       await screen.findByText("4 packs · 5, 10, 20, 8 sessions"),
@@ -398,6 +433,7 @@ describe("la lista de un Admin en el móvil", () => {
     expect(
       await screen.findByText("Inglés: texto de la app · Español: propio"),
     ).toBeVisible();
+    expect(await screen.findByText("Sin enlaces todavía")).toBeVisible();
     expect(await screen.findByText("6 posiciones · 1 archivada")).toBeVisible();
     expect(
       await screen.findByText("4 packs · 5, 10, 20, 8 sesiones"),

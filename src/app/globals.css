@@ -12332,6 +12332,21 @@ a.groups-icon-button {
   }
 }
 
+/* Las redes del club (#963, RF-1 del PRD de E37): un campo por red, en la
+   columna de 640px. El icono de la red va delante de su nombre, al tamaño
+   del texto, para reconocer la red sin leerla. */
+.club-social-links .auth-field label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.club-social-links .auth-field label svg {
+  flex: none;
+  font-size: 16px;
+  color: var(--color-text);
+}
+
 /* Noticias (#329, rehecho en #594). El feed sigue el handoff de E22
    (docs/design/design_handoff_news/README.md, "Feed (#2a)"): una tarjeta
    destacada arriba y debajo la lista con miniaturas. */

@@ -222,8 +222,9 @@ describe("GET/PUT /api/v1/club/settings/social-links", () => {
     });
 
     it("responde 400 a un cuerpo sin una de las redes", async () => {
-      const withoutWebsite: Partial<SocialLinks> = { ...CLUB_LINKS };
-      delete withoutWebsite.website;
+      const withoutWebsite = Object.fromEntries(
+        Object.entries(CLUB_LINKS).filter(([network]) => network !== "website"),
+      );
 
       const response = await putLinks(withoutWebsite);
 

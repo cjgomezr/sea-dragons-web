@@ -1,6 +1,7 @@
 /**
  * Las secciones de la configuración del club (#718, D9 del PRD de E26) y
- * cómo van en la dirección: `/club?tab=general|sign-in|positions|packs`.
+ * cómo van en la dirección: `/club?tab=general|sign-in|social|positions|packs`.
+ * Redes (`social`) llegó con #963.
  *
  * Un `tab` que no existe es como si no estuviera, y qué pinta entonces lo
  * decide la pantalla: en escritorio General, en el móvil la lista. El
@@ -11,6 +12,7 @@
 export const CLUB_SETTINGS_SECTIONS = [
   "general",
   "sign-in",
+  "social",
   "positions",
   "packs",
 ] as const;
