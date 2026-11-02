@@ -361,6 +361,11 @@ export const CLUB_LOGO_API_PATH = `${CLUB_SETTINGS_API_PATH}/logo`;
  * `RESTRICTED_ROUTES`, como las posiciones. */
 export const CLUB_SIGN_IN_TEXTS_API_PATH = `${CLUB_SETTINGS_API_PATH}/sign-in-texts`;
 
+/** Las redes del club (#963, RF-1 del PRD de E37). Leerlas es público
+ * (`PUBLIC_READ_API_PATHS`): la pantalla de entrar las enseñará. Cambiarlas
+ * cuelga de la configuración, así que es sólo del Admin. */
+export const CLUB_SOCIAL_LINKS_API_PATH = `${CLUB_SETTINGS_API_PATH}/social-links`;
+
 /** Las posiciones del club tal como las administra el Admin (#300): todas,
  * archivadas incluidas. GET las lista y POST crea una. Cuelga de la
  * configuración, así que ya es sólo del Admin; se declara igual en
@@ -793,6 +798,16 @@ export const PUBLIC_API_PATHS: readonly string[] = [
   STRIPE_WEBHOOK_API_PATH,
 ];
 
+/**
+ * Los endpoints que se leen sin sesión pero se escriben con ella (#963). Sólo
+ * la lectura (GET o HEAD) de justo esa ruta es pública; cualquier otro método
+ * pasa por las reglas de siempre, `RESTRICTED_ROUTES` incluida. Se comparan
+ * por igualdad, como `PUBLIC_API_PATHS`.
+ */
+export const PUBLIC_READ_API_PATHS: readonly string[] = [
+  CLUB_SOCIAL_LINKS_API_PATH,
+];
+
 export const API_V1_PREFIX = "/api/v1";
 
 /** Una ruta que sólo alcanza el rol que tiene la capacidad de la matriz. */
@@ -855,6 +870,8 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
     capability: "manageUsersAndRoles",
   },
   { path: CLUB_SIGN_IN_TEXTS_API_PATH, capability: "manageUsersAndRoles" },
+  // Se lee sin sesión (`PUBLIC_READ_API_PATHS`); escribirla es del Admin.
+  { path: CLUB_SOCIAL_LINKS_API_PATH, capability: "manageUsersAndRoles" },
   // Sólo los pide el alta de un socio, que es de usuarios y roles.
   {
     path: CLUB_COMMON_COUNTRIES_API_PATH,

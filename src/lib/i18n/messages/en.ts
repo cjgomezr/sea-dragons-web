@@ -2147,6 +2147,7 @@ export const englishMessages = {
   "clubSettings.sections.label": "Club settings sections",
   "clubSettings.sections.general": "General",
   "clubSettings.sections.sign-in": "Sign-in page",
+  "clubSettings.sections.social": "Social links",
   "clubSettings.sections.positions": "Positions",
   "clubSettings.sections.packs": "Session packs",
   "clubSettings.list.adminsOnly": "Only Admins see this.",
@@ -2154,6 +2155,7 @@ export const englishMessages = {
   "clubSettings.list.backToList": "Settings",
   "clubSettings.draft.unsaved.general": "Unsaved changes to the club details",
   "clubSettings.draft.unsaved.sign-in": "Unsaved changes to the sign-in page",
+  "clubSettings.draft.unsaved.social": "Unsaved changes to social links",
   "clubSettings.draft.unsaved.packs": "Unsaved changes to session packs",
   "clubSettings.draft.discard": "Discard",
   "clubSettings.draft.save": "Save changes",
@@ -2170,6 +2172,7 @@ export const englishMessages = {
   "clubSettings.summary.signIn.spanish": "Español",
   "clubSettings.summary.signIn.appText": "app text",
   "clubSettings.summary.signIn.custom": "custom",
+  "clubSettings.summary.social.none": "No links yet",
   "clubSettings.summary.positions.active": {
     one: "{count} position",
     other: "{count} positions",
@@ -2269,6 +2272,27 @@ export const englishMessages = {
     "The headline can have at most {max} characters.",
   "clubSettings.signInTexts.issue.welcomeTooLong":
     "The welcome paragraph can have at most {max} characters.",
+  "clubSettings.socialLinks.title": "Social links",
+  "clubSettings.socialLinks.lead":
+    "Paste one link for each network the club uses. Leave a field empty to remove that network.",
+  "clubSettings.socialLinks.loading": "Loading the social links…",
+  "clubSettings.socialLinks.network.instagram": "Instagram",
+  "clubSettings.socialLinks.network.tiktok": "TikTok",
+  "clubSettings.socialLinks.network.youtube": "YouTube",
+  "clubSettings.socialLinks.network.facebook": "Facebook",
+  "clubSettings.socialLinks.network.whatsapp": "WhatsApp",
+  "clubSettings.socialLinks.network.website": "Website",
+  "clubSettings.socialLinks.whatsappHelp":
+    "Anyone who opens the sign-in page will see this number.",
+  "clubSettings.socialLinks.issue.too_long":
+    "A link can have at most {max} characters.",
+  "clubSettings.socialLinks.issue.not_https":
+    "Paste a link that starts with https://.",
+  "clubSettings.socialLinks.issue.not_a_link":
+    "This isn't a link. Copy it again from your browser's address bar.",
+  "clubSettings.socialLinks.issue.wrong_domain": "Paste a link to {domain}.",
+  "clubSettings.socialLinks.issue.whatsapp_group":
+    "Group invite links aren't allowed here: anyone could join. Use a wa.me number or a channel.",
   "clubSettings.sessionPacks.title": "Session packs",
   "clubSettings.sessionPacks.lead":
     "Bundles Casual members can buy. Each pack costs the Casual session price × sessions (now {price} per session in Stripe).",

@@ -4,6 +4,7 @@ import {
   summarizePositions,
   summarizeSessionPacks,
   summarizeSignInTexts,
+  summarizeSocialLinks,
 } from "@/lib/club/club-settings-summaries";
 import type { ClubSettings } from "@/lib/club/club-settings";
 import type {
@@ -11,6 +12,7 @@ import type {
   ManagedPositions,
 } from "@/lib/club/manage-club-positions";
 import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
+import { NO_SOCIAL_LINKS } from "@/lib/club/social-links";
 import { createTranslator } from "@/lib/i18n/translator";
 
 /**
@@ -158,5 +160,21 @@ describe("el resumen de los packs", () => {
 
   it("sin packs lo dice", () => {
     expect(summarizeSessionPacks(spanish, [])).toBe("Sin packs");
+  });
+});
+
+describe("summarizeSocialLinks", () => {
+  it("nombra las redes puestas, en su orden", () => {
+    expect(
+      summarizeSocialLinks(spanish, {
+        ...NO_SOCIAL_LINKS,
+        website: "https://seadragons.example",
+        instagram: "https://instagram.com/seadragons",
+      }),
+    ).toBe("Instagram, Web del club");
+  });
+
+  it("sin redes lo dice", () => {
+    expect(summarizeSocialLinks(english, NO_SOCIAL_LINKS)).toBe("No links yet");
   });
 });

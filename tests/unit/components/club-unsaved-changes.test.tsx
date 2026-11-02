@@ -5,6 +5,7 @@ import { ClubSettingsScreen } from "@/components/club/ClubSettingsScreen";
 import { SAVED_NOTICE_DURATION_MS } from "@/components/club/use-club-draft";
 import type { ClubSettings } from "@/lib/club/club-settings";
 import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
+import { NO_SOCIAL_LINKS } from "@/lib/club/social-links";
 import { visit } from "../../support/location-search-params";
 import { stubScreenWidth } from "../../support/screen-width";
 
@@ -18,6 +19,7 @@ import { stubScreenWidth } from "../../support/screen-width";
 const SETTINGS_PATH = "/api/v1/club/settings";
 const POSITIONS_PATH = `${SETTINGS_PATH}/positions`;
 const SIGN_IN_TEXTS_PATH = `${SETTINGS_PATH}/sign-in-texts`;
+const SOCIAL_LINKS_PATH = `${SETTINGS_PATH}/social-links`;
 const SESSION_PACKS_PATH = "/api/v1/club/session-packs";
 const NO_PRICE = { amountCents: null, reason: "not_configured" } as const;
 
@@ -106,6 +108,8 @@ function respondToRead(url: string): Response {
       return jsonResponse(200, { data: { positions: [] } });
     case SIGN_IN_TEXTS_PATH:
       return jsonResponse(200, { data: NO_SIGN_IN_TEXTS });
+    case SOCIAL_LINKS_PATH:
+      return jsonResponse(200, { data: NO_SOCIAL_LINKS });
     case SESSION_PACKS_PATH:
       return packsCatalog([5, 10]);
     default:
@@ -528,6 +532,23 @@ describe("salir con un borrador", () => {
     await renderScreen();
 
     expect(dispatchBeforeUnload().defaultPrevented).toBe(false);
+  });
+
+  it("marca Redes y pide confirmación con un enlace sin guardar (#963)", async () => {
+    stubApi();
+    await renderScreen();
+    await openTab(/^Social links/);
+
+    await userEvent.type(
+      await screen.findByRole("textbox", { name: "Instagram" }),
+      "https://instagram.com/seadragons",
+    );
+
+    expect(queryBar("Unsaved changes to social links")).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "Social links Unsaved" }),
+    ).toBeInTheDocument();
+    expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
   });
 
   it("pide confirmación al cerrar o recargar con borrador", async () => {

@@ -10383,7 +10383,11 @@ a.groups-icon-button {
   border-bottom: 1px solid var(--color-border);
 }
 
+/* `relative`: el "Sin guardar" escondido es absoluto y, sin ancestro
+   posicionado, se escapa del desplazamiento de la barra y ensancha la página
+   en tableta cuando la pestaña con borrador queda fuera de la vista. */
 .club-settings-tab {
+  position: relative;
   display: inline-flex;
   flex: none;
   gap: var(--space-2);
@@ -12330,6 +12334,21 @@ a.groups-icon-button {
   .club-sign-in-intro .segmented-choice {
     flex: none;
   }
+}
+
+/* Las redes del club (#963, RF-1 del PRD de E37): un campo por red, en la
+   columna de 640px. El icono de la red va delante de su nombre, al tamaño
+   del texto, para reconocer la red sin leerla. */
+.club-social-links .auth-field label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.club-social-links .auth-field label svg {
+  flex: none;
+  font-size: 16px;
+  color: var(--color-text);
 }
 
 /* Noticias (#329, rehecho en #594). El feed sigue el handoff de E22

@@ -2142,6 +2142,7 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.sections.label": "Secciones de la configuración",
   "clubSettings.sections.general": "General",
   "clubSettings.sections.sign-in": "Página de inicio de sesión",
+  "clubSettings.sections.social": "Redes",
   "clubSettings.sections.positions": "Posiciones",
   "clubSettings.sections.packs": "Packs de sesiones",
   "clubSettings.list.adminsOnly": "Solo los Admin ven esto.",
@@ -2151,6 +2152,7 @@ export const spanishMessages: MessageCatalog = {
     "Cambios sin guardar en los datos del club",
   "clubSettings.draft.unsaved.sign-in":
     "Cambios sin guardar en la página de inicio de sesión",
+  "clubSettings.draft.unsaved.social": "Cambios sin guardar en las redes",
   "clubSettings.draft.unsaved.packs": "Cambios sin guardar en los packs",
   "clubSettings.draft.discard": "Descartar",
   "clubSettings.draft.save": "Guardar cambios",
@@ -2167,6 +2169,7 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.summary.signIn.spanish": "Español",
   "clubSettings.summary.signIn.appText": "texto de la app",
   "clubSettings.summary.signIn.custom": "propio",
+  "clubSettings.summary.social.none": "Sin enlaces todavía",
   "clubSettings.summary.positions.active": {
     one: "{count} posición",
     other: "{count} posiciones",
@@ -2266,6 +2269,27 @@ export const spanishMessages: MessageCatalog = {
     "El titular puede tener como mucho {max} caracteres.",
   "clubSettings.signInTexts.issue.welcomeTooLong":
     "El párrafo de bienvenida puede tener como mucho {max} caracteres.",
+  "clubSettings.socialLinks.title": "Redes",
+  "clubSettings.socialLinks.lead":
+    "Pega un enlace por cada red que usa el club. Deja un campo vacío para quitar esa red.",
+  "clubSettings.socialLinks.loading": "Cargando las redes…",
+  "clubSettings.socialLinks.network.instagram": "Instagram",
+  "clubSettings.socialLinks.network.tiktok": "TikTok",
+  "clubSettings.socialLinks.network.youtube": "YouTube",
+  "clubSettings.socialLinks.network.facebook": "Facebook",
+  "clubSettings.socialLinks.network.whatsapp": "WhatsApp",
+  "clubSettings.socialLinks.network.website": "Web del club",
+  "clubSettings.socialLinks.whatsappHelp":
+    "Cualquiera que abra la página de inicio de sesión verá este número.",
+  "clubSettings.socialLinks.issue.too_long":
+    "Un enlace puede tener como mucho {max} caracteres.",
+  "clubSettings.socialLinks.issue.not_https":
+    "Pega un enlace que empiece por https://.",
+  "clubSettings.socialLinks.issue.not_a_link":
+    "Esto no es un enlace. Cópialo otra vez de la barra de direcciones del navegador.",
+  "clubSettings.socialLinks.issue.wrong_domain": "Pega un enlace de {domain}.",
+  "clubSettings.socialLinks.issue.whatsapp_group":
+    "Aquí no valen los enlaces de invitación a un grupo: cualquiera podría entrar. Usa un número de wa.me o un canal.",
   "clubSettings.sessionPacks.title": "Packs de sesiones",
   "clubSettings.sessionPacks.lead":
     "Paquetes que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual × sesiones (ahora {price} por sesión en Stripe).",

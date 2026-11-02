@@ -18,19 +18,22 @@ import {
   summarizePositions,
   summarizeSessionPacks,
   summarizeSignInTexts,
+  summarizeSocialLinks,
 } from "@/lib/club/club-settings-summaries";
 import type { ManagedPositions } from "@/lib/club/manage-club-positions";
 import type { SignInTexts } from "@/lib/club/sign-in-texts";
+import type { SocialLinks } from "@/lib/club/social-links";
 import type { Translator } from "@/lib/i18n/translator";
 import { loadManagedPositions } from "./club-positions-admin-client";
 import { loadSessionPacks } from "./club-session-packs-client";
 import { loadClubSettings } from "./club-settings-client";
 import { loadSignInTexts } from "./club-sign-in-texts-client";
+import { loadSocialLinks } from "./club-social-links-client";
 import { CLUB_SETTINGS_SECTION_ICONS } from "./club-settings-section-icons";
 
 /**
  * La configuración del club en el móvil sin sección abierta (#718, #3a del
- * handoff de E26): la fila del club y una tarjeta con las cuatro secciones,
+ * handoff de E26): la fila del club y una tarjeta con las secciones,
  * cada una con un resumen de lo que tiene guardado. Tocar una la abre. Una
  * con borrador dice "● Sin guardar" junto a su título (#719).
  */
@@ -41,6 +44,7 @@ export type ClubIdentity = Pick<ClubBrand, "name" | "initials" | "logoUrl">;
 type ListData = {
   readonly settings: ClubSettings | null;
   readonly signInTexts: SignInTexts | null;
+  readonly socialLinks: SocialLinks | null;
   readonly positions: ManagedPositions | null;
   readonly packSizes: readonly number[] | null;
 };
@@ -48,11 +52,12 @@ type ListData = {
 const NO_LIST_DATA: ListData = {
   settings: null,
   signInTexts: null,
+  socialLinks: null,
   positions: null,
   packSizes: null,
 };
 
-/** Pide lo de las cuatro secciones a la vez, cada una por su lado. Una que
+/** Pide lo de todas las secciones a la vez, cada una por su lado. Una que
  * falla se queda sin resumen y nada más: su error lo enseña la sección al
  * abrirla, que es donde se puede reintentar. */
 function useListData(): ListData {
@@ -69,6 +74,9 @@ function useListData(): ListData {
     });
     void loadSignInTexts().then((read) => {
       if (read.kind === "loaded") keep({ signInTexts: read.texts });
+    });
+    void loadSocialLinks().then((read) => {
+      if (read.kind === "loaded") keep({ socialLinks: read.links });
     });
     void loadManagedPositions().then((read) => {
       if (read.kind === "loaded") keep({ positions: read.positions });
@@ -97,6 +105,10 @@ function summarizeSection(
       return data.signInTexts === null
         ? null
         : summarizeSignInTexts(translate, data.signInTexts);
+    case "social":
+      return data.socialLinks === null
+        ? null
+        : summarizeSocialLinks(translate, data.socialLinks);
     case "positions":
       return data.positions === null
         ? null
