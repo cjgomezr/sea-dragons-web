@@ -47,6 +47,10 @@ export const AUDIT_ACTIONS = [
   // metadata nombra los que cambiaron (`{ fields: ["es.tagline"] }`), nunca
   // el texto. La entidad es el id del club.
   "club.sign_in_texts_changed",
+  // RF-1 de E37 (#963): un Admin cambia las redes del club. La metadata
+  // nombra las redes que cambiaron (`{ networks: ["instagram"] }`), nunca el
+  // enlace. La entidad es el id del club.
+  "club.social_links_changed",
   // RF-4 de E13 (#469): un Admin o un Committee cambia los packs de sesiones
   // que se ofrecen. La entidad es el id del club y la metadata lleva los
   // tamaños en el orden nuevo (`{ sessions: [5, 10] }`).

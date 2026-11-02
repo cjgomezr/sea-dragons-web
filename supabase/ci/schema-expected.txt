@@ -34,6 +34,9 @@ columna club_sign_in_texts.club_id tipo=uuid null=NO default=-
 columna club_sign_in_texts.locale tipo=text null=NO default=-
 columna club_sign_in_texts.tagline tipo=text null=YES default=-
 columna club_sign_in_texts.welcome tipo=text null=YES default=-
+columna club_social_links.club_id tipo=uuid null=NO default=-
+columna club_social_links.network tipo=text null=NO default=-
+columna club_social_links.url tipo=text null=NO default=-
 columna clubs.accent_color tipo=text null=NO default='#1c6ea4'::text
 columna clubs.created_at tipo=timestamp with time zone null=NO default=now()
 columna clubs.id tipo=uuid null=NO default=gen_random_uuid()
@@ -554,6 +557,22 @@ grant club_sign_in_texts service_role SELECT
 grant club_sign_in_texts service_role TRIGGER
 grant club_sign_in_texts service_role TRUNCATE
 grant club_sign_in_texts service_role UPDATE
+grant club_social_links anon SELECT
+grant club_social_links authenticated SELECT
+grant club_social_links postgres DELETE
+grant club_social_links postgres INSERT
+grant club_social_links postgres REFERENCES
+grant club_social_links postgres SELECT
+grant club_social_links postgres TRIGGER
+grant club_social_links postgres TRUNCATE
+grant club_social_links postgres UPDATE
+grant club_social_links service_role DELETE
+grant club_social_links service_role INSERT
+grant club_social_links service_role REFERENCES
+grant club_social_links service_role SELECT
+grant club_social_links service_role TRIGGER
+grant club_social_links service_role TRUNCATE
+grant club_social_links service_role UPDATE
 grant clubs authenticated SELECT
 grant clubs postgres DELETE
 grant clubs postgres INSERT
@@ -1141,6 +1160,7 @@ indice club_session_pack_options_club_id_position_key CREATE UNIQUE INDEX club_s
 indice club_session_pack_options_club_id_sessions_key CREATE UNIQUE INDEX club_session_pack_options_club_id_sessions_key ON public.club_session_pack_options USING btree (club_id, sessions)
 indice club_session_pack_options_pkey CREATE UNIQUE INDEX club_session_pack_options_pkey ON public.club_session_pack_options USING btree (id)
 indice club_sign_in_texts_pkey CREATE UNIQUE INDEX club_sign_in_texts_pkey ON public.club_sign_in_texts USING btree (club_id, locale)
+indice club_social_links_pkey CREATE UNIQUE INDEX club_social_links_pkey ON public.club_social_links USING btree (club_id, network)
 indice clubs_pkey CREATE UNIQUE INDEX clubs_pkey ON public.clubs USING btree (id)
 indice clubs_slug_key CREATE UNIQUE INDEX clubs_slug_key ON public.clubs USING btree (slug)
 indice confirmation_email_requests_email_hash_requested_at_idx CREATE INDEX confirmation_email_requests_email_hash_requested_at_idx ON public.confirmation_email_requests USING btree (email_hash, requested_at DESC)
@@ -1279,6 +1299,7 @@ policy club_session_pack_options.club_session_pack_options_select_own_club cmd=S
    FROM members m
   WHERE ((m.user_id = ( SELECT auth.uid() AS uid)) AND (m.account_status = 'active'::text)))) check=-
 policy club_sign_in_texts.club_sign_in_texts_select_public cmd=SELECT roles={anon,authenticated} using=true check=-
+policy club_social_links.club_social_links_select_public cmd=SELECT roles={anon,authenticated} using=true check=-
 policy clubs.clubs_select_anon cmd=SELECT roles={anon} using=true check=-
 policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
 policy confirmation_email_requests.confirmation_email_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
@@ -1381,6 +1402,10 @@ restriccion club_sign_in_texts.club_sign_in_texts_locale_check CHECK ((locale = 
 restriccion club_sign_in_texts.club_sign_in_texts_pkey PRIMARY KEY (club_id, locale)
 restriccion club_sign_in_texts.club_sign_in_texts_tagline_length CHECK (((char_length(btrim(tagline)) >= 1) AND (char_length(btrim(tagline)) <= 140)))
 restriccion club_sign_in_texts.club_sign_in_texts_welcome_length CHECK (((char_length(btrim(welcome)) >= 1) AND (char_length(btrim(welcome)) <= 320)))
+restriccion club_social_links.club_social_links_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+restriccion club_social_links.club_social_links_network_check CHECK ((network = ANY (ARRAY['instagram'::text, 'tiktok'::text, 'youtube'::text, 'facebook'::text, 'whatsapp'::text, 'website'::text])))
+restriccion club_social_links.club_social_links_pkey PRIMARY KEY (club_id, network)
+restriccion club_social_links.club_social_links_url_length CHECK (((char_length(btrim(url)) >= 1) AND (char_length(btrim(url)) <= 300)))
 restriccion clubs.clubs_accent_color_hex CHECK ((accent_color ~ '^#[0-9A-Fa-f]{6}$'::text))
 restriccion clubs.clubs_initials_length CHECK (((char_length(initials) >= 1) AND (char_length(initials) <= 3)))
 restriccion clubs.clubs_name_length CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 60)))
@@ -1674,6 +1699,7 @@ tabla club_position_names rls=t
 tabla club_positions rls=t
 tabla club_session_pack_options rls=t
 tabla club_sign_in_texts rls=t
+tabla club_social_links rls=t
 tabla clubs rls=t
 tabla confirmation_email_requests rls=t
 tabla directory_email_sends rls=t

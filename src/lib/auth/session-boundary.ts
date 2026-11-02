@@ -7,6 +7,7 @@ import {
   MEMBER_ONLY_ROUTES,
   PAYMENTS_PATH,
   PUBLIC_API_PATHS,
+  PUBLIC_READ_API_PATHS,
   PUBLIC_BROWSER_ASSET_PATHS,
   PUBLIC_PAGE_PATHS,
   READABLE_ROUTES,
@@ -125,6 +126,13 @@ export function isPublicPath(pathname: string): boolean {
     PUBLIC_PREFIX_PATHS.some((publicPath) =>
       isPathWithin(pathname, publicPath),
     ) || PUBLIC_API_PATHS.includes(pathname)
+  );
+}
+
+/** La lectura de un endpoint que cualquiera puede leer (#963). */
+function isPublicRead(pathname: string, method: string): boolean {
+  return (
+    READ_METHODS.includes(method) && PUBLIC_READ_API_PATHS.includes(pathname)
   );
 }
 
@@ -269,7 +277,7 @@ export function decideSessionBoundary({
   method = DEFAULT_METHOD,
   session,
 }: SessionBoundaryRequest): SessionBoundaryOutcome {
-  if (isPublicPath(pathname)) {
+  if (isPublicPath(pathname) || isPublicRead(pathname, method)) {
     return { kind: "allow" };
   }
   // El orden es el de las fronteras: sin sesión, luego cuenta incompleta, y
