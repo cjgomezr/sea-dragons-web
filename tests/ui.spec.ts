@@ -78,7 +78,10 @@ import {
 } from "@/lib/club/accent-color";
 import { memberInitials } from "@/lib/auth/member-initials";
 import { buildAccentStylesheet } from "@/lib/club/accent-stylesheet";
-import type { ClubSettingsSection } from "@/lib/club/club-settings-sections";
+import {
+  CLUB_SETTINGS_SECTIONS,
+  type ClubSettingsSection,
+} from "@/lib/club/club-settings-sections";
 import { shrinkProfilePhoto } from "@/lib/members/shrink-profile-photo";
 import {
   shrinkNewsCover,
@@ -13312,10 +13315,11 @@ const CLUB_SECTIONS_COMMITTEE = viewports.filter((vp) => vp.name !== "tablet");
 /** El alto mínimo de una fila de la lista del móvil (#3a del handoff). */
 const CLUB_LIST_ROW_MIN_HEIGHT_PX = 68;
 
-/** Las cuatro filas de la lista del móvil, con su resumen ya llegado. */
+/** Las filas de la lista del móvil, una por sección, con su resumen ya
+ * llegado. */
 async function waitForClubSettingsList(page: Page): Promise<void> {
   const summaries = page.locator(".club-settings-list-summary");
-  await expect(summaries).toHaveCount(4);
+  await expect(summaries).toHaveCount(CLUB_SETTINGS_SECTIONS.length);
   for (const summary of await summaries.all()) {
     await expect(summary).not.toBeEmpty();
   }
