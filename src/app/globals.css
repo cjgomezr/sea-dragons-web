@@ -10383,7 +10383,11 @@ a.groups-icon-button {
   border-bottom: 1px solid var(--color-border);
 }
 
+/* `relative`: el "Sin guardar" escondido es absoluto y, sin ancestro
+   posicionado, se escapa del desplazamiento de la barra y ensancha la página
+   en tableta cuando la pestaña con borrador queda fuera de la vista. */
 .club-settings-tab {
+  position: relative;
   display: inline-flex;
   flex: none;
   gap: var(--space-2);
