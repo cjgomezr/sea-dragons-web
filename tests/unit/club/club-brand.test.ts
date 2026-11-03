@@ -18,7 +18,10 @@ const STORED_ROW: ClubBrandRow = {
   accentColor: "#7b3fa0",
   logoUrl: null,
   signInTexts: NO_SIGN_IN_TEXTS,
-  socialLinks: NO_SOCIAL_LINKS,
+};
+const CLUB_SOCIAL_LINKS: SocialLinks = {
+  ...NO_SOCIAL_LINKS,
+  instagram: "https://www.instagram.com/hobartorcas",
 };
 const LOGO_URL = "https://storage.example.test/club-logos/club/logo.png";
 const TIME_TO_LIVE_MS = 60_000;
@@ -26,16 +29,22 @@ const READ_TIMEOUT_MS = 3_000;
 
 type ReaderSetup = {
   readonly fetchRow: () => Promise<ClubBrandRow>;
+  readonly fetchSocialLinks?: () => Promise<SocialLinks>;
   readonly reportFailure?: (error: unknown) => void;
 };
 
-function createReader({ fetchRow, reportFailure = vi.fn() }: ReaderSetup): {
+function createReader({
+  fetchRow,
+  fetchSocialLinks = async () => NO_SOCIAL_LINKS,
+  reportFailure = vi.fn(),
+}: ReaderSetup): {
   reader: ReturnType<typeof createCachedClubBrandReader>;
   advanceClock: (ms: number) => void;
 } {
   let nowMs = 0;
   const reader = createCachedClubBrandReader({
     fetchRow,
+    fetchSocialLinks,
     reportFailure,
     timeToLiveMs: TIME_TO_LIVE_MS,
     readTimeoutMs: READ_TIMEOUT_MS,
@@ -100,15 +109,41 @@ describe("lectura de la marca", () => {
 
   // #964: las redes del club viajan con la marca, en la misma caché.
   it("devuelve las redes que guardó el club", async () => {
-    const socialLinks: SocialLinks = {
-      ...NO_SOCIAL_LINKS,
-      instagram: "https://www.instagram.com/hobartorcas",
-    };
     const { reader } = createReader({
-      fetchRow: async () => ({ ...STORED_ROW, socialLinks }),
+      fetchRow: async () => STORED_ROW,
+      fetchSocialLinks: async () => CLUB_SOCIAL_LINKS,
     });
 
-    expect((await reader.read()).socialLinks).toEqual(socialLinks);
+    expect((await reader.read()).socialLinks).toEqual(CLUB_SOCIAL_LINKS);
+  });
+
+  it("sirve las redes de la caché, sin volver a pedirlas", async () => {
+    const fetchSocialLinks = vi.fn(async () => CLUB_SOCIAL_LINKS);
+    const { reader } = createReader({
+      fetchRow: async () => STORED_ROW,
+      fetchSocialLinks,
+    });
+
+    await reader.read();
+    await reader.read();
+
+    expect(fetchSocialLinks).toHaveBeenCalledTimes(1);
+  });
+
+  it("tras invalidar, vuelve a pedir las redes", async () => {
+    const fetchSocialLinks = vi
+      .fn<() => Promise<SocialLinks>>()
+      .mockResolvedValueOnce(NO_SOCIAL_LINKS)
+      .mockResolvedValueOnce(CLUB_SOCIAL_LINKS);
+    const { reader } = createReader({
+      fetchRow: async () => STORED_ROW,
+      fetchSocialLinks,
+    });
+
+    await reader.read();
+    reader.invalidate();
+
+    expect((await reader.read()).socialLinks).toEqual(CLUB_SOCIAL_LINKS);
   });
 
   // #301: el lema y el párrafo del inicio de sesión viajan con la marca.
@@ -201,18 +236,38 @@ describe("lectura de la marca", () => {
     expect(reportFailure).toHaveBeenCalledWith(failure);
   });
 
-  it("si leer las redes falla, devuelve la marca sin redes y registra el fallo", async () => {
+  // #964: un fallo de las redes no se lleva el nombre, el logo ni los textos.
+  it("si leer las redes falla, devuelve la marca guardada sin redes y registra el fallo", async () => {
     const failure = new Error("relation club_social_links does not exist");
     const reportFailure = vi.fn();
     const { reader } = createReader({
-      fetchRow: async () => {
+      fetchRow: async () => STORED_ROW,
+      fetchSocialLinks: async () => {
         throw failure;
       },
       reportFailure,
     });
 
-    expect((await reader.read()).socialLinks).toEqual(NO_SOCIAL_LINKS);
+    const brand = await reader.read();
+
+    expect(brand.name).toBe("Hobart Orcas");
+    expect(brand.socialLinks).toEqual(NO_SOCIAL_LINKS);
     expect(reportFailure).toHaveBeenCalledWith(failure);
+  });
+
+  it("tras un fallo de las redes, la visita siguiente vuelve a pedirlas", async () => {
+    const fetchSocialLinks = vi
+      .fn<() => Promise<SocialLinks>>()
+      .mockRejectedValueOnce(new Error("connect ECONNREFUSED"))
+      .mockResolvedValueOnce(CLUB_SOCIAL_LINKS);
+    const { reader } = createReader({
+      fetchRow: async () => STORED_ROW,
+      fetchSocialLinks,
+    });
+
+    await reader.read();
+
+    expect((await reader.read()).socialLinks).toEqual(CLUB_SOCIAL_LINKS);
   });
 
   describe("con la base colgada", () => {

@@ -33,7 +33,6 @@ export type ClubBrandRow = {
   readonly accentColor: string;
   readonly logoUrl: string | null;
   readonly signInTexts: SignInTexts;
-  readonly socialLinks: SocialLinks;
 };
 
 /** La red si la base no contesta: la marca sale en todas las pantallas, y una
@@ -59,14 +58,14 @@ export function deriveInitials(name: string): string {
     .join("");
 }
 
-function toClubBrand(row: ClubBrandRow): ClubBrand {
+function toClubBrand(row: ClubBrandRow, socialLinks: SocialLinks): ClubBrand {
   return {
     name: row.name,
     initials: row.initials ?? deriveInitials(row.name),
     accentColor: row.accentColor,
     logoUrl: row.logoUrl,
     signInTexts: row.signInTexts,
-    socialLinks: row.socialLinks,
+    socialLinks,
   };
 }
 
@@ -79,6 +78,9 @@ export type ClubBrandReader = {
 
 export type CachedClubBrandReaderOptions = {
   readonly fetchRow: () => Promise<ClubBrandRow>;
+  /** Las redes van aparte (#964): si no se pueden leer, la marca se pinta
+   * igual, sin ellas, en vez de caer entera al respaldo. */
+  readonly fetchSocialLinks: () => Promise<SocialLinks>;
   readonly reportFailure: (error: unknown) => void;
   readonly timeToLiveMs: number;
   /** Una base que no contesta no devuelve un error: deja la consulta colgada,
@@ -92,10 +94,10 @@ type CacheEntry = {
   readonly expiresAtMs: number;
 };
 
-async function fetchWithinTimeout(
-  fetchRow: () => Promise<ClubBrandRow>,
+async function fetchWithinTimeout<T>(
+  fetch: () => Promise<T>,
   timeoutMs: number,
-): Promise<ClubBrandRow> {
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expiry = new Promise<never>((_, reject) => {
     timer = setTimeout(
@@ -105,20 +107,33 @@ async function fetchWithinTimeout(
   });
 
   try {
-    return await Promise.race([fetchRow(), expiry]);
+    return await Promise.race([fetch(), expiry]);
   } finally {
     clearTimeout(timer);
   }
+}
+
+type Fetched<T> =
+  | { readonly kind: "read"; readonly value: T }
+  | { readonly kind: "failed"; readonly error: unknown };
+
+function settle<T>(fetching: Promise<T>): Promise<Fetched<T>> {
+  return fetching.then(
+    (value): Fetched<T> => ({ kind: "read", value }),
+    (error: unknown): Fetched<T> => ({ kind: "failed", error }),
+  );
 }
 
 /**
  * Una consulta por caducidad, no por visita. Se guarda la promesa y no el
  * valor, para que las visitas que llegan a la vez con la caché vacía compartan
  * la misma consulta. Un fallo se sirve con el respaldo y no se guarda: la
- * visita siguiente vuelve a intentarlo.
+ * visita siguiente vuelve a intentarlo. Si sólo fallan las redes, la marca
+ * sale sin ellas.
  */
 export function createCachedClubBrandReader({
   fetchRow,
+  fetchSocialLinks,
   reportFailure,
   timeToLiveMs,
   readTimeoutMs,
@@ -126,19 +141,33 @@ export function createCachedClubBrandReader({
 }: CachedClubBrandReaderOptions): ClubBrandReader {
   let cached: CacheEntry | null = null;
 
+  async function fetchBrand(entry: CacheEntry): Promise<ClubBrand> {
+    const [row, socialLinks] = await Promise.all([
+      settle(fetchWithinTimeout(fetchRow, readTimeoutMs)),
+      settle(fetchWithinTimeout(fetchSocialLinks, readTimeoutMs)),
+    ]);
+    const failures = [row, socialLinks].flatMap((fetched) =>
+      fetched.kind === "failed" ? [fetched.error] : [],
+    );
+    // Sólo si nadie la sustituyó entre medias: una invalidación posterior ya
+    // dejó en la caché una consulta más nueva.
+    if (failures.length > 0 && cached === entry) {
+      cached = null;
+    }
+    failures.forEach((error) => reportFailure(error));
+    if (row.kind === "failed") {
+      return DEFAULT_CLUB_BRAND;
+    }
+    return toClubBrand(
+      row.value,
+      socialLinks.kind === "read" ? socialLinks.value : NO_SOCIAL_LINKS,
+    );
+  }
+
   function startFetch(): CacheEntry {
     const entry: CacheEntry = {
-      brand: Promise.resolve()
-        .then(() => fetchWithinTimeout(fetchRow, readTimeoutMs))
-        .then(toClubBrand, (error: unknown) => {
-          // Sólo si nadie la sustituyó entre medias: una invalidación
-          // posterior ya dejó en la caché una consulta más nueva.
-          if (cached === entry) {
-            cached = null;
-          }
-          reportFailure(error);
-          return DEFAULT_CLUB_BRAND;
-        }),
+      // Corre en otra vuelta, cuando `entry` ya existe.
+      brand: Promise.resolve().then(() => fetchBrand(entry)),
       expiresAtMs: now() + timeToLiveMs,
     };
     return entry;

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
 import { NO_SOCIAL_LINKS } from "@/lib/club/social-links";
-import { fetchClubBrandRow } from "@/lib/club/supabase-club-brand";
+import {
+  fetchClubBrandRow,
+  fetchClubSocialLinks,
+} from "@/lib/club/supabase-club-brand";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { NETWORK_TEST_TIMEOUT_MS } from "../../support/network-test-timeout";
 
@@ -29,8 +32,18 @@ describe.skipIf(!hasCredentials)("lectura de la marca en Supabase", () => {
         accentColor: "#1c6ea4",
         logoUrl: null,
         signInTexts: NO_SIGN_IN_TEXTS,
-        socialLinks: NO_SOCIAL_LINKS,
       });
+    },
+    NETWORK_TEST_TIMEOUT_MS,
+  );
+});
+
+describe.skipIf(!hasCredentials)("lectura de las redes en Supabase", () => {
+  // #964: las capturas de la entrada dan por hecho un club sin redes.
+  it(
+    "lee las redes del club de la instalación, que no tiene ninguna",
+    async () => {
+      expect(await fetchClubSocialLinks(process.env)).toEqual(NO_SOCIAL_LINKS);
     },
     NETWORK_TEST_TIMEOUT_MS,
   );

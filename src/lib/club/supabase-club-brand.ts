@@ -6,27 +6,22 @@ import {
   createCachedClubBrandReader,
 } from "./club-brand";
 import { type SignInTextRow, toSignInTexts } from "./sign-in-texts";
-import { type SocialLinkRow, toSocialLinks } from "./social-links";
+import { readClubSocialLinks, type SocialLinks } from "./social-links";
+import { createSocialLinksGateways } from "./supabase-social-links-gateways";
 import { readClubLogoUrl } from "./supabase-club-logo-gateways";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
 const CLUBS_TABLE = "clubs";
 // Los alias dejan la fila casi con la forma de `ClubBrandRow`: falta pasar la
-// ruta del logo a su dirección pública, repartir los textos del inicio de
-// sesión (#301) por idioma y las redes (#964) por red. Las redes van en la
-// misma consulta: si no se pueden leer, falla la marca entera y se pinta el
-// respaldo, que no lleva ninguna.
+// ruta del logo a su dirección pública y repartir los textos del inicio de
+// sesión (#301) por idioma.
 const BRAND_COLUMNS =
-  "name, initials, accentColor:accent_color, logoPath:logo_path, signInTextRows:club_sign_in_texts(locale, tagline, welcome), socialLinkRows:club_social_links(network, url)";
+  "name, initials, accentColor:accent_color, logoPath:logo_path, signInTextRows:club_sign_in_texts(locale, tagline, welcome)";
 
-type BrandColumns = Omit<
-  ClubBrandRow,
-  "logoUrl" | "signInTexts" | "socialLinks"
-> & {
+type BrandColumns = Omit<ClubBrandRow, "logoUrl" | "signInTexts"> & {
   readonly logoPath: string | null;
   readonly signInTextRows: readonly SignInTextRow[];
-  readonly socialLinkRows: readonly SocialLinkRow[];
 };
 
 /** Cuánto vive la marca en la memoria del servidor. Guardar un cambio la
@@ -59,20 +54,29 @@ export async function fetchClubBrandRow(
   if (error) {
     throw new Error(`No se pudo leer la marca del club: ${error.message}`);
   }
-  const { logoPath, signInTextRows, socialLinkRows, ...brand } = data;
+  const { logoPath, signInTextRows, ...brand } = data;
   return {
     ...brand,
     logoUrl: readClubLogoUrl(client, logoPath),
     signInTexts: toSignInTexts(signInTextRows),
-    socialLinks: toSocialLinks(socialLinkRows),
   };
+}
+
+/** Las redes del club de esta instalación (#964), con la misma llave y el
+ * mismo club que la marca. Lanza si no se pueden leer. */
+export function fetchClubSocialLinks(env: Environment): Promise<SocialLinks> {
+  return readClubSocialLinks(
+    createSocialLinksGateways(createServiceRoleClient(env)),
+    { clubSlug: DEFAULT_CLUB_SLUG },
+  );
 }
 
 const clubBrandReader = createCachedClubBrandReader({
   fetchRow: () => fetchClubBrandRow(process.env),
+  fetchSocialLinks: () => fetchClubSocialLinks(process.env),
   reportFailure: (error) => {
     console.error(
-      "[marca] no se pudo leer la marca del club; se pinta la de respaldo:",
+      "[marca] no se pudo leer la marca del club o sus redes; se pinta sin lo que falló:",
       error,
     );
   },

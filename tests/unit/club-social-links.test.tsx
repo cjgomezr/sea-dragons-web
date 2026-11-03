@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { render, screen, within } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ClubSocialLinks } from "@/components/ClubSocialLinks";
 import { NO_SOCIAL_LINKS, type SocialLinks } from "@/lib/club/social-links";
@@ -109,5 +111,36 @@ describe("ClubSocialLinks", () => {
         name: "Instagram de Victoria Seadragons",
       }),
     ).toBeInTheDocument();
+  });
+});
+
+// Playwright no puede cargar los iconos de Phosphor (sólo traen ESM), así que
+// inserta este HTML en la página. Si el componente cambia, este test lo pide.
+describe("la lista que siembra Playwright", () => {
+  it("es la que pinta el componente con las seis redes", () => {
+    const fixture = readFileSync(
+      "tests/support/fixtures/club-social-links.html",
+      "utf8",
+    );
+
+    const markup = renderToStaticMarkup(
+      <ClubSocialLinks
+        links={{
+          instagram: "https://www.instagram.com/victoriaseadragons",
+          tiktok: "https://www.tiktok.com/@victoriaseadragons",
+          youtube: "https://www.youtube.com/@victoriaseadragons",
+          facebook: "https://www.facebook.com/victoriaseadragons",
+          whatsapp: "https://wa.me/61400000000",
+          website: "https://victoriaseadragons.example",
+        }}
+        clubName="Victoria Seadragons"
+        locale="en"
+      />,
+    );
+
+    expect(
+      markup,
+      "Vuelve a generar tests/support/fixtures/club-social-links.html con este HTML",
+    ).toBe(fixture);
   });
 });
