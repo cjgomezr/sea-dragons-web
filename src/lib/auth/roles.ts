@@ -25,6 +25,7 @@ export type Capability =
   | "viewLevyPayers"
   | "viewMemberRecords"
   | "planTraining"
+  | "postSessionVideos"
   | "useMemberFeatures";
 
 /** Una fila de la matriz. Al ser un `Record` de los cuatro roles, una fila que
@@ -95,6 +96,16 @@ export const CAPABILITY_MATRIX: Readonly<Record<Capability, RoleGrants>> = {
     Admin: true,
     Coach: true,
     Committee: false,
+    Player: false,
+  },
+  // Poner y quitar el vídeo de YouTube de una sesión (#965). Tampoco está
+  // en la sección 4: es D8 del PRD de E37, del 2 de noviembre de 2026. El
+  // Coach lo sube porque es quien graba; no le da ningún otro permiso sobre
+  // los eventos.
+  postSessionVideos: {
+    Admin: true,
+    Coach: true,
+    Committee: true,
     Player: false,
   },
   // Directorio, calendario, noticias, RSVP, perfil propio y pagos.

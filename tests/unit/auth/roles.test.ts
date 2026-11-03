@@ -79,6 +79,8 @@ const SRD_MATRIX: Readonly<
   viewMemberRecords: [true, true, true, false],
   // Tampoco: D3 del PRD de E35, del 27 de octubre de 2026 (#903).
   planTraining: [true, true, false, false],
+  // Tampoco: D8 del PRD de E37, del 2 de noviembre de 2026 (#965).
+  postSessionVideos: [true, true, true, false],
   useMemberFeatures: [true, true, true, true],
 };
 
@@ -93,8 +95,8 @@ const SRD_CELLS = Object.entries(SRD_MATRIX).flatMap(([capability, row]) =>
 );
 
 describe("matriz de capacidades", () => {
-  it("recorre las 28 celdas de la tabla del SRD, las cuatro de FR-080, las cuatro de #531, las cuatro de #770 y las cuatro de #903", () => {
-    expect(SRD_CELLS).toHaveLength(44);
+  it("recorre las 28 celdas de la tabla del SRD, las cuatro de FR-080, las cuatro de #531, las cuatro de #770, las cuatro de #903 y las cuatro de #965", () => {
+    expect(SRD_CELLS).toHaveLength(48);
   });
 
   it("no tiene capacidades que el SRD no liste", () => {

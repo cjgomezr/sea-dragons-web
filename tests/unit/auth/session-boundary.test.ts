@@ -32,6 +32,7 @@ import {
   EVENT_SERIES_CANCELLATION_API_PATH,
   EVENT_SERIES_MANAGE_API_PATH,
   EVENT_TEAM_API_PATH,
+  EVENT_VIDEO_API_PATH,
   GROUPS_API_PATH,
   GROUPS_PATH,
   GUARDIAN_CONSENT_API_PATH,
@@ -1097,6 +1098,34 @@ describe("frontera de editar y cancelar series (#315)", () => {
     expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
       ALLOW,
     );
+  });
+});
+
+describe("frontera del vídeo de una sesión (#965)", () => {
+  const pathname = EVENT_VIDEO_API_PATH.replace(
+    "[id]",
+    "e1e1e1e1-0000-4000-8000-00000000000e",
+  );
+
+  it("niega a un Player", () => {
+    expect(decideSessionBoundary({ pathname, ...activeAs("Player") })).toEqual({
+      kind: "missingCapability",
+    });
+  });
+
+  it.each(["Admin", "Committee", "Coach"] as const)("deja a un %s", (role) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
+  });
+
+  it("deja a un Player leer el evento del que cuelga", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: pathname.replace(/\/video$/, ""),
+        ...activeAs("Player"),
+      }),
+    ).toEqual(ALLOW);
   });
 });
 
