@@ -128,6 +128,7 @@ columna events.starts_at tipo=timestamp with time zone null=YES default=-
 columna events.starts_on tipo=date null=NO default=-
 columna events.status tipo=text null=NO default='scheduled'::text
 columna events.title tipo=text null=NO default=-
+columna events.video_url tipo=text null=YES default=-
 columna group_memberships.assigned_at tipo=timestamp with time zone null=NO default=now()
 columna group_memberships.club_id tipo=uuid null=NO default=-
 columna group_memberships.group_id tipo=uuid null=NO default=-
@@ -1484,6 +1485,7 @@ restriccion events.events_place_name_length CHECK (((char_length(btrim(place_nam
 restriccion events.events_series_same_club_fkey FOREIGN KEY (series_id, club_id) REFERENCES event_series(id, club_id)
 restriccion events.events_status_check CHECK ((status = ANY (ARRAY['scheduled'::text, 'cancelled'::text])))
 restriccion events.events_title_length CHECK (((char_length(btrim(title)) >= 1) AND (char_length(btrim(title)) <= 80)))
+restriccion events.events_video_url_length CHECK (((char_length(btrim(video_url)) >= 1) AND (char_length(btrim(video_url)) <= 300)))
 restriccion group_memberships.group_memberships_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion group_memberships.group_memberships_group_same_club_fkey FOREIGN KEY (group_id, club_id) REFERENCES groups(id, club_id) ON DELETE CASCADE
 restriccion group_memberships.group_memberships_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
