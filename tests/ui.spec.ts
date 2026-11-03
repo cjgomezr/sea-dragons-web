@@ -19851,6 +19851,93 @@ async function showPastEvents(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
 }
 
+// El vídeo de la sesión (#965, RF-4 y RF-5 del PRD de E37). Quien lo pone
+// es el Admin de la suite, que ve lo mismo que un Coach; el Player es la
+// sesión por defecto. Guardar no se pulsa nunca: el error del campo es el de
+// la validación de la pantalla, que no pide nada a la API.
+const SESSION_VIDEO_URL = "https://youtu.be/abc123";
+
+const [SESSION_VIDEO_EVENT, ...EVENTS_AFTER_SESSION_VIDEO] =
+  STUBBED_AGENDA_EVENTS;
+
+const EVENTS_WITH_SESSION_VIDEO = [
+  { ...SESSION_VIDEO_EVENT, videoUrl: SESSION_VIDEO_URL },
+  ...EVENTS_AFTER_SESSION_VIDEO,
+] as const;
+
+function sessionVideoBlock(page: Page): Locator {
+  return eventPanel(page, SESSION_VIDEO_EVENT.title).getByRole("region", {
+    name: /^(Session video|Vídeo de la sesión)$/,
+  });
+}
+
+/** Abre el evento y deja su vídeo a la vista. */
+async function showSessionVideo(page: Page): Promise<void> {
+  await openFirstPanel(page);
+  await sessionVideoBlock(page).scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+}
+
+/** Abre Añadir vídeo, pega el enlace de un canal y guarda: el campo queda
+ * abierto con su aviso. */
+async function showSessionVideoFieldError(page: Page): Promise<void> {
+  await showSessionVideo(page);
+  const block = sessionVideoBlock(page);
+  await block
+    .getByRole("button", { name: /^(Add video|Añadir vídeo)$/ })
+    .click();
+  await block
+    .getByRole("textbox", { name: /^(YouTube link|Enlace de YouTube)$/ })
+    .fill("https://www.youtube.com/@club");
+  await block.getByRole("button", { name: /^(Save|Guardar)$/ }).click();
+  await expect(block.locator(".auth-field-error")).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+/** Pulsa Quitar vídeo y espera la pregunta. */
+async function showSessionVideoRemoval(page: Page): Promise<void> {
+  await showSessionVideo(page);
+  const block = sessionVideoBlock(page);
+  await block
+    .getByRole("button", { name: /^(Remove video|Quitar vídeo)$/ })
+    .click();
+  await expect(block.getByRole("group")).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+const SESSION_VIDEO_STATES: readonly CalendarState[] = [
+  {
+    name: "evento-video-sin-video",
+    events: STUBBED_AGENDA_EVENTS,
+    opened: PLAYER_OPENED_EVENT,
+    ready: showSessionVideo,
+  },
+  {
+    name: "evento-video-campo-error",
+    events: STUBBED_AGENDA_EVENTS,
+    opened: PLAYER_OPENED_EVENT,
+    ready: showSessionVideoFieldError,
+  },
+  {
+    name: "evento-video-con-video-player",
+    events: EVENTS_WITH_SESSION_VIDEO,
+    opened: PLAYER_OPENED_EVENT,
+    storageState: E2E_STORAGE_STATE_PATH,
+    ready: showSessionVideo,
+  },
+  {
+    name: "evento-video-quitar",
+    events: EVENTS_WITH_SESSION_VIDEO,
+    opened: PLAYER_OPENED_EVENT,
+    ready: showSessionVideoRemoval,
+  },
+  {
+    name: "evento-video-agenda",
+    events: EVENTS_WITH_SESSION_VIDEO,
+    ready: waitForAgendaRows,
+  },
+];
+
 const CALENDAR_EXPANDED_AS_PLAYER: CalendarState = {
   name: "calendario-desplegado-player",
   events: STUBBED_AGENDA_EVENTS,
@@ -20003,6 +20090,7 @@ const CALENDAR_STATES: readonly CalendarState[] = [
     beforeVisit: chooseSpanish,
     ready: showPastEvents,
   },
+  ...SESSION_VIDEO_STATES,
 ];
 
 async function goToCalendar(
