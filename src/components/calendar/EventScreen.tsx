@@ -32,6 +32,7 @@ import type { EventDetailState } from "./use-event-detail";
 export type ScreenSlots = {
   readonly more: React.ReactNode;
   readonly rsvp: React.ReactNode;
+  readonly video: React.ReactNode;
   readonly teams: React.ReactNode;
   readonly takeAttendance: React.ReactNode;
 };
@@ -133,6 +134,7 @@ export function EventScreen({
         </div>
         <WhenBlocks translate={translate} event={event} opened={opened} />
         <EventPlaceCard translate={translate} event={event} />
+        {slots.video}
         {slots.rsvp}
         <OpenedSections
           translate={translate}

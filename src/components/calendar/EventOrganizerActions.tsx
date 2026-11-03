@@ -85,7 +85,7 @@ const FINISHED: FormSubmission = { kind: "finished" };
 
 /** La pregunta de un paso recibe el foco al aparecer, para que el lector de
  * pantalla la lea y el teclado siga desde ahí. */
-function useFocusOnMount<
+export function useFocusOnMount<
   Element extends HTMLElement,
 >(): React.RefObject<Element | null> {
   const ref = useRef<Element>(null);

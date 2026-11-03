@@ -316,6 +316,7 @@ function AgendaList({
   selection,
   organizer,
   canTakeAttendance,
+  canPostVideos,
   rsvpDisabledReasonId,
 }: {
   readonly translate: Translator;
@@ -327,6 +328,7 @@ function AgendaList({
   readonly selection: AgendaSelection;
   readonly organizer: EventOrganizer | null;
   readonly canTakeAttendance: boolean;
+  readonly canPostVideos: boolean;
   readonly rsvpDisabledReasonId: string | null;
 }): React.JSX.Element {
   const today = clubCalendarDate(new Date());
@@ -353,6 +355,7 @@ function AgendaList({
                 target={selection.target}
                 organizer={organizer}
                 canTakeAttendance={canTakeAttendance}
+                canPostVideos={canPostVideos}
                 rsvpDisabledReasonId={rsvpDisabledReasonId}
               />
             ))}
@@ -618,6 +621,7 @@ function AgendaView({
   shouldRevealTeams,
   organizer,
   canTakeAttendance,
+  canPostVideos,
   rsvpDisabledReasonId,
   phoneScreen,
 }: {
@@ -634,6 +638,7 @@ function AgendaView({
   readonly shouldRevealTeams: boolean;
   readonly organizer: EventOrganizer | null;
   readonly canTakeAttendance: boolean;
+  readonly canPostVideos: boolean;
   readonly rsvpDisabledReasonId: string | null;
   /** Nula desde 768 px, donde el evento se abre en el panel. */
   readonly phoneScreen: PhoneScreen | null;
@@ -791,6 +796,7 @@ function AgendaView({
               selection={selectionOf(state.events)}
               organizer={organizer}
               canTakeAttendance={canTakeAttendance}
+              canPostVideos={canPostVideos}
               rsvpDisabledReasonId={rsvpDisabledReasonId}
             />
             {nextCursor === null ? null : (
@@ -949,6 +955,7 @@ export function AgendaScreen({
   locale,
   canManageEvents,
   canTakeAttendance,
+  canPostVideos = false,
   canRespond,
   initialPeriod = "upcoming",
   initialTypes = AGENDA_TYPE_CHIPS,
@@ -964,6 +971,9 @@ export function AgendaScreen({
   /** Si quien mira registra asistencia: decide si un entrenamiento empezado
    * ofrece "Pasar lista" (#395). */
   readonly canTakeAttendance: boolean;
+  /** Si quien mira pone el vídeo de las sesiones (#965): Admin, Committee y
+   * Coach. Sólo decide qué se pinta; el endpoint ya rechaza a un Player. */
+  readonly canPostVideos?: boolean;
   /** Si quien mira puede responder al RSVP. Sin la membresía al día ve los
    * eventos con los botones deshabilitados (#453); el endpoint ya responde
    * 403. */
@@ -1148,6 +1158,7 @@ export function AgendaScreen({
                   }
                   organizer={organizer}
                   canTakeAttendance={canTakeAttendance}
+                  canPostVideos={canPostVideos}
                   rsvpDisabledReasonId={rsvpDisabledReasonId}
                   phoneScreen={phoneScreen}
                 />

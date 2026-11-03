@@ -16106,6 +16106,11 @@ a.groups-icon-button {
   display: inline-flex;
 }
 
+/* El icono de una sesión con vídeo (#965), al lado del de repetición. */
+.agenda-video-mark {
+  display: inline-flex;
+}
+
 /* El lugar es su propio enlace, por encima del que cubre la fila. */
 .agenda-place {
   position: relative;
@@ -16780,6 +16785,66 @@ a.groups-icon-button {
 
 .agenda-directions:hover {
   text-decoration: underline;
+}
+
+/* El vídeo de la sesión (#965): un bloque más del panel, como la tarjeta
+   del lugar. Ver el vídeo es un enlace a todo el ancho con el mismo trazo
+   que la tarjeta; ponerlo, cambiarlo y quitarlo, botones secundarios. */
+.agenda-video {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.agenda-video-watch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  font-weight: 700;
+  color: var(--color-accent-text);
+  text-decoration: none;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.agenda-video-watch:hover {
+  text-decoration: underline;
+}
+
+.agenda-video-watch:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.agenda-video-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.agenda-video-actions .admin-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.agenda-video-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.agenda-video-status {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.agenda-video-status:empty {
+  display: none;
 }
 
 /* Los apartados de abajo llevan su título en mono de 11px, como los días. */
