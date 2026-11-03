@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { COMPLETE_REGISTRATION_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
+import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 
 /**
  * La disposición de dentro de la aplicación (#213): el rol con el que se
@@ -64,7 +65,11 @@ vi.mock("@/lib/members/supabase-profile-photo-gateways", () => ({
   }),
 }));
 vi.mock("@/lib/club/supabase-club-brand", () => ({
-  readClubBrand: async () => ({ name: "Hobart Orcas", initials: "HO" }),
+  readClubBrand: async (): Promise<ClubBrand> => ({
+    ...DEFAULT_CLUB_BRAND,
+    name: "Hobart Orcas",
+    initials: "HO",
+  }),
 }));
 
 /** La fila de miembro de quien mira: la cáscara pone su nombre y su correo
