@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { evaluateAccentColor } from "@/lib/club/accent-color";
 import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
+import { NO_SOCIAL_LINKS } from "@/lib/club/social-links";
 import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
 import type { Locale } from "@/lib/i18n/locale";
 import { contrastRatio } from "../helpers/wcag-contrast";
@@ -582,6 +583,7 @@ const STORED_BRAND: ClubBrand = {
   accentColor: "#7A2E8C",
   logoUrl: null,
   signInTexts: NO_SIGN_IN_TEXTS,
+  socialLinks: NO_SOCIAL_LINKS,
 };
 const PUBLIC_LOGO_URL =
   "https://abc.supabase.co/storage/v1/object/public/club-logos/club/logo.png";

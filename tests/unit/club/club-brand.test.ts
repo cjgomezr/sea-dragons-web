@@ -7,6 +7,7 @@ import {
   deriveInitials,
 } from "@/lib/club/club-brand";
 import { NO_SIGN_IN_TEXTS, type SignInTexts } from "@/lib/club/sign-in-texts";
+import { NO_SOCIAL_LINKS, type SocialLinks } from "@/lib/club/social-links";
 
 /** La marca de E18a (#292, RF-1 y RF-2): se lee de la base una vez, se sirve de
  * la caché, y si la base no contesta la pantalla se pinta con el respaldo. */
@@ -17,6 +18,7 @@ const STORED_ROW: ClubBrandRow = {
   accentColor: "#7b3fa0",
   logoUrl: null,
   signInTexts: NO_SIGN_IN_TEXTS,
+  socialLinks: NO_SOCIAL_LINKS,
 };
 const LOGO_URL = "https://storage.example.test/club-logos/club/logo.png";
 const TIME_TO_LIVE_MS = 60_000;
@@ -75,6 +77,11 @@ describe("marca por defecto", () => {
   it("no lleva textos del inicio de sesión, así que salen los de la aplicación", () => {
     expect(DEFAULT_CLUB_BRAND.signInTexts).toEqual(NO_SIGN_IN_TEXTS);
   });
+
+  // #964: si la base no contesta, la entrada se pinta sin redes.
+  it("no lleva redes del club", () => {
+    expect(DEFAULT_CLUB_BRAND.socialLinks).toEqual(NO_SOCIAL_LINKS);
+  });
 });
 
 describe("lectura de la marca", () => {
@@ -87,7 +94,21 @@ describe("lectura de la marca", () => {
       accentColor: "#7b3fa0",
       logoUrl: null,
       signInTexts: NO_SIGN_IN_TEXTS,
+      socialLinks: NO_SOCIAL_LINKS,
     });
+  });
+
+  // #964: las redes del club viajan con la marca, en la misma caché.
+  it("devuelve las redes que guardó el club", async () => {
+    const socialLinks: SocialLinks = {
+      ...NO_SOCIAL_LINKS,
+      instagram: "https://www.instagram.com/hobartorcas",
+    };
+    const { reader } = createReader({
+      fetchRow: async () => ({ ...STORED_ROW, socialLinks }),
+    });
+
+    expect((await reader.read()).socialLinks).toEqual(socialLinks);
   });
 
   // #301: el lema y el párrafo del inicio de sesión viajan con la marca.
@@ -177,6 +198,20 @@ describe("lectura de la marca", () => {
     });
 
     expect(await reader.read()).toEqual(DEFAULT_CLUB_BRAND);
+    expect(reportFailure).toHaveBeenCalledWith(failure);
+  });
+
+  it("si leer las redes falla, devuelve la marca sin redes y registra el fallo", async () => {
+    const failure = new Error("relation club_social_links does not exist");
+    const reportFailure = vi.fn();
+    const { reader } = createReader({
+      fetchRow: async () => {
+        throw failure;
+      },
+      reportFailure,
+    });
+
+    expect((await reader.read()).socialLinks).toEqual(NO_SOCIAL_LINKS);
     expect(reportFailure).toHaveBeenCalledWith(failure);
   });
 

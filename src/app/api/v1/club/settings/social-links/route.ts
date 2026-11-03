@@ -19,6 +19,7 @@ import {
   SocialLinksValidationError,
   updateSocialLinks,
 } from "@/lib/club/social-links";
+import { invalidateClubBrand } from "@/lib/club/supabase-club-brand";
 import { createSupabaseSocialLinksGateways } from "@/lib/club/supabase-social-links-gateways";
 
 /**
@@ -102,12 +103,14 @@ export function PUT(request: NextRequest): Promise<NextResponse> {
         decorateResponse,
       });
       try {
-        return {
-          data: await updateSocialLinks(requireSocialLinksGateways(), {
-            callerId,
-            links: body,
-          }),
-        };
+        const links = await updateSocialLinks(requireSocialLinksGateways(), {
+          callerId,
+          links: body,
+        });
+        // La entrada y la navegación leen las redes con la marca (#964): sin
+        // esto seguirían con las de antes hasta que caducara su caché.
+        invalidateClubBrand();
+        return { data: links };
       } catch (error) {
         asSocialLinksApiError(error);
       }

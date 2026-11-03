@@ -6,6 +6,7 @@ import {
   type AccountMenuTrigger,
 } from "@/components/AccountMenu";
 import { ClubBrandMark } from "@/components/ClubBrandMark";
+import { ClubSocialLinks } from "@/components/ClubSocialLinks";
 import { ClubNameProvider } from "@/components/club/ClubNameProvider";
 import { FailedPaymentNotice } from "@/components/FailedPaymentNotice";
 import { MobileTabBar } from "@/components/MobileTabBar";
@@ -93,6 +94,11 @@ export function AppShell({
     account: { ...account, role: access.role },
     canConfigureClub: isAllowedForAccess(CLUB_SETTINGS_PATH, access),
   };
+  const socialLinksProps = {
+    links: brand.socialLinks,
+    clubName: brand.name,
+    locale,
+  };
   return (
     <div className="app-shell">
       <PhoneHeader>
@@ -123,6 +129,9 @@ export function AppShell({
           </div>
         </div>
         <SidebarNav locale={locale} access={access} />
+        {/* Al pie de la barra lateral (#964). En el móvil esta barra es la
+            cabecera y la hoja de estilos la esconde: allí van en Más. */}
+        <ClubSocialLinks {...socialLinksProps} className="app-sidebar-social" />
       </PhoneHeader>
       <div className="app-content">
         {/* La barra de arriba de escritorio: el cuadro de búsqueda del mockup
@@ -155,7 +164,11 @@ export function AppShell({
       </div>
       {/* After main on purpose: the bar sits at the bottom of the screen, so
           the tab order should reach it after the content, not before. */}
-      <MobileTabBar locale={locale} access={access} />
+      <MobileTabBar
+        locale={locale}
+        access={access}
+        overflowFooter={<ClubSocialLinks {...socialLinksProps} />}
+      />
     </div>
   );
 }

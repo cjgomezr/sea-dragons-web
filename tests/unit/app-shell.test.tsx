@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/AppShell";
 import type { Role } from "@/lib/auth/roles";
 import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
+import { NO_SOCIAL_LINKS } from "@/lib/club/social-links";
 import type { Locale } from "@/lib/i18n/locale";
 import type { FailedPaymentAlert } from "@/lib/membership/failed-payment-alert";
 
@@ -808,5 +809,54 @@ describe("la alerta de pago fallido (#474)", () => {
       await within(failedPaymentAlert()).findByRole("alert"),
     ).toHaveTextContent("We couldn't open the payment.");
     expect(openCheckout).not.toHaveBeenCalled();
+  });
+});
+
+// #964: las redes del club al pie de la barra lateral y al final de la hoja
+// "More"; sin redes, la cáscara queda como hoy.
+describe("las redes del club en la cáscara", () => {
+  const INSTAGRAM = "https://www.instagram.com/hobartorcas";
+  const WITH_LINKS: ClubBrand = {
+    ...BRAND,
+    socialLinks: { ...NO_SOCIAL_LINKS, instagram: INSTAGRAM },
+  };
+
+  it("con redes las pinta al pie de la barra lateral, fuera de la navegación", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell("en", WITH_LINKS);
+
+    const sidebar = screen.getByRole("complementary");
+    const list = within(sidebar).getByRole("list", {
+      name: "Club social links",
+    });
+    expect(sidebar.lastElementChild).toContainElement(list);
+    const navigation = within(sidebar).getByRole("navigation", {
+      name: "Main",
+    });
+    expect(navigation).not.toContainElement(list);
+  });
+
+  it("con redes las pinta al final de la hoja Más", async () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell("en", WITH_LINKS);
+
+    const tabBar = screen.getByRole("navigation", { name: "Sections" });
+    await userEvent.click(within(tabBar).getByRole("button", { name: "More" }));
+
+    expect(
+      within(tabBar).getByRole("link", { name: "Instagram of Hobart Orcas" }),
+    ).toHaveAttribute("href", INSTAGRAM);
+  });
+
+  it("sin redes no pinta la lista en ningún sitio", async () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+
+    const tabBar = screen.getByRole("navigation", { name: "Sections" });
+    await userEvent.click(within(tabBar).getByRole("button", { name: "More" }));
+
+    expect(
+      screen.queryByRole("list", { name: "Club social links" }),
+    ).toBeNull();
   });
 });
