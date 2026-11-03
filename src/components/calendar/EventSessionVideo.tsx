@@ -1,18 +1,18 @@
 import { PlayCircle } from "@phosphor-icons/react/dist/ssr/PlayCircle";
 import { YoutubeLogo } from "@phosphor-icons/react/dist/ssr/YoutubeLogo";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import {
   type SessionVideoUrlIssue,
   parseSessionVideoUrl,
 } from "@/lib/events/session-video-url";
 import type { Translator } from "@/lib/i18n/translator";
-import { useFocusOnMount } from "./EventOrganizerActions";
 import {
   describeSessionVideoIssue,
   readSessionVideoIssue,
   removeSessionVideo,
   saveSessionVideo,
 } from "./session-video-client";
+import { useFocusOnMount, useFocusWhen } from "./use-focus";
 
 /**
  * El vídeo de la sesión en la pantalla del evento (#965, RF-4 del PRD de
@@ -54,19 +54,6 @@ function describeFieldIssue(translate: Translator, issue: FieldIssue): string {
   return issue === "save_failed"
     ? translate("calendar.video.saveFailed")
     : describeSessionVideoIssue(translate, issue);
-}
-
-/** Enfoca el elemento al montarse si le toca. */
-function useFocusWhen<Element extends HTMLElement>(
-  shouldFocus: boolean,
-): React.RefObject<Element | null> {
-  const ref = useRef<Element>(null);
-  useEffect(() => {
-    if (shouldFocus) {
-      ref.current?.focus();
-    }
-  }, [shouldFocus]);
-  return ref;
 }
 
 function WatchLink({
@@ -380,12 +367,22 @@ export function EventSessionVideo({
   const { step, announcement } = steps;
   const canChange = canEdit && !isCancelled;
   const canRemove = canEdit && videoUrl !== null;
+  // Quitado el vídeo de un evento cancelado no queda Add video al que volver:
+  // el foco va al título del bloque, que sigue con el aviso.
+  const headingRef = useFocusWhen<HTMLHeadingElement>(
+    step.kind === "viewing" && step.focus === "edit" && !canChange,
+  );
   if (videoUrl === null && !canChange && announcement === null) {
     return null;
   }
   return (
     <section className="agenda-video" aria-labelledby={headingId}>
-      <h3 id={headingId} className="agenda-panel-eyebrow">
+      <h3
+        ref={headingRef}
+        id={headingId}
+        className="agenda-panel-eyebrow"
+        tabIndex={-1}
+      >
         {translate("calendar.video.heading")}
       </h3>
       {step.kind === "viewing" ? (

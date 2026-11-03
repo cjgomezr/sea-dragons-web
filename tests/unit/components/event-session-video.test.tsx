@@ -313,6 +313,19 @@ describe("EventSessionVideo", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("deja el foco en el bloque al quitar el vídeo de un evento cancelado", async () => {
+    const user = userEvent.setup();
+    stubSavingApi();
+    renderVideo({ videoUrl: VIDEO, isCancelled: true });
+    await user.click(screen.getByRole("button", { name: "Remove video" }));
+
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Session video" }),
+    ).toHaveFocus();
+  });
+
   it("dice que no se pudo quitar si falla", async () => {
     const user = userEvent.setup();
     stubApi(() => Promise.reject(new TypeError("Failed to fetch")));
