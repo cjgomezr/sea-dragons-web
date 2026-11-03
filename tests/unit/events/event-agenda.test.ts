@@ -632,7 +632,10 @@ describe("el vídeo de una sesión (#965)", () => {
   it("lo trae en el detalle a quien ve el evento", async () => {
     const event = clubEvent("2027-06-22", { videoUrl: VIDEO });
 
-    const detail = await open({ callerRole: "Player", events: [event] }, event.id);
+    const detail = await open(
+      { callerRole: "Player", events: [event] },
+      event.id,
+    );
 
     expect(detail).toMatchObject({ videoUrl: VIDEO });
   });
