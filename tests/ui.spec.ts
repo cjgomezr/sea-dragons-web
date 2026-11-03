@@ -19362,6 +19362,7 @@ const STUBBED_AGENDA_EVENTS = [
     myResponse: "yes",
     inAudience: true,
     coverThumbUrl: null,
+    videoUrl: null,
   },
   {
     id: "e0e0e0e0-0000-4000-8000-0000000000e2",
@@ -19381,6 +19382,7 @@ const STUBBED_AGENDA_EVENTS = [
     myResponse: null,
     inAudience: true,
     coverThumbUrl: null,
+    videoUrl: null,
   },
   {
     id: "e0e0e0e0-0000-4000-8000-0000000000e3",
@@ -19400,6 +19402,7 @@ const STUBBED_AGENDA_EVENTS = [
     myResponse: "maybe",
     inAudience: true,
     coverThumbUrl: null,
+    videoUrl: null,
   },
   {
     id: "e0e0e0e0-0000-4000-8000-0000000000e4",
@@ -19419,6 +19422,7 @@ const STUBBED_AGENDA_EVENTS = [
     myResponse: null,
     inAudience: false,
     coverThumbUrl: null,
+    videoUrl: null,
   },
 ] as const;
 
@@ -19440,6 +19444,7 @@ const STUBBED_CANCELLED_EVENT = {
   myResponse: null,
   inAudience: true,
   coverThumbUrl: null,
+  videoUrl: null,
 } as const;
 
 // Una agenda con un evento de cada tipo, todos en pie (#641): la etiqueta de

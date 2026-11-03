@@ -29,6 +29,7 @@ const AGENDA_EVENT = {
   myResponse: null,
   inAudience: true,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 /** Sirve una agenda vacía y devuelve las URL que se pidieron. */

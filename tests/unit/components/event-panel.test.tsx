@@ -47,6 +47,7 @@ const TRIVIA_NIGHT: AgendaEvent = {
   myResponse: null,
   inAudience: true,
   coverThumbUrl: "https://storage.example/thumb.webp",
+  videoUrl: null,
 };
 
 const SERIES_ID = "5e5e5e5e-0000-4000-8000-000000000005";
@@ -63,6 +64,7 @@ const OPEN_TRAINING: AgendaEvent = {
   goingCount: 12,
   maybeCount: 2,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 const CAMP: AgendaEvent = {
@@ -75,6 +77,7 @@ const CAMP: AgendaEvent = {
   title: "Weekend skills camp",
   eventType: "competition",
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 const WEDNESDAYS: EventSeriesSummary = {

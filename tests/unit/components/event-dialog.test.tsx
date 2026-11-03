@@ -60,6 +60,7 @@ const CREATED_EVENT: AgendaEvent = {
   myResponse: null,
   inAudience: true,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 type Call = {

@@ -76,6 +76,8 @@ export type EventRow = {
   readonly myResponse: RsvpResponse | null;
   /** La imagen (#644). Una sesión de una serie trae la que heredó. */
   readonly coverUploadId: string | null;
+  /** El vídeo de YouTube de la sesión (#965), o nulo. */
+  readonly videoUrl: string | null;
 };
 
 /** El punto de la agenda desde el que sigue la página siguiente. */
@@ -165,6 +167,9 @@ export type AgendaEvent = {
   readonly inAudience: boolean;
   /** La miniatura firmada (#644); null sin imagen o fuera de la audiencia. */
   readonly coverThumbUrl: string | null;
+  /** El vídeo de YouTube de la sesión (#965), o nulo. Lo ve cualquiera que
+   * ve el evento. */
+  readonly videoUrl: string | null;
 };
 
 /** `nextCursor` es nulo en la última página. Quien quiera la siguiente lo
@@ -322,6 +327,7 @@ function toAgendaEvent(row: EventRow, view: AgendaView): AgendaEvent {
     myResponse: row.myResponse,
     inAudience: view.inAudience,
     coverThumbUrl: view.coverThumbUrl,
+    videoUrl: row.videoUrl,
   };
 }
 

@@ -33,6 +33,7 @@ const POOL_TRAINING: AgendaEvent = {
   myResponse: "yes",
   inAudience: true,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 const SCRIMMAGE: AgendaEvent = {

@@ -217,6 +217,7 @@ describe("el evento guardado en el formulario (#650)", () => {
     myResponse: null,
     inAudience: true,
     coverThumbUrl: null,
+    videoUrl: null,
   };
   const DETAILS = { notes: null, audience: { kind: "club" } } as const;
 
@@ -338,6 +339,7 @@ describe("el lugar elegido (#652)", () => {
       myResponse: null,
       inAudience: true,
       coverThumbUrl: null,
+      videoUrl: null,
     };
 
     expect(

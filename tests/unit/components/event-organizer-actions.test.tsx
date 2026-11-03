@@ -60,6 +60,7 @@ const SCRIMMAGE: AgendaEvent = {
   myResponse: null,
   inAudience: true,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 const TRAINING_OCCURRENCE: AgendaEvent = {
@@ -80,6 +81,7 @@ const TRAINING_OCCURRENCE: AgendaEvent = {
   myResponse: "yes",
   inAudience: true,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 const CANCELLED_SOCIAL: AgendaEvent = {
@@ -1262,6 +1264,7 @@ describe("el fin y la imagen al editar (#650)", () => {
     title: "Gala Night",
     eventType: "social",
     coverThumbUrl: "https://storage.example/gala.webp",
+    videoUrl: null,
   };
 
   it("en un evento anterior a E24 deja Termina vacío, explica por qué y no deja guardar", async () => {
@@ -1368,6 +1371,7 @@ describe("quitar una imagen que el servidor rechazó (#650)", () => {
       ...SCRIMMAGE,
       id: "abababab-0000-4000-8000-0000000000ab",
       coverThumbUrl: "https://storage.example/scrimmage.webp",
+      videoUrl: null,
     };
     stubApi({
       events: [withCover],

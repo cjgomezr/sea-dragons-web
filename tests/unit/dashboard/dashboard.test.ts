@@ -182,6 +182,7 @@ function event(overrides: {
     placeDetail: null,
     notes: null,
     coverUploadId: null,
+    videoUrl: null,
     status: "scheduled",
     seriesId: null,
     audience:
