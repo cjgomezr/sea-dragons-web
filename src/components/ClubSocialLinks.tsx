@@ -67,25 +67,21 @@ export function ClubSocialLinks({
       }
       aria-label={translate("club.socialLinks.label")}
     >
-      {saved.map(({ network, url }) => {
-        return (
-          <li key={network}>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={translate("club.socialLinks.link", {
-                network: translate(
-                  `clubSettings.socialLinks.network.${network}`,
-                ),
-                club: clubName,
-              })}
-            >
-              <Icon glyph={NETWORK_ICONS[network]} />
-            </a>
-          </li>
-        );
-      })}
+      {saved.map(({ network, url }) => (
+        <li key={network}>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={translate("club.socialLinks.link", {
+              network: translate(`clubSettings.socialLinks.network.${network}`),
+              club: clubName,
+            })}
+          >
+            <Icon glyph={NETWORK_ICONS[network]} />
+          </a>
+        </li>
+      ))}
     </ul>
   );
 }

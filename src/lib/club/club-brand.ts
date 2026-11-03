@@ -95,7 +95,7 @@ type CacheEntry = {
 };
 
 async function fetchWithinTimeout<T>(
-  fetch: () => Promise<T>,
+  read: () => Promise<T>,
   timeoutMs: number,
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -107,7 +107,7 @@ async function fetchWithinTimeout<T>(
   });
 
   try {
-    return await Promise.race([fetch(), expiry]);
+    return await Promise.race([read(), expiry]);
   } finally {
     clearTimeout(timer);
   }
