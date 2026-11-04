@@ -4691,10 +4691,10 @@ test.describe("barra lateral fija", () => {
   test.describe("con la sesión de administración", () => {
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    test("a 1440×500 la barra hace scroll por dentro antes que la página", async ({
+    test("a 1440×400 la barra hace scroll por dentro antes que la página", async ({
       page,
     }) => {
-      await page.setViewportSize({ width: 1440, height: 500 });
+      await page.setViewportSize({ width: 1440, height: 400 });
       await goToLongHome(page);
       const before = await sidebarGeometry(page);
       expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
