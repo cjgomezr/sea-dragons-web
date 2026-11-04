@@ -20247,6 +20247,15 @@ async function fitViewportToFirstPanel(page: Page): Promise<void> {
   await fitViewportToPage(page);
 }
 
+/** En el móvil `useIsPhone` ya es true y la captura no lo cambia: la ventana
+ * se queda como está, con la barra de abajo donde la ve quien usa la app. */
+async function fitViewportToFirstPanelOutsidePhone(page: Page): Promise<void> {
+  if (isPhoneViewport(page)) {
+    return;
+  }
+  await fitViewportToFirstPanel(page);
+}
+
 /** Cambia a los pasados y espera a que estén pintados. */
 async function showPastEvents(page: Page): Promise<void> {
   await waitForAgendaRows(page);
@@ -20300,7 +20309,7 @@ async function showSessionVideoFieldError(page: Page): Promise<void> {
     .fill("https://www.youtube.com/@club");
   await block.getByRole("button", { name: /^(Save|Guardar)$/ }).click();
   await expect(block.locator(".auth-field-error")).toBeVisible();
-  await fitViewportToFirstPanel(page);
+  await fitViewportToFirstPanelOutsidePhone(page);
   await expect(block.locator(".auth-field-error")).toBeVisible();
   await page.mouse.move(0, 0);
 }
@@ -20313,7 +20322,7 @@ async function showSessionVideoRemoval(page: Page): Promise<void> {
     .getByRole("button", { name: /^(Remove video|Quitar vídeo)$/ })
     .click();
   await expect(block.getByRole("group")).toBeVisible();
-  await fitViewportToFirstPanel(page);
+  await fitViewportToFirstPanelOutsidePhone(page);
   await expect(block.getByRole("group")).toBeVisible();
   await page.mouse.move(0, 0);
 }
