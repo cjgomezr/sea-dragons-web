@@ -1,10 +1,10 @@
 "use client";
 
-import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { UserPlus } from "@phosphor-icons/react/dist/ssr/UserPlus";
 import { X } from "@phosphor-icons/react/dist/ssr/X";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { Icon } from "@/components/Icon";
 import { loadPositionChoices } from "@/components/club/positions-client";
 import { cycleFocus } from "@/components/focus-cycle";

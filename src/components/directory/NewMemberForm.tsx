@@ -1,6 +1,5 @@
 "use client";
 
-import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { Check } from "@phosphor-icons/react/dist/ssr/Check";
 import { PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr/PaperPlaneTilt";
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
@@ -8,6 +7,7 @@ import { WarningCircle } from "@phosphor-icons/react/dist/ssr/WarningCircle";
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { Icon } from "@/components/Icon";
 import { GROUPS_PATH, memberRecordHref } from "@/lib/auth/routes";
 import type { NamedPosition } from "@/lib/club/club-positions";

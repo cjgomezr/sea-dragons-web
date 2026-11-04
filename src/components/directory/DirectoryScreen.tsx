@@ -1,7 +1,7 @@
 "use client";
 
-import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { returnFocus } from "@/components/input-modality";
 import type { Role } from "@/lib/auth/roles";
 import {

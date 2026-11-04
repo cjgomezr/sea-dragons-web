@@ -2620,6 +2620,8 @@ const WIDE_REGISTRATION_NAME = "W".repeat(16);
  * `seadragons-dev`, y cambiarlo allí movería las capturas de todas las demás
  * pruebas, como la marca de #294 y #295; así que se cambia en la página, ya
  * hidratada y preparada. Un número como "AUF-1" no es el nombre: se deja.
+ * Sólo cambia el texto visible: los `aria-label` siguen diciendo "AUF", que
+ * a la captura no le importa.
  */
 async function showWideRegistrationName(page: Page): Promise<void> {
   const replaced = await page.evaluate((name) => {
@@ -2648,7 +2650,7 @@ async function showWideRegistrationName(page: Page): Promise<void> {
 /** Primero lo de la captura de siempre y después el nombre ancho. */
 function thenShowWideRegistrationName(
   prepare: ((page: Page) => Promise<void>) | undefined,
-) {
+): (page: Page) => Promise<void> {
   return async (page: Page): Promise<void> => {
     await prepare?.(page);
     await showWideRegistrationName(page);
@@ -12290,7 +12292,10 @@ const TOO_LONG_REGISTRATION_NAME = "W".repeat(17);
 
 /** Escribe un nombre del registro demasiado largo: el campo lo dice y la
  * barra no deja guardar. */
-function typeTooLongRegistrationName(saveLabel: string, issueText: RegExp) {
+function typeTooLongRegistrationName(
+  saveLabel: string,
+  issueText: RegExp,
+): (page: Page) => Promise<void> {
   return async (page: Page): Promise<void> => {
     const field = page.getByLabel(/^(Registration name|Nombre del registro)$/);
     await field.fill(TOO_LONG_REGISTRATION_NAME);

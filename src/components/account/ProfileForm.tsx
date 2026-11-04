@@ -1,8 +1,8 @@
 "use client";
 
-import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import {
   type ClubPositions,
   offeredPositions,

@@ -1,11 +1,11 @@
 "use client";
 
+import { useRef, useState } from "react";
+import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import {
   useClubTranslator,
   useRegistrationName,
 } from "@/components/club/RegistrationNameProvider";
-import { useRef, useState } from "react";
-import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { type HeroMember, ProfileHero } from "@/components/account/ProfileHero";
 import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";

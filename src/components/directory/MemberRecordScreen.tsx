@@ -1,7 +1,7 @@
 "use client";
 
-import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { useEffect, useRef, useState } from "react";
+import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { ProfilePhoneBar } from "@/components/account/ProfilePhoneBar";
 import { useIsPhone } from "@/components/use-is-phone";
 import { DIRECTORY_PATH } from "@/lib/auth/routes";
