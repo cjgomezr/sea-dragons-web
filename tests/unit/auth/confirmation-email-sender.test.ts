@@ -229,6 +229,7 @@ describe("la marca en el correo de confirmación", () => {
   it("si la marca no se puede leer, sale igual con la de respaldo", async () => {
     const reader = createCachedClubBrandReader({
       fetchRow: () => Promise.reject(new Error("la base no contesta")),
+      fetchSocialLinks: () => Promise.reject(new Error("la base no contesta")),
       reportFailure: () => undefined,
       timeToLiveMs: 60_000,
       readTimeoutMs: 1_000,

@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
+import { NO_SOCIAL_LINKS } from "@/lib/club/social-links";
 import { LOCALE_COOKIE_NAME } from "@/lib/i18n/locale";
 import {
   COMPLETE_REGISTRATION_PATH,
@@ -280,5 +281,91 @@ describe("disposición de las pantallas de autenticación", () => {
     expect(
       screen.getByText("Rugby subacuático · Melbourne"),
     ).toBeInTheDocument();
+  });
+});
+
+// #964: las redes del club, en el pie del panel de marca y, en el móvil,
+// debajo del formulario. Las dos copias existen en el DOM; la hoja de estilos
+// esconde la que no toca en cada tamaño.
+describe("las redes del club en la pantalla de entrar", () => {
+  const INSTAGRAM = "https://www.instagram.com/hobartorcas";
+  const YOUTUBE = "https://www.youtube.com/@hobartorcas";
+
+  function givenSocialLinks(socialLinks: ClubBrand["socialLinks"]): void {
+    storedBrand.current = { ...storedBrand.current, socialLinks };
+  }
+
+  it("con redes las pinta en el pie de la marca, junto al copyright", async () => {
+    givenSocialLinks({
+      ...NO_SOCIAL_LINKS,
+      instagram: INSTAGRAM,
+      youtube: YOUTUBE,
+    });
+
+    await renderAuthLayout();
+
+    const brandPanel = screen.getByRole("complementary");
+    const footer = within(brandPanel)
+      .getByText("© 2026 Hobart Orcas")
+      .closest(".auth-brand-footer");
+    expect(footer).not.toBeNull();
+    const list = within(footer as HTMLElement).getByRole("list", {
+      name: "Club social links",
+    });
+    expect(
+      within(list)
+        .getAllByRole("link")
+        .map((link) => link.getAttribute("aria-label")),
+    ).toEqual(["Instagram of Hobart Orcas", "YouTube of Hobart Orcas"]);
+  });
+
+  it("con redes las pinta también al final de la columna del formulario, después de él", async () => {
+    givenSocialLinks({ ...NO_SOCIAL_LINKS, instagram: INSTAGRAM });
+
+    await renderAuthLayout();
+
+    const main = screen.getByRole("main");
+    const form = within(main).getByRole("form", { name: "Entrar" });
+    const list = within(main).getByRole("list", { name: "Club social links" });
+    expect(
+      form.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("sin redes no aparece la lista ni en el panel ni en el formulario", async () => {
+    givenSocialLinks(NO_SOCIAL_LINKS);
+
+    await renderAuthLayout();
+
+    expect(
+      screen.queryByRole("list", { name: "Club social links" }),
+    ).toBeNull();
+    expect(screen.getByText("© 2026 Hobart Orcas")).toBeInTheDocument();
+  });
+
+  it.each([
+    REGISTRATION_PATH,
+    PASSWORD_RECOVERY_PATH,
+    COMPLETE_REGISTRATION_PATH,
+  ])("en %s enseña las mismas redes", async (path) => {
+    currentPath.value = path;
+    givenSocialLinks({ ...NO_SOCIAL_LINKS, instagram: INSTAGRAM });
+
+    await renderAuthLayout();
+
+    expect(
+      screen.getAllByRole("link", { name: "Instagram of Hobart Orcas" }),
+    ).not.toHaveLength(0);
+  });
+
+  it("en español la lista se llama Redes del club", async () => {
+    incoming.cookies.set(LOCALE_COOKIE_NAME, "es");
+    givenSocialLinks({ ...NO_SOCIAL_LINKS, instagram: INSTAGRAM });
+
+    await renderAuthLayout();
+
+    expect(
+      screen.getAllByRole("list", { name: "Redes del club" }),
+    ).toHaveLength(2);
   });
 });
