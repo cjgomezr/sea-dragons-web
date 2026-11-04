@@ -14312,8 +14312,8 @@ for (const signInScreen of SIGN_IN_TEXTS_SCREENS) {
 }
 
 /* #964: las redes del club en la entrada, al final de la hoja Más y (desde
-   #972) al final del menú de la cuenta. Se ponen sobre la página ya servida, como los textos del
-   club: guardarlas en la base cambiaría las capturas de las demás pruebas, y
+   #972) al final del menú de la cuenta. Se ponen sobre la página ya servida,
+   como los textos del club: guardarlas en la base cambiaría las capturas de las demás pruebas, y
    las capturas de hoy, sin redes, no deben cambiar. Que el servidor la pinte
    sólo con redes, y dónde, lo prueban los unitarios. */
 const SOCIAL_LINKS_LIST_NAME = "Club social links";

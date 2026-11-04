@@ -1171,14 +1171,9 @@ button.notification-item-content:hover {
     font-size: 13.5px;
   }
 
-  .account-menu-signout {
-    margin-top: 10px;
-    padding-top: 6px;
-    border-top: 1px solid var(--color-border);
-  }
-
-  /* Las redes del club al final del desplegable (#972), tras la misma raya
-     y el mismo margen que separan el cierre de sesión. */
+  /* Las redes del club van al final del desplegable (#972), tras la misma
+     raya y el mismo margen que separan el cierre de sesión. */
+  .account-menu-signout,
   .account-menu-social {
     margin-top: 10px;
     padding-top: 6px;

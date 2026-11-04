@@ -27,9 +27,9 @@ import { isSectionActive } from "@/lib/navigation";
  * El menú de la cuenta (#287, rehecho en #716): quién tiene la sesión arriba,
  * Mi perfil, la configuración del club a quien puede cambiarla (#296),
  * Apariencia e Idioma como controles segmentados, Cerrar sesión y, en
- * escritorio, las redes del club (#972). Se abre
- * como la lista de avisos (#266): desplegable en escritorio y pantalla entera
- * con su flecha de volver en el móvil.
+ * escritorio, las redes del club (#972). Se abre como la lista de avisos
+ * (#266): desplegable en escritorio y pantalla entera con su flecha de volver
+ * en el móvil.
  *
  * Es de cliente porque abre y cierra. Cambiar de idioma rehace la cabecera en
  * el servidor, y este componente conserva su estado: el menú sigue abierto y
