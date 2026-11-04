@@ -97,6 +97,12 @@ const DATA_FOR_EVERY_TYPE = {
     playerName: "Nerea Silva",
     teamName: "Team Kelp",
   },
+  event_video_added: {
+    eventId: "e1e1e1e1-0000-4000-8000-00000000000e",
+    title: "Entrenamiento",
+    startsOn: "2027-07-06",
+    startTime: "19:00",
+  },
   membership_renewal_upcoming: {
     amountCents: 4500,
     chargeOn: "2026-10-29",
@@ -745,6 +751,50 @@ describe("team_player_dropped y team_player_returned", () => {
       expect(text.title).toBe("New notification");
     });
   }
+});
+
+// #966: a la audiencia, cuando la sesión pasa de no tener vídeo a tenerlo.
+describe("event_video_added", () => {
+  const ADDED = {
+    type: "event_video_added",
+    data: DATA_FOR_EVERY_TYPE.event_video_added,
+  } as const;
+
+  it("dice en inglés que ya está el vídeo, con el día y la hora de la sesión", () => {
+    const text = describeNotification(createTranslator("en"), ADDED);
+
+    expect(text).toEqual({
+      title: "The video of Entrenamiento is up",
+      body: "6 July 2027 at 7:00 pm",
+    });
+  });
+
+  it("lo dice en español", () => {
+    const text = describeNotification(createTranslator("es"), ADDED);
+
+    expect(text).toEqual({
+      title: "Ya está el vídeo de Entrenamiento",
+      body: "6 de julio de 2027, 19:00",
+    });
+  });
+
+  it("lleva a la misma pantalla que el aviso de un evento cambiado", () => {
+    expect(notificationDestination(ADDED)).toBe(
+      notificationDestination({
+        type: "event_changed",
+        data: DATA_FOR_EVERY_TYPE.event_changed,
+      }),
+    );
+  });
+
+  it("da el texto genérico y ningún destino sin el título", () => {
+    const broken = { ...ADDED, data: { ...ADDED.data, title: "" } };
+
+    expect(describeNotification(createTranslator("en"), broken).title).toBe(
+      "New notification",
+    );
+    expect(notificationDestination(broken)).toBeNull();
+  });
 });
 
 describe("tiempo relativo", () => {

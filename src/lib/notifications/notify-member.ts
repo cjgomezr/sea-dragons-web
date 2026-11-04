@@ -41,6 +41,7 @@ export const NOTIFICATION_TYPES = [
   "membership_renewal_upcoming",
   "team_player_dropped",
   "team_player_returned",
+  "event_video_added",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -154,6 +155,14 @@ type NotificationDataByType = DataForEveryType<{
   readonly team_player_dropped: TeamPlayerChange;
   /** #838. Al mismo, cuando ese jugador vuelve a ir. */
   readonly team_player_returned: TeamPlayerChange;
+  /** #966. A la audiencia, cuando la sesión pasa de no tener vídeo a tenerlo.
+   * El día y la hora distinguen las sesiones de una serie. */
+  readonly event_video_added: {
+    readonly eventId: string;
+    readonly title: string;
+    readonly startsOn: string;
+    readonly startTime: string;
+  };
 }>;
 
 /** El jugador de un reparto publicado que cambió su respuesta. */

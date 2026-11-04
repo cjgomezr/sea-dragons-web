@@ -3,10 +3,16 @@ import type {
   SessionVideoEvent,
   SessionVideoGateways,
 } from "@/lib/events/session-video";
+import {
+  type FakeNoticeOptions,
+  type FakeNotices,
+  fakeEventNotices,
+} from "./events-club";
 
 /**
  * Un club de mentira para el vídeo de una sesión (#965): quien llama, sus
- * grupos y los eventos, con el vídeo de cada uno a la vista.
+ * grupos y los eventos, con el vídeo de cada uno a la vista, y los avisos de
+ * vídeo nuevo que se reparten (#966).
  */
 
 export const VIDEO_CLUB_ID = "c1c1c1c1-0000-4000-8000-00000000000c";
@@ -17,12 +23,18 @@ export const VIDEO_SENIOR_EVENT_ID = "e2e2e2e2-0000-4000-8000-00000000000e";
 export const VIDEO_SENIOR_SQUAD_ID = "f1f1f1f1-0000-4000-8000-00000000000f";
 export const VIDEO_URL = "https://youtu.be/abc123";
 
-export type StoredVideoEvent = SessionVideoEvent & { readonly clubId: string };
+export type StoredVideoEvent = SessionVideoEvent & {
+  readonly clubId: string;
+  readonly videoUrl: string | null;
+};
 
 export const CLUB_VIDEO_EVENT: StoredVideoEvent = {
   id: VIDEO_EVENT_ID,
   clubId: VIDEO_CLUB_ID,
   status: "scheduled",
+  title: "Entrenamiento",
+  startsOn: "2027-07-06",
+  startTime: "19:00",
   audience: { kind: "club" },
   videoUrl: null,
 };
@@ -33,14 +45,14 @@ export const SENIOR_VIDEO_EVENT: StoredVideoEvent = {
   audience: { kind: "groups", groupIds: [VIDEO_SENIOR_SQUAD_ID] },
 };
 
-export type FakeVideoClubOptions = {
+export type FakeVideoClubOptions = FakeNoticeOptions & {
   /** Sin ficha con `null`. Coach si no se dice. */
   readonly role?: Role | null;
   readonly callerGroupIds?: readonly string[];
   readonly events?: readonly StoredVideoEvent[];
 };
 
-export type FakeVideoClub = {
+export type FakeVideoClub = FakeNotices & {
   readonly gateways: SessionVideoGateways;
   /** El vídeo de cada evento, por id. */
   readonly videos: ReadonlyMap<string, string | null>;
@@ -52,6 +64,8 @@ export function fakeVideoClub(
   const role = options.role === undefined ? "Coach" : options.role;
   const events = options.events ?? [CLUB_VIDEO_EVENT];
   const videos = new Map(events.map((event) => [event.id, event.videoUrl]));
+  const { notices, noticeBatches, ...noticeGateways } =
+    fakeEventNotices(options);
   const gateways: SessionVideoGateways = {
     members: {
       findRoleRequestMember: async () =>
@@ -69,17 +83,18 @@ export function fakeVideoClub(
           (candidate) =>
             candidate.id === eventId && candidate.clubId === clubId,
         );
-        return event === undefined
-          ? null
-          : { ...event, videoUrl: videos.get(event.id) ?? null };
+        return event ?? null;
       },
       saveVideo: async ({ eventId, url }) => {
+        const previous = videos.get(eventId) ?? null;
         videos.set(eventId, url);
+        return previous === null ? "added" : "replaced";
       },
       removeVideo: async ({ eventId }) => {
         videos.set(eventId, null);
       },
     },
+    ...noticeGateways,
   };
-  return { gateways, videos };
+  return { gateways, videos, notices, noticeBatches };
 }

@@ -1506,6 +1506,9 @@ export const englishMessages = {
   "notifications.team_assigned.body": "{title}: {moment}",
   "notifications.team_unassigned.title": "You're no longer in a team",
   "notifications.team_unassigned.body": "{title}: {moment}",
+  // #966: a la audiencia, cuando la sesión pasa a tener vídeo. El cuerpo es
+  // el día y la hora de la sesión.
+  "notifications.event_video_added.title": "The video of {title} is up",
   // #838: a quien publicó el reparto.
   "notifications.team_player_dropped.title": "{name} can't make {title}",
   "notifications.team_player_dropped.body": "Was on {team}",
