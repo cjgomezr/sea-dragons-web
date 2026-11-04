@@ -62,6 +62,8 @@ export const agendaEventSchema = z.object({
   inAudience: z.boolean(),
   // La miniatura firmada (#644); nula sin imagen o fuera de la audiencia.
   coverThumbUrl: z.string().nullable(),
+  // El vídeo de YouTube de la sesión (#965); nulo sin vídeo.
+  videoUrl: z.string().nullable(),
 });
 
 const agendaResponseSchema = z.object({

@@ -30,6 +30,13 @@ import { createSupabaseEventGateways } from "./supabase-event-gateways";
 import { createSupabaseEventManagementGateways } from "./supabase-event-management-gateways";
 import { createSupabaseEventRsvpGateways } from "./supabase-event-rsvp-gateways";
 import { createSupabaseSeriesManagementGateways } from "./supabase-series-management-gateways";
+import {
+  InvalidSessionVideoUrlError,
+  SessionVideoEventCancelledError,
+  SessionVideoForbiddenError,
+  type SessionVideoGateways,
+} from "./session-video";
+import { createSupabaseSessionVideoGateways } from "./supabase-session-video-gateways";
 
 /**
  * Lo que comparten los endpoints de eventos (#307): cómo se cablean, la forma
@@ -214,7 +221,37 @@ export function requireEventAgendaGateways(): EventAgendaGateways {
   return wiring.gateways;
 }
 
+/** El enlace del vídeo de una sesión (#965). Que sea de un vídeo de YouTube
+ * lo decide el dominio, que responde 400 con el motivo en `reason`. */
+export const sessionVideoSchema = z.object({ url: z.string() });
+
+export function requireSessionVideoGateways(): SessionVideoGateways {
+  const wiring = createSupabaseSessionVideoGateways(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new ApiError(
+      "service_unavailable",
+      describeMissingAuthKeys(wiring.missingKeys),
+    );
+  }
+  return wiring.gateways;
+}
+
+/** Los errores del vídeo de una sesión: un enlace que no vale es un 400 con
+ * su motivo, para que el campo lo traduzca, y un evento cancelado un 409. */
+function asSessionVideoApiError(error: unknown): void {
+  if (error instanceof InvalidSessionVideoUrlError) {
+    throw new ApiError("validation_error", error.message, error.issue);
+  }
+  if (error instanceof SessionVideoEventCancelledError) {
+    throw new ApiError("conflict", error.message, error.code);
+  }
+  if (error instanceof SessionVideoForbiddenError) {
+    throw new ApiError("forbidden", error.message);
+  }
+}
+
 export function asEventsApiError(error: unknown): never {
+  asSessionVideoApiError(error);
   if (error instanceof InvalidAgendaCursorError) {
     throw new ApiError("validation_error", error.message);
   }

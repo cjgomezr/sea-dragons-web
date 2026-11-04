@@ -72,6 +72,7 @@ export function clubEvent(
     audience: { kind: "club" },
     myResponse: null,
     coverUploadId: null,
+    videoUrl: null,
     ...overrides,
   };
 }

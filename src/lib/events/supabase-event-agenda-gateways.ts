@@ -64,7 +64,7 @@ const MY_RSVP_FILTER = "my_rsvp.user_id";
 const EVENT_COLUMNS = [
   "id, starts_on, start_time, end_time, ends_on, starts_at, title, event_type, location, notes",
   PLACE_COLUMNS,
-  "status, series_id, audience, cover_upload_id",
+  "status, series_id, audience, cover_upload_id, video_url",
   AUDIENCE_EMBED,
   MY_RSVP_EMBED,
 ].join(", ");
@@ -87,6 +87,7 @@ const eventRowSchema = z.object({
   series_id: z.string().nullable(),
   audience: z.enum(["all", "groups"]),
   cover_upload_id: z.string().nullable(),
+  video_url: z.string().nullable(),
   event_groups: z.array(
     z.object({ group: z.object({ id: z.string(), name: z.string() }) }),
   ),
@@ -139,6 +140,7 @@ function toEventRow(row: unknown): EventRow {
           },
     myResponse: parsed.my_rsvp[0]?.response ?? null,
     coverUploadId: parsed.cover_upload_id,
+    videoUrl: parsed.video_url,
   };
 }
 

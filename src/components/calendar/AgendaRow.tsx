@@ -19,7 +19,7 @@ import {
 import type { Translator } from "@/lib/i18n/translator";
 import { BUILDABLE_EVENT_TYPES } from "@/lib/teams/team-ids";
 import { clubMoment } from "@/lib/time/club-calendar";
-import { AgendaCardContent, RepeatMark } from "./AgendaCard";
+import { AgendaCardContent, RepeatMark, VideoMark } from "./AgendaCard";
 import { type AgendaFailure, describeRsvpFailure } from "./agenda-client";
 import { EventCover } from "./EventCover";
 import { EventDetailPanel, openedOf } from "./EventDetailPanel";
@@ -31,6 +31,7 @@ import {
 import { EventRsvp } from "./EventRsvp";
 import { EventScreen } from "./EventScreen";
 import { EventScreenActions } from "./EventScreenActions";
+import { EventSessionVideo } from "./EventSessionVideo";
 import { EventTeams } from "./EventTeams";
 import { EventTypeTag } from "./EventTypeTag";
 import { MyAnswer } from "./MyAnswer";
@@ -440,6 +441,7 @@ function PanelRowContent({
           {event.seriesId === null ? null : (
             <RepeatMark translate={translate} />
           )}
+          {event.videoUrl === null ? null : <VideoMark translate={translate} />}
           <PlaceLink translate={translate} event={event} />
         </div>
       </div>
@@ -461,6 +463,7 @@ function PanelRowContent({
 /** Lo que la fila pone en el panel o en la pantalla del evento. */
 type OpenedEventParts = {
   readonly rsvp: React.ReactNode;
+  readonly video: React.ReactNode;
   readonly teams: React.ReactNode;
   readonly takeAttendance: boolean;
   /** Lo que el diálogo de editar necesita, o nulo si quien mira no puede
@@ -470,7 +473,7 @@ type OpenedEventParts = {
 
 export function AgendaRow({
   translate,
-  event,
+  event: listedEvent,
   period,
   shouldTakeFocus,
   shouldRevealTeams = false,
@@ -479,6 +482,7 @@ export function AgendaRow({
   target,
   organizer,
   canTakeAttendance,
+  canPostVideos = false,
   rsvpDisabledReasonId,
 }: {
   readonly translate: Translator;
@@ -499,10 +503,17 @@ export function AgendaRow({
   /** Si quien mira registra asistencia. Sólo decide si se pinta el enlace:
    * la frontera ya reserva Asistencia a Admin y Coach. */
   readonly canTakeAttendance: boolean;
+  /** Si quien mira pone el vídeo de las sesiones (#965): Admin, Committee y
+   * Coach. Sólo decide qué se pinta; el endpoint ya rechaza a un Player. */
+  readonly canPostVideos?: boolean;
   /** El id de la frase que dice por qué quien mira no puede responder (#453),
    * o `null` si puede. */
   readonly rsvpDisabledReasonId: string | null;
 }): React.JSX.Element {
+  // El vídeo lo cambia el panel sin recargar la agenda (#965): la fila es
+  // dueña de él para que su icono cambie a la vez.
+  const [videoUrl, setVideoUrl] = useState(listedEvent.videoUrl);
+  const event: AgendaEvent = { ...listedEvent, videoUrl };
   const { detail, open, retry, receive } = useEventDetail(event.id);
   const rsvp = useEventRsvp(event, receive);
   const { tally } = rsvp.state;
@@ -568,6 +579,16 @@ export function AgendaRow({
         disabledReasonId={rsvpDisabledReasonId}
       />
     ) : null,
+    video: (
+      <EventSessionVideo
+        translate={translate}
+        eventId={event.id}
+        videoUrl={videoUrl}
+        canEdit={canPostVideos}
+        isCancelled={isCancelled}
+        onChange={setVideoUrl}
+      />
+    ),
     teams: canHaveTeams ? (
       <EventTeams
         translate={translate}
@@ -624,6 +645,7 @@ export function AgendaRow({
               />
             ),
           rsvp: parts.rsvp,
+          video: parts.video,
           teams: parts.teams,
           takeAttendance: parts.takeAttendance ? (
             <TakeAttendanceLink translate={translate} eventId={event.id} />
@@ -645,6 +667,7 @@ export function AgendaRow({
         onRetry={retry}
         slots={{
           rsvp: parts.rsvp,
+          video: parts.video,
           teams: parts.teams,
           actions: (
             <PanelActions

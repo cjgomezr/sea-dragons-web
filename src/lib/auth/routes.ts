@@ -538,6 +538,12 @@ export const EVENT_RSVP_API_PATH = `${EVENT_API_PATH}/rsvp`;
  * (#453), y quien no ve el evento recibe 404. */
 export const EVENT_TEAM_API_PATH = `${EVENT_API_PATH}/team`;
 
+/** El vídeo de YouTube de una sesión (#965, RF-4 y D8 del PRD de E37): PUT
+ * lo pone y DELETE lo quita. Es de Admin, Committee y Coach
+ * (`postSessionVideos`), así que no cuelga de `EVENTS_MANAGE_API_PATH`, que
+ * es sólo de Admin y Committee. El vídeo se lee con el detalle del evento. */
+export const EVENT_VIDEO_API_PATH = `${EVENT_API_PATH}/video`;
+
 /** Pasar lista (#393, RF-2 a RF-4 del PRD de E8). Todo lo que cuelga de
  * este camino es de Admin y Coach (`buildTeamsAndTrackAttendance`): un
  * Committee o un Player no leen ni escriben ninguna hoja (AC-007). El
@@ -900,6 +906,7 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: EVENT_COVER_UPLOADS_API_PATH, capability: "createEvents" },
   { path: EVENT_SERIES_MANAGE_API_PATH, capability: "createEvents" },
   { path: EVENT_SERIES_CANCELLATION_API_PATH, capability: "createEvents" },
+  { path: EVENT_VIDEO_API_PATH, capability: "postSessionVideos" },
   { path: ATTENDANCE_API_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: ATTENDANCE_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: TEAMS_API_PATH, capability: "buildTeamsAndTrackAttendance" },

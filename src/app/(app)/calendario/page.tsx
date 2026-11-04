@@ -81,6 +81,7 @@ export default async function CalendarioPage({
       locale={locale}
       canManageEvents={canManageEvents}
       canTakeAttendance={hasCapability(role, "buildTeamsAndTrackAttendance")}
+      canPostVideos={hasCapability(role, "postSessionVideos")}
       canRespond={membershipCurrent}
       openCreateWith={canManageEvents ? readNewEventType(params) : null}
     />

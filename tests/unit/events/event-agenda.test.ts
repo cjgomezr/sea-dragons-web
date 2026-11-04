@@ -89,6 +89,7 @@ describe("agenda", () => {
           myResponse: "maybe",
           inAudience: true,
           coverThumbUrl: null,
+          videoUrl: null,
         },
       ],
       nextCursor: null,
@@ -362,6 +363,7 @@ describe("detalle de un evento", () => {
       myResponse: null,
       inAudience: true,
       coverThumbUrl: null,
+      videoUrl: null,
       coverUrl: null,
       series: null,
       notes: "Traed aletas.",
@@ -560,6 +562,7 @@ describe("imagen de los eventos (#644)", () => {
 
     expect(detail).toMatchObject({
       coverThumbUrl: signed(coverOf(COVER).thumbnail),
+      videoUrl: null,
       coverUrl: signed(coverOf(COVER).large),
     });
   });
@@ -608,5 +611,32 @@ describe("imagen de los eventos (#644)", () => {
     const detail = await open({ events: [event] }, event.id);
 
     expect(detail).toMatchObject({ coverThumbUrl: null, coverUrl: null });
+  });
+});
+
+describe("el vídeo de una sesión (#965)", () => {
+  const VIDEO = "https://youtu.be/abc123";
+
+  it("lo trae en cada fila de la agenda, o null sin vídeo, también a un Player", async () => {
+    const withVideo = clubEvent("2027-06-22", { videoUrl: VIDEO });
+    const without = clubEvent("2027-06-23");
+
+    const page = await agenda({
+      callerRole: "Player",
+      events: [withVideo, without],
+    });
+
+    expect(page.events.map((row) => row.videoUrl)).toEqual([VIDEO, null]);
+  });
+
+  it("lo trae en el detalle a quien ve el evento", async () => {
+    const event = clubEvent("2027-06-22", { videoUrl: VIDEO });
+
+    const detail = await open(
+      { callerRole: "Player", events: [event] },
+      event.id,
+    );
+
+    expect(detail).toMatchObject({ videoUrl: VIDEO });
   });
 });

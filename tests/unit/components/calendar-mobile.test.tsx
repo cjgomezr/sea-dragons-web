@@ -37,6 +37,7 @@ const OPEN_TRAINING: AgendaEvent = {
   myResponse: "yes",
   inAudience: true,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 const TRIVIA_NIGHT: AgendaEvent = {

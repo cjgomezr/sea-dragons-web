@@ -1,5 +1,6 @@
 import { MapPin } from "@phosphor-icons/react/dist/ssr/MapPin";
 import { Repeat } from "@phosphor-icons/react/dist/ssr/Repeat";
+import { YoutubeLogo } from "@phosphor-icons/react/dist/ssr/YoutubeLogo";
 import type { AgendaEvent } from "@/lib/events/event-agenda";
 import { formatCompactClockRange } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
@@ -30,6 +31,24 @@ export function RepeatMark({
       <span className="visually-hidden">
         {translate("calendar.event.repeats")}
       </span>
+    </span>
+  );
+}
+
+/** El icono de una sesión con vídeo (#965, RF-5 del PRD de E37), con su
+ * nombre para el lector de pantalla. */
+export function VideoMark({
+  translate,
+}: {
+  readonly translate: Translator;
+}): React.JSX.Element {
+  return (
+    <span
+      className="agenda-video-mark"
+      role="img"
+      aria-label={translate("calendar.event.hasVideo")}
+    >
+      <YoutubeLogo aria-hidden="true" focusable="false" size={14} />
     </span>
   );
 }
@@ -69,6 +88,7 @@ export function AgendaCardContent({
           {event.seriesId === null ? null : (
             <RepeatMark translate={translate} />
           )}
+          {event.videoUrl === null ? null : <VideoMark translate={translate} />}
           <span className="visually-hidden">
             {translate(`event.type.${event.eventType}`)}
           </span>

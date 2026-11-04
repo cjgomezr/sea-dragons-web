@@ -51,6 +51,7 @@ const CREATED_EVENT: AgendaEvent = {
   myResponse: null,
   inAudience: true,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 const SAVED_FORM: EventForm = {

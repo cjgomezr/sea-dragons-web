@@ -1,7 +1,7 @@
 import { CalendarBlank } from "@phosphor-icons/react/dist/ssr/CalendarBlank";
 import { Repeat } from "@phosphor-icons/react/dist/ssr/Repeat";
 import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import type {
   AgendaEvent,
@@ -29,6 +29,7 @@ import {
 } from "./event-manage-client";
 import { EventDialog } from "./EventDialog";
 import type { FormSubmission } from "./EventForm";
+import { useFocusOnMount } from "./use-focus";
 
 /**
  * "Editar" y "Cancelar" en la fila desplegada de un evento futuro (#316,
@@ -82,18 +83,6 @@ type ActionStep =
     };
 
 const FINISHED: FormSubmission = { kind: "finished" };
-
-/** La pregunta de un paso recibe el foco al aparecer, para que el lector de
- * pantalla la lea y el teclado siga desde ahí. */
-function useFocusOnMount<
-  Element extends HTMLElement,
->(): React.RefObject<Element | null> {
-  const ref = useRef<Element>(null);
-  useEffect(() => {
-    ref.current?.focus();
-  }, []);
-  return ref;
-}
 
 /** Una opción del selector: el nombre es su etiqueta, y la pista, si la
  * tiene, la describe sin alargar el nombre. */

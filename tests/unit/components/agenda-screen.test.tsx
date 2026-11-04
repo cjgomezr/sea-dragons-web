@@ -45,6 +45,7 @@ const POOL_TRAINING: AgendaEvent = {
   myResponse: "yes",
   inAudience: true,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 const SCRIMMAGE: AgendaEvent = {
@@ -65,6 +66,7 @@ const SCRIMMAGE: AgendaEvent = {
   myResponse: null,
   inAudience: true,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 const CANCELLED_SOCIAL: AgendaEvent = {
@@ -83,6 +85,7 @@ const COMMITTEE_ONLY: AgendaEvent = {
   eventType: "meeting",
   inAudience: false,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 type Respond = (request: {
@@ -2276,6 +2279,7 @@ describe("fila de la agenda", () => {
     endTime: "20:30",
     seriesId: "eeeeeeee-0000-4000-8000-00000000000e",
     coverThumbUrl: "https://storage.example/thumb.webp?token=signed",
+    videoUrl: null,
   };
 
   it("pone la hora de fin debajo de la de inicio", async () => {

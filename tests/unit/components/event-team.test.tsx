@@ -33,6 +33,7 @@ const SCRIMMAGE: AgendaEvent = {
   myResponse: "yes",
   inAudience: true,
   coverThumbUrl: null,
+  videoUrl: null,
 };
 
 const CANCELLED_SCRIMMAGE: AgendaEvent = {
