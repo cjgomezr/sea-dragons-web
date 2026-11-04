@@ -6,6 +6,8 @@ import {
   createCachedClubBrandReader,
 } from "./club-brand";
 import { type SignInTextRow, toSignInTexts } from "./sign-in-texts";
+import { readClubSocialLinks, type SocialLinks } from "./social-links";
+import { createSocialLinksGateways } from "./supabase-social-links-gateways";
 import { readClubLogoUrl } from "./supabase-club-logo-gateways";
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -60,11 +62,21 @@ export async function fetchClubBrandRow(
   };
 }
 
+/** Las redes del club de esta instalación (#964), con la misma llave y el
+ * mismo club que la marca. Lanza si no se pueden leer. */
+export function fetchClubSocialLinks(env: Environment): Promise<SocialLinks> {
+  return readClubSocialLinks(
+    createSocialLinksGateways(createServiceRoleClient(env)),
+    { clubSlug: DEFAULT_CLUB_SLUG },
+  );
+}
+
 const clubBrandReader = createCachedClubBrandReader({
   fetchRow: () => fetchClubBrandRow(process.env),
+  fetchSocialLinks: () => fetchClubSocialLinks(process.env),
   reportFailure: (error) => {
     console.error(
-      "[marca] no se pudo leer la marca del club; se pinta la de respaldo:",
+      "[marca] no se pudo leer la marca del club o sus redes; se pinta sin lo que falló:",
       error,
     );
   },

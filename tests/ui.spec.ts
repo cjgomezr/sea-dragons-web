@@ -89,6 +89,7 @@ import {
 } from "@/lib/news/shrink-news-cover";
 import { LOCALE_COOKIE_NAME, type Locale, isLocale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
+import { SOCIAL_NETWORKS } from "@/lib/club/social-links";
 
 // Con qué condiciones se toma cada captura, sembrada o comparada. Hoy
 // coinciden con los valores por defecto de toHaveScreenshot, pero se pasan a
@@ -14309,6 +14310,276 @@ for (const signInScreen of SIGN_IN_TEXTS_SCREENS) {
     });
   });
 }
+
+/* #964: las redes del club en la entrada, al final de la hoja Más y al pie de
+   la barra lateral. Se ponen sobre la página ya servida, como los textos del
+   club: guardarlas en la base cambiaría las capturas de las demás pruebas, y
+   las capturas de hoy, sin redes, no deben cambiar. Que el servidor la pinte
+   sólo con redes, y dónde, lo prueban los unitarios. */
+const SOCIAL_LINKS_LIST_NAME = "Club social links";
+
+/** El HTML de `ClubSocialLinks` con las seis redes. Playwright no puede cargar
+ * los iconos de Phosphor, que sólo traen ESM; `club-social-links.test.tsx`
+ * comprueba que el archivo sigue siendo lo que pinta el componente. */
+const CLUB_SOCIAL_LINKS_MARKUP = readFileSync(
+  "tests/support/fixtures/club-social-links.html",
+  "utf8",
+);
+
+/** La lista con la clase con la que la coloca quien la pinta. */
+function clubSocialLinksMarkup(className?: string): string {
+  return className === undefined
+    ? CLUB_SOCIAL_LINKS_MARKUP
+    : CLUB_SOCIAL_LINKS_MARKUP.replace(
+        'class="club-social-links"',
+        `class="club-social-links ${className}"`,
+      );
+}
+
+type SocialLinksInsertion = {
+  /** El elemento al final del cual va la lista. */
+  readonly container: string;
+  readonly markup: string;
+};
+
+/** Espera a que React hidrate cada contenedor, para que no pise la lista. */
+async function insertClubSocialLinks(
+  page: Page,
+  insertions: readonly SocialLinksInsertion[],
+): Promise<void> {
+  for (const { container } of insertions) {
+    await waitForHydration(page, container);
+  }
+  await page.evaluate((pending) => {
+    for (const { container, markup } of pending) {
+      const target = document.querySelector(container);
+      if (target === null) {
+        throw new Error(`La página no tiene ${container}.`);
+      }
+      target.insertAdjacentHTML("beforeend", markup);
+    }
+  }, insertions);
+}
+
+/** Lo que pinta `(auth)/layout.tsx` con redes: el pie de la marca y, para el
+ * móvil, la lista al final de la columna del formulario. */
+const SIGN_IN_SOCIAL_LINKS: readonly SocialLinksInsertion[] = [
+  { container: ".auth-brand-footer", markup: clubSocialLinksMarkup() },
+  {
+    container: ".auth-main",
+    markup: clubSocialLinksMarkup("auth-main-social"),
+  },
+];
+
+async function goToSignInWithSocialLinks(
+  page: Page,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${SIGN_IN_PATH}`);
+  } else {
+    await goToWithTheme(page, SIGN_IN_PATH, theme);
+  }
+  await insertClubSocialLinks(page, SIGN_IN_SOCIAL_LINKS);
+}
+
+test.describe("entrar-redes", () => {
+  for (const vp of viewports) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToSignInWithSocialLinks(page, theme);
+          const snapshot = `entrar-redes-${vp.name}-${theme}.png`;
+          await createMissingLocalBaseline(snapshot, () =>
+            page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+          );
+          await expect(page).toHaveScreenshot(snapshot, {
+            ...SCREENSHOT_OPTIONS,
+            fullPage: true,
+            maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          });
+        });
+      }
+
+      test("enseña una sola lista, con los seis iconos de 44 px", async ({
+        page,
+      }) => {
+        await goToSignInWithSocialLinks(page);
+
+        const list = page.getByRole("list", { name: SOCIAL_LINKS_LIST_NAME });
+        await expect(list).toHaveCount(1);
+        const links = list.getByRole("link");
+        await expect(links).toHaveCount(SOCIAL_NETWORKS.length);
+        for (const link of await links.all()) {
+          const box = await link.boundingBox();
+          expect(box?.width).toBeGreaterThanOrEqual(44);
+          expect(box?.height).toBeGreaterThanOrEqual(44);
+        }
+      });
+
+      test("has no horizontal scroll", async ({ page }) => {
+        await goToSignInWithSocialLinks(page);
+        const overflow = await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth >
+            document.documentElement.clientWidth,
+        );
+        expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+      });
+    });
+  }
+
+  test("desde 768 px van en el pie del panel de marca", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await goToSignInWithSocialLinks(page);
+
+    await expect(
+      page
+        .locator(".auth-brand-footer")
+        .getByRole("list", { name: SOCIAL_LINKS_LIST_NAME }),
+    ).toBeVisible();
+    await expect(page.locator(".auth-main-social")).toBeHidden();
+  });
+
+  test("en el móvil van debajo del formulario, que sigue empezando sin scroll", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToSignInWithSocialLinks(page);
+
+    const footerList = page.locator(".auth-main-social");
+    await expect(footerList).toBeVisible();
+    await expect(page.locator(".auth-brand-footer")).toBeHidden();
+    await expect(page.getByRole("heading", { level: 1 })).toBeInViewport();
+    const formBox = await page.locator(".auth-form").boundingBox();
+    const listBox = await footerList.boundingBox();
+    expect(listBox?.y).toBeGreaterThan(
+      (formBox?.y ?? 0) + (formBox?.height ?? 0),
+    );
+  });
+
+  test("has no accessibility violations (axe-core)", async ({ page }) => {
+    await goToSignInWithSocialLinks(page);
+    await expectNoAxeViolations(page);
+  });
+});
+
+test.describe("las redes del club dentro de la aplicación", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const PHONE = { width: 375, height: 812 } as const;
+  const DESKTOP_WINDOW = { width: 1440, height: 900 } as const;
+
+  async function goToDashboardWithSocialLinks(
+    page: Page,
+    theme?: (typeof themes)[number],
+  ): Promise<void> {
+    if (theme === undefined) {
+      await page.goto(`${APP_URL}/dashboard`);
+    } else {
+      await goToWithTheme(page, "/dashboard", theme);
+    }
+    await waitForSectionsLoaded(page, []);
+    await insertClubSocialLinks(page, [
+      { container: "#app-tabbar-overflow", markup: clubSocialLinksMarkup() },
+      {
+        container: ".app-sidebar",
+        markup: clubSocialLinksMarkup("app-sidebar-social"),
+      },
+    ]);
+  }
+
+  async function openMoreWithSocialLinks(
+    page: Page,
+    theme?: (typeof themes)[number],
+  ): Promise<Locator> {
+    await page.setViewportSize(PHONE);
+    await goToDashboardWithSocialLinks(page, theme);
+    const tabBar = page.getByRole("navigation", { name: "Sections" });
+    await tabBar.getByRole("button", { name: "More" }).click();
+    return tabBar;
+  }
+
+  for (const theme of themes) {
+    test(`la hoja Más con redes coincide con la línea base (${theme})`, async ({
+      page,
+    }) => {
+      const tabBar = await openMoreWithSocialLinks(page, theme);
+      const name = `mas-redes-375-${theme}.png`;
+      await createMissingLocalBaseline(name, () =>
+        tabBar.screenshot(SCREENSHOT_OPTIONS),
+      );
+      await expect(tabBar).toHaveScreenshot(name, {
+        ...SCREENSHOT_OPTIONS,
+        maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+      });
+    });
+
+    test(`la barra lateral con redes coincide con la línea base (${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(DESKTOP_WINDOW);
+      await goToDashboardWithSocialLinks(page, theme);
+      const sidebar = page.locator(".app-sidebar");
+      const name = `barra-lateral-redes-desktop-${theme}.png`;
+      await createMissingLocalBaseline(name, () =>
+        sidebar.screenshot(SCREENSHOT_OPTIONS),
+      );
+      await expect(sidebar).toHaveScreenshot(name, {
+        ...SCREENSHOT_OPTIONS,
+        maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+      });
+    });
+  }
+
+  test("en el móvil las redes van al final de Más y no en la cabecera", async ({
+    page,
+  }) => {
+    const tabBar = await openMoreWithSocialLinks(page);
+
+    await expect(
+      tabBar.getByRole("list", { name: SOCIAL_LINKS_LIST_NAME }),
+    ).toBeVisible();
+    await expect(page.locator(".app-sidebar-social")).toBeHidden();
+  });
+
+  test("en escritorio las redes van al pie de la barra lateral", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP_WINDOW);
+    await goToDashboardWithSocialLinks(page);
+
+    const list = page.locator(".app-sidebar-social");
+    await expect(list).toBeVisible();
+    const sidebarBox = await page.locator(".app-sidebar").boundingBox();
+    const listBox = await list.boundingBox();
+    // Abajo del todo: entre la lista y el borde sólo queda el relleno.
+    expect(
+      (sidebarBox?.y ?? 0) +
+        (sidebarBox?.height ?? 0) -
+        ((listBox?.y ?? 0) + (listBox?.height ?? 0)),
+    ).toBeLessThanOrEqual(16);
+  });
+
+  test("con Más abierto y redes no hay violaciones de accesibilidad", async ({
+    page,
+  }) => {
+    await openMoreWithSocialLinks(page);
+    await expectNoAxeViolations(page);
+  });
+
+  test("la barra lateral con redes no tiene violaciones de accesibilidad", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP_WINDOW);
+    await goToDashboardWithSocialLinks(page);
+    await expectNoAxeViolations(page);
+  });
+});
 
 test.describe("un Admin frente a la configuración de verdad", () => {
   skipWithoutSession();

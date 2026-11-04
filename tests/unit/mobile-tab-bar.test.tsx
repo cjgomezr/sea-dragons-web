@@ -1,7 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ClubSocialLinks } from "@/components/ClubSocialLinks";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { NO_SOCIAL_LINKS, type SocialLinks } from "@/lib/club/social-links";
 
 const { usePathname } = vi.hoisted(() => ({ usePathname: vi.fn() }));
 vi.mock("next/navigation", () => ({ usePathname }));
@@ -539,5 +541,57 @@ describe("cierre del menú Más (#577)", () => {
     await user.click(moreButton());
 
     expectMenuClosed();
+  });
+});
+
+// #964: las redes del club van al final de la hoja "More", debajo de las
+// secciones y separadas de ellas.
+describe("las redes del club en la hoja Más", () => {
+  const INSTAGRAM = "https://www.instagram.com/hobartorcas";
+
+  function renderWithSocialLinks(links: SocialLinks): void {
+    usePathname.mockReturnValue("/dashboard");
+    render(
+      <MobileTabBar
+        locale="en"
+        access={{ role: "Player", membershipCurrent: true }}
+        overflowFooter={
+          <ClubSocialLinks links={links} clubName="Hobart Orcas" locale="en" />
+        }
+      />,
+    );
+  }
+
+  it("con redes las enseña al abrir Más, después de las secciones", async () => {
+    renderWithSocialLinks({ ...NO_SOCIAL_LINKS, instagram: INSTAGRAM });
+
+    await userEvent.click(screen.getByRole("button", { name: "More" }));
+
+    const list = screen.getByRole("list", { name: "Club social links" });
+    const lastSection = screen.getByRole("link", { name: "Payments" });
+    expect(
+      lastSection.compareDocumentPosition(list) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Instagram of Hobart Orcas" }),
+    ).toHaveAttribute("href", INSTAGRAM);
+  });
+
+  it("con Más cerrado las redes no se ven", () => {
+    renderWithSocialLinks({ ...NO_SOCIAL_LINKS, instagram: INSTAGRAM });
+
+    expect(
+      screen.queryByRole("list", { name: "Club social links" }),
+    ).toBeNull();
+  });
+
+  it("sin redes la hoja Más queda como hoy", async () => {
+    renderWithSocialLinks(NO_SOCIAL_LINKS);
+
+    expect(await openMoreAndListIt()).toEqual(["Training", "Payments"]);
+    expect(
+      screen.queryByRole("list", { name: "Club social links" }),
+    ).toBeNull();
   });
 });

@@ -2254,6 +2254,8 @@ export const englishMessages = {
   "clubSettings.logo.issue.logoUndecodable":
     "This file cannot be read as an image. Choose another logo.",
   "club.logoAlt": "{club} logo",
+  "club.socialLinks.label": "Club social links",
+  "club.socialLinks.link": "{network} of {club}",
   "clubSettings.reloadLatest": "Load the latest settings",
   "clubSettings.issue.nameRequired": "The club needs a name.",
   "clubSettings.issue.nameTooLong":

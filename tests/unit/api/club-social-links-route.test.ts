@@ -28,6 +28,7 @@ const CLUB_LINKS: SocialLinks = {
 };
 
 const readSessionState = vi.fn();
+const invalidateClubBrand = vi.fn();
 const writes: string[] = [];
 let callerRole: Role = "Admin";
 let stored: SocialLinks = NO_SOCIAL_LINKS;
@@ -79,6 +80,10 @@ vi.mock("@/lib/club/supabase-social-links-gateways", () => ({
     kind: "ready",
     gateways: socialLinksGateways(),
   }),
+}));
+
+vi.mock("@/lib/club/supabase-club-brand", () => ({
+  invalidateClubBrand: () => invalidateClubBrand(),
 }));
 
 const { proxy } = await import("@/proxy");
@@ -170,6 +175,15 @@ describe("GET/PUT /api/v1/club/settings/social-links", () => {
       expect(writes).toEqual(["links", "audit club.social_links_changed"]);
     });
 
+    // #964: la entrada lee las redes con la marca; sin esto seguiría con las
+    // de antes hasta que caducara su caché.
+    it("al guardar invalida la caché de la marca", async () => {
+      const response = await putLinks(CLUB_LINKS);
+
+      expect(response.status).toBe(200);
+      expect(invalidateClubBrand).toHaveBeenCalledOnce();
+    });
+
     it("quita las redes que llegan vacías", async () => {
       stored = CLUB_LINKS;
 
@@ -190,6 +204,7 @@ describe("GET/PUT /api/v1/club/settings/social-links", () => {
 
         expect(response.status).toBe(403);
         expect(writes).toEqual([]);
+        expect(invalidateClubBrand).not.toHaveBeenCalled();
       },
     );
 

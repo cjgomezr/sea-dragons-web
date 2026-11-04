@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { ActiveAccess } from "@/lib/auth/session-boundary";
 import type { Locale } from "@/lib/i18n/locale";
@@ -26,9 +26,13 @@ const OVERFLOW_PANEL_ID = "app-tabbar-overflow";
 export function MobileTabBar({
   locale,
   access,
+  overflowFooter,
 }: {
   locale: Locale;
   access: ActiveAccess;
+  /** Lo que va al final de Más, debajo de las secciones: las redes del club
+   * (#964). Llega ya pintado del servidor, como un hueco. */
+  overflowFooter?: ReactNode;
 }): React.JSX.Element {
   const pathname = usePathname();
   const translate = createTranslator(locale);
@@ -75,25 +79,28 @@ export function MobileTabBar({
       className="app-tabbar"
       hidden={isPhone && isTyping}
     >
-      <ul
-        className="app-tabbar-overflow"
+      <div
+        className="app-tabbar-overflow-panel"
         id={OVERFLOW_PANEL_ID}
         hidden={!isOverflowOpen}
       >
-        {overflow.map((section) => (
-          <li key={section.href}>
-            <Link
-              href={section.href}
-              onClick={closeOverflow}
-              aria-current={
-                isSectionActive(section.href, pathname) ? "page" : undefined
-              }
-            >
-              {getSectionLabel(section, translate)}
-            </Link>
-          </li>
-        ))}
-      </ul>
+        <ul className="app-tabbar-overflow">
+          {overflow.map((section) => (
+            <li key={section.href}>
+              <Link
+                href={section.href}
+                onClick={closeOverflow}
+                aria-current={
+                  isSectionActive(section.href, pathname) ? "page" : undefined
+                }
+              >
+                {getSectionLabel(section, translate)}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        {overflowFooter}
+      </div>
       <ul className="app-tabbar-tabs">
         {primary.map((section) => {
           const SectionIcon = NAV_SECTION_ICONS[section.icon];

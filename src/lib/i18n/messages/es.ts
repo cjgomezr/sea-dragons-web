@@ -2254,6 +2254,8 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.logo.issue.logoUndecodable":
     "Este archivo no se puede leer como imagen. Elige otro logo.",
   "club.logoAlt": "Logo de {club}",
+  "club.socialLinks.label": "Redes del club",
+  "club.socialLinks.link": "{network} de {club}",
   "clubSettings.reloadLatest": "Cargar la configuración más reciente",
   "clubSettings.issue.nameRequired": "El club necesita un nombre.",
   "clubSettings.issue.nameTooLong":

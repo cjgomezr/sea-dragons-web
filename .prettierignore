@@ -17,3 +17,7 @@ docs/design/
 # aprueba un permiso: revisarlo hacía fallar `npm test` en la máquina de quien
 # lo tuviera, y en CI nunca, porque allí no existe.
 .claude/settings.local.json
+
+# El HTML que pinta ClubSocialLinks, tal cual (#964): Playwright lo inserta
+# en la página y un test de Vitest lo compara byte a byte con el componente.
+tests/support/fixtures/club-social-links.html

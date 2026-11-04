@@ -7,6 +7,7 @@ import {
   deriveInitials,
 } from "@/lib/club/club-brand";
 import { NO_SIGN_IN_TEXTS, type SignInTexts } from "@/lib/club/sign-in-texts";
+import { NO_SOCIAL_LINKS, type SocialLinks } from "@/lib/club/social-links";
 
 /** La marca de E18a (#292, RF-1 y RF-2): se lee de la base una vez, se sirve de
  * la caché, y si la base no contesta la pantalla se pinta con el respaldo. */
@@ -18,22 +19,32 @@ const STORED_ROW: ClubBrandRow = {
   logoUrl: null,
   signInTexts: NO_SIGN_IN_TEXTS,
 };
+const CLUB_SOCIAL_LINKS: SocialLinks = {
+  ...NO_SOCIAL_LINKS,
+  instagram: "https://www.instagram.com/hobartorcas",
+};
 const LOGO_URL = "https://storage.example.test/club-logos/club/logo.png";
 const TIME_TO_LIVE_MS = 60_000;
 const READ_TIMEOUT_MS = 3_000;
 
 type ReaderSetup = {
   readonly fetchRow: () => Promise<ClubBrandRow>;
+  readonly fetchSocialLinks?: () => Promise<SocialLinks>;
   readonly reportFailure?: (error: unknown) => void;
 };
 
-function createReader({ fetchRow, reportFailure = vi.fn() }: ReaderSetup): {
+function createReader({
+  fetchRow,
+  fetchSocialLinks = async () => NO_SOCIAL_LINKS,
+  reportFailure = vi.fn(),
+}: ReaderSetup): {
   reader: ReturnType<typeof createCachedClubBrandReader>;
   advanceClock: (ms: number) => void;
 } {
   let nowMs = 0;
   const reader = createCachedClubBrandReader({
     fetchRow,
+    fetchSocialLinks,
     reportFailure,
     timeToLiveMs: TIME_TO_LIVE_MS,
     readTimeoutMs: READ_TIMEOUT_MS,
@@ -75,6 +86,11 @@ describe("marca por defecto", () => {
   it("no lleva textos del inicio de sesión, así que salen los de la aplicación", () => {
     expect(DEFAULT_CLUB_BRAND.signInTexts).toEqual(NO_SIGN_IN_TEXTS);
   });
+
+  // #964: si la base no contesta, la entrada se pinta sin redes.
+  it("no lleva redes del club", () => {
+    expect(DEFAULT_CLUB_BRAND.socialLinks).toEqual(NO_SOCIAL_LINKS);
+  });
 });
 
 describe("lectura de la marca", () => {
@@ -87,7 +103,47 @@ describe("lectura de la marca", () => {
       accentColor: "#7b3fa0",
       logoUrl: null,
       signInTexts: NO_SIGN_IN_TEXTS,
+      socialLinks: NO_SOCIAL_LINKS,
     });
+  });
+
+  // #964: las redes del club viajan con la marca, en la misma caché.
+  it("devuelve las redes que guardó el club", async () => {
+    const { reader } = createReader({
+      fetchRow: async () => STORED_ROW,
+      fetchSocialLinks: async () => CLUB_SOCIAL_LINKS,
+    });
+
+    expect((await reader.read()).socialLinks).toEqual(CLUB_SOCIAL_LINKS);
+  });
+
+  it("sirve las redes de la caché, sin volver a pedirlas", async () => {
+    const fetchSocialLinks = vi.fn(async () => CLUB_SOCIAL_LINKS);
+    const { reader } = createReader({
+      fetchRow: async () => STORED_ROW,
+      fetchSocialLinks,
+    });
+
+    await reader.read();
+    await reader.read();
+
+    expect(fetchSocialLinks).toHaveBeenCalledTimes(1);
+  });
+
+  it("tras invalidar, vuelve a pedir las redes", async () => {
+    const fetchSocialLinks = vi
+      .fn<() => Promise<SocialLinks>>()
+      .mockResolvedValueOnce(NO_SOCIAL_LINKS)
+      .mockResolvedValueOnce(CLUB_SOCIAL_LINKS);
+    const { reader } = createReader({
+      fetchRow: async () => STORED_ROW,
+      fetchSocialLinks,
+    });
+
+    await reader.read();
+    reader.invalidate();
+
+    expect((await reader.read()).socialLinks).toEqual(CLUB_SOCIAL_LINKS);
   });
 
   // #301: el lema y el párrafo del inicio de sesión viajan con la marca.
@@ -178,6 +234,40 @@ describe("lectura de la marca", () => {
 
     expect(await reader.read()).toEqual(DEFAULT_CLUB_BRAND);
     expect(reportFailure).toHaveBeenCalledWith(failure);
+  });
+
+  // #964: un fallo de las redes no se lleva el nombre, el logo ni los textos.
+  it("si leer las redes falla, devuelve la marca guardada sin redes y registra el fallo", async () => {
+    const failure = new Error("relation club_social_links does not exist");
+    const reportFailure = vi.fn();
+    const { reader } = createReader({
+      fetchRow: async () => STORED_ROW,
+      fetchSocialLinks: async () => {
+        throw failure;
+      },
+      reportFailure,
+    });
+
+    const brand = await reader.read();
+
+    expect(brand.name).toBe("Hobart Orcas");
+    expect(brand.socialLinks).toEqual(NO_SOCIAL_LINKS);
+    expect(reportFailure).toHaveBeenCalledWith(failure);
+  });
+
+  it("tras un fallo de las redes, la visita siguiente vuelve a pedirlas", async () => {
+    const fetchSocialLinks = vi
+      .fn<() => Promise<SocialLinks>>()
+      .mockRejectedValueOnce(new Error("connect ECONNREFUSED"))
+      .mockResolvedValueOnce(CLUB_SOCIAL_LINKS);
+    const { reader } = createReader({
+      fetchRow: async () => STORED_ROW,
+      fetchSocialLinks,
+    });
+
+    await reader.read();
+
+    expect((await reader.read()).socialLinks).toEqual(CLUB_SOCIAL_LINKS);
   });
 
   describe("con la base colgada", () => {
