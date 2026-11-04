@@ -20220,6 +20220,15 @@ async function openFirstPanelWithTeams(page: Page): Promise<void> {
  * nunca, porque el panel crece con ella. */
 async function showNotComingTeammates(page: Page): Promise<void> {
   await openFirstPanelWithTeams(page);
+  await fitViewportToFirstPanel(page);
+  await page.mouse.move(0, 0);
+}
+
+/** Alarga la ventana hasta el fondo del panel del primer evento y luego
+ * hasta la página. Si la página no cabe, la captura de página entera deja la
+ * ventana en 1×1 un instante, `useIsPhone` pasa a móvil y el panel se vuelve
+ * a montar: lo que estuviera abierto dentro se cierra (#974). */
+async function fitViewportToFirstPanel(page: Page): Promise<void> {
   const viewport = page.viewportSize();
   if (viewport === null) {
     throw new Error("La página no tiene un tamaño de ventana fijo.");
@@ -20236,7 +20245,6 @@ async function showNotComingTeammates(page: Page): Promise<void> {
     height: Math.max(viewport.height, Math.ceil(panelBottom)),
   });
   await fitViewportToPage(page);
-  await page.mouse.move(0, 0);
 }
 
 /** Cambia a los pasados y espera a que estén pintados. */
@@ -20292,6 +20300,8 @@ async function showSessionVideoFieldError(page: Page): Promise<void> {
     .fill("https://www.youtube.com/@club");
   await block.getByRole("button", { name: /^(Save|Guardar)$/ }).click();
   await expect(block.locator(".auth-field-error")).toBeVisible();
+  await fitViewportToFirstPanel(page);
+  await expect(block.locator(".auth-field-error")).toBeVisible();
   await page.mouse.move(0, 0);
 }
 
@@ -20302,6 +20312,8 @@ async function showSessionVideoRemoval(page: Page): Promise<void> {
   await block
     .getByRole("button", { name: /^(Remove video|Quitar vídeo)$/ })
     .click();
+  await expect(block.getByRole("group")).toBeVisible();
+  await fitViewportToFirstPanel(page);
   await expect(block.getByRole("group")).toBeVisible();
   await page.mouse.move(0, 0);
 }
@@ -21195,6 +21207,41 @@ async function showSeriesSheet(page: Page): Promise<void> {
   );
   await page.mouse.move(0, 0);
 }
+
+// Lo abierto en el vídeo de la sesión sigue en la captura de página entera
+// (#974): la ventana ya mide la página, así que la captura no la encoge.
+const SESSION_VIDEO_OPEN_STATES = SESSION_VIDEO_STATES.filter((state) =>
+  ["evento-video-campo-error", "evento-video-quitar"].includes(state.name),
+);
+
+test.describe("el vídeo de la sesión abierto en la captura de página entera", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const state of SESSION_VIDEO_OPEN_STATES) {
+    for (const vp of viewports.filter((each) => each.name !== "mobile")) {
+      test(`${state.name} a ${vp.name}: la ventana mide la página y lo abierto sigue tras capturar`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: vp.width, height: vp.height });
+        await goToCalendar(page, state);
+
+        const fitsViewport = await page.evaluate(
+          () => document.documentElement.scrollHeight <= window.innerHeight,
+        );
+        await page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true });
+
+        expect(fitsViewport).toBe(true);
+        await expect(
+          sessionVideoBlock(page).getByRole("button", {
+            name: /^(Add video|Añadir vídeo|Remove video|Quitar vídeo)$/,
+          }),
+        ).toHaveCount(0);
+      });
+    }
+  }
+});
 
 const MOBILE_AGENDA_STATE: CalendarState = {
   name: "calendario-movil-agenda",
