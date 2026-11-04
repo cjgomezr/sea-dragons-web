@@ -4691,10 +4691,10 @@ test.describe("barra lateral fija", () => {
   test.describe("con la sesión de administración", () => {
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    test("a 1440×500 la barra hace scroll por dentro antes que la página", async ({
+    test("a 1440×400 la barra hace scroll por dentro antes que la página", async ({
       page,
     }) => {
-      await page.setViewportSize({ width: 1440, height: 500 });
+      await page.setViewportSize({ width: 1440, height: 400 });
       await goToLongHome(page);
       const before = await sidebarGeometry(page);
       expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
@@ -14311,9 +14311,9 @@ for (const signInScreen of SIGN_IN_TEXTS_SCREENS) {
   });
 }
 
-/* #964: las redes del club en la entrada, al final de la hoja Más y al pie de
-   la barra lateral. Se ponen sobre la página ya servida, como los textos del
-   club: guardarlas en la base cambiaría las capturas de las demás pruebas, y
+/* #964: las redes del club en la entrada, al final de la hoja Más y (desde
+   #972) al final del menú de la cuenta. Se ponen sobre la página ya servida,
+   como los textos del club: guardarlas en la base cambiaría las capturas de las demás pruebas, y
    las capturas de hoy, sin redes, no deben cambiar. Que el servidor la pinte
    sólo con redes, y dónde, lo prueban los unitarios. */
 const SOCIAL_LINKS_LIST_NAME = "Club social links";
@@ -14472,7 +14472,12 @@ test.describe("las redes del club dentro de la aplicación", () => {
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
   const PHONE = { width: 375, height: 812 } as const;
-  const DESKTOP_WINDOW = { width: 1440, height: 900 } as const;
+  /** Los anchos del menú de la cuenta con redes (#972): el corte de la
+   * tableta y el escritorio. */
+  const ACCOUNT_MENU_WINDOWS = [
+    { name: "768", width: 768, height: 1024 },
+    { name: "1440", width: 1440, height: 900 },
+  ] as const;
 
   async function goToDashboardWithSocialLinks(
     page: Page,
@@ -14486,10 +14491,6 @@ test.describe("las redes del club dentro de la aplicación", () => {
     await waitForSectionsLoaded(page, []);
     await insertClubSocialLinks(page, [
       { container: "#app-tabbar-overflow", markup: clubSocialLinksMarkup() },
-      {
-        container: ".app-sidebar",
-        markup: clubSocialLinksMarkup("app-sidebar-social"),
-      },
     ]);
   }
 
@@ -14502,6 +14503,20 @@ test.describe("las redes del club dentro de la aplicación", () => {
     const tabBar = page.getByRole("navigation", { name: "Sections" });
     await tabBar.getByRole("button", { name: "More" }).click();
     return tabBar;
+  }
+
+  /** El desplegable lo pinta React al abrirse (#972): la lista se pone
+   * después de abrirlo, al final, donde la pinta `AccountMenu`. */
+  async function openAccountMenuWithSocialLinks(
+    page: Page,
+    theme?: (typeof themes)[number],
+  ): Promise<Locator> {
+    await goToDashboardWithSocialLinks(page, theme);
+    const menu = await openAccountMenu(page);
+    await menu.evaluate((element, markup) => {
+      element.insertAdjacentHTML("beforeend", markup);
+    }, clubSocialLinksMarkup("account-menu-social"));
+    return menu;
   }
 
   for (const theme of themes) {
@@ -14518,23 +14533,34 @@ test.describe("las redes del club dentro de la aplicación", () => {
         maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
       });
     });
-
-    test(`la barra lateral con redes coincide con la línea base (${theme})`, async ({
-      page,
-    }) => {
-      await page.setViewportSize(DESKTOP_WINDOW);
-      await goToDashboardWithSocialLinks(page, theme);
-      const sidebar = page.locator(".app-sidebar");
-      const name = `barra-lateral-redes-desktop-${theme}.png`;
-      await createMissingLocalBaseline(name, () =>
-        sidebar.screenshot(SCREENSHOT_OPTIONS),
-      );
-      await expect(sidebar).toHaveScreenshot(name, {
-        ...SCREENSHOT_OPTIONS,
-        maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
-      });
-    });
   }
+
+  // La cabecera del menú lleva el nombre y el correo de quien entra. El
+  // Admin sembrado cambia de sufijo en cada corrida; la sesión de e2e tiene
+  // siempre el mismo nombre, como en las capturas `menu-cuenta-*`.
+  test.describe("captura del menú de la cuenta con redes", () => {
+    test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+    for (const theme of themes) {
+      for (const window of ACCOUNT_MENU_WINDOWS) {
+        test(`el menú de la cuenta con redes coincide con la línea base a ${window.name} (${theme})`, async ({
+          page,
+        }) => {
+          await page.setViewportSize(window);
+          const menu = await openAccountMenuWithSocialLinks(page, theme);
+          await page.mouse.move(0, 0);
+          const name = `menu-cuenta-redes-${window.name}-${theme}.png`;
+          await createMissingLocalBaseline(name, () =>
+            menu.screenshot(SCREENSHOT_OPTIONS),
+          );
+          await expect(menu).toHaveScreenshot(name, {
+            ...SCREENSHOT_OPTIONS,
+            maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+          });
+        });
+      }
+    }
+  });
 
   test("en el móvil las redes van al final de Más y no en la cabecera", async ({
     page,
@@ -14544,25 +14570,48 @@ test.describe("las redes del club dentro de la aplicación", () => {
     await expect(
       tabBar.getByRole("list", { name: SOCIAL_LINKS_LIST_NAME }),
     ).toBeVisible();
-    await expect(page.locator(".app-sidebar-social")).toBeHidden();
+    await expect(
+      page
+        .locator(".app-sidebar")
+        .getByRole("list", { name: SOCIAL_LINKS_LIST_NAME }),
+    ).toHaveCount(0);
   });
 
-  test("en escritorio las redes van al pie de la barra lateral", async ({
+  // #972: con las redes en el menú de la cuenta, la barra lateral no las
+  // lleva, ni la lista ni su hueco.
+  test("en escritorio la barra lateral no lleva las redes", async ({
     page,
   }) => {
-    await page.setViewportSize(DESKTOP_WINDOW);
+    await page.setViewportSize({ width: 1440, height: 900 });
     await goToDashboardWithSocialLinks(page);
 
-    const list = page.locator(".app-sidebar-social");
+    await expect(
+      page
+        .locator(".app-sidebar")
+        .getByRole("list", { name: SOCIAL_LINKS_LIST_NAME }),
+    ).toHaveCount(0);
+  });
+
+  test("en el menú de la cuenta van al final, tras una raya, con iconos de 44 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const menu = await openAccountMenuWithSocialLinks(page);
+
+    const list = menu.getByRole("list", { name: SOCIAL_LINKS_LIST_NAME });
     await expect(list).toBeVisible();
-    const sidebarBox = await page.locator(".app-sidebar").boundingBox();
-    const listBox = await list.boundingBox();
-    // Abajo del todo: entre la lista y el borde sólo queda el relleno.
-    expect(
-      (sidebarBox?.y ?? 0) +
-        (sidebarBox?.height ?? 0) -
-        ((listBox?.y ?? 0) + (listBox?.height ?? 0)),
-    ).toBeLessThanOrEqual(16);
+    const placement = await list.evaluate((element) => ({
+      borderTop: getComputedStyle(element).borderTopWidth,
+      isLast: element.parentElement?.lastElementChild === element,
+    }));
+    expect(placement).toEqual({ borderTop: "1px", isLast: true });
+    const links = list.getByRole("link");
+    await expect(links).toHaveCount(SOCIAL_NETWORKS.length);
+    for (const link of await links.all()) {
+      const box = await boxOf(link);
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
   });
 
   test("con Más abierto y redes no hay violaciones de accesibilidad", async ({
@@ -14572,12 +14621,93 @@ test.describe("las redes del club dentro de la aplicación", () => {
     await expectNoAxeViolations(page);
   });
 
-  test("la barra lateral con redes no tiene violaciones de accesibilidad", async ({
+  test("con el menú de la cuenta abierto y redes no hay violaciones de accesibilidad", async ({
     page,
   }) => {
-    await page.setViewportSize(DESKTOP_WINDOW);
-    await goToDashboardWithSocialLinks(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openAccountMenuWithSocialLinks(page);
     await expectNoAxeViolations(page);
+  });
+});
+
+/* #972: la barra lateral de un Admin, con todas sus secciones y el logo, cabe
+   sin scroll en una ventana de 600 px de alto. Se comprueba con las medidas:
+   una captura de la barra no enseña si tiene scroll. */
+test.describe("la barra lateral sin scroll a 600 px de alto", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const SHORT_WINDOW_HEIGHT_PX = 600;
+  const SHORT_WINDOW_WIDTHS = [1440, 1024, 768] as const;
+  /** El nombre más largo que admite el club (#292): parte en dos líneas, el
+   * caso que más alto deja la cabecera de la barra. */
+  const LONGEST_CLUB_NAME =
+    "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania";
+  /** Lo que separa dos secciones del menú lateral desde #972. */
+  const NAV_ROW_GAP_PX = 2;
+
+  async function goToDashboardWithLogo(page: Page): Promise<void> {
+    await serveClubLogos(page);
+    await page.goto(`${APP_URL}/dashboard`);
+    await waitForSectionsLoaded(page, []);
+    await showLogoOnServedPage(page, PHOTOGRAPHED_LOGO);
+  }
+
+  async function expectSidebarWithoutScroll(page: Page): Promise<void> {
+    const sizes = await page.locator(".app-sidebar").evaluate((element) => ({
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    }));
+    expect(sizes.scrollHeight).toBeLessThanOrEqual(sizes.clientHeight);
+  }
+
+  for (const width of SHORT_WINDOW_WIDTHS) {
+    test(`con logo, a ${width}×${SHORT_WINDOW_HEIGHT_PX}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: SHORT_WINDOW_HEIGHT_PX });
+      await goToDashboardWithLogo(page);
+
+      await expectSidebarWithoutScroll(page);
+    });
+
+    test(`con logo y un nombre en dos líneas, a ${width}×${SHORT_WINDOW_HEIGHT_PX}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: SHORT_WINDOW_HEIGHT_PX });
+      await goToDashboardWithLogo(page);
+      const brand = page.locator(".app-sidebar .app-brand");
+      const lineHeight = await brand.evaluate((element, name) => {
+        element.textContent = name;
+        return parseFloat(getComputedStyle(element).lineHeight);
+      }, LONGEST_CLUB_NAME);
+      expect((await boxOf(brand)).height).toBeGreaterThan(lineHeight * 1.5);
+
+      await expectSidebarWithoutScroll(page);
+    });
+  }
+
+  test("cada sección conserva su objetivo de 44 px y se separan 2 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({
+      width: 1440,
+      height: SHORT_WINDOW_HEIGHT_PX,
+    });
+    await goToDashboardWithLogo(page);
+
+    const boxes = await Promise.all(
+      (await page.locator(".app-nav li > a").all()).map((section) =>
+        boxOf(section),
+      ),
+    );
+    const [first, second] = boxes;
+    if (first === undefined || second === undefined) {
+      throw new Error("El menú lateral de un Admin tiene más de una sección.");
+    }
+    for (const box of boxes) {
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+    expect(second.y - (first.y + first.height)).toBeCloseTo(NAV_ROW_GAP_PX, 0);
   });
 });
 
@@ -20090,6 +20220,15 @@ async function openFirstPanelWithTeams(page: Page): Promise<void> {
  * nunca, porque el panel crece con ella. */
 async function showNotComingTeammates(page: Page): Promise<void> {
   await openFirstPanelWithTeams(page);
+  await fitViewportToFirstPanel(page);
+  await page.mouse.move(0, 0);
+}
+
+/** Alarga la ventana hasta el fondo del panel del primer evento y luego
+ * hasta la página. Si la página no cabe, la captura de página entera deja la
+ * ventana en 1×1 un instante, `useIsPhone` pasa a móvil y el panel se vuelve
+ * a montar: lo que estuviera abierto dentro se cierra (#974). */
+async function fitViewportToFirstPanel(page: Page): Promise<void> {
   const viewport = page.viewportSize();
   if (viewport === null) {
     throw new Error("La página no tiene un tamaño de ventana fijo.");
@@ -20106,7 +20245,15 @@ async function showNotComingTeammates(page: Page): Promise<void> {
     height: Math.max(viewport.height, Math.ceil(panelBottom)),
   });
   await fitViewportToPage(page);
-  await page.mouse.move(0, 0);
+}
+
+/** En el móvil `useIsPhone` ya es true y la captura no lo cambia: la ventana
+ * se queda como está, con la barra de abajo donde la ve quien usa la app. */
+async function fitViewportToFirstPanelOutsidePhone(page: Page): Promise<void> {
+  if (isPhoneViewport(page)) {
+    return;
+  }
+  await fitViewportToFirstPanel(page);
 }
 
 /** Cambia a los pasados y espera a que estén pintados. */
@@ -20162,6 +20309,8 @@ async function showSessionVideoFieldError(page: Page): Promise<void> {
     .fill("https://www.youtube.com/@club");
   await block.getByRole("button", { name: /^(Save|Guardar)$/ }).click();
   await expect(block.locator(".auth-field-error")).toBeVisible();
+  await fitViewportToFirstPanelOutsidePhone(page);
+  await expect(block.locator(".auth-field-error")).toBeVisible();
   await page.mouse.move(0, 0);
 }
 
@@ -20172,6 +20321,8 @@ async function showSessionVideoRemoval(page: Page): Promise<void> {
   await block
     .getByRole("button", { name: /^(Remove video|Quitar vídeo)$/ })
     .click();
+  await expect(block.getByRole("group")).toBeVisible();
+  await fitViewportToFirstPanelOutsidePhone(page);
   await expect(block.getByRole("group")).toBeVisible();
   await page.mouse.move(0, 0);
 }
@@ -21065,6 +21216,41 @@ async function showSeriesSheet(page: Page): Promise<void> {
   );
   await page.mouse.move(0, 0);
 }
+
+// Lo abierto en el vídeo de la sesión sigue en la captura de página entera
+// (#974): la ventana ya mide la página, así que la captura no la encoge.
+const SESSION_VIDEO_OPEN_STATES = SESSION_VIDEO_STATES.filter((state) =>
+  ["evento-video-campo-error", "evento-video-quitar"].includes(state.name),
+);
+
+test.describe("el vídeo de la sesión abierto en la captura de página entera", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const state of SESSION_VIDEO_OPEN_STATES) {
+    for (const vp of viewports.filter((each) => each.name !== "mobile")) {
+      test(`${state.name} a ${vp.name}: la ventana mide la página y lo abierto sigue tras capturar`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: vp.width, height: vp.height });
+        await goToCalendar(page, state);
+
+        const fitsViewport = await page.evaluate(
+          () => document.documentElement.scrollHeight <= window.innerHeight,
+        );
+        await page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true });
+
+        expect(fitsViewport).toBe(true);
+        await expect(
+          sessionVideoBlock(page).getByRole("button", {
+            name: /^(Add video|Añadir vídeo|Remove video|Quitar vídeo)$/,
+          }),
+        ).toHaveCount(0);
+      });
+    }
+  }
+});
 
 const MOBILE_AGENDA_STATE: CalendarState = {
   name: "calendario-movil-agenda",

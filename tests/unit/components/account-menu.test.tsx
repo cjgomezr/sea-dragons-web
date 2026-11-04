@@ -7,6 +7,7 @@ import {
   CLUB_SETTINGS_PATH,
   SIGN_IN_PATH,
 } from "@/lib/auth/routes";
+import { NO_SOCIAL_LINKS, type SocialLinks } from "@/lib/club/social-links";
 import { LOCALE_COOKIE_NAME, type Locale } from "@/lib/i18n/locale";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 
@@ -553,5 +554,77 @@ describe("Idioma dentro del menú", () => {
       within(menu).getByRole("link", { name: "Mi perfil" }),
     ).toBeInTheDocument();
     expect(within(menu).getByRole("radio", { name: "Español" })).toBeChecked();
+  });
+});
+
+// #972: las redes del club pasan de la barra lateral al final del menú de la
+// cuenta, tras la misma raya que separa el cierre de sesión.
+describe("Las redes del club al final del menú", () => {
+  const INSTAGRAM = "https://www.instagram.com/hobartorcas";
+  const WEBSITE = "https://hobartorcas.example";
+
+  function renderMenuWithLinks(
+    links: SocialLinks,
+    locale: Locale = "en",
+  ): void {
+    render(
+      <AccountMenu
+        locale={locale}
+        trigger="avatar"
+        canConfigureClub={false}
+        account={CAMILO}
+        socialLinks={{ links, clubName: "Hobart Orcas" }}
+      />,
+    );
+  }
+
+  it("con redes pinta la fila al final del desplegable, tras el cierre de sesión", async () => {
+    renderMenuWithLinks({
+      ...NO_SOCIAL_LINKS,
+      website: WEBSITE,
+      instagram: INSTAGRAM,
+    });
+
+    const menu = await openMenu();
+
+    const row = within(menu).getByRole("list", { name: "Club social links" });
+    expect(menu.lastElementChild).toBe(row);
+    const links = within(row).getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("aria-label"))).toEqual([
+      "Instagram of Hobart Orcas",
+      "Website of Hobart Orcas",
+    ]);
+    expect(links[0]).toHaveAttribute("href", INSTAGRAM);
+    expect(links[0]).toHaveAttribute("target", "_blank");
+    expect(links[0]).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("nombra cada red en español con la aplicación en español", async () => {
+    renderMenuWithLinks({ ...NO_SOCIAL_LINKS, instagram: INSTAGRAM }, "es");
+
+    const menu = await openMenu("Mi cuenta");
+
+    expect(
+      within(menu).getByRole("link", { name: "Instagram de Hobart Orcas" }),
+    ).toHaveAttribute("href", INSTAGRAM);
+  });
+
+  it("sin redes no pinta fila ni separador: el cierre de sesión cierra el menú", async () => {
+    renderMenuWithLinks(NO_SOCIAL_LINKS);
+
+    const menu = await openMenu();
+
+    expect(
+      within(menu).queryByRole("list", { name: "Club social links" }),
+    ).toBeNull();
+    expect(menu.lastElementChild).toHaveClass("account-menu-signout");
+  });
+
+  it("sin la prop de redes tampoco pinta la fila", async () => {
+    renderMenu();
+
+    const menu = await openMenu();
+
+    expect(menu.lastElementChild).toHaveClass("account-menu-signout");
   });
 });

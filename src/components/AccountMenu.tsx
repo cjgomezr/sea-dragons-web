@@ -11,12 +11,14 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { Icon } from "@/components/Icon";
 import { LanguageChoice } from "@/components/LanguageChoice";
 import { MemberAvatar } from "@/components/MemberAvatar";
+import { ClubSocialLinks } from "@/components/ClubSocialLinks";
 import { AccountIcon } from "@/components/NavIcons";
 import { ThemeChoice } from "@/components/ThemeChoice";
 import { useDropdownMenu } from "@/components/use-dropdown-menu";
 import type { MemberIdentity } from "@/lib/auth/caller-identity";
 import type { Role } from "@/lib/auth/roles";
 import { ACCOUNT_PAGE_PATH, CLUB_SETTINGS_PATH } from "@/lib/auth/routes";
+import type { SocialLinks } from "@/lib/club/social-links";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator, type Translator } from "@/lib/i18n/translator";
 import { isSectionActive } from "@/lib/navigation";
@@ -24,9 +26,10 @@ import { isSectionActive } from "@/lib/navigation";
 /**
  * El menú de la cuenta (#287, rehecho en #716): quién tiene la sesión arriba,
  * Mi perfil, la configuración del club a quien puede cambiarla (#296),
- * Apariencia e Idioma como controles segmentados y Cerrar sesión. Se abre
- * como la lista de avisos (#266): desplegable en escritorio y pantalla entera
- * con su flecha de volver en el móvil.
+ * Apariencia e Idioma como controles segmentados, Cerrar sesión y, en
+ * escritorio, las redes del club (#972). Se abre como la lista de avisos
+ * (#266): desplegable en escritorio y pantalla entera con su flecha de volver
+ * en el móvil.
  *
  * Es de cliente porque abre y cierra. Cambiar de idioma rehace la cabecera en
  * el servidor, y este componente conserva su estado: el menú sigue abierto y
@@ -45,6 +48,13 @@ export type AccountIdentity = MemberIdentity & {
  * móvil, o el círculo con la cara o las iniciales de la barra de arriba de
  * escritorio (#717). */
 export type AccountMenuTrigger = "icon" | "avatar";
+
+/** Las redes del club que el menú pone al final (#972), con el nombre del
+ * club que llevan sus enlaces. */
+export type AccountMenuSocialLinks = {
+  readonly links: SocialLinks;
+  readonly clubName: string;
+};
 
 /** `MemberAvatar` pide una medida; la que manda es la del CSS, 40 px en
  * escritorio y 52 en el móvil. */
@@ -137,6 +147,7 @@ function AccountMenuPanel({
   locale,
   account,
   canConfigureClub,
+  socialLinks,
   headingRef,
   onBack,
   onNavigate,
@@ -145,6 +156,7 @@ function AccountMenuPanel({
   readonly locale: Locale;
   readonly account: AccountIdentity;
   readonly canConfigureClub: boolean;
+  readonly socialLinks: AccountMenuSocialLinks | undefined;
   readonly headingRef: React.Ref<HTMLHeadingElement>;
   readonly onBack: () => void;
   readonly onNavigate: () => void;
@@ -175,6 +187,15 @@ function AccountMenuPanel({
       <div className="account-menu-signout">
         <SignOutButton locale={locale} />
       </div>
+      {/* Sin redes la lista no se pinta, y con ella su raya: es la propia
+          lista la que la lleva, no un envoltorio que quedaría vacío. */}
+      {socialLinks === undefined ? null : (
+        <ClubSocialLinks
+          {...socialLinks}
+          locale={locale}
+          className="account-menu-social"
+        />
+      )}
     </section>
   );
 }
@@ -204,6 +225,7 @@ export function AccountMenu({
   account,
   trigger,
   canConfigureClub,
+  socialLinks,
 }: {
   locale: Locale;
   account: AccountIdentity;
@@ -211,6 +233,9 @@ export function AccountMenu({
   /** Si quien lo abre es Admin: sólo entonces ofrece la configuración del
    * club. Lo decide el servidor con la regla de la frontera. */
   canConfigureClub: boolean;
+  /** Sólo el desplegable de escritorio las lleva (#972): en el móvil ya
+   * están al final de la hoja Más. */
+  socialLinks?: AccountMenuSocialLinks;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const menuId = useId();
@@ -248,6 +273,7 @@ export function AccountMenu({
           locale={locale}
           account={account}
           canConfigureClub={canConfigureClub}
+          socialLinks={socialLinks}
           headingRef={headingRef}
           onBack={closeAndReturnFocus}
           onNavigate={close}

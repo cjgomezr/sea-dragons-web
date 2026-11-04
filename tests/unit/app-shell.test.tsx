@@ -812,8 +812,8 @@ describe("la alerta de pago fallido (#474)", () => {
   });
 });
 
-// #964: las redes del club al pie de la barra lateral y al final de la hoja
-// "More"; sin redes, la cáscara queda como hoy.
+// #964 y #972: las redes del club al final del menú de la cuenta en escritorio
+// y al final de la hoja "More" en el móvil; sin redes, la cáscara queda como hoy.
 describe("las redes del club en la cáscara", () => {
   const INSTAGRAM = "https://www.instagram.com/hobartorcas";
   const WITH_LINKS: ClubBrand = {
@@ -821,19 +821,37 @@ describe("las redes del club en la cáscara", () => {
     socialLinks: { ...NO_SOCIAL_LINKS, instagram: INSTAGRAM },
   };
 
-  it("con redes las pinta al pie de la barra lateral, fuera de la navegación", () => {
+  it("con redes la barra lateral ya no las lleva (#972)", () => {
     usePathname.mockReturnValue("/dashboard");
     renderShell("en", WITH_LINKS);
 
     const sidebar = screen.getByRole("complementary");
-    const list = within(sidebar).getByRole("list", {
-      name: "Club social links",
-    });
-    expect(sidebar.lastElementChild).toContainElement(list);
-    const navigation = within(sidebar).getByRole("navigation", {
-      name: "Main",
-    });
-    expect(navigation).not.toContainElement(list);
+    expect(
+      within(sidebar).queryByRole("list", { name: "Club social links" }),
+    ).toBeNull();
+  });
+
+  it("en escritorio las pinta al final del menú de la cuenta (#972)", async () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell("en", WITH_LINKS);
+
+    const menu = await openAccountMenu();
+
+    expect(
+      within(menu).getByRole("link", { name: "Instagram of Hobart Orcas" }),
+    ).toHaveAttribute("href", INSTAGRAM);
+  });
+
+  it("en el móvil el menú de la cuenta no las repite: siguen en Más (#972)", async () => {
+    emulatePhone();
+    usePathname.mockReturnValue("/dashboard");
+    renderShell("en", WITH_LINKS);
+
+    const menu = await openAccountMenu();
+
+    expect(
+      within(menu).queryByRole("list", { name: "Club social links" }),
+    ).toBeNull();
   });
 
   it("con redes las pinta al final de la hoja Más", async () => {
