@@ -1,5 +1,6 @@
 "use client";
 
+import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { returnFocus } from "@/components/input-modality";
 import type { Role } from "@/lib/auth/roles";
@@ -14,7 +15,7 @@ import {
 } from "@/lib/directory/directory";
 import { writeDirectoryQuery } from "@/lib/directory/directory-query";
 import type { Locale } from "@/lib/i18n/locale";
-import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { Translator } from "@/lib/i18n/translator";
 import {
   DirectoryEmailComposer,
   type EmailRecipient,
@@ -367,7 +368,7 @@ export function DirectoryScreen({
    * Admin. */
   isInviteOpenAtStart?: boolean;
 }): React.JSX.Element {
-  const translate = createTranslator(locale);
+  const translate = useClubTranslator(locale);
   const [filters, setFilters] = useState<DirectoryFilterState>(() =>
     filtersOf(initialQuery),
   );

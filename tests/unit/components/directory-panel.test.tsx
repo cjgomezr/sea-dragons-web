@@ -1089,7 +1089,7 @@ describe("el resumen del club (#551)", () => {
     const user = userEvent.setup();
     const summary = await openOverview({ summary: NEEDS_ATTENTION });
     const card = within(summary).getByRole("group", {
-      name: "2 AUF registrations need renewal",
+      name: "2 members need to renew their AUF",
     });
 
     expect(card).toHaveTextContent(
@@ -1101,7 +1101,7 @@ describe("el resumen del club (#551)", () => {
 
     await user.click(
       within(card).getByRole("button", {
-        name: "View the AUF registrations to renew",
+        name: "View the members who need to renew their AUF",
       }),
     );
 
@@ -1112,7 +1112,7 @@ describe("el resumen del club (#551)", () => {
     const summary = await openOverview();
 
     expect(
-      within(summary).queryByRole("group", { name: /AUF registration/ }),
+      within(summary).queryByRole("group", { name: /renew their AUF/ }),
     ).toBeNull();
   });
 
@@ -1244,7 +1244,7 @@ describe("el resumen del club (#551)", () => {
     ).toBeVisible();
     expect(
       within(summary).getByRole("group", {
-        name: "2 registros AUF por renovar",
+        name: "2 miembros tienen que renovar su AUF",
       }),
     ).toHaveTextContent("Nerea Ruiz (vencido), Ana Admin (por vencer)");
     expect(

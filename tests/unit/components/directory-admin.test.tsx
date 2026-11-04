@@ -734,7 +734,7 @@ describe("directorio para Admin: ficha reservada (#242)", () => {
       screen.getByRole("link", { name: "Abrir la ficha de Nerea Ruiz" }),
     ).toBeVisible();
     expect(dotsOf("Nerea Ruiz")).toEqual(["Sin número de AUF"]);
-    expect(dotsOf("Vera Vencida")).toEqual(["AUF vencido"]);
+    expect(dotsOf("Vera Vencida")).toEqual(["Vencido: AUF"]);
   });
 });
 describe("directorio para quien no es Admin", () => {

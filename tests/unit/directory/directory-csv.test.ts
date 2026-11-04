@@ -160,7 +160,10 @@ describe("directoryCsv", () => {
 
   it("da al Admin además el AUF, la membresía y si está evaluado", () => {
     const [header] = linesOf(
-      directoryCsv({ kind: "admin", members: [] }, createTranslator("es")),
+      directoryCsv(
+        { kind: "admin", members: [] },
+        createTranslator("es", { registrationName: "AUF" }),
+      ),
     );
 
     expect(header).toBe(
@@ -169,8 +172,8 @@ describe("directoryCsv", () => {
         "País",
         "Nivel",
         "Número de AUF",
-        "Vencimiento del AUF",
-        "AUF verificado",
+        "Vencimiento de AUF",
+        "Verificación de AUF",
         "Estado de la cuenta",
         "Membresía",
         "Evaluado",

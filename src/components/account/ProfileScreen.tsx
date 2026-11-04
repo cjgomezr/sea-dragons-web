@@ -66,6 +66,7 @@ export function ProfileScreen({
   membershipStatus,
   membershipRenewsOn,
   joinedOn,
+  registrationName,
 }: {
   locale: Locale;
   /** El `user_id` de quien mira su perfil. */
@@ -93,8 +94,10 @@ export function ProfileScreen({
   membershipRenewsOn: string | null;
   /** YYYY-MM-DD, el día en que ingresó. */
   joinedOn: string;
+  /** El nombre del registro del club (#967), de su marca. */
+  registrationName: string | null;
 }): React.JSX.Element {
-  const translate = createTranslator(locale);
+  const translate = createTranslator(locale, { registrationName });
   const position = positionOptions.find(
     (option) => option.id === profile.positionId,
   );
@@ -110,6 +113,7 @@ export function ProfileScreen({
       <ProfileHero
         locale={locale}
         isOwnProfile
+        registrationName={registrationName}
         member={{
           userId,
           fullName: account.fullName,

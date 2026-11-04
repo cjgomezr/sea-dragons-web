@@ -13,10 +13,19 @@ type PlaceholderNames<Template> =
 
 type TemplatesOf<Entry> = Entry extends string ? Entry : Entry[keyof Entry];
 
+/** El nombre del registro del club (#967): lo pone el traductor, que lo
+ * recibe al crearse, así que ninguna llamada lo pide. */
+const REGISTRATION_PARAM = "registration";
+type TranslatorProvidedParam = typeof REGISTRATION_PARAM;
+
+/** La palabra de la app cuando el club no le pone nombre a su registro (D12
+ * del PRD de E37): "Registration" / "Registro". */
+const DEFAULT_REGISTRATION_KEY = "registration.defaultName";
+
 /** Un plural pide `count` aunque ninguna de sus formas lo escriba
  * ("One minute left"): sin él no hay forma que elegir. */
 type ParamNames<Entry> =
-  | PlaceholderNames<TemplatesOf<Entry>>
+  | Exclude<PlaceholderNames<TemplatesOf<Entry>>, TranslatorProvidedParam>
   | (Entry extends string ? never : "count");
 
 /** Los datos que pide un mensaje, deducidos de sus llaves. `count` elige la
@@ -84,13 +93,36 @@ function insertParams(
   });
 }
 
+export type TranslatorOptions = {
+  /** El nombre del registro del club (#967). Nulo o ausente es la palabra
+   * de la app. */
+  readonly registrationName?: string | null;
+};
+
+function readDefaultRegistration(
+  catalog: Readonly<Record<string, Message>>,
+): string {
+  const word = catalog[DEFAULT_REGISTRATION_KEY];
+  if (typeof word !== "string") {
+    throw new RangeError(
+      `El catálogo no tiene la palabra "${DEFAULT_REGISTRATION_KEY}".`,
+    );
+  }
+  return word;
+}
+
 /** Lo mismo en un componente de servidor que en uno de cliente: es una
  * función pura sobre catálogos estáticos. Un componente de cliente la llama
  * con el idioma que recibe como prop, porque la función devuelta no se puede
  * pasar del servidor al navegador. */
-export function createTranslator(locale: Locale): Translator {
+export function createTranslator(
+  locale: Locale,
+  options: TranslatorOptions = {},
+): Translator {
   const catalog: Readonly<Record<string, Message>> = messageCatalogs[locale];
   const plurals = new Intl.PluralRules(locale);
+  const registration =
+    options.registrationName ?? readDefaultRegistration(catalog);
 
   const translate = <Key extends MessageKey>(
     key: Key,
@@ -102,7 +134,10 @@ export function createTranslator(locale: Locale): Translator {
         `No hay mensaje "${key}" en el catálogo "${locale}".`,
       );
     }
-    const values: ParamValues = params ?? {};
+    const values: ParamValues = {
+      ...params,
+      [REGISTRATION_PARAM]: registration,
+    };
     return insertParams(
       locale,
       selectTemplate(plurals, message, values),

@@ -16,5 +16,10 @@ export async function readMetadataContext(): Promise<MetadataContext> {
     readRequestLocale(),
     readClubBrand(),
   ]);
-  return { translate: createTranslator(locale), club: brand.name };
+  return {
+    translate: createTranslator(locale, {
+      registrationName: brand.registrationName,
+    }),
+    club: brand.name,
+  };
 }

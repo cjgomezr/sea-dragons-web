@@ -29,6 +29,7 @@ function renderHero(
     <ProfileHero
       locale={locale}
       isOwnProfile={false}
+      registrationName="AUF"
       member={{ ...MEMBER, ...member }}
     />,
   );

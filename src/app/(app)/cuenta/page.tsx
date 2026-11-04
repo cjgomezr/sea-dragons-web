@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ProfileScreen } from "@/components/account/ProfileScreen";
+import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { readOwnSeasonAttendance } from "@/lib/attendance/own-attendance";
 import type { SeasonAttendance } from "@/lib/attendance/season-attendance";
 import { createSupabaseOwnSeasonAttendanceGateways } from "@/lib/attendance/supabase-season-attendance";
@@ -231,9 +232,10 @@ async function readAccount(userId: string): Promise<RoleRequestAccount> {
 }
 
 export default async function AccountPage(): Promise<React.JSX.Element> {
-  const [locale, caller] = await Promise.all([
+  const [locale, caller, brand] = await Promise.all([
     readRequestLocale(),
     readCallerSession(),
+    readClubBrand(),
   ]);
   const [account, profile, photo, groups, evaluation, attendance, membership] =
     await Promise.all([
@@ -263,6 +265,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
       membershipStatus={membership === null ? null : membership.status}
       membershipRenewsOn={membership === null ? null : membership.renewsOn}
       joinedOn={profile.joinedOn}
+      registrationName={brand.registrationName}
     />
   );
 }

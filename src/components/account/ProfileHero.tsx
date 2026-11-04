@@ -190,6 +190,7 @@ export function ProfileHero({
   member,
   isOwnProfile,
   actions = null,
+  registrationName,
 }: {
   locale: Locale;
   member: HeroMember;
@@ -197,8 +198,11 @@ export function ProfileHero({
   isOwnProfile: boolean;
   /** Lo que va a la derecha, o null. */
   actions?: React.ReactNode;
+  /** El nombre del registro del club (#967): la cabecera también se pinta
+   * en el servidor, donde no hay contexto que leer. */
+  registrationName: string | null;
 }): React.JSX.Element {
-  const translate = createTranslator(locale);
+  const translate = createTranslator(locale, { registrationName });
   const identity = <HeroIdentity translate={translate} member={member} />;
   return (
     <header className="profile-hero">

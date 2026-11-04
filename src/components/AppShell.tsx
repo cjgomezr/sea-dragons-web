@@ -9,6 +9,7 @@ import {
 import { ClubBrandMark } from "@/components/ClubBrandMark";
 import { ClubSocialLinks } from "@/components/ClubSocialLinks";
 import { ClubNameProvider } from "@/components/club/ClubNameProvider";
+import { RegistrationNameProvider } from "@/components/club/RegistrationNameProvider";
 import { FailedPaymentNotice } from "@/components/FailedPaymentNotice";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { PhoneHeader } from "@/components/PhoneHeader";
@@ -163,7 +164,11 @@ export function AppShell({
           />
         )}
         <main className="app-main">
-          <ClubNameProvider name={brand.name}>{children}</ClubNameProvider>
+          <ClubNameProvider name={brand.name}>
+            <RegistrationNameProvider name={brand.registrationName}>
+              {children}
+            </RegistrationNameProvider>
+          </ClubNameProvider>
         </main>
       </div>
       {/* After main on purpose: the bar sits at the bottom of the screen, so

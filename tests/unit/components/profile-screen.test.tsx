@@ -165,6 +165,7 @@ function profileScreen(
   const locale = options.locale ?? "en";
   return (
     <ProfileScreen
+      registrationName="AUF"
       locale={locale}
       userId="cccccccc-0000-4000-8000-00000000000c"
       email="nerea@example.com"
@@ -722,15 +723,13 @@ function withAuf(auf: OwnAuf): OwnProfile {
  * tarjeta cuenta lo que falta para el vencimiento. */
 const NOW_IN_CLUB = new Date("2026-10-20T02:00:00.000Z");
 
-function aufCard(name = "AUF registration"): HTMLElement {
+function aufCard(name = "AUF"): HTMLElement {
   return screen.getByRole("region", { name });
 }
 
 async function openAuf(user: User): Promise<HTMLElement> {
   const card = aufCard();
-  await user.click(
-    within(card).getByRole("button", { name: "Edit AUF registration" }),
-  );
+  await user.click(within(card).getByRole("button", { name: "Edit AUF" }));
   return card;
 }
 
@@ -801,7 +800,7 @@ describe("perfil propio: el AUF en su tarjeta (#274, #773)", () => {
 
     const card = aufCard();
     expect(
-      within(card).getByRole("button", { name: "Edit AUF registration" }),
+      within(card).getByRole("button", { name: "Edit AUF" }),
     ).toBeInTheDocument();
     expect(
       within(card).getByText(
@@ -895,7 +894,7 @@ describe("perfil propio: el AUF en su tarjeta (#274, #773)", () => {
     expect(cellOf(card, "Number")).toHaveTextContent("AUF-200");
     expect(cellOf(card, "Status")).toHaveTextContent("Pending");
     expect(
-      within(card).getByRole("button", { name: "Edit AUF registration" }),
+      within(card).getByRole("button", { name: "Edit AUF" }),
     ).toHaveFocus();
   });
 
@@ -965,7 +964,7 @@ describe("perfil propio: el AUF en su tarjeta (#274, #773)", () => {
     await user.click(saveIn(card));
 
     expect(await within(card).findByRole("alert")).toHaveTextContent(
-      "Your AUF is already verified. Only an Admin can change it.",
+      "An Admin already verified your AUF. Only an Admin can change it.",
     );
     expect(within(card).getByLabelText("AUF number")).toHaveValue("AUF-300");
   });
@@ -1005,7 +1004,7 @@ describe("perfil propio: el AUF en su tarjeta (#274, #773)", () => {
     expect(calls).toEqual([]);
     expect(cellOf(card, "Number")).toHaveTextContent("AUF-100");
     expect(
-      within(card).getByRole("button", { name: "Edit AUF registration" }),
+      within(card).getByRole("button", { name: "Edit AUF" }),
     ).toHaveFocus();
   });
 
@@ -1031,7 +1030,7 @@ describe("perfil propio: el AUF en su tarjeta (#274, #773)", () => {
   it("en español, el AUF y su estado salen en español", () => {
     renderScreen({ locale: "es", profile: withAuf(PENDING_AUF) });
 
-    const card = aufCard("Registro AUF");
+    const card = aufCard("AUF");
     expect(cellOf(card, "Número")).toHaveTextContent("AUF-100");
     expect(cellOf(card, "Vence")).toHaveTextContent("en 253 días");
     expect(cellOf(card, "Estado")).toHaveTextContent("Pendiente");

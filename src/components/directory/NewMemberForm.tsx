@@ -1,5 +1,6 @@
 "use client";
 
+import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { Check } from "@phosphor-icons/react/dist/ssr/Check";
 import { PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr/PaperPlaneTilt";
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
@@ -12,7 +13,7 @@ import { GROUPS_PATH, memberRecordHref } from "@/lib/auth/routes";
 import type { NamedPosition } from "@/lib/club/club-positions";
 import { type CountryCode, listCountryOptions } from "@/lib/geo/countries";
 import type { Group } from "@/lib/groups/groups";
-import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { Translator } from "@/lib/i18n/translator";
 import type { Locale } from "@/lib/i18n/locale";
 import {
   type NewMemberField,
@@ -410,7 +411,7 @@ export function NewMemberForm({
   onCreated,
   onCancel,
 }: NewMemberFormProps): React.JSX.Element {
-  const translate = createTranslator(locale);
+  const translate = useClubTranslator(locale);
   const countries = useMemo(() => listCountryOptions(locale), [locale]);
   const form = useNewMemberForm({ positions, initialGroupIds, onCreated });
   const { draft, status, issues } = form;

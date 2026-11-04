@@ -1,5 +1,6 @@
 "use client";
 
+import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -8,7 +9,7 @@ import {
 } from "@/lib/club/club-positions";
 import type { CountryOption } from "@/lib/geo/countries";
 import type { Locale } from "@/lib/i18n/locale";
-import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { Translator } from "@/lib/i18n/translator";
 import {
   type MissingProfileItem,
   profileCompletenessOf,
@@ -89,7 +90,7 @@ export function ProfileForm({
   countries: readonly CountryOption[];
   emergencyContactProposal: EmergencyContactProposal | null;
 }): React.JSX.Element {
-  const translate = createTranslator(locale);
+  const translate = useClubTranslator(locale);
   const router = useRouter();
   const [profile, setProfile] = useState(initialProfile);
   // La propuesta es para la primera vez: quien guardó su contacto ya decidió,

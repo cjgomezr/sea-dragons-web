@@ -452,17 +452,19 @@ export const englishMessages = {
     "We couldn't save your changes. Try again in a moment.",
   // El AUF del perfil propio (#274): lo escribe el miembro y queda pendiente
   // hasta que un Admin lo verifica.
-  "account.profile.auf.title": "AUF registration",
-  "account.profile.auf.number": "AUF number",
-  "account.profile.auf.expiry": "AUF expiry",
-  "account.profile.issue.aufNumberMissing": "Write your AUF number.",
+  // El nombre del registro cuando el club no le pone uno (#967, D12 de E37).
+  "registration.defaultName": "Registration",
+  "account.profile.auf.title": "{registration}",
+  "account.profile.auf.number": "{registration} number",
+  "account.profile.auf.expiry": "{registration} expiry",
+  "account.profile.issue.aufNumberMissing": "Write your {registration} number.",
   "account.profile.issue.aufNumberTooLong":
-    "Your AUF number can be at most {max} characters.",
+    "Your {registration} number can be at most {max} characters.",
   "account.profile.issue.aufExpiryNotADate": "Write a valid expiry date.",
   "account.profile.issue.aufExpiryBeforeJoined":
     "The expiry can't be before the day you joined the club.",
   "account.profile.error.aufVerified":
-    "Your AUF is already verified. Only an Admin can change it.",
+    "An Admin already verified your {registration}. Only an Admin can change it.",
   // El aviso de los datos de contacto que faltan (#498).
   "contactReminder.emergencyContact.title": "Add your emergency contact",
   "contactReminder.phone.title": "Add your phone number",
@@ -525,7 +527,7 @@ export const englishMessages = {
   "profileCard.contact.emergencySummary": "{name} · {relationship}",
   // Registro AUF y Ficha del club, en el perfil y en la ficha (#773).
   "profileCard.adminOnly": "Admin",
-  "profileCard.auf.saved": "AUF saved",
+  "profileCard.auf.saved": "{registration} saved",
   "profileCard.auf.number": "Number",
   "profileCard.auf.expires": "Expires",
   "profileCard.auf.status": "Status",
@@ -557,7 +559,7 @@ export const englishMessages = {
   "account.photo.saved": "Photo updated.",
   "account.photo.removed": "Photo removed.",
   "account.photo.retry": "Try again",
-  "profileHero.auf.pending": "AUF pending",
+  "profileHero.auf.pending": "{registration} pending",
   "profileHero.memberSince": "Member since {date}",
   "profileCompletion.title": "Your profile is almost complete. Missing:",
   "profileCompletion.progress": "Profile completeness",
@@ -810,9 +812,9 @@ export const englishMessages = {
   "directory.filter.position.none": "No position",
   "directory.filter.group": "Group",
   "directory.filter.group.all": "All groups",
-  "directory.filter.auf": "AUF",
-  "directory.filter.auf.all": "Any AUF",
-  "directory.filter.auf.missing": "No AUF number",
+  "directory.filter.auf": "{registration}",
+  "directory.filter.auf.all": "Any {registration}",
+  "directory.filter.auf.missing": "No {registration} number",
   "directory.filter.auf.expired": "Expired",
   "directory.filter.auf.expiring": "Expires within 30 days",
   "directory.filter.auf.unverified": "Not verified",
@@ -911,10 +913,10 @@ export const englishMessages = {
   "directory.requestsScreen.reason": "Reason",
   "directory.requestsScreen.allCaughtUp": "All caught up",
   "directory.mark.inactive": "Deactivated",
-  "directory.dot.aufExpired": "AUF expired",
+  "directory.dot.aufExpired": "{registration} expired",
   "directory.dot.membershipPastDue": "Membership past due",
-  "directory.dot.aufMissing": "No AUF number",
-  "directory.dot.aufExpiring": "AUF expiring soon",
+  "directory.dot.aufMissing": "No {registration} number",
+  "directory.dot.aufExpiring": "{registration} expiring soon",
   "directory.legend.label": "Status dots",
   "directory.legend.danger": "Needs action",
   "directory.legend.warning": "Check soon",
@@ -939,16 +941,18 @@ export const englishMessages = {
   "directory.overview.requestLabel": "Role request from {name}",
   "directory.overview.openMember": "Open the details of {name}",
   "directory.overview.aufTitle": {
-    one: "{count} AUF registration needs renewal",
-    other: "{count} AUF registrations need renewal",
+    one: "{count} member needs to renew their {registration}",
+    other: "{count} members need to renew their {registration}",
   },
   "directory.overview.aufExpired": "{name} (expired)",
   "directory.overview.aufExpiring": "{name} (expiring)",
   "directory.overview.view": "View",
-  "directory.overview.viewLabel": "View the AUF registrations to renew",
+  "directory.overview.viewLabel":
+    "View the members who need to renew their {registration}",
   "directory.overview.attention": "Needs attention",
-  "directory.overview.attention.aufMissing": "Without AUF",
-  "directory.overview.attention.aufRenewal": "AUF expired or expiring",
+  "directory.overview.attention.aufMissing": "Without {registration}",
+  "directory.overview.attention.aufRenewal":
+    "{registration} expired or expiring",
   "directory.overview.attention.withoutEmergencyContact":
     "No emergency contact",
   "directory.overview.attention.membershipPastDue": "Membership past due",
@@ -989,10 +993,10 @@ export const englishMessages = {
   "directory.action.emergency": "Call {name}'s emergency contact",
   "directory.action.noPhone": "{name} has no phone",
   "directory.action.noEmergency": "{name} has no emergency contact",
-  "directory.mark.aufExpired": "AUF expired",
+  "directory.mark.aufExpired": "{registration} expired",
   // #274: el AUF que escribió el miembro, hasta que un Admin lo verifica.
-  "directory.mark.aufNotVerified": "AUF not verified",
-  "directory.mark.aufVerified": "AUF verified",
+  "directory.mark.aufNotVerified": "{registration} not verified",
+  "directory.mark.aufVerified": "{registration} verified",
   "directory.mark.membership.none": "No membership",
   "directory.mark.membership.pending": "Membership pending",
   "directory.mark.membership.trialing": "On trial",
@@ -1012,7 +1016,7 @@ export const englishMessages = {
   // grupos de un miembro, abierta desde su fila del directorio.
   "memberRecord.metaTitle": "Member record · {club}",
   "memberRecord.metaDescription":
-    "A member's AUF registration and groups, which only an Admin edits.",
+    "A member's {registration} and groups, which only an Admin edits.",
   "memberRecord.back": "Directory",
   "memberRecord.openLabel": "Open {name}'s record",
   "memberRecord.loading": "Loading the member's record…",
@@ -1029,17 +1033,17 @@ export const englishMessages = {
   "photoViewer.alt": "Photo of {name}",
   "photoViewer.loading": "Loading the photo…",
   "photoViewer.failed": "The photo couldn't be loaded.",
-  "memberRecord.auf.title": "AUF registration",
-  "memberRecord.auf.number": "AUF number",
+  "memberRecord.auf.title": "{registration}",
+  "memberRecord.auf.number": "{registration} number",
   "memberRecord.auf.expiry": "Expiry date",
   "memberRecord.auf.hint": "Clearing the number also clears its expiry date.",
-  "memberRecord.auf.verify": "Verify AUF",
+  "memberRecord.auf.verify": "Verify {registration}",
   "memberRecord.auf.verifying": "Verifying…",
-  "memberRecord.auf.verified": "AUF verified.",
+  "memberRecord.auf.verified": "{registration} verified.",
   "memberRecord.aufStrip.withExpiry":
-    "{name} added AUF {number} (expires {date}). Check it and verify.",
+    "{name} added their {registration} number {number} (expires {date}). Check it and verify.",
   "memberRecord.aufStrip.withoutExpiry":
-    "{name} added AUF {number}. Check it and verify.",
+    "{name} added their {registration} number {number}. Check it and verify.",
   "memberRecord.birth.label": "Date of birth",
   "memberRecord.birth.hint":
     "The member can't change it: it decides whether they need a guardian's consent.",
@@ -1059,7 +1063,7 @@ export const englishMessages = {
     "This is {name}'s own phone. The emergency contact should be someone else.",
   "memberRecord.groups.empty": "The club has no groups yet.",
   "memberRecord.issue.aufNumberTooLong":
-    "The AUF number can have at most {max} characters.",
+    "The {registration} number can have at most {max} characters.",
   "memberRecord.issue.aufExpiryNotADate": "That expiry isn't a valid date.",
   "memberRecord.issue.aufExpiryBeforeJoined":
     "The expiry can't be before the date they joined ({date}).",
@@ -1075,7 +1079,7 @@ export const englishMessages = {
   "memberRecord.error.memberStatusChanged":
     "The member's account changed while saving. Reload the record and try again.",
   "memberRecord.error.aufChanged":
-    "The member changed the AUF after you opened the record. Reload it before verifying.",
+    "The member changed their {registration} after you opened the record. Reload it before verifying.",
   "memberRecord.error.signInRequired":
     "Your session ended. Sign in again to keep going.",
   "memberRecord.error.forbidden": "Only an Admin can see and edit this record.",
@@ -1124,9 +1128,9 @@ export const englishMessages = {
   "directory.bulk.reason.unexpected": "something failed, try again",
   "directory.export.fileName": "directory",
   "directory.export.column.name": "Name",
-  "directory.export.column.aufNumber": "AUF number",
-  "directory.export.column.aufExpiry": "AUF expiry",
-  "directory.export.column.aufVerified": "AUF verified",
+  "directory.export.column.aufNumber": "{registration} number",
+  "directory.export.column.aufExpiry": "{registration} expiry",
+  "directory.export.column.aufVerified": "{registration} verified",
   "directory.export.column.accountStatus": "Account status",
   "directory.export.column.membership": "Membership",
   "directory.export.column.evaluated": "Assessed",
@@ -1322,7 +1326,7 @@ export const englishMessages = {
   "newMember.gender": "Gender",
   "newMember.gender.private": "only Admins and the member",
   "newMember.choose": "Choose one",
-  "newMember.auf.title": "AUF registration",
+  "newMember.auf.title": "{registration}",
   "newMember.auf.hint": "Both or neither",
   "newMember.auf.number": "Number",
   "newMember.auf.expiry": "Expires",
@@ -1331,8 +1335,8 @@ export const englishMessages = {
     other: "{count} things to fix before sending",
   },
   "newMember.summary.item": "{field}: {issue}",
-  "newMember.summary.aufNumber": "AUF number",
-  "newMember.summary.aufExpiry": "AUF expiry",
+  "newMember.summary.aufNumber": "{registration} number",
+  "newMember.summary.aufExpiry": "{registration} expiry",
   "newMember.preview.titleNamed": "What {name} will receive",
   "newMember.preview.titleUnnamed": "What they will receive",
   "newMember.preview.from": "From",
@@ -1363,14 +1367,14 @@ export const englishMessages = {
   "newMember.issue.positionUnknown": "Choose a position.",
   "newMember.issue.experienceLevelUnknown": "Choose an experience level.",
   "newMember.issue.genderUnknown": "Choose an option.",
-  "newMember.issue.aufNumberMissing": "Write the AUF number.",
+  "newMember.issue.aufNumberMissing": "Write the {registration} number.",
   "newMember.issue.aufNumberTooLong":
-    "The AUF number can have at most {max} characters.",
+    "The {registration} number can have at most {max} characters.",
   "newMember.issue.aufExpiryMissing":
-    "Add the expiry date that goes with the AUF number.",
-  "newMember.issue.aufExpiryNotADate": "Write the AUF expiry date.",
+    "Add the expiry date that goes with the {registration} number.",
+  "newMember.issue.aufExpiryNotADate": "Write the {registration} expiry date.",
   "newMember.issue.aufExpiryInThePast":
-    "The AUF has already expired. Check the date.",
+    "The {registration} has already expired. Check the date.",
   "newMember.error.emailTaken": "This email already belongs to a member.",
   "newMember.error.openExisting": "Open {name}'s profile",
   "newMember.error.groupNotFound":

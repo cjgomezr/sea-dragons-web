@@ -17,7 +17,7 @@ const CLUBS_TABLE = "clubs";
 // ruta del logo a su dirección pública y repartir los textos del inicio de
 // sesión (#301) por idioma.
 const BRAND_COLUMNS =
-  "name, initials, accentColor:accent_color, logoPath:logo_path, signInTextRows:club_sign_in_texts(locale, tagline, welcome)";
+  "name, initials, accentColor:accent_color, logoPath:logo_path, registrationName:registration_name, signInTextRows:club_sign_in_texts(locale, tagline, welcome)";
 
 type BrandColumns = Omit<ClubBrandRow, "logoUrl" | "signInTexts"> & {
   readonly logoPath: string | null;
