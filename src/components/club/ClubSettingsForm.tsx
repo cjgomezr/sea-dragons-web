@@ -59,6 +59,7 @@ type Draft = {
   readonly initials: string;
   readonly accentColor: string;
   readonly seasonStartsOn: string;
+  readonly registrationName: string;
 };
 
 const FIELD_OF_ISSUE: Readonly<
@@ -70,6 +71,7 @@ const FIELD_OF_ISSUE: Readonly<
   accent_color_invalid: "accentColor",
   accent_color_no_readable_text: "accentColor",
   season_starts_on_invalid: "seasonStartsOn",
+  registration_name_too_long: "registrationName",
 };
 
 function toDraft(settings: ClubSettings): Draft {
@@ -78,6 +80,7 @@ function toDraft(settings: ClubSettings): Draft {
     initials: settings.initials ?? "",
     accentColor: settings.accentColor.toUpperCase(),
     seasonStartsOn: settings.seasonStartsOn ?? "",
+    registrationName: settings.registrationName ?? "",
   };
 }
 
@@ -87,6 +90,8 @@ function toIdentity(draft: Draft): ClubIdentity {
     initials: draft.initials.trim() === "" ? null : draft.initials,
     accentColor: normalizeAccentInput(draft.accentColor),
     seasonStartsOn: draft.seasonStartsOn === "" ? null : draft.seasonStartsOn,
+    registrationName:
+      draft.registrationName.trim() === "" ? null : draft.registrationName,
   };
 }
 
@@ -96,6 +101,7 @@ function identityOf(settings: ClubSettings): ClubIdentity {
     initials: settings.initials,
     accentColor: settings.accentColor,
     seasonStartsOn: settings.seasonStartsOn,
+    registrationName: settings.registrationName,
   };
 }
 
@@ -295,6 +301,7 @@ export function ClubSettingsForm({
               translate={translate}
               name={draft.name}
               initials={draft.initials}
+              registrationName={draft.registrationName}
               automaticInitials={deriveInitials(draft.name)}
               issueTextFor={issueTextFor}
               onChange={update}

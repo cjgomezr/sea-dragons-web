@@ -22,6 +22,12 @@ const DEFAULT_WORD: Readonly<Record<Locale, string>> = {
 
 const LOCALES: readonly Locale[] = ["en", "es"];
 
+/** La ayuda del campo en la configuración cita "AUF" como ejemplo de nombre:
+ * no es un texto del registro, es la pista para escribirlo. */
+const EXAMPLE_KEYS: ReadonlySet<string> = new Set([
+  "clubSettings.registrationName.hint",
+]);
+
 function templatesOf(message: Message): readonly string[] {
   return typeof message === "string"
     ? [message]
@@ -63,6 +69,7 @@ describe("los textos del registro", () => {
     const catalog: LooseCatalog = messageCatalogs[locale];
 
     const hardCoded = Object.entries(catalog)
+      .filter(([key]) => !EXAMPLE_KEYS.has(key))
       .filter(([, message]) =>
         templatesOf(message).some((template) => template.includes("AUF")),
       )

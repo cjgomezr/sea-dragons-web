@@ -22,7 +22,7 @@ import { readClubLogoUrl } from "./supabase-club-logo-gateways";
 
 const CLUBS_TABLE = "clubs";
 const SETTINGS_COLUMNS =
-  "name, initials, accent_color, logo_path, season_starts_on";
+  "name, initials, accent_color, logo_path, season_starts_on, registration_name";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -39,6 +39,7 @@ function toClubSettings(serviceClient: SupabaseClient, row: Row): ClubSettings {
     ),
     // Una columna `date` llega como YYYY-MM-DD, que es como la usa el dominio.
     seasonStartsOn: readText(row, "season_starts_on", CLUBS_TABLE),
+    registrationName: readText(row, "registration_name", CLUBS_TABLE),
   };
 }
 
@@ -77,6 +78,7 @@ async function updateClubIdentity(
       initials: identity.initials,
       accent_color: identity.accentColor,
       season_starts_on: identity.seasonStartsOn,
+      registration_name: identity.registrationName,
     })
     .eq("id", clubId)
     .eq("name", expected.name)
@@ -86,10 +88,14 @@ async function updateClubIdentity(
     expected.initials === null
       ? matchingName.is("initials", null)
       : matchingName.eq("initials", expected.initials);
-  const matchingRow =
+  const matchingSeason =
     expected.seasonStartsOn === null
       ? matchingInitials.is("season_starts_on", null)
       : matchingInitials.eq("season_starts_on", expected.seasonStartsOn);
+  const matchingRow =
+    expected.registrationName === null
+      ? matchingSeason.is("registration_name", null)
+      : matchingSeason.eq("registration_name", expected.registrationName);
   const { data, error } = await matchingRow
     .select(SETTINGS_COLUMNS)
     .maybeSingle<Row>();

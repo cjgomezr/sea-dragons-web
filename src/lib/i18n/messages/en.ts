@@ -2224,6 +2224,10 @@ export const englishMessages = {
   "clubSettings.initials.optional": "optional",
   "clubSettings.initials.hint":
     "Shown when there's no logo. Up to {max} letters.",
+  // El nombre del registro de los socios (#967, RF-7 de E37).
+  "clubSettings.registrationName.label": "Registration name",
+  "clubSettings.registrationName.hint":
+    "The membership registration your sport requires, like AUF.",
   "clubSettings.season.title": "Season",
   "clubSettings.season.label": "Season start",
   "clubSettings.season.hint":
@@ -2273,6 +2277,8 @@ export const englishMessages = {
   "clubSettings.issue.accentNoReadableText":
     "No text colour reaches the minimum contrast (4.5:1) on this accent. Pick a lighter or darker one.",
   "clubSettings.issue.seasonStartInvalid": "Pick a real date.",
+  "clubSettings.issue.registrationNameTooLong":
+    "Use {max} characters or fewer.",
   "clubSettings.error.changed":
     "Another Admin changed the settings while you were editing. Load the latest settings and make your change again.",
   "clubSettings.error.signInRequired":

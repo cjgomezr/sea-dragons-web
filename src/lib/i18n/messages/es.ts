@@ -2228,6 +2228,10 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.initials.optional": "opcional",
   "clubSettings.initials.hint":
     "Se ven cuando no hay logo. Hasta {max} letras.",
+  // El nombre del registro de los socios (#967, RF-7 de E37).
+  "clubSettings.registrationName.label": "Nombre del registro",
+  "clubSettings.registrationName.hint":
+    "El registro de miembros que pide tu deporte, como AUF.",
   "clubSettings.season.title": "Temporada",
   "clubSettings.season.label": "Inicio de temporada",
   "clubSettings.season.hint":
@@ -2276,6 +2280,8 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.issue.accentNoReadableText":
     "Ningún color de texto llega al contraste mínimo (4,5:1) sobre este acento. Elige uno más claro o más oscuro.",
   "clubSettings.issue.seasonStartInvalid": "Elige una fecha que exista.",
+  "clubSettings.issue.registrationNameTooLong":
+    "Usa {max} caracteres como mucho.",
   "clubSettings.error.changed":
     "Otro Admin cambió la configuración mientras la editabas. Carga la más reciente y vuelve a hacer tu cambio.",
   "clubSettings.error.signInRequired":

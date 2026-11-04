@@ -34,6 +34,11 @@ export const CLUB_NAME_MAX_LENGTH = 60;
 /** El límite de `clubs_initials_length` en `0022_club_brand.sql`. */
 export const CLUB_INITIALS_MAX_LENGTH = 3;
 
+/** El límite de `clubs_registration_name_length` en
+ * `0094_club_registration_name.sql`: cabe en los chips del móvil (D11 de
+ * E37). */
+export const CLUB_REGISTRATION_NAME_MAX_LENGTH = 16;
+
 export const CLUB_SETTINGS_CHANGED_REASON = "club_settings_changed";
 
 export type ClubSettings = {
@@ -46,12 +51,15 @@ export type ClubSettings = {
   /** YYYY-MM-DD, el día del club en que empieza la temporada (D1 de E27).
    * Sin fecha es `null`, y cuenta desde el 1 de enero (`seasonStartFor`). */
   readonly seasonStartsOn: string | null;
+  /** El nombre del registro de los socios, como "AUF" (#967). Sin nombre es
+   * `null`, y los textos usan la palabra de la app. */
+  readonly registrationName: string | null;
 };
 
 /** La parte de la configuración que esta pantalla escribe. */
 export type ClubIdentity = Pick<
   ClubSettings,
-  "name" | "initials" | "accentColor" | "seasonStartsOn"
+  "name" | "initials" | "accentColor" | "seasonStartsOn" | "registrationName"
 >;
 
 export type ClubIdentityField = keyof ClubIdentity;
@@ -69,6 +77,7 @@ export const CLUB_SETTINGS_ISSUE_CODES = [
   "accent_color_invalid",
   "accent_color_no_readable_text",
   "season_starts_on_invalid",
+  "registration_name_too_long",
 ] as const;
 
 export type ClubSettingsIssueCode = (typeof CLUB_SETTINGS_ISSUE_CODES)[number];
@@ -139,6 +148,31 @@ function countCharacters(text: string): number {
   return [...text].length;
 }
 
+export type RegistrationNameValidation =
+  | { readonly kind: "valid"; readonly registrationName: string | null }
+  | { readonly kind: "too_long" };
+
+/** El nombre del registro como lo guarda la base (D11, D12 de E37):
+ * recortado, y vacío como nulo, que es la palabra por defecto. */
+export function validateRegistrationName(
+  raw: string | null,
+): RegistrationNameValidation {
+  const trimmed = raw?.trim() ?? "";
+  if (trimmed === "") {
+    return { kind: "valid", registrationName: null };
+  }
+  return countCharacters(trimmed) > CLUB_REGISTRATION_NAME_MAX_LENGTH
+    ? { kind: "too_long" }
+    : { kind: "valid", registrationName: trimmed };
+}
+
+/** Recortado y vacío como nulo. Uno demasiado largo se queda como está, para
+ * que `findClubSettingsIssues` lo rechace. */
+function normalizeRegistrationName(raw: string | null): string | null {
+  const validation = validateRegistrationName(raw);
+  return validation.kind === "valid" ? validation.registrationName : raw;
+}
+
 const ACCENT_ISSUE_OF_REJECTION: Readonly<
   Record<AccentRejection, ClubSettingsIssueCode>
 > = {
@@ -155,6 +189,7 @@ function normalizeIdentity(identity: ClubIdentity): ClubIdentity {
     initials: initials === "" ? null : initials,
     accentColor: identity.accentColor.toLowerCase(),
     seasonStartsOn: identity.seasonStartsOn,
+    registrationName: normalizeRegistrationName(identity.registrationName),
   };
 }
 
@@ -170,7 +205,8 @@ export function isSameClubIdentity(
     a.name === b.name &&
     a.initials === b.initials &&
     a.accentColor === b.accentColor &&
-    a.seasonStartsOn === b.seasonStartsOn
+    a.seasonStartsOn === b.seasonStartsOn &&
+    a.registrationName === b.registrationName
   );
 }
 
@@ -225,6 +261,12 @@ export function findClubSettingsIssues({
   if (seasonStartsOn !== null && !isRealCalendarDate(seasonStartsOn)) {
     issues.push({ field: "seasonStartsOn", code: "season_starts_on_invalid" });
   }
+  if (validateRegistrationName(identity.registrationName).kind === "too_long") {
+    issues.push({
+      field: "registrationName",
+      code: "registration_name_too_long",
+    });
+  }
   return issues;
 }
 
@@ -251,7 +293,13 @@ function changedFields(
   expected: ClubIdentity,
 ): readonly ClubIdentityField[] {
   return (
-    ["name", "initials", "accentColor", "seasonStartsOn"] as const
+    [
+      "name",
+      "initials",
+      "accentColor",
+      "seasonStartsOn",
+      "registrationName",
+    ] as const
   ).filter((field) => identity[field] !== expected[field]);
 }
 

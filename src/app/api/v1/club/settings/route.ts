@@ -10,6 +10,7 @@ import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import {
   CLUB_INITIALS_MAX_LENGTH,
   CLUB_NAME_MAX_LENGTH,
+  CLUB_REGISTRATION_NAME_MAX_LENGTH,
   CLUB_SETTINGS_CHANGED_REASON,
   ClubSettingsConflictError,
   ClubSettingsForbiddenError,
@@ -24,8 +25,8 @@ import { createSupabaseClubSettingsGateways } from "@/lib/club/supabase-club-set
 
 /**
  * La configuración del club (#296, RF-6 del PRD de E18a): GET la lee y PATCH
- * cambia el nombre, las iniciales, el acento (#294, RF-3) y el inicio de la
- * temporada (#744, RF-1 de E27).
+ * cambia el nombre, las iniciales, el acento (#294, RF-3), el inicio de la
+ * temporada (#744, RF-1 de E27) y el nombre del registro (#967, RF-7 de E37).
  *
  * Quién puede llamarlo lo decide la frontera: `RESTRICTED_ROUTES` lo reserva
  * al Admin, y el dominio lo vuelve a comprobar. El PATCH lleva lo que el
@@ -40,6 +41,7 @@ export const dynamic = "force-dynamic";
  * dominio, que cuenta en caracteres y dice qué campo falló. */
 const NAME_BODY_MAX_LENGTH = CLUB_NAME_MAX_LENGTH * 4;
 const INITIALS_BODY_MAX_LENGTH = CLUB_INITIALS_MAX_LENGTH * 4;
+const REGISTRATION_NAME_BODY_MAX_LENGTH = CLUB_REGISTRATION_NAME_MAX_LENGTH * 4;
 /** `#rrggbb` son siete; que sea un color lo dice el dominio. */
 const ACCENT_BODY_MAX_LENGTH = 32;
 /** `YYYY-MM-DD` son diez; que sea una fecha lo dice el dominio. */
@@ -50,6 +52,10 @@ const identityShape = {
   initials: z.string().max(INITIALS_BODY_MAX_LENGTH).nullable(),
   accentColor: z.string().max(ACCENT_BODY_MAX_LENGTH),
   seasonStartsOn: z.string().max(SEASON_START_BODY_MAX_LENGTH).nullable(),
+  registrationName: z
+    .string()
+    .max(REGISTRATION_NAME_BODY_MAX_LENGTH)
+    .nullable(),
 };
 
 /** Sólo la forma. `strict` responde 400 a cualquier campo que no sea de esta
