@@ -148,6 +148,10 @@ const eventSeriesCancelledData = z.object({
   startTime: clockTime,
 });
 
+/** #966: los mismos datos que una cancelación, con el día para distinguir las
+ * sesiones de una serie. */
+const eventVideoAddedData = eventCancelledData;
+
 const teamUnassignedData = z.object({
   eventId: z.uuid(),
   title: z.string().min(1),
@@ -411,6 +415,23 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         }),
       };
     },
+    event_video_added: (translate, data) => {
+      const parsed = eventVideoAddedData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      const event = parsed.data;
+      return {
+        title: translate("notifications.event_video_added.title", {
+          title: event.title,
+        }),
+        body: formatCalendarDayAt(
+          translate.locale,
+          event.startsOn,
+          event.startTime,
+        ),
+      };
+    },
     membership_renewal_upcoming: (translate, data) => {
       const parsed = membershipRenewalUpcomingData.safeParse(data);
       if (!parsed.success) {
@@ -497,6 +518,9 @@ const DESTINATION_BY_TYPE: Readonly<Record<NotificationType, DestinationOf>> = {
     teamAssignedData.safeParse(data).success ? CALENDAR_PATH : null,
   team_unassigned: (data) =>
     teamUnassignedData.safeParse(data).success ? CALENDAR_PATH : null,
+  // #966: al calendario, como un evento cambiado.
+  event_video_added: (data) =>
+    eventVideoAddedData.safeParse(data).success ? CALENDAR_PATH : null,
   // #470: a Pagos, donde se cambia la tarjeta o el plan antes del cobro.
   membership_renewal_upcoming: (data) =>
     membershipRenewalUpcomingData.safeParse(data).success

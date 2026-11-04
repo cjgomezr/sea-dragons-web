@@ -6,6 +6,10 @@ import type {
 import { hasCapability } from "@/lib/auth/roles";
 import type { MemberGroupsGateway } from "@/lib/groups/member-groups";
 import type { EventAudience } from "./event-creation";
+import {
+  type EventNoticeGateways,
+  notifyEventAudience,
+} from "./event-creation-notice";
 import { EventNotFoundError, isInAudience } from "./event-rsvp";
 import {
   type SessionVideoUrlIssue,
@@ -21,28 +25,41 @@ import {
  * audiencia, y uno que no le corresponde no existe para él, igual que en la
  * agenda (AC-052). Un evento cancelado no recibe vídeo nuevo, pero el que ya
  * tenía se puede quitar.
+ *
+ * Cuando una sesión pasa de no tener vídeo a tenerlo, su audiencia recibe un
+ * aviso (#966, RF-6, D9 y D10). Cambiar el enlace no avisa: casi siempre es
+ * corregirlo. Si estaba vacío lo dice la misma escritura, no una lectura
+ * previa: dos personas que ponen vídeo a la vez dan un solo aviso.
  */
 
 export type SessionVideoEvent = {
   readonly id: string;
   readonly status: "scheduled" | "cancelled";
+  readonly title: string;
+  /** `YYYY-MM-DD`. */
+  readonly startsOn: string;
+  /** `HH:MM`. */
+  readonly startTime: string;
   readonly audience: EventAudience;
-  /** El que tiene ahora. El aviso de vídeo nuevo (RF-6) lo compara con el
-   * que se guarda para saber si pasó de vacío a con vídeo. */
-  readonly videoUrl: string | null;
 };
+
+/** `added` si la sesión no tenía vídeo al escribir, `replaced` si ya tenía. */
+export type SessionVideoSave = "added" | "replaced";
 
 type EventQuery = { readonly clubId: string; readonly eventId: string };
 
 export type SessionVideosGateway = {
   /** El evento, si es de ese club. */
   findEvent(query: EventQuery): Promise<SessionVideoEvent | null>;
-  saveVideo(video: EventQuery & { readonly url: string }): Promise<void>;
+  /** Decide si estaba vacío en la misma sentencia que escribe. */
+  saveVideo(
+    video: EventQuery & { readonly url: string },
+  ): Promise<SessionVideoSave>;
   /** No falla si no tenía. */
   removeVideo(query: EventQuery): Promise<void>;
 };
 
-export type SessionVideoGateways = {
+export type SessionVideoGateways = EventNoticeGateways & {
   readonly members: RoleRequestGateways["members"];
   readonly memberGroups: MemberGroupsGateway;
   readonly sessionVideos: SessionVideosGateway;
@@ -128,6 +145,32 @@ async function findVisibleEvent(
   return event;
 }
 
+/** No lanza: el vídeo ya está guardado (`notifyEventAudience`). */
+function announceVideo(
+  gateways: SessionVideoGateways,
+  announcement: {
+    readonly caller: RoleRequestMember;
+    readonly callerId: string;
+    readonly event: SessionVideoEvent;
+  },
+): Promise<void> {
+  const { caller, callerId, event } = announcement;
+  return notifyEventAudience(gateways, {
+    clubId: caller.clubId,
+    authorId: callerId,
+    audience: event.audience,
+    content: {
+      type: "event_video_added",
+      data: {
+        eventId: event.id,
+        title: event.title,
+        startsOn: event.startsOn,
+        startTime: event.startTime,
+      },
+    },
+  });
+}
+
 /** Pone o cambia el vídeo de una sola sesión, o dice por qué no. */
 export async function setSessionVideo(
   gateways: SessionVideoGateways,
@@ -142,11 +185,18 @@ export async function setSessionVideo(
   if (event.status === "cancelled") {
     throw new SessionVideoEventCancelledError();
   }
-  await gateways.sessionVideos.saveVideo({
+  const saved = await gateways.sessionVideos.saveVideo({
     clubId: caller.clubId,
     eventId: event.id,
     url: parsed.url,
   });
+  if (saved === "added") {
+    await announceVideo(gateways, {
+      caller,
+      callerId: request.callerId,
+      event,
+    });
+  }
   return { eventId: event.id, url: parsed.url };
 }
 

@@ -1501,6 +1501,9 @@ export const spanishMessages: MessageCatalog = {
   "notifications.team_assigned.body": "{title}: {moment}",
   "notifications.team_unassigned.title": "Ya no estás en ningún equipo",
   "notifications.team_unassigned.body": "{title}: {moment}",
+  // #966: a la audiencia, cuando la sesión pasa a tener vídeo. El cuerpo es
+  // el día y la hora de la sesión.
+  "notifications.event_video_added.title": "Ya está el vídeo de {title}",
   // #838: a quien publicó el reparto.
   "notifications.team_player_dropped.title": "{name} ya no viene a {title}",
   "notifications.team_player_dropped.body": "Estaba en {team}",
