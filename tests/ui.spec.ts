@@ -14533,25 +14533,34 @@ test.describe("las redes del club dentro de la aplicación", () => {
         maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
       });
     });
-
-    for (const window of ACCOUNT_MENU_WINDOWS) {
-      test(`el menú de la cuenta con redes coincide con la línea base a ${window.name} (${theme})`, async ({
-        page,
-      }) => {
-        await page.setViewportSize(window);
-        const menu = await openAccountMenuWithSocialLinks(page, theme);
-        await page.mouse.move(0, 0);
-        const name = `menu-cuenta-redes-${window.name}-${theme}.png`;
-        await createMissingLocalBaseline(name, () =>
-          menu.screenshot(SCREENSHOT_OPTIONS),
-        );
-        await expect(menu).toHaveScreenshot(name, {
-          ...SCREENSHOT_OPTIONS,
-          maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
-        });
-      });
-    }
   }
+
+  // La cabecera del menú lleva el nombre y el correo de quien entra. El
+  // Admin sembrado cambia de sufijo en cada corrida; la sesión de e2e tiene
+  // siempre el mismo nombre, como en las capturas `menu-cuenta-*`.
+  test.describe("captura del menú de la cuenta con redes", () => {
+    test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+    for (const theme of themes) {
+      for (const window of ACCOUNT_MENU_WINDOWS) {
+        test(`el menú de la cuenta con redes coincide con la línea base a ${window.name} (${theme})`, async ({
+          page,
+        }) => {
+          await page.setViewportSize(window);
+          const menu = await openAccountMenuWithSocialLinks(page, theme);
+          await page.mouse.move(0, 0);
+          const name = `menu-cuenta-redes-${window.name}-${theme}.png`;
+          await createMissingLocalBaseline(name, () =>
+            menu.screenshot(SCREENSHOT_OPTIONS),
+          );
+          await expect(menu).toHaveScreenshot(name, {
+            ...SCREENSHOT_OPTIONS,
+            maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+          });
+        });
+      }
+    }
+  });
 
   test("en el móvil las redes van al final de Más y no en la cabecera", async ({
     page,
