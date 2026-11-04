@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   AccountMenu,
   type AccountIdentity,
+  type AccountMenuSocialLinks,
   type AccountMenuTrigger,
 } from "@/components/AccountMenu";
 import { ClubBrandMark } from "@/components/ClubBrandMark";
@@ -38,11 +39,13 @@ function HeaderActions({
   account,
   trigger,
   canConfigureClub,
+  socialLinks,
 }: {
   locale: Locale;
   account: AccountIdentity;
   trigger: AccountMenuTrigger;
   canConfigureClub: boolean;
+  socialLinks?: AccountMenuSocialLinks;
 }): React.JSX.Element {
   return (
     <>
@@ -52,6 +55,7 @@ function HeaderActions({
         account={account}
         trigger={trigger}
         canConfigureClub={canConfigureClub}
+        socialLinks={socialLinks}
       />
     </>
   );
@@ -94,11 +98,7 @@ export function AppShell({
     account: { ...account, role: access.role },
     canConfigureClub: isAllowedForAccess(CLUB_SETTINGS_PATH, access),
   };
-  const socialLinksProps = {
-    links: brand.socialLinks,
-    clubName: brand.name,
-    locale,
-  };
+  const socialLinks = { links: brand.socialLinks, clubName: brand.name };
   return (
     <div className="app-shell">
       <PhoneHeader>
@@ -129,9 +129,6 @@ export function AppShell({
           </div>
         </div>
         <SidebarNav locale={locale} access={access} />
-        {/* Al pie de la barra lateral (#964). En el móvil esta barra es la
-            cabecera y la hoja de estilos la esconde: allí van en Más. */}
-        <ClubSocialLinks {...socialLinksProps} className="app-sidebar-social" />
       </PhoneHeader>
       <div className="app-content">
         {/* La barra de arriba de escritorio: el cuadro de búsqueda del mockup
@@ -146,7 +143,14 @@ export function AppShell({
           ) : null}
           <div className="app-topbar-actions">
             <ScreenOnly screen="desktop">
-              <HeaderActions {...headerActions} trigger="avatar" />
+              {/* Las redes del club van al final de este menú y no en la
+                  barra lateral, que así cabe sin scroll en un portátil
+                  (#972). En el móvil siguen en Más. */}
+              <HeaderActions
+                {...headerActions}
+                trigger="avatar"
+                socialLinks={socialLinks}
+              />
             </ScreenOnly>
           </div>
         </div>
@@ -167,7 +171,7 @@ export function AppShell({
       <MobileTabBar
         locale={locale}
         access={access}
-        overflowFooter={<ClubSocialLinks {...socialLinksProps} />}
+        overflowFooter={<ClubSocialLinks {...socialLinks} locale={locale} />}
       />
     </div>
   );
