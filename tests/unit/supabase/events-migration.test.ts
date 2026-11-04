@@ -285,6 +285,7 @@ describeConPostgres("esquema de eventos", () => {
       "starts_on date null=NO",
       "status text null=NO",
       "title text null=NO",
+      "video_url text null=YES",
     ]);
   });
 
