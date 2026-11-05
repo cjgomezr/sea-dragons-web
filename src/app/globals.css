@@ -26081,6 +26081,46 @@ a.dashboard-club-cell-body:focus-visible {
   border-color: var(--color-success);
 }
 
+/* La de los ciclos que se archivan al activar o al guardar los grupos
+   (#980): avisa en ámbar y no en rojo, porque archivar no borra nada. */
+.training-plan-cycle-conflicts {
+  flex: 1 0 100%;
+}
+
+.training-plan-confirm.training-plan-cycle-conflicts {
+  background: color-mix(in srgb, var(--color-warning) 16%, var(--color-panel));
+  border-color: var(--color-warning);
+}
+
+/* El campo For bajo los otros campos (#980). La lista de grupos se desplaza
+   dentro de su caja: treinta grupos no alargan la página en el móvil. */
+.training-plan-audience {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  max-width: 780px;
+}
+
+.training-plan-audience .news-audience-groups {
+  min-width: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.training-plan-audience-hint {
+  margin: 0;
+  font-size: 14px;
+}
+
+.training-plan-audience-save {
+  align-self: flex-start;
+}
+
+.training-plan-audience-label {
+  overflow-wrap: anywhere;
+}
+
 .training-plan-fields {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) 100px;

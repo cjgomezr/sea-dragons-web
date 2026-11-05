@@ -28748,6 +28748,13 @@ type PlannerState = {
   /** Con el archivado elegido y la confirmación de volver a activarlo
    * abierta (#952). */
   readonly isConfirmingReactivate?: boolean;
+  /** Para quién es cada ciclo (#980): con la lista que trae ciclos de
+   * grupos, el que se elige y, si se pide, la confirmación de los que se
+   * archivan al activarlo. */
+  readonly audience?: {
+    readonly selectedName: string;
+    readonly isConfirmingConflicts?: boolean;
+  };
 };
 
 /** Como la captura del handoff: un activo elegido, un borrador y un
@@ -28763,10 +28770,36 @@ const PLANNER_STATES: readonly PlannerState[] = [
     openWeek: 2,
     isConfirmingClearWeek: true,
   },
+  {
+    name: "planificar-ciclo-grupos",
+    audience: { selectedName: "Juniors block" },
+  },
+  {
+    name: "planificar-ciclo-sin-grupos",
+    audience: { selectedName: "Orphan block" },
+  },
+  {
+    name: "planificar-ciclo-choque",
+    audience: {
+      selectedName: "Summer base 2027",
+      isConfirmingConflicts: true,
+    },
+  },
 ];
 
 const PLANNER_DRAFT_CYCLE_NAME = "Summer base 2027";
 const PLANNER_ARCHIVED_CYCLE_NAME = "Winter 2026";
+/** Lo que sigue a cada ciclo de todo el club en el selector del móvil
+ * (#980). */
+const PLANNER_WHOLE_CLUB = "Whole club";
+
+/** Los grupos del club que ofrece el campo For (#980): servidos, para que
+ * la captura no cambie con los de seadragons-dev. */
+const PLANNER_GROUPS = [
+  { id: "cccccccc-0000-4000-8000-000000000001", name: "Juniors" },
+  { id: "cccccccc-0000-4000-8000-000000000002", name: "Masters" },
+  { id: "cccccccc-0000-4000-8000-000000000003", name: "Women's squad" },
+];
 
 /* La cuadrícula del ciclo activo (#907): rutinas del ciclo y una compartida,
    dos rutinas el lunes, y la nota y la dosis de algunas semanas. */
@@ -28838,10 +28871,48 @@ function plannerPlan(cycle: { readonly weeks: number }): unknown {
 const PLANNER_SUMMARY =
   /^(Week 1 starts|La semana 1 empieza) .* (week 3 today|semana 3)\.$/;
 
+/** La lista con un ciclo de dos grupos y otro de grupos sin ninguno (D9 de
+ * E38), además de los de siempre (#980). */
+const PLANNER_AUDIENCE_CYCLES = [
+  ...PLANNER_CYCLES,
+  {
+    id: "aaaaaaaa-0000-4000-8000-000000000004",
+    name: "Juniors block",
+    status: "draft",
+    weeks: 6,
+    startDate: "2027-01-04",
+    event: null,
+    ownRoutines: 0,
+    audience: { kind: "groups", groups: PLANNER_GROUPS.slice(0, 2) },
+  },
+  {
+    id: "aaaaaaaa-0000-4000-8000-000000000005",
+    name: "Orphan block",
+    status: "draft",
+    weeks: 6,
+    startDate: "2027-03-01",
+    event: null,
+    ownRoutines: 0,
+    audience: { kind: "groups", groups: [] },
+  },
+];
+
 async function stubPlannerCycles(page: Page): Promise<void> {
   // Con el reloj instalado, y no fijo, los temporizadores siguen: el aviso
   // se va solo cuando la prueba adelanta el reloj.
   await page.clock.install({ time: PLANNER_NOW });
+  await page.route(
+    (url) => url.pathname === "/api/v1/groups",
+    (route) =>
+      route.fulfill(
+        jsonBody({
+          groups: PLANNER_GROUPS.map((group) => ({
+            ...group,
+            memberCount: 8,
+          })),
+        }),
+      ),
+  );
   await page.route(
     (url) => url.pathname === PLANNER_CYCLES_ENDPOINT,
     (route) => route.fulfill(jsonBody({ cycles: PLANNER_CYCLES })),
@@ -28930,7 +29001,77 @@ async function goToPlanner(
   theme?: (typeof themes)[number],
 ): Promise<void> {
   await stubPlannerCycles(page);
+  if (state.audience !== undefined) {
+    await stubPlannerAudience(page);
+  }
   await openPlanner(page, state, theme);
+}
+
+/** La lista con ciclos de grupos, y activar que choca con el activo de todo
+ * el club: la API responde 409 con su nombre (#978). */
+async function stubPlannerAudience(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === PLANNER_CYCLES_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ cycles: PLANNER_AUDIENCE_CYCLES })),
+  );
+  await page.route(
+    (url) => url.pathname.endsWith("/activate"),
+    (route) =>
+      route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            code: "conflict",
+            message: "x",
+            reason: "cycle_conflicts",
+            conflicts: [
+              { id: PLANNER_ACTIVE_CYCLE.id, name: PLANNER_ACTIVE_CYCLE.name },
+            ],
+          },
+        }),
+      }),
+  );
+}
+
+/** La opción de cada ciclo de la lista con audiencias en el selector del
+ * móvil: su nombre, su estado y para quién es. */
+const PLANNER_AUDIENCE_OPTIONS: Readonly<Record<string, string>> = {
+  "Juniors block": "Juniors block · draft · Juniors, Masters",
+  "Orphan block": "Orphan block · draft · No groups: no member sees it",
+  [PLANNER_DRAFT_CYCLE_NAME]: `${PLANNER_DRAFT_CYCLE_NAME} · draft · ${PLANNER_WHOLE_CLUB}`,
+};
+
+/** Elige el ciclo que pide el estado (con su tarjeta en el escritorio, con
+ * el selector en el móvil) y abre la confirmación de los que se archivan
+ * si la pide (#980). */
+async function openPlannerAudience(
+  page: Page,
+  audience: NonNullable<PlannerState["audience"]>,
+): Promise<void> {
+  const select = page.getByRole("combobox", { name: "Cycle", exact: true });
+  if (await select.isVisible()) {
+    const label = PLANNER_AUDIENCE_OPTIONS[audience.selectedName];
+    if (label === undefined) {
+      throw new Error(`Sin opción para ${audience.selectedName}`);
+    }
+    await select.selectOption({ label });
+  } else {
+    await page
+      .getByRole("button", { name: new RegExp(`^${audience.selectedName}`) })
+      .click();
+  }
+  await expect(
+    page.getByRole("radio", { name: "Specific groups" }),
+  ).toBeVisible();
+  if (audience.isConfirmingConflicts === true) {
+    await page.getByRole("button", { name: "Make active" }).click();
+    await expect(
+      page.getByRole("group", {
+        name: "Road to Nationals 2027 will be archived: it's active for some of the same members.",
+      }),
+    ).toBeVisible();
+  }
 }
 
 /** Abre Planificar con lo que ya sirve la prueba: las rutas que se añaden
@@ -28961,6 +29102,9 @@ async function openPlanner(
   if (state.isConfirmingReactivate === true) {
     await openCycleReactivateConfirm(page);
   }
+  if (state.audience !== undefined) {
+    await openPlannerAudience(page, state.audience);
+  }
   if (state.isConfirmingClearWeek === true && state.openWeek !== undefined) {
     await openClearWeekConfirm(page, state.openWeek);
   }
@@ -28986,7 +29130,9 @@ async function openClearWeekConfirm(page: Page, week: number): Promise<void> {
 async function openCycleDeleteConfirm(page: Page): Promise<void> {
   const select = page.getByRole("combobox", { name: "Cycle", exact: true });
   if (await select.isVisible()) {
-    await select.selectOption({ label: `${PLANNER_DRAFT_CYCLE_NAME} · draft` });
+    await select.selectOption({
+      label: `${PLANNER_DRAFT_CYCLE_NAME} · draft · ${PLANNER_WHOLE_CLUB}`,
+    });
   } else {
     await page
       .getByRole("button", { name: new RegExp(`^${PLANNER_DRAFT_CYCLE_NAME}`) })
@@ -29006,7 +29152,9 @@ async function openCycleDeleteConfirm(page: Page): Promise<void> {
 async function openCycleReactivateConfirm(page: Page): Promise<void> {
   const select = page.getByRole("combobox", { name: "Cycle", exact: true });
   if (await select.isVisible()) {
-    await select.selectOption({ label: PLANNER_ARCHIVED_CYCLE_NAME });
+    await select.selectOption({
+      label: `${PLANNER_ARCHIVED_CYCLE_NAME} · ${PLANNER_WHOLE_CLUB}`,
+    });
   } else {
     await page.getByRole("button", { name: "Show archived · 1" }).click();
     await page
@@ -29018,7 +29166,7 @@ async function openCycleReactivateConfirm(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Make active" }).click();
   await expect(
     page.getByRole("group", {
-      name: `Make "${PLANNER_ARCHIVED_CYCLE_NAME}" active again? Road to Nationals 2027 will be archived. It ended on 12 Jul. Members will see a finished cycle.`,
+      name: `Make "${PLANNER_ARCHIVED_CYCLE_NAME}" active again? It ended on 12 Jul. Members will see a finished cycle.`,
     }),
   ).toBeVisible();
 }
@@ -29033,7 +29181,9 @@ async function plannerCaptureFullPage(
   state: PlannerState,
 ): Promise<boolean> {
   const hasOpenConfirm =
-    state.isConfirmingDelete === true || state.isConfirmingReactivate === true;
+    state.isConfirmingDelete === true ||
+    state.isConfirmingReactivate === true ||
+    state.audience?.isConfirmingConflicts === true;
   if (state.openWeek === undefined && !hasOpenConfirm) {
     return true;
   }
