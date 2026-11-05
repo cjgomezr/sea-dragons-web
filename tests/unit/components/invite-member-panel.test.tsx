@@ -487,7 +487,7 @@ describe("los datos de jugador", () => {
     await renderPanel();
     await openDetails();
 
-    const auf = screen.getByRole("group", { name: "AUF registration" });
+    const auf = screen.getByRole("group", { name: "AUF" });
     expect(within(auf).getByText("Both or neither")).toBeVisible();
     expect(within(auf).getByLabelText("Number")).toBeVisible();
     expect(within(auf).getByLabelText("Expires")).toHaveAttribute(

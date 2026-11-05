@@ -36,6 +36,7 @@ const STORED: ClubSettings = {
   accentColor: "#1c6ea4",
   logoUrl: null,
   seasonStartsOn: null,
+  registrationName: "AUF",
 };
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
@@ -271,11 +272,14 @@ describe("pantalla de configuración: guardar", () => {
         accentColor: "#1c6ea4",
         // #744: la fecha también viaja como está guardada, aquí sin ninguna.
         seasonStartsOn: null,
+        // #967: el nombre del registro, igual.
+        registrationName: "AUF",
         expected: {
           name: "Harbour Hammerheads",
           initials: "HH",
           accentColor: "#1c6ea4",
           seasonStartsOn: null,
+          registrationName: "AUF",
         },
       },
     ]);

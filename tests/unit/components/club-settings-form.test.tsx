@@ -33,6 +33,7 @@ const STORED: ClubSettings = {
   accentColor: "#1c6ea4",
   logoUrl: null,
   seasonStartsOn: null,
+  registrationName: "AUF",
 };
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
@@ -313,6 +314,116 @@ describe("General: inicio de temporada", () => {
       screen.getByLabelText("Inicio de temporada"),
     ).toHaveAccessibleDescription(
       "La asistencia del inicio cuenta desde aquí. Vacío: desde el 1 de enero.",
+    );
+  });
+});
+
+// #967 (RF-7 y D11 del PRD de E37)
+describe("General: nombre del registro", () => {
+  const REGISTRATION_HINT =
+    "The membership registration your sport requires, like AUF.";
+
+  function registrationField(): HTMLElement {
+    return screen.getByLabelText("Registration name");
+  }
+
+  async function saveChanges(): Promise<void> {
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await screen.findByRole("status");
+  }
+
+  it("enseña el nombre guardado con su contador y su ayuda", async () => {
+    stubApi();
+    await renderScreen();
+
+    expect(registrationField()).toHaveValue("AUF");
+    expect(registrationField()).toHaveAccessibleDescription(
+      `3 / 16 ${REGISTRATION_HINT}`,
+    );
+  });
+
+  it("cuenta los caracteres mientras se escribe", async () => {
+    stubApi();
+    await renderScreen();
+
+    await userEvent.type(registrationField(), " Oz");
+
+    expect(registrationField()).toHaveAccessibleDescription(
+      `6 / 16 ${REGISTRATION_HINT}`,
+    );
+  });
+
+  it("guarda el nombre nuevo con la barra, con lo que había en expected", async () => {
+    stubApi();
+    await renderScreen();
+    await userEvent.clear(registrationField());
+    await userEvent.type(registrationField(), "Licencia FEDAS");
+
+    await saveChanges();
+
+    expect(patches).toMatchObject([
+      {
+        registrationName: "Licencia FEDAS",
+        expected: { registrationName: "AUF" },
+      },
+    ]);
+  });
+
+  it("vaciar el campo guarda null, la palabra por defecto", async () => {
+    stubApi();
+    await renderScreen();
+    await userEvent.clear(registrationField());
+
+    await saveChanges();
+
+    expect(patches).toMatchObject([
+      { registrationName: null, expected: { registrationName: "AUF" } },
+    ]);
+  });
+
+  it("sin nombre guardado el campo sale vacío", async () => {
+    stubApi({ ...STORED, registrationName: null });
+    await renderScreen();
+
+    expect(registrationField()).toHaveValue("");
+  });
+
+  it("con más de 16 caracteres lo dice junto al campo y no deja guardar", async () => {
+    stubApi();
+    await renderScreen();
+    await userEvent.clear(registrationField());
+
+    await userEvent.type(registrationField(), "W".repeat(17));
+
+    expect(registrationField()).toHaveAccessibleDescription(
+      /^Use 16 characters or fewer\./,
+    );
+    expect(registrationField()).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(patches).toEqual([]);
+  });
+
+  it("16 caracteres con espacios en los extremos valen", async () => {
+    stubApi();
+    await renderScreen();
+    await userEvent.clear(registrationField());
+
+    await userEvent.type(registrationField(), ` ${"W".repeat(16)} `);
+
+    expect(registrationField()).toHaveAttribute("aria-invalid", "false");
+    expect(
+      screen.getByRole("button", { name: "Save changes" }),
+    ).not.toBeDisabled();
+  });
+
+  it("habla en español", async () => {
+    stubApi();
+    await renderScreen("es");
+    const field = screen.getByLabelText("Nombre del registro");
+    await userEvent.type(field, "W".repeat(14));
+
+    expect(field).toHaveAccessibleDescription(
+      /^Usa 16 caracteres como mucho\. 17 \/ 16 El registro de miembros que pide tu deporte, como AUF\.$/,
     );
   });
 });

@@ -11,6 +11,7 @@ import {
   ClubSettingsValidationError,
   readClubSettings,
   updateClubSettings,
+  validateRegistrationName,
 } from "@/lib/club/club-settings";
 
 /**
@@ -29,6 +30,7 @@ const STORED: ClubSettings = {
   accentColor: "#1c6ea4",
   logoUrl: null,
   seasonStartsOn: null,
+  registrationName: "AUF",
 };
 
 const LOADED: ClubIdentity = {
@@ -36,6 +38,7 @@ const LOADED: ClubIdentity = {
   initials: STORED.initials,
   accentColor: STORED.accentColor,
   seasonStartsOn: STORED.seasonStartsOn,
+  registrationName: STORED.registrationName,
 };
 
 type FakeOptions = {
@@ -460,4 +463,110 @@ describe("configuración del club: validación", () => {
 
     expect(writes).toHaveLength(1);
   });
+});
+
+describe("validateRegistrationName", () => {
+  it("recorta los espacios de los extremos", () => {
+    expect(validateRegistrationName("  Licencia FEDAS  ")).toEqual({
+      kind: "valid",
+      registrationName: "Licencia FEDAS",
+    });
+  });
+
+  it.each([
+    ["vacío", ""],
+    ["de sólo espacios", "   "],
+    ["nulo", null],
+  ])("deja nulo un nombre %s, que es la palabra por defecto", (_case, raw) => {
+    expect(validateRegistrationName(raw)).toEqual({
+      kind: "valid",
+      registrationName: null,
+    });
+  });
+
+  it("acepta 16 caracteres", () => {
+    expect(validateRegistrationName("W".repeat(16))).toEqual({
+      kind: "valid",
+      registrationName: "W".repeat(16),
+    });
+  });
+
+  it("rechaza 17 caracteres", () => {
+    expect(validateRegistrationName("W".repeat(17))).toEqual({
+      kind: "too_long",
+    });
+  });
+
+  it("cuenta como un carácter cada emoji", () => {
+    expect(validateRegistrationName("🐉".repeat(16)).kind).toBe("valid");
+  });
+});
+
+describe("configuración del club: nombre del registro (#967)", () => {
+  it("guarda el nombre recortado y anota el campo, sin el valor", async () => {
+    const { gateways, writes, auditRows } = fake();
+
+    const settings = await updateClubSettings(gateways, {
+      callerId: ADMIN_ID,
+      submission: submit({ registrationName: " Licencia FEDAS " }),
+    });
+
+    expect(writes[0]?.identity.registrationName).toBe("Licencia FEDAS");
+    expect(settings.registrationName).toBe("Licencia FEDAS");
+    expect(auditRows[0]?.metadata).toEqual({ fields: ["registrationName"] });
+  });
+
+  it("vacío vuelve a nulo, la palabra por defecto", async () => {
+    const { gateways, writes } = fake();
+
+    await updateClubSettings(gateways, {
+      callerId: ADMIN_ID,
+      submission: submit({ registrationName: "" }),
+    });
+
+    expect(writes[0]?.identity.registrationName).toBeNull();
+  });
+
+  it("no escribe nada si sólo cambian los espacios de los extremos", async () => {
+    const { gateways, writes } = fake();
+
+    await updateClubSettings(gateways, {
+      callerId: ADMIN_ID,
+      submission: submit({ registrationName: " AUF " }),
+    });
+
+    expect(writes).toEqual([]);
+  });
+
+  it("rechaza más de 16 caracteres junto a su campo, sin tocar la base", async () => {
+    const { gateways, reads, writes } = fake();
+
+    const attempt = updateClubSettings(gateways, {
+      callerId: ADMIN_ID,
+      submission: submit({ registrationName: "W".repeat(17) }),
+    });
+
+    await expect(attempt).rejects.toMatchObject({
+      issues: [
+        { field: "registrationName", code: "registration_name_too_long" },
+      ],
+    });
+    expect(reads).toEqual([]);
+    expect(writes).toEqual([]);
+  });
+
+  it.each(["Committee", "Coach", "Player"] as const)(
+    "no deja a un %s cambiarlo",
+    async (callerRole) => {
+      const { gateways, writes } = fake({ callerRole });
+
+      const attempt = updateClubSettings(gateways, {
+        callerId: ADMIN_ID,
+        submission: submit({ registrationName: "Licencia FEDAS" }),
+      });
+
+      await expect(attempt).rejects.toBeInstanceOf(ClubSettingsForbiddenError);
+      expect(writes).toEqual([]);
+    },
+  );
 });

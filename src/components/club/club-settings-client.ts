@@ -10,6 +10,7 @@ import { CLUB_SETTINGS_API_PATH } from "@/lib/auth/routes";
 import {
   CLUB_INITIALS_MAX_LENGTH,
   CLUB_NAME_MAX_LENGTH,
+  CLUB_REGISTRATION_NAME_MAX_LENGTH,
   CLUB_SETTINGS_CHANGED_REASON,
   CLUB_SETTINGS_ISSUE_CODES,
   type ClubSettings,
@@ -32,6 +33,7 @@ const settingsSchema = z.object({
   accentColor: z.string(),
   logoUrl: z.url({ protocol: /^https?$/ }).nullable(),
   seasonStartsOn: z.string().nullable(),
+  registrationName: z.string().nullable(),
 });
 
 const responseSchema = z.object({ data: settingsSchema });
@@ -107,6 +109,10 @@ export function describeClubSettingsIssue(
       return translate("clubSettings.issue.accentNoReadableText");
     case "season_starts_on_invalid":
       return translate("clubSettings.issue.seasonStartInvalid");
+    case "registration_name_too_long":
+      return translate("clubSettings.issue.registrationNameTooLong", {
+        max: CLUB_REGISTRATION_NAME_MAX_LENGTH,
+      });
   }
 }
 

@@ -31,6 +31,9 @@ describe.skipIf(!hasCredentials)("lectura de la marca en Supabase", () => {
         initials: "VS",
         accentColor: "#1c6ea4",
         logoUrl: null,
+        // El club sembrado ya existía cuando nació la columna: 0094 le deja
+        // el "AUF" de siempre (#967).
+        registrationName: "AUF",
         signInTexts: NO_SIGN_IN_TEXTS,
       });
     },

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { ProfilePhoneBar } from "@/components/account/ProfilePhoneBar";
 import { useIsPhone } from "@/components/use-is-phone";
 import { DIRECTORY_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
-import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { Translator } from "@/lib/i18n/translator";
 import type { Group } from "@/lib/groups/groups";
 import type { MemberRecord } from "@/lib/members/member-record";
 import {
@@ -79,7 +80,7 @@ export function MemberRecordScreen({
   locale: Locale;
   userId: string;
 }): React.JSX.Element {
-  const translate = createTranslator(locale);
+  const translate = useClubTranslator(locale);
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
   const isPhone = useIsPhone();

@@ -29,6 +29,7 @@ const STORED: ClubSettings = {
   accentColor: "#1c6ea4",
   logoUrl: null,
   seasonStartsOn: null,
+  registrationName: "AUF",
 };
 
 const CLUB = { name: STORED.name, initials: "HH", logoUrl: null } as const;

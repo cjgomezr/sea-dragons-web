@@ -253,6 +253,37 @@ describe("exportDirectory", () => {
     expect(marked.csv.split("\r\n")[0]).toBe(all.csv.split("\r\n")[0]);
   });
 
+  it("nombra las columnas del registro con el nombre del club, sin cambiar cuántas son ni su orden (#967)", async () => {
+    const withAuf = await exportAs(admin);
+    const fedas = harness("Admin");
+    const withFedas = await exportAs({
+      ...fedas,
+      gateways: {
+        ...fedas.gateways,
+        brand: {
+          readClubBrand: async () => ({
+            ...DEFAULT_CLUB_BRAND,
+            registrationName: "Licencia FEDAS",
+          }),
+        },
+      },
+    });
+
+    const aufHeader = withAuf.csv.split("\r\n")[0]?.split(",") ?? [];
+    const fedasHeader = withFedas.csv.split("\r\n")[0]?.split(",") ?? [];
+    expect(fedasHeader).toHaveLength(aufHeader.length);
+    expect(fedasHeader).toEqual(
+      aufHeader.map((column) => column.replace("AUF", "Licencia FEDAS")),
+    );
+    expect(fedasHeader).toEqual(
+      expect.arrayContaining([
+        "Número de Licencia FEDAS",
+        "Vencimiento de Licencia FEDAS",
+        "Verificación de Licencia FEDAS",
+      ]),
+    );
+  });
+
   it("apunta en la bitácora cuántos iban marcados", async () => {
     await exportAs(admin, DEFAULT_DIRECTORY_QUERY, [
       MARIA.userId,

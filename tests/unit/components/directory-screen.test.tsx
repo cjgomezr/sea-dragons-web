@@ -2350,7 +2350,7 @@ describe("la lista compacta (#549)", () => {
 
     await renderScreen("es");
 
-    expect(dotsOf("Ana Admin")).toEqual(["AUF vencido", "Membresía vencida"]);
+    expect(dotsOf("Ana Admin")).toEqual(["Vencido: AUF", "Membresía vencida"]);
     expect(
       screen.getAllByRole("img", { name: "Sin número de AUF" }),
     ).toHaveLength(1);

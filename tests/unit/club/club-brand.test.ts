@@ -18,6 +18,7 @@ const STORED_ROW: ClubBrandRow = {
   accentColor: "#7b3fa0",
   logoUrl: null,
   signInTexts: NO_SIGN_IN_TEXTS,
+  registrationName: "Licencia FEDAS",
 };
 const CLUB_SOCIAL_LINKS: SocialLinks = {
   ...NO_SOCIAL_LINKS,
@@ -91,6 +92,11 @@ describe("marca por defecto", () => {
   it("no lleva redes del club", () => {
     expect(DEFAULT_CLUB_BRAND.socialLinks).toEqual(NO_SOCIAL_LINKS);
   });
+
+  // #967: el respaldo es lo que la migración le dejó al club de siempre.
+  it("llama AUF al registro, como el club sembrado", () => {
+    expect(DEFAULT_CLUB_BRAND.registrationName).toBe("AUF");
+  });
 });
 
 describe("lectura de la marca", () => {
@@ -104,7 +110,18 @@ describe("lectura de la marca", () => {
       logoUrl: null,
       signInTexts: NO_SIGN_IN_TEXTS,
       socialLinks: NO_SOCIAL_LINKS,
+      registrationName: "Licencia FEDAS",
     });
+  });
+
+  // #967: un club sin nombre del registro lo deja nulo, y los textos usan la
+  // palabra de la app.
+  it("deja nulo el nombre del registro que el club no puso", async () => {
+    const { reader } = createReader({
+      fetchRow: async () => ({ ...STORED_ROW, registrationName: null }),
+    });
+
+    expect((await reader.read()).registrationName).toBeNull();
   });
 
   // #964: las redes del club viajan con la marca, en la misma caché.

@@ -2610,6 +2610,53 @@ type AccountState = {
 /** Lo que sólo existe en el móvil del perfil y de la ficha (#777). */
 const PHONE_ONLY_VIEWPORTS = viewports.filter((vp) => vp.name === "mobile");
 
+/** El nombre del registro más ancho que admite la base (#967, D11 de E37):
+ * 16 uves dobles. */
+const WIDE_REGISTRATION_NAME = "W".repeat(16);
+
+/**
+ * Pone el nombre del registro más ancho donde la página servida dice "AUF"
+ * (#967). El nombre lo lee el servidor de la fila del club en
+ * `seadragons-dev`, y cambiarlo allí movería las capturas de todas las demás
+ * pruebas, como la marca de #294 y #295; así que se cambia en la página, ya
+ * hidratada y preparada. Un número como "AUF-1" no es el nombre: se deja.
+ * Sólo cambia el texto visible: los `aria-label` siguen diciendo "AUF", que
+ * a la captura no le importa.
+ */
+async function showWideRegistrationName(page: Page): Promise<void> {
+  const replaced = await page.evaluate((name) => {
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+    );
+    let count = 0;
+    for (
+      let node = walker.nextNode();
+      node !== null;
+      node = walker.nextNode()
+    ) {
+      const text = node.textContent ?? "";
+      const named = text.replace(/\bAUF\b(?!-)/g, name);
+      if (named !== text) {
+        node.textContent = named;
+        count += 1;
+      }
+    }
+    return count;
+  }, WIDE_REGISTRATION_NAME);
+  expect(replaced, "la página no dice AUF en ningún texto").toBeGreaterThan(0);
+}
+
+/** Primero lo de la captura de siempre y después el nombre ancho. */
+function thenShowWideRegistrationName(
+  prepare: ((page: Page) => Promise<void>) | undefined,
+): (page: Page) => Promise<void> {
+  return async (page: Page): Promise<void> => {
+    await prepare?.(page);
+    await showWideRegistrationName(page);
+  };
+}
+
 /** Un estado que sólo existe en unos anchos pasa axe en el primero de ellos;
  * los demás, en el ancho por defecto. */
 async function useFirstStateViewport(
@@ -2650,7 +2697,8 @@ const FULL_PROFILE_STORAGE_STATE =
  * capturas en español preparan la pantalla con la misma función. */
 const ABOUT_CARD = /^(About|Sobre mí)$/;
 const CONTACT_CARD = /^(Contact|Contacto)$/;
-const AUF_CARD = /^(AUF registration|Registro AUF)$/;
+// #967: la tarjeta lleva el nombre del registro del club, "AUF".
+const AUF_CARD = /^AUF$/;
 const CLUB_RECORD_CARD = /^(Club record|Ficha del club)$/;
 const EDIT_CARD_BUTTON = /^(Edit|Editar) /;
 const SAVE_CARD_BUTTON = /^(Save|Guardar)$/;
@@ -2859,6 +2907,13 @@ const ACCOUNT_STATES: readonly AccountState[] = [
   {
     name: "perfil-auf-pendiente",
     storageState: roleRequestStorageStatePath("perfil-auf-pendiente"),
+  },
+  // #967: el chip de la cabecera y la tarjeta con el nombre más ancho.
+  {
+    name: "registro-largo-perfil",
+    storageState: roleRequestStorageStatePath("perfil-auf-pendiente"),
+    prepare: thenShowWideRegistrationName(undefined),
+    viewports: PHONE_ONLY_VIEWPORTS,
   },
   {
     name: "perfil-auf-pendiente-es",
@@ -6023,6 +6078,8 @@ type DirectoryState = {
   readonly listHeading: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
+  /** Sin ellos, los tres. */
+  readonly viewports?: readonly (typeof viewports)[number][];
 };
 
 /* El correo del directorio (#501): el formulario, el diálogo que confirma,
@@ -6553,6 +6610,17 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     listHeading: ENGLISH_DIRECTORY_HEADING,
     prepare: chooseFilters(ENGLISH_FILTER_LABELS, false),
   },
+  // #967: las fichas de los filtros, las marcas de las filas y el resumen
+  // con el nombre del registro más ancho, en el móvil.
+  {
+    name: "registro-largo-directorio",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: thenShowWideRegistrationName(
+      chooseFilters(ENGLISH_FILTER_LABELS, false),
+    ),
+    viewports: PHONE_ONLY_VIEWPORTS,
+  },
   {
     name: "directorio-filtros-abiertos-es",
     asAdmin: true,
@@ -6702,7 +6770,7 @@ for (const state of DIRECTORY_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of state.viewports ?? viewports) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -9721,6 +9789,13 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
     name: "ficha-auf-sin-verificar",
     record: UNVERIFIED_AUF_RECORD,
   },
+  // #967: la franja, la cabecera y la tarjeta con el nombre más ancho.
+  {
+    name: "registro-largo-ficha",
+    record: UNVERIFIED_AUF_RECORD,
+    prepare: thenShowWideRegistrationName(undefined),
+    viewports: PHONE_ONLY_VIEWPORTS,
+  },
   {
     name: "ficha-auf-sin-verificar-es",
     record: UNVERIFIED_AUF_RECORD,
@@ -12093,6 +12168,7 @@ const STUBBED_CLUB_SETTINGS = {
   accentColor: "#1c6ea4",
   logoUrl: null,
   seasonStartsOn: null,
+  registrationName: "AUF",
 } as const;
 
 /** Un inicio de temporada elegido en General (#744). */
@@ -12207,6 +12283,24 @@ function chooseSeasonStart(saveLabel: string) {
     await field.fill(CHOSEN_SEASON_START);
     await expect(field).toHaveValue(CHOSEN_SEASON_START);
     await expect(page.getByRole("button", { name: saveLabel })).toBeEnabled();
+  };
+}
+
+/** Un nombre del registro de 17 caracteres anchos (#967): uno más de los que
+ * admite la base. */
+const TOO_LONG_REGISTRATION_NAME = "W".repeat(17);
+
+/** Escribe un nombre del registro demasiado largo: el campo lo dice y la
+ * barra no deja guardar. */
+function typeTooLongRegistrationName(
+  saveLabel: string,
+  issueText: RegExp,
+): (page: Page) => Promise<void> {
+  return async (page: Page): Promise<void> => {
+    const field = page.getByLabel(/^(Registration name|Nombre del registro)$/);
+    await field.fill(TOO_LONG_REGISTRATION_NAME);
+    await expect(page.getByText(issueText)).toBeVisible();
+    await expect(page.getByRole("button", { name: saveLabel })).toBeDisabled();
   };
 }
 
@@ -12786,6 +12880,24 @@ const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
     name: "club-general-temporada-es",
     beforeVisit: chooseSpanish,
     prepare: chooseSeasonStart(SPANISH_SAVE_SETTINGS),
+    beforeCapture: fitViewportToPage,
+  },
+  // #967: General con un nombre del registro de más de 16 caracteres.
+  {
+    name: "club-general-registro-largo",
+    prepare: typeTooLongRegistrationName(
+      ENGLISH_SAVE_SETTINGS,
+      /^Use 16 characters or fewer\.$/,
+    ),
+    beforeCapture: fitViewportToPage,
+  },
+  {
+    name: "club-general-registro-largo-es",
+    beforeVisit: chooseSpanish,
+    prepare: typeTooLongRegistrationName(
+      SPANISH_SAVE_SETTINGS,
+      /^Usa 16 caracteres como mucho\.$/,
+    ),
     beforeCapture: fitViewportToPage,
   },
   {
@@ -14750,6 +14862,7 @@ test.describe("un Admin frente a la configuración de verdad", () => {
         initials: string | null;
         accentColor: string;
         seasonStartsOn: string | null;
+        registrationName: string | null;
       };
     };
     const identity = {
@@ -14757,6 +14870,7 @@ test.describe("un Admin frente a la configuración de verdad", () => {
       initials: data.initials,
       accentColor: data.accentColor,
       seasonStartsOn: data.seasonStartsOn,
+      registrationName: data.registrationName,
     };
 
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
@@ -14825,6 +14939,7 @@ test.describe("un Admin frente a la configuración de verdad", () => {
       initials: null,
       accentColor: "#1c6ea4",
       seasonStartsOn: null,
+      registrationName: null,
     };
 
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
@@ -14848,6 +14963,7 @@ test.describe("un Admin frente a la configuración de verdad", () => {
         initials: string | null;
         accentColor: string;
         seasonStartsOn: string | null;
+        registrationName: string | null;
       };
     };
     const expected = {
@@ -14855,6 +14971,7 @@ test.describe("un Admin frente a la configuración de verdad", () => {
       initials: data.initials,
       accentColor: data.accentColor,
       seasonStartsOn: data.seasonStartsOn,
+      registrationName: data.registrationName,
     };
 
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
@@ -14898,6 +15015,7 @@ test.describe("un Player frente a la configuración del club", () => {
       initials: null,
       accentColor: "#7b3fa0",
       seasonStartsOn: null,
+      registrationName: null,
     };
 
     const read = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);

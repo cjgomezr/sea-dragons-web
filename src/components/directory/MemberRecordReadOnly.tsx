@@ -1,3 +1,7 @@
+import {
+  useClubTranslator,
+  useRegistrationName,
+} from "@/components/club/RegistrationNameProvider";
 import { type HeroMember, ProfileHero } from "@/components/account/ProfileHero";
 import {
   ContactSummary,
@@ -9,7 +13,7 @@ import { GroupChips } from "@/components/account/MyGroups";
 import { SideCard } from "@/components/account/SideCard";
 import { SeasonAttendanceCard } from "@/components/attendance/SeasonAttendanceCard";
 import type { Locale } from "@/lib/i18n/locale";
-import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { Translator } from "@/lib/i18n/translator";
 import type { StaffMemberRecord } from "@/lib/members/member-record";
 import { MemberRecordAbout } from "./MemberRecordAbout";
 import { MemberRecordActions } from "./MemberRecordActions";
@@ -117,12 +121,14 @@ export function MemberRecordReadOnly({
   locale: Locale;
   record: StaffMemberRecord;
 }): React.JSX.Element {
-  const translate = createTranslator(locale);
+  const translate = useClubTranslator(locale);
+  const registrationName = useRegistrationName();
   return (
     <>
       <ProfileHero
         locale={locale}
         isOwnProfile={false}
+        registrationName={registrationName}
         member={heroMemberOf(record)}
         actions={
           <MemberRecordActions

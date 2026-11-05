@@ -7,12 +7,13 @@ import { WarningCircle } from "@phosphor-icons/react/dist/ssr/WarningCircle";
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { Icon } from "@/components/Icon";
 import { GROUPS_PATH, memberRecordHref } from "@/lib/auth/routes";
 import type { NamedPosition } from "@/lib/club/club-positions";
 import { type CountryCode, listCountryOptions } from "@/lib/geo/countries";
 import type { Group } from "@/lib/groups/groups";
-import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { Translator } from "@/lib/i18n/translator";
 import type { Locale } from "@/lib/i18n/locale";
 import {
   type NewMemberField,
@@ -410,7 +411,7 @@ export function NewMemberForm({
   onCreated,
   onCancel,
 }: NewMemberFormProps): React.JSX.Element {
-  const translate = createTranslator(locale);
+  const translate = useClubTranslator(locale);
   const countries = useMemo(() => listCountryOptions(locale), [locale]);
   const form = useNewMemberForm({ positions, initialGroupIds, onCreated });
   const { draft, status, issues } = form;

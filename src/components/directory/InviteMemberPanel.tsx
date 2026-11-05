@@ -4,6 +4,7 @@ import { UserPlus } from "@phosphor-icons/react/dist/ssr/UserPlus";
 import { X } from "@phosphor-icons/react/dist/ssr/X";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { useClubTranslator } from "@/components/club/RegistrationNameProvider";
 import { Icon } from "@/components/Icon";
 import { loadPositionChoices } from "@/components/club/positions-client";
 import { cycleFocus } from "@/components/focus-cycle";
@@ -12,7 +13,7 @@ import { isPhoneNow } from "@/components/use-is-phone";
 import type { NamedPosition } from "@/lib/club/club-positions";
 import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
-import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { Translator } from "@/lib/i18n/translator";
 import { InvitationResult } from "./InvitationResult";
 import type { CreatedMemberView } from "./new-member-client";
 import { FIELD_IDS } from "./new-member-issues";
@@ -141,7 +142,7 @@ function InvitePanel({
   readonly onClose: () => void;
   readonly onMemberCreated: () => void;
 }): React.JSX.Element {
-  const translate = createTranslator(locale);
+  const translate = useClubTranslator(locale);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const { catalogs, retry } = useCatalogs();
   const commonCountryCodes = useCommonCountries();

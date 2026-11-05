@@ -42,7 +42,7 @@ function settingsGateway() {
 
 describeRls("configuración del club en Supabase", () => {
   it(
-    "guarda el nombre, las iniciales y el acento cuando la fila sigue como se leyó",
+    "guarda el nombre, las iniciales, el acento y el nombre del registro cuando la fila sigue como se leyó",
     async () => {
       await withThrowawayClub("HH", async (club) => {
         const result = await settingsGateway().updateClubIdentity(club.id, {
@@ -51,12 +51,14 @@ describeRls("configuración del club en Supabase", () => {
             initials: "HH",
             accentColor: SEEDED_ACCENT,
             seasonStartsOn: null,
+            registrationName: null,
           },
           identity: {
             name: "Bay Barracudas",
             initials: null,
             accentColor: "#7b3fa0",
             seasonStartsOn: "2026-03-02",
+            registrationName: "Licencia FEDAS",
           },
         });
 
@@ -68,6 +70,7 @@ describeRls("configuración del club en Supabase", () => {
             accentColor: "#7b3fa0",
             logoUrl: null,
             seasonStartsOn: "2026-03-02",
+            registrationName: "Licencia FEDAS",
           },
         });
       });
@@ -85,12 +88,14 @@ describeRls("configuración del club en Supabase", () => {
             initials: null,
             accentColor: SEEDED_ACCENT,
             seasonStartsOn: null,
+            registrationName: null,
           },
           identity: {
             name: "Harbour Hammerheads",
             initials: "HQ",
             accentColor: SEEDED_ACCENT,
             seasonStartsOn: null,
+            registrationName: null,
           },
         });
 
@@ -112,20 +117,21 @@ describeRls("configuración del club en Supabase", () => {
           name: "Harbour Hammerheads",
           initials: "HH",
           accentColor: SEEDED_ACCENT,
+          registrationName: null,
         };
         await gateway.updateClubIdentity(club.id, {
-          expected: { ...loaded, seasonStartsOn: null },
+          expected: { ...loaded, seasonStartsOn: null, registrationName: null },
           identity: { ...loaded, seasonStartsOn: "2026-03-02" },
         });
 
         const result = await gateway.updateClubIdentity(club.id, {
           expected: { ...loaded, seasonStartsOn: "2026-03-02" },
-          identity: { ...loaded, seasonStartsOn: null },
+          identity: { ...loaded, seasonStartsOn: null, registrationName: null },
         });
 
         expect(result).toMatchObject({
           kind: "updated",
-          settings: { seasonStartsOn: null },
+          settings: { seasonStartsOn: null, registrationName: null },
         });
       });
     },
@@ -135,11 +141,32 @@ describeRls("configuración del club en Supabase", () => {
   it.each([
     [
       "las iniciales",
-      { initials: "XX", accentColor: SEEDED_ACCENT, seasonStartsOn: null },
+      {
+        initials: "XX",
+        accentColor: SEEDED_ACCENT,
+        seasonStartsOn: null,
+        registrationName: null,
+      },
     ],
     [
       "el acento",
-      { initials: "HH", accentColor: "#7b3fa0", seasonStartsOn: null },
+      {
+        initials: "HH",
+        accentColor: "#7b3fa0",
+        seasonStartsOn: null,
+        registrationName: null,
+      },
+    ],
+    // #967: un club nuevo nace sin nombre del registro, y el Admin creía
+    // tener uno.
+    [
+      "el nombre del registro",
+      {
+        initials: "HH",
+        accentColor: SEEDED_ACCENT,
+        seasonStartsOn: null,
+        registrationName: "AUF",
+      },
     ],
     // #744: la fila tiene null y el Admin creía tener una fecha.
     [
@@ -148,6 +175,7 @@ describeRls("configuración del club en Supabase", () => {
         initials: "HH",
         accentColor: SEEDED_ACCENT,
         seasonStartsOn: "2026-03-02",
+        registrationName: null,
       },
     ],
   ])(
@@ -163,6 +191,7 @@ describeRls("configuración del club en Supabase", () => {
             initials: "BB",
             accentColor: "#2e7d32",
             seasonStartsOn: null,
+            registrationName: null,
           },
         });
 

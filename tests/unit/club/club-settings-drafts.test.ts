@@ -14,6 +14,7 @@ const STORED_IDENTITY = {
   initials: "HH",
   accentColor: "#1c6ea4",
   seasonStartsOn: null,
+  registrationName: "AUF",
 } as const;
 
 describe("la identidad del club sin cambios", () => {

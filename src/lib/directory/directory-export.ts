@@ -119,7 +119,9 @@ function buildExport(
   { locale, todayInClub }: DirectoryExportRequest,
   brand: ClubBrand,
 ): DirectoryExport {
-  const translate = createTranslator(locale);
+  const translate = createTranslator(locale, {
+    registrationName: brand.registrationName,
+  });
   return {
     filename: directoryCsvFilename({
       clubName: brand.name,

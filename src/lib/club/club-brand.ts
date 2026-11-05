@@ -23,6 +23,9 @@ export type ClubBrand = {
   readonly signInTexts: SignInTexts;
   /** Las redes del club (#964): la entrada y la navegación las enseñan. */
   readonly socialLinks: SocialLinks;
+  /** El nombre del registro de sus socios (#967), como "AUF". Nulo es la
+   * palabra de la app ("Registration" / "Registro"). */
+  readonly registrationName: string | null;
 };
 
 /** Lo que guarda la base. Sin iniciales es `null`, nunca la cadena vacía
@@ -33,6 +36,7 @@ export type ClubBrandRow = {
   readonly accentColor: string;
   readonly logoUrl: string | null;
   readonly signInTexts: SignInTexts;
+  readonly registrationName: string | null;
 };
 
 /** La red si la base no contesta: la marca sale en todas las pantallas, y una
@@ -44,6 +48,8 @@ export const DEFAULT_CLUB_BRAND: ClubBrand = {
   logoUrl: null,
   signInTexts: NO_SIGN_IN_TEXTS,
   socialLinks: NO_SOCIAL_LINKS,
+  // Lo que `0094_club_registration_name.sql` le dejó al club de siempre.
+  registrationName: "AUF",
 };
 
 const DERIVED_INITIALS_WORD_COUNT = 2;
@@ -66,6 +72,7 @@ function toClubBrand(row: ClubBrandRow, socialLinks: SocialLinks): ClubBrand {
     logoUrl: row.logoUrl,
     signInTexts: row.signInTexts,
     socialLinks,
+    registrationName: row.registrationName,
   };
 }
 

@@ -275,7 +275,7 @@ async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
 
 type User = ReturnType<typeof userEvent.setup>;
 
-function aufCard(name = "AUF registration"): HTMLElement {
+function aufCard(name = "AUF"): HTMLElement {
   return screen.getByRole("region", { name });
 }
 
@@ -285,9 +285,7 @@ function clubRecordCard(name = "Club record"): HTMLElement {
 
 async function openAuf(user: User): Promise<HTMLElement> {
   const card = aufCard();
-  await user.click(
-    within(card).getByRole("button", { name: "Edit AUF registration" }),
-  );
+  await user.click(within(card).getByRole("button", { name: "Edit AUF" }));
   return card;
 }
 
@@ -417,12 +415,8 @@ describe("ficha en pantalla: carga", () => {
 
     await renderScreen("es");
 
-    expect(cellOf(aufCard("Registro AUF"), "Número")).toHaveTextContent(
-      "AUF-1",
-    );
-    expect(cellOf(aufCard("Registro AUF"), "Estado")).toHaveTextContent(
-      "Verificado",
-    );
+    expect(cellOf(aufCard("AUF"), "Número")).toHaveTextContent("AUF-1");
+    expect(cellOf(aufCard("AUF"), "Estado")).toHaveTextContent("Verificado");
     expect(clubRecordCard("Ficha del club")).toBeInTheDocument();
     expect(screen.getByText("Miembro desde marzo de 2024")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Grupos" })).toBeInTheDocument();
@@ -486,7 +480,7 @@ describe("pantalla de la ficha", () => {
     expect(screen.getByText("PP")).toHaveAttribute("aria-hidden", "true");
     expect(cellOf(aufCard(), "Number")).toHaveTextContent("AUF-1");
     expect(
-      within(aufCard()).getByRole("button", { name: "Edit AUF registration" }),
+      within(aufCard()).getByRole("button", { name: "Edit AUF" }),
     ).toBeEnabled();
   });
 });
@@ -575,7 +569,7 @@ describe("ficha en pantalla: Registro AUF (#242, #773)", () => {
     ]);
     expect(cellOf(card, "Number")).toHaveTextContent("AUF-99");
     expect(
-      within(card).getByRole("button", { name: "Edit AUF registration" }),
+      within(card).getByRole("button", { name: "Edit AUF" }),
     ).toHaveFocus();
   });
 
@@ -683,7 +677,7 @@ describe("ficha en pantalla: Registro AUF (#242, #773)", () => {
     expect(patches).toEqual([]);
     expect(cellOf(card, "Number")).toHaveTextContent("AUF-1");
     expect(
-      within(card).getByRole("button", { name: "Edit AUF registration" }),
+      within(card).getByRole("button", { name: "Edit AUF" }),
     ).toHaveFocus();
   });
 });
@@ -1518,7 +1512,7 @@ describe("ficha en pantalla: verificar el AUF (#274)", () => {
     await user.click(verifyButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The member changed the AUF after you opened the record. Reload it before verifying.",
+      "The member changed their AUF after you opened the record. Reload it before verifying.",
     );
     expect(screen.getByText("AUF pending")).toBeInTheDocument();
   });
@@ -2478,7 +2472,7 @@ describe("ficha en pantalla: la cabecera (#771)", () => {
 
 describe("ficha en pantalla: la franja del AUF pendiente (#771)", () => {
   function aufStrip(): HTMLElement {
-    return screen.getByRole("note", { name: /added AUF/ });
+    return screen.getByRole("note", { name: /added their AUF number/ });
   }
 
   it("dice quién añadió qué AUF y cuándo vence, con Verificar AUF", async () => {
@@ -2488,7 +2482,7 @@ describe("ficha en pantalla: la franja del AUF pendiente (#771)", () => {
 
     const strip = aufStrip();
     expect(strip).toHaveTextContent(
-      "Paula Player added AUF AUF-1 (expires 31 March 2027). Check it and verify.",
+      "Paula Player added their AUF number AUF-1 (expires 31 March 2027). Check it and verify.",
     );
     expect(within(strip).getByText("AUF-1").tagName).toBe("STRONG");
     expect(
@@ -2502,7 +2496,7 @@ describe("ficha en pantalla: la franja del AUF pendiente (#771)", () => {
     await renderScreen();
 
     expect(aufStrip()).toHaveTextContent(
-      "Paula Player added AUF AUF-1. Check it and verify.",
+      "Paula Player added their AUF number AUF-1. Check it and verify.",
     );
   });
 
@@ -2522,7 +2516,7 @@ describe("ficha en pantalla: la franja del AUF pendiente (#771)", () => {
       { aufNumber: "AUF-1", aufExpiry: "2027-03-31" },
     ]);
     expect(
-      screen.queryByRole("note", { name: /added AUF/ }),
+      screen.queryByRole("note", { name: /added their AUF number/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -2539,7 +2533,7 @@ describe("ficha en pantalla: la franja del AUF pendiente (#771)", () => {
     await renderScreen();
 
     expect(
-      screen.queryByRole("note", { name: /added AUF/ }),
+      screen.queryByRole("note", { name: /added their AUF number/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -2549,9 +2543,9 @@ describe("ficha en pantalla: la franja del AUF pendiente (#771)", () => {
     await renderScreen("es");
 
     expect(
-      screen.getByRole("note", { name: /añadió el AUF/ }),
+      screen.getByRole("note", { name: /añadió su número de AUF/ }),
     ).toHaveTextContent(
-      "Paula Player añadió el AUF AUF-1 (vence el 31 de marzo de 2027). Revísalo y verifícalo.",
+      "Paula Player añadió su número de AUF, AUF-1 (vence el 31 de marzo de 2027). Revísalo y verifícalo.",
     );
   });
 });
@@ -2980,7 +2974,7 @@ describe("ficha en pantalla: en lectura para Committee y Coach (#776)", () => {
       await renderScreen();
 
       expect(
-        screen.queryByRole("region", { name: "AUF registration" }),
+        screen.queryByRole("region", { name: "AUF" }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole("region", { name: "Club record" }),
@@ -3052,7 +3046,7 @@ describe("ficha en pantalla: en lectura para Committee y Coach (#776)", () => {
         screen.getByRole("region", { name: "Groups" }),
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole("region", { name: "AUF registration" }),
+        screen.queryByRole("region", { name: "AUF" }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole("region", { name: "Evaluation" }),

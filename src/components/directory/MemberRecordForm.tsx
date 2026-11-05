@@ -2,10 +2,14 @@
 
 import { useRef, useState } from "react";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
+import {
+  useClubTranslator,
+  useRegistrationName,
+} from "@/components/club/RegistrationNameProvider";
 import { type HeroMember, ProfileHero } from "@/components/account/ProfileHero";
 import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
-import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import type { Translator } from "@/lib/i18n/translator";
 import type { MemberRecord } from "@/lib/members/member-record";
 import { AufPendingStrip, type PendingAuf } from "./AufPendingStrip";
 import { MemberRecordAbout } from "./MemberRecordAbout";
@@ -121,7 +125,8 @@ export function MemberRecordForm({
   /** Lo que abrió la última opción del ⋯, justo bajo la cabecera. */
   adminPanel: React.ReactNode;
 }): React.JSX.Element {
-  const translate = createTranslator(locale);
+  const translate = useClubTranslator(locale);
+  const registrationName = useRegistrationName();
   const [record, setRecord] = useState(initialRecord);
   const [verifyStatus, setVerifyStatus] = useState<VerifyStatus>({
     kind: "idle",
@@ -161,6 +166,7 @@ export function MemberRecordForm({
       <ProfileHero
         locale={locale}
         isOwnProfile={false}
+        registrationName={registrationName}
         member={heroMemberOf(record, initialRecord)}
         actions={
           // Los botones de contacto leen la ficha guardada aquí: si el Admin

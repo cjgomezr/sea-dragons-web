@@ -32,6 +32,7 @@ const STORED: ClubSettings = {
   accentColor: "#1c6ea4",
   logoUrl: null,
   seasonStartsOn: null,
+  registrationName: "AUF",
 };
 
 const VALID_BODY = {
@@ -39,11 +40,13 @@ const VALID_BODY = {
   initials: "BB",
   accentColor: STORED.accentColor,
   seasonStartsOn: STORED.seasonStartsOn,
+  registrationName: STORED.registrationName,
   expected: {
     name: STORED.name,
     initials: STORED.initials,
     accentColor: STORED.accentColor,
     seasonStartsOn: STORED.seasonStartsOn,
+    registrationName: STORED.registrationName,
   },
 } as const;
 
@@ -433,6 +436,80 @@ describe("endpoint de la configuración: inicio de temporada", () => {
       reason: "club_settings_changed",
     });
   });
+});
+
+// #967 (RF-7 y D11 del PRD de E37)
+describe("endpoint de la configuración: nombre del registro", () => {
+  const REGISTRATION_BODY = {
+    ...VALID_BODY,
+    name: STORED.name,
+    initials: STORED.initials,
+    registrationName: "Licencia FEDAS",
+  } as const;
+
+  it("guarda el nombre de un Admin y lo devuelve", async () => {
+    const response = await patchSettings(REGISTRATION_BODY);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: { ...STORED, registrationName: "Licencia FEDAS" },
+    });
+    expect(writes).toEqual([
+      `identity ${STORED.name}`,
+      "audit club.settings_changed",
+    ]);
+    expect(invalidateClubBrand).toHaveBeenCalled();
+  });
+
+  it("vacío lo deja nulo", async () => {
+    const response = await patchSettings({
+      ...REGISTRATION_BODY,
+      registrationName: "",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { registrationName: null },
+    });
+  });
+
+  it("responde 400 a más de 16 caracteres, con el campo en el motivo", async () => {
+    const response = await patchSettings({
+      ...REGISTRATION_BODY,
+      registrationName: "W".repeat(17),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(errorOf(response)).resolves.toEqual(
+      expect.objectContaining({
+        code: "validation_error",
+        reason: "registration_name_too_long",
+      }),
+    );
+    expect(writes).toEqual([]);
+  });
+
+  it("responde 400 a un cuerpo sin el nombre", async () => {
+    const response = await patchSettings({
+      ...REGISTRATION_BODY,
+      registrationName: undefined,
+    });
+
+    expect(response.status).toBe(400);
+    expect(writes).toEqual([]);
+  });
+
+  it.each(["Committee", "Coach", "Player"] as const)(
+    "responde 403 a un %s sin escribir nada",
+    async (role) => {
+      givenSession({ kind: "active", role, membershipCurrent: true });
+
+      const response = await patchSettings(REGISTRATION_BODY);
+
+      expect(response.status).toBe(403);
+      expect(writes).toEqual([]);
+    },
+  );
 });
 
 describe("la pantalla de configuración en la frontera", () => {

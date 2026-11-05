@@ -67,6 +67,7 @@ function renderScreen(
   const locale = options.locale ?? "en";
   render(
     <ProfileScreen
+      registrationName="AUF"
       locale={locale}
       userId={OWN_USER_ID}
       email="nerea@example.com"

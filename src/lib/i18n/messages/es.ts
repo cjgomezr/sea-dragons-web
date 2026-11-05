@@ -445,18 +445,21 @@ export const spanishMessages: MessageCatalog = {
     "No pudimos guardar tus cambios. Vuelve a intentarlo en un momento.",
   // El AUF del perfil propio (#274): lo escribe el miembro y queda pendiente
   // hasta que un Admin lo verifica.
-  "account.profile.auf.title": "Registro AUF",
-  "account.profile.auf.number": "Número de AUF",
-  "account.profile.auf.expiry": "Vencimiento del AUF",
-  "account.profile.issue.aufNumberMissing": "Escribe tu número de AUF.",
+  // El nombre del registro cuando el club no le pone uno (#967, D12 de E37).
+  "registration.defaultName": "Registro",
+  "account.profile.auf.title": "{registration}",
+  "account.profile.auf.number": "Número de {registration}",
+  "account.profile.auf.expiry": "Vencimiento de {registration}",
+  "account.profile.issue.aufNumberMissing":
+    "Escribe tu número de {registration}.",
   "account.profile.issue.aufNumberTooLong":
-    "Tu número de AUF no puede pasar de {max} caracteres.",
+    "Tu número de {registration} no puede pasar de {max} caracteres.",
   "account.profile.issue.aufExpiryNotADate":
     "Escribe una fecha de vencimiento válida.",
   "account.profile.issue.aufExpiryBeforeJoined":
     "El vencimiento no puede ser anterior al día en que ingresaste al club.",
   "account.profile.error.aufVerified":
-    "Tu AUF ya está verificado. Sólo un Admin puede cambiarlo.",
+    "Un Admin ya verificó tu {registration}. Sólo un Admin puede cambiar sus datos.",
   // El aviso de los datos de contacto que faltan (#498).
   "contactReminder.emergencyContact.title": "Añade tu contacto de emergencia",
   "contactReminder.phone.title": "Añade tu teléfono",
@@ -519,7 +522,7 @@ export const spanishMessages: MessageCatalog = {
   "profileCard.contact.emergencySummary": "{name} · {relationship}",
   // Registro AUF y Ficha del club, en el perfil y en la ficha (#773).
   "profileCard.adminOnly": "Admin",
-  "profileCard.auf.saved": "AUF guardado",
+  "profileCard.auf.saved": "Guardado: {registration}",
   "profileCard.auf.number": "Número",
   "profileCard.auf.expires": "Vence",
   "profileCard.auf.status": "Estado",
@@ -551,7 +554,7 @@ export const spanishMessages: MessageCatalog = {
   "account.photo.saved": "Foto actualizada.",
   "account.photo.removed": "Foto quitada.",
   "account.photo.retry": "Reintentar",
-  "profileHero.auf.pending": "AUF pendiente",
+  "profileHero.auf.pending": "{registration} pendiente",
   "profileHero.memberSince": "Miembro desde {date}",
   "profileCompletion.title": "Tu perfil está casi completo. Falta:",
   "profileCompletion.progress": "Perfil completado",
@@ -799,9 +802,9 @@ export const spanishMessages: MessageCatalog = {
   "directory.filter.position.none": "Sin posición",
   "directory.filter.group": "Grupo",
   "directory.filter.group.all": "Todos los grupos",
-  "directory.filter.auf": "AUF",
-  "directory.filter.auf.all": "Cualquier AUF",
-  "directory.filter.auf.missing": "Sin número de AUF",
+  "directory.filter.auf": "{registration}",
+  "directory.filter.auf.all": "Cualquier {registration}",
+  "directory.filter.auf.missing": "Sin número de {registration}",
   "directory.filter.auf.expired": "Vencido",
   "directory.filter.auf.expiring": "Vence en los próximos 30 días",
   "directory.filter.auf.unverified": "Sin verificar",
@@ -899,10 +902,10 @@ export const spanishMessages: MessageCatalog = {
   "directory.requestsScreen.reason": "Motivo",
   "directory.requestsScreen.allCaughtUp": "Todo al día",
   "directory.mark.inactive": "Desactivada",
-  "directory.dot.aufExpired": "AUF vencido",
+  "directory.dot.aufExpired": "Vencido: {registration}",
   "directory.dot.membershipPastDue": "Membresía vencida",
-  "directory.dot.aufMissing": "Sin número de AUF",
-  "directory.dot.aufExpiring": "AUF por vencer",
+  "directory.dot.aufMissing": "Sin número de {registration}",
+  "directory.dot.aufExpiring": "{registration} por vencer",
   "directory.legend.label": "Puntos de estado",
   "directory.legend.danger": "Necesita acción",
   "directory.legend.warning": "Revisar pronto",
@@ -927,16 +930,18 @@ export const spanishMessages: MessageCatalog = {
   "directory.overview.requestLabel": "Solicitud de rol de {name}",
   "directory.overview.openMember": "Abrir la ficha de {name}",
   "directory.overview.aufTitle": {
-    one: "{count} registro AUF por renovar",
-    other: "{count} registros AUF por renovar",
+    one: "{count} miembro tiene que renovar su {registration}",
+    other: "{count} miembros tienen que renovar su {registration}",
   },
   "directory.overview.aufExpired": "{name} (vencido)",
   "directory.overview.aufExpiring": "{name} (por vencer)",
   "directory.overview.view": "Ver",
-  "directory.overview.viewLabel": "Ver los AUF por renovar",
+  "directory.overview.viewLabel":
+    "Ver los miembros que tienen que renovar su {registration}",
   "directory.overview.attention": "Necesita atención",
-  "directory.overview.attention.aufMissing": "Sin AUF",
-  "directory.overview.attention.aufRenewal": "AUF vencido o por vencer",
+  "directory.overview.attention.aufMissing": "Sin {registration}",
+  "directory.overview.attention.aufRenewal":
+    "Vencido o por vencer: {registration}",
   "directory.overview.attention.withoutEmergencyContact":
     "Sin contacto de emergencia",
   "directory.overview.attention.membershipPastDue": "Membresía vencida",
@@ -979,10 +984,10 @@ export const spanishMessages: MessageCatalog = {
   "directory.action.emergency": "Llamar al contacto de emergencia de {name}",
   "directory.action.noPhone": "{name} no tiene teléfono",
   "directory.action.noEmergency": "{name} no tiene contacto de emergencia",
-  "directory.mark.aufExpired": "AUF vencido",
+  "directory.mark.aufExpired": "Vencido: {registration}",
   // #274: el AUF que escribió el miembro, hasta que un Admin lo verifica.
-  "directory.mark.aufNotVerified": "AUF sin verificar",
-  "directory.mark.aufVerified": "AUF verificado",
+  "directory.mark.aufNotVerified": "{registration} sin verificar",
+  "directory.mark.aufVerified": "Verificado: {registration}",
   "directory.mark.membership.none": "Sin membresía",
   "directory.mark.membership.pending": "Membresía pendiente",
   "directory.mark.membership.trialing": "En prueba",
@@ -1001,7 +1006,7 @@ export const spanishMessages: MessageCatalog = {
   // La ficha reservada al Admin (#242, RF-4 del PRD de E5).
   "memberRecord.metaTitle": "Ficha del miembro · {club}",
   "memberRecord.metaDescription":
-    "El registro AUF y los grupos de un miembro, que sólo edita un Admin.",
+    "Los datos de {registration} y los grupos de un miembro, que sólo edita un Admin.",
   "memberRecord.back": "Directorio",
   "memberRecord.openLabel": "Abrir la ficha de {name}",
   "memberRecord.loading": "Cargando la ficha del miembro…",
@@ -1018,18 +1023,18 @@ export const spanishMessages: MessageCatalog = {
   "photoViewer.alt": "Foto de {name}",
   "photoViewer.loading": "Cargando la foto…",
   "photoViewer.failed": "No se pudo cargar la foto.",
-  "memberRecord.auf.title": "Registro AUF",
-  "memberRecord.auf.number": "Número de AUF",
+  "memberRecord.auf.title": "{registration}",
+  "memberRecord.auf.number": "Número de {registration}",
   "memberRecord.auf.expiry": "Vencimiento",
   "memberRecord.auf.hint":
     "Si borras el número, se borra también su vencimiento.",
-  "memberRecord.auf.verify": "Verificar AUF",
+  "memberRecord.auf.verify": "Verificar {registration}",
   "memberRecord.auf.verifying": "Verificando…",
-  "memberRecord.auf.verified": "AUF verificado.",
+  "memberRecord.auf.verified": "Verificación guardada: {registration}.",
   "memberRecord.aufStrip.withExpiry":
-    "{name} añadió el AUF {number} (vence el {date}). Revísalo y verifícalo.",
+    "{name} añadió su número de {registration}, {number} (vence el {date}). Revísalo y verifícalo.",
   "memberRecord.aufStrip.withoutExpiry":
-    "{name} añadió el AUF {number}. Revísalo y verifícalo.",
+    "{name} añadió su número de {registration}, {number}. Revísalo y verifícalo.",
   "memberRecord.birth.label": "Fecha de nacimiento",
   "memberRecord.birth.hint":
     "El miembro no puede cambiarla: de ella depende si necesita el consentimiento de un tutor.",
@@ -1049,7 +1054,7 @@ export const spanishMessages: MessageCatalog = {
     "Es el teléfono de {name}. El contacto de emergencia debería ser otra persona.",
   "memberRecord.groups.empty": "El club todavía no tiene grupos.",
   "memberRecord.issue.aufNumberTooLong":
-    "El número de AUF no puede pasar de {max} caracteres.",
+    "El número de {registration} no puede pasar de {max} caracteres.",
   "memberRecord.issue.aufExpiryNotADate":
     "Ese vencimiento no es una fecha válida.",
   "memberRecord.issue.aufExpiryBeforeJoined":
@@ -1066,7 +1071,7 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.error.memberStatusChanged":
     "La cuenta del miembro cambió mientras se guardaba. Vuelve a cargar la ficha e inténtalo de nuevo.",
   "memberRecord.error.aufChanged":
-    "El miembro cambió el AUF después de que abrieras la ficha. Recárgala antes de verificarlo.",
+    "El miembro cambió su {registration} después de que abrieras la ficha. Recárgala antes de verificar.",
   "memberRecord.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para seguir.",
   "memberRecord.error.forbidden":
@@ -1116,9 +1121,9 @@ export const spanishMessages: MessageCatalog = {
   "directory.bulk.reason.unexpected": "algo falló, inténtalo de nuevo",
   "directory.export.fileName": "directorio",
   "directory.export.column.name": "Nombre",
-  "directory.export.column.aufNumber": "Número de AUF",
-  "directory.export.column.aufExpiry": "Vencimiento del AUF",
-  "directory.export.column.aufVerified": "AUF verificado",
+  "directory.export.column.aufNumber": "Número de {registration}",
+  "directory.export.column.aufExpiry": "Vencimiento de {registration}",
+  "directory.export.column.aufVerified": "Verificación de {registration}",
   "directory.export.column.accountStatus": "Estado de la cuenta",
   "directory.export.column.membership": "Membresía",
   "directory.export.column.evaluated": "Evaluado",
@@ -1316,7 +1321,7 @@ export const spanishMessages: MessageCatalog = {
   "newMember.gender": "Género",
   "newMember.gender.private": "solo los Admin y el miembro",
   "newMember.choose": "Elige una opción",
-  "newMember.auf.title": "Registro AUF",
+  "newMember.auf.title": "{registration}",
   "newMember.auf.hint": "Los dos o ninguno",
   "newMember.auf.number": "Número",
   "newMember.auf.expiry": "Vencimiento",
@@ -1325,8 +1330,8 @@ export const spanishMessages: MessageCatalog = {
     other: "{count} cosas por arreglar antes de enviar",
   },
   "newMember.summary.item": "{field}: {issue}",
-  "newMember.summary.aufNumber": "Número de AUF",
-  "newMember.summary.aufExpiry": "Vencimiento del AUF",
+  "newMember.summary.aufNumber": "Número de {registration}",
+  "newMember.summary.aufExpiry": "Vencimiento de {registration}",
   "newMember.preview.titleNamed": "Lo que recibirá {name}",
   "newMember.preview.titleUnnamed": "Lo que recibirá",
   "newMember.preview.from": "De",
@@ -1357,13 +1362,15 @@ export const spanishMessages: MessageCatalog = {
   "newMember.issue.positionUnknown": "Elige una posición.",
   "newMember.issue.experienceLevelUnknown": "Elige un nivel de experiencia.",
   "newMember.issue.genderUnknown": "Elige una opción.",
-  "newMember.issue.aufNumberMissing": "Escribe el número de AUF.",
+  "newMember.issue.aufNumberMissing": "Escribe el número de {registration}.",
   "newMember.issue.aufNumberTooLong":
-    "El número de AUF no puede pasar de {max} caracteres.",
+    "El número de {registration} no puede pasar de {max} caracteres.",
   "newMember.issue.aufExpiryMissing":
-    "Añade el vencimiento que va con el número de AUF.",
-  "newMember.issue.aufExpiryNotADate": "Escribe el vencimiento del AUF.",
-  "newMember.issue.aufExpiryInThePast": "Ese AUF ya venció. Revisa la fecha.",
+    "Añade el vencimiento que va con el número de {registration}.",
+  "newMember.issue.aufExpiryNotADate":
+    "Escribe el vencimiento de {registration}.",
+  "newMember.issue.aufExpiryInThePast":
+    "El vencimiento de {registration} ya pasó. Revisa la fecha.",
   "newMember.error.emailTaken": "Este correo ya es de un miembro.",
   "newMember.error.openExisting": "Abrir la ficha de {name}",
   "newMember.error.groupNotFound":
@@ -2221,6 +2228,10 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.initials.optional": "opcional",
   "clubSettings.initials.hint":
     "Se ven cuando no hay logo. Hasta {max} letras.",
+  // El nombre del registro de los socios (#967, RF-7 de E37).
+  "clubSettings.registrationName.label": "Nombre del registro",
+  "clubSettings.registrationName.hint":
+    "El registro de miembros que pide tu deporte, como AUF.",
   "clubSettings.season.title": "Temporada",
   "clubSettings.season.label": "Inicio de temporada",
   "clubSettings.season.hint":
@@ -2269,6 +2280,8 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.issue.accentNoReadableText":
     "Ningún color de texto llega al contraste mínimo (4,5:1) sobre este acento. Elige uno más claro o más oscuro.",
   "clubSettings.issue.seasonStartInvalid": "Elige una fecha que exista.",
+  "clubSettings.issue.registrationNameTooLong":
+    "Usa {max} caracteres como mucho.",
   "clubSettings.error.changed":
     "Otro Admin cambió la configuración mientras la editabas. Carga la más reciente y vuelve a hacer tu cambio.",
   "clubSettings.error.signInRequired":

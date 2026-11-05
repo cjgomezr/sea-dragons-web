@@ -584,6 +584,7 @@ const STORED_BRAND: ClubBrand = {
   logoUrl: null,
   signInTexts: NO_SIGN_IN_TEXTS,
   socialLinks: NO_SOCIAL_LINKS,
+  registrationName: "AUF",
 };
 const PUBLIC_LOGO_URL =
   "https://abc.supabase.co/storage/v1/object/public/club-logos/club/logo.png";
