@@ -1016,6 +1016,35 @@ describe("la audiencia del ciclo", () => {
       expect(auditRows).toEqual([]);
     });
 
+    it("si el cambio de campos falla después, el archivado ya guardado queda anotado", async () => {
+      const working = gateways();
+      const failing: ClubCyclesGateways = {
+        ...working,
+        cycles: {
+          ...working.cycles,
+          updateCycle: async () => {
+            throw new Error("la base no respondió");
+          },
+        },
+      };
+
+      await expect(
+        updateManagedCycle(failing, {
+          callerId: COACH_ID,
+          cycleId: WINTER_ID,
+          changes: {
+            name: "Juniors block",
+            audience: { kind: "groups", groupIds: [JUNIORS.id, MASTERS.id] },
+          },
+          confirmRemoval: false,
+          confirm: true,
+        }),
+      ).rejects.toThrow("la base no respondió");
+      expect(
+        auditRows.map(({ action, entity_id }) => [action, entity_id]),
+      ).toEqual([["training_cycle.archived", SUMMER_ID]]);
+    });
+
     it("con confirmación archiva el que choca, guarda los grupos y anota los dos", async () => {
       const detail = await changeAudience(
         WINTER_ID,

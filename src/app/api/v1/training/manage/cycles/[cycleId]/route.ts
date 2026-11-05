@@ -21,9 +21,9 @@ import {
  * `confirmRemoval: true`. Con `audience` cambia para quién es (#978, D1 y D3
  * de E38): todo el club, o grupos del club con al menos uno (si no, 422). En
  * un activo que choca con otros activos es un 409 `cycle_conflicts` con la
- * lista, salvo con `?confirm=true`, que los archiva. DELETE borra un borrador o un archivado (#935) y
- * responde la lista entera; el activo es un 409 `cycle_is_active`. Un ciclo
- * de otro club responde 404.
+ * lista, salvo con `?confirm=true`, que los archiva. DELETE borra un
+ * borrador o un archivado (#935) y responde la lista entera; el activo es un
+ * 409 `cycle_is_active`. Un ciclo de otro club responde 404.
  */
 
 // Depende de la sesión de quien llama y del ciclo ahora.

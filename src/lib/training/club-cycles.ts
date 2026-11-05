@@ -248,7 +248,7 @@ export class CycleConflictError extends Error {
 
   constructor(conflicts: readonly ConflictingCycle[]) {
     super(
-      `Choca con ${conflicts.length} ciclos activos: confirma para archivarlos.`,
+      `Choca con ciclos activos (${conflicts.map(({ name }) => name).join(", ")}): confirma para archivarlos.`,
     );
     this.name = "CycleConflictError";
     this.conflicts = conflicts;
@@ -553,12 +553,14 @@ export async function updateManagedCycle(
     audience,
     confirm: request.confirm,
   });
-  await gateways.cycles.updateCycle(target, fields);
+  // Los archivados ya están guardados: se anotan antes del cambio de campos,
+  // que es otra transacción y podría fallar.
   await recordConflictArchives(gateways, {
     actor,
     archived: audienceChange.archived,
     replacedBy: target.cycleId,
   });
+  await gateways.cycles.updateCycle(target, fields);
   await recordCycleEvent(gateways, {
     actor,
     action: "training_cycle.updated",
