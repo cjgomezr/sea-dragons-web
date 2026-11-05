@@ -166,48 +166,56 @@ async function seedClubWithGroups(database: TemporaryDatabase) {
 }
 
 describeConPostgres("0095 sobre los ciclos que ya había", () => {
-  it("deja cada ciclo de todo el club, sin grupos, y el activo sigue activo", async () => {
-    const database = await databaseBeforeMigration(MIGRATION_PREFIX);
-    const clubId = await seededClubId(database);
-    const active = await seedLegacyCycle(database, clubId, {
-      name: "Winter",
-      status: "active",
-    });
-    const draft = await seedLegacyCycle(database, clubId, {
-      name: "Summer",
-      status: "draft",
-    });
+  it(
+    "deja cada ciclo de todo el club, sin grupos, y el activo sigue activo",
+    async () => {
+      const database = await databaseBeforeMigration(MIGRATION_PREFIX);
+      const clubId = await seededClubId(database);
+      const active = await seedLegacyCycle(database, clubId, {
+        name: "Winter",
+        status: "active",
+      });
+      const draft = await seedLegacyCycle(database, clubId, {
+        name: "Summer",
+        status: "draft",
+      });
 
-    const applied = await applyRepositoryMigrations(database);
+      const applied = await applyRepositoryMigrations(database);
 
-    expect(applied.code, applied.stderr).toBe(0);
-    expect(await audienceOf(database, active)).toBe("club|-");
-    expect(await audienceOf(database, draft)).toBe("club|-");
-    expect(await statusOf(database, active)).toBe("active");
-  }, REAPPLY_TIMEOUT_MS);
+      expect(applied.code, applied.stderr).toBe(0);
+      expect(await audienceOf(database, active)).toBe("club|-");
+      expect(await audienceOf(database, draft)).toBe("club|-");
+      expect(await statusOf(database, active)).toBe("active");
+    },
+    REAPPLY_TIMEOUT_MS,
+  );
 
-  it("aplicada dos veces con un activo de club y uno de grupo no falla", async () => {
-    const database = await migratedDatabase();
-    const { clubId, groupA } = await seedClubWithGroups(database);
-    const club = await createCycle(database, clubId, {
-      name: "Club",
-      audience: "club",
-    });
-    const juniors = await createCycle(database, clubId, {
-      name: "Juniors",
-      audience: "groups",
-      groupIds: [groupA],
-    });
-    await activate(database, clubId, { cycleId: club, confirm: false });
-    await activate(database, clubId, { cycleId: juniors, confirm: false });
+  it(
+    "aplicada dos veces con un activo de club y uno de grupo no falla",
+    async () => {
+      const database = await migratedDatabase();
+      const { clubId, groupA } = await seedClubWithGroups(database);
+      const club = await createCycle(database, clubId, {
+        name: "Club",
+        audience: "club",
+      });
+      const juniors = await createCycle(database, clubId, {
+        name: "Juniors",
+        audience: "groups",
+        groupIds: [groupA],
+      });
+      await activate(database, clubId, { cycleId: club, confirm: false });
+      await activate(database, clubId, { cycleId: juniors, confirm: false });
 
-    const again = await applyRepositoryMigrations(database);
+      const again = await applyRepositoryMigrations(database);
 
-    expect(again.code, again.stderr).toBe(0);
-    expect(await statusOf(database, club)).toBe("active");
-    expect(await statusOf(database, juniors)).toBe("active");
-    expect(await audienceOf(database, juniors)).toBe("groups|Juveniles");
-  }, REAPPLY_TIMEOUT_MS);
+      expect(again.code, again.stderr).toBe(0);
+      expect(await statusOf(database, club)).toBe("active");
+      expect(await statusOf(database, juniors)).toBe("active");
+      expect(await audienceOf(database, juniors)).toBe("groups|Juveniles");
+    },
+    REAPPLY_TIMEOUT_MS,
+  );
 });
 
 describeConPostgres("la audiencia del ciclo en la base", () => {

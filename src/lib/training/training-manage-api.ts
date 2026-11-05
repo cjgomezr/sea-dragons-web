@@ -17,10 +17,13 @@ import {
 } from "./club-cycle-input";
 import {
   type ClubCyclesGateways,
+  type CycleAudienceInput,
   type CycleChanges,
   type CycleDayChange,
   type CycleInput,
   type CycleWeekRecord,
+  CycleAudienceError,
+  CycleConflictError,
   CycleDaysWouldBeRemovedError,
   CycleIsActiveError,
   CycleNotFoundError,
@@ -70,6 +73,7 @@ export const EXERCISE_IN_USE_REASON = "exercise_in_use";
 export const LIBRARY_EXERCISE_REASON = "library_exercise";
 export const CYCLE_DAYS_WOULD_BE_REMOVED_REASON = "cycle_days_would_be_removed";
 export const CYCLE_IS_ACTIVE_REASON = "cycle_is_active";
+export const CYCLE_CONFLICTS_REASON = "cycle_conflicts";
 export const ROUTINE_IN_USE_REASON = "routine_in_use";
 export const ROUTINE_UNKNOWN_REFERENCE_REASON = "unknown_reference";
 
@@ -104,11 +108,31 @@ const cycleScheduleSchema = z.discriminatedUnion("kind", [
 
 const cycleWeeksSchema = z.number().int();
 
+/** Un tope holgado sólo para no arrastrar un cuerpo de megas hasta el
+ * dominio: un club con más grupos que esto no existe. */
+const CYCLE_GROUP_IDS_BODY_MAX = 200;
+
+/** Que haya al menos un grupo, y que sean del club, lo dice el dominio con
+ * un 422 (RF-1). */
+const cycleAudienceSchema: z.ZodType<CycleAudienceInput> = z.discriminatedUnion(
+  "kind",
+  [
+    z.object({ kind: z.literal("club") }).strict(),
+    z
+      .object({
+        kind: z.literal("groups"),
+        groupIds: z.array(z.uuid()).max(CYCLE_GROUP_IDS_BODY_MAX),
+      })
+      .strict(),
+  ],
+);
+
 export const cycleBodySchema: z.ZodType<CycleInput> = z
   .object({
     name: bodyText(CYCLE_NAME_MAX_LENGTH),
     weeks: cycleWeeksSchema,
     schedule: cycleScheduleSchema,
+    audience: cycleAudienceSchema.optional(),
   })
   .strict();
 
@@ -121,6 +145,7 @@ export const cycleChangesBodySchema: z.ZodType<CycleChangesBody> = z
     name: bodyText(CYCLE_NAME_MAX_LENGTH).optional(),
     weeks: cycleWeeksSchema.optional(),
     schedule: cycleScheduleSchema.optional(),
+    audience: cycleAudienceSchema.optional(),
     confirmRemoval: z.boolean().optional(),
   })
   .strict();
@@ -293,6 +318,15 @@ function asCycleApiError(error: unknown): void {
   if (error instanceof CycleIsActiveError) {
     throw new ApiError("conflict", error.message, CYCLE_IS_ACTIVE_REASON);
   }
+  if (error instanceof CycleAudienceError) {
+    throw new ApiError("business_rule", error.message, error.code);
+  }
+  if (error instanceof CycleConflictError) {
+    throw new ApiErrorWithDetails("conflict", error.message, {
+      reason: CYCLE_CONFLICTS_REASON,
+      details: { conflicts: error.conflicts },
+    });
+  }
   if (error instanceof CycleDaysWouldBeRemovedError) {
     throw new ApiErrorWithDetails("conflict", error.message, {
       reason: CYCLE_DAYS_WOULD_BE_REMOVED_REASON,
@@ -348,11 +382,12 @@ export type CycleRouteRequest<Body> = {
   readonly callerId: string;
   readonly cycleId: string;
   readonly body: Body;
+  readonly searchParams: URLSearchParams;
 };
 
-/** Un handler de `/cycles/{cycleId}/...` (#904): quién llama, qué ciclo y el
- * cuerpo ya validado, y cada error del dominio con su código. Todas las
- * rutas de un ciclo lo comparten y sólo cambian en qué hacen. */
+/** Un handler de `/cycles/{cycleId}/...` (#904): quién llama, qué ciclo, el
+ * cuerpo ya validado y la consulta, y cada error del dominio con su código.
+ * Todas las rutas de un ciclo lo comparten y sólo cambian en qué hacen. */
 export function createCycleRoute<T, Body = undefined>(config: {
   readonly schema?: ZodType<Body>;
   readonly run: (
@@ -375,12 +410,14 @@ export function createCycleRoute<T, Body = undefined>(config: {
           (await context.params).cycleId,
           new CycleNotFoundError(),
         );
+        const { searchParams } = apiRequest.nextUrl;
         try {
           return {
             data: await config.run(requireClubCyclesGateways(), {
               callerId,
               cycleId,
               body,
+              searchParams,
             }),
           };
         } catch (error) {

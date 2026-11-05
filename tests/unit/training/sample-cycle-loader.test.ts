@@ -144,11 +144,14 @@ function cyclesGateways(): ClubCyclesGateways {
           startDate: fields.startDate,
           event: null,
           ownRoutines: 0,
+          audience: { kind: "club" },
         });
         return id;
       },
+      findClubGroupIds: notUsed,
       updateCycle: notUsed,
       activateCycle: notUsed,
+      saveAudience: notUsed,
       archiveCycle: notUsed,
       deleteCycle: notUsed,
       duplicateCycle: notUsed,

@@ -28,6 +28,7 @@ const ACTIVE: ManagedCycle = {
   startDate: "2026-10-12",
   event: { name: "UWR Nationals", date: "2027-04-22" },
   ownRoutines: 2,
+  audience: { kind: "club" },
 };
 
 const GYM: ManagedRoutine = {

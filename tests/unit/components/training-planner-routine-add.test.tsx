@@ -34,6 +34,7 @@ const ACTIVE: ManagedCycle = {
   startDate: "2026-10-12",
   event: null,
   ownRoutines: 1,
+  audience: { kind: "club" },
 };
 
 const STRENGTH: ManagedRoutine = {

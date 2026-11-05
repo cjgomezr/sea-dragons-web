@@ -28,6 +28,11 @@ export const TRAINING_EXERCISE_IMAGES_BUCKET = "training-exercise-images";
 
 const ACTIVE_STATUS = "active";
 
+/** Desde E38 (#978) puede haber varios activos, pero sólo uno de todo el
+ * club. Hasta que el #979 elija por los grupos del socio, la semana del socio
+ * es la de ese: leer "el activo" a secas fallaría con dos. */
+const CLUB_AUDIENCE = "club";
+
 const CYCLE_COLUMNS = "id, name, event_name, event_date, start_date, weeks";
 
 /** Lo de una semana; también lo lee Planificar (#904). */
@@ -214,6 +219,7 @@ async function findActiveCycle(
     .select(CYCLE_COLUMNS)
     .eq("club_id", clubId)
     .eq("status", ACTIVE_STATUS)
+    .eq("audience", CLUB_AUDIENCE)
     .maybeSingle();
   if (error) {
     throw new Error(

@@ -79,12 +79,6 @@ function seedDay(
   );
 }
 
-function statusOf(database: TemporaryDatabase, cycleId: string) {
-  return database.query(
-    `select status from public.training_cycles where id = '${cycleId}'`,
-  );
-}
-
 function daysOf(
   database: TemporaryDatabase,
   cycleId: string,

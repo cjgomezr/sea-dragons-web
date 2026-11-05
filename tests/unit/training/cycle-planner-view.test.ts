@@ -19,6 +19,7 @@ const ACTIVE: ManagedCycle = {
   startDate: "2026-10-12",
   event: { name: "UWR Nationals", date: "2027-04-22" },
   ownRoutines: 4,
+  audience: { kind: "club" },
 };
 
 const DRAFT: ManagedCycle = {
@@ -29,6 +30,7 @@ const DRAFT: ManagedCycle = {
   startDate: "2027-06-07",
   event: null,
   ownRoutines: 1,
+  audience: { kind: "club" },
 };
 
 const ARCHIVED: ManagedCycle = {

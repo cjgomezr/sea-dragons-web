@@ -8,6 +8,9 @@ import type {
   ClubCycleRecord,
   ClubCyclesGateway,
   ClubCyclesGateways,
+  CycleAudience,
+  CycleAudienceInput,
+  CycleConflictOutcome,
   CycleDayChange,
   CycleDayRecord,
   CycleDeletion,
@@ -29,7 +32,8 @@ import type { DoseIntensity } from "./training-load";
  * club de quien llama. Cambiar, activar, duplicar, poner un día y copiar la
  * semana 1 son funciones de `0085_training_cycles_manage.sql`, y borrar es
  * la de `0088_training_cycle_delete.sql`, para que cada una sea una
- * transacción.
+ * transacción. Crear, activar, cambiar la audiencia y duplicar son las de
+ * `0095_training_cycle_audience.sql` (#978).
  */
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -38,11 +42,16 @@ const CYCLES_TABLE = "training_cycles";
 const WEEKS_TABLE = "training_cycle_weeks";
 const DAYS_TABLE = "training_cycle_days";
 const ROUTINES_TABLE = "training_routines";
+const GROUPS_TABLE = "groups";
 
-// La clave se nombra: entre ciclos y rutinas hay más de un camino posible.
+// Las claves se nombran: entre ciclos y rutinas hay más de un camino
+// posible, y entre ciclos y grupos la tabla del medio también lo es.
 const CYCLE_COLUMNS = `
-  id, name, status, weeks, start_date, event_name, event_date,
-  routines:training_routines!training_routines_cycle_same_club_fkey ( count )`;
+  id, name, status, weeks, start_date, event_name, event_date, audience,
+  routines:training_routines!training_routines_cycle_same_club_fkey ( count ),
+  cycle_groups:training_cycle_groups!training_cycle_groups_cycle_same_club_fkey (
+    group:groups!training_cycle_groups_group_same_club_fkey ( id, name )
+  )`;
 
 const cycleRowSchema = z.object({
   id: z.string(),
@@ -52,8 +61,24 @@ const cycleRowSchema = z.object({
   start_date: z.string(),
   event_name: z.string().nullable(),
   event_date: z.string().nullable(),
+  audience: z.enum(["club", "groups"]),
   routines: z.array(z.object({ count: z.number().int() })),
+  cycle_groups: z.array(
+    z.object({ group: z.object({ id: z.string(), name: z.string() }) }),
+  ),
 });
+
+/** Lo que devuelven activar y cambiar la audiencia (`0095`). */
+const conflictRowsSchema = z.array(
+  z.discriminatedUnion("outcome", [
+    z.object({ outcome: z.literal("missing") }),
+    z.object({
+      outcome: z.enum(["conflict", "archived", "activated", "saved"]),
+      affected_cycle_id: z.string(),
+      affected_cycle_name: z.string(),
+    }),
+  ]),
+);
 
 const plannedWeekRowSchema = weekRowSchema.extend({
   week_no: z.number().int(),
@@ -67,10 +92,6 @@ const dayRowSchema = z.object({
 });
 
 const updateRowsSchema = z.array(z.object({ days_removed: z.number().int() }));
-
-const activationRowsSchema = z.array(
-  z.object({ archived_cycle_id: z.string().nullable() }),
-);
 
 const deletionRowsSchema = z.array(
   z.discriminatedUnion("deleted", [
@@ -91,11 +112,23 @@ function failure(action: string, message: string): Error {
   return new Error(`No se pudo ${action}: ${message}`);
 }
 
+/** Los grupos, por nombre. Uno de grupos sin ninguno sigue siéndolo (D9). */
+function toAudience(row: z.infer<typeof cycleRowSchema>): CycleAudience {
+  if (row.audience === "club") {
+    return { kind: "club" };
+  }
+  const groups = row.cycle_groups
+    .map(({ group }) => group)
+    .sort((left, right) => left.name.localeCompare(right.name));
+  return { kind: "groups", groups };
+}
+
 /** Un ciclo sin la fecha o sin el nombre del evento no tiene evento: la API
  * siempre guarda los dos. */
 function toCycleRecord(row: z.infer<typeof cycleRowSchema>): ClubCycleRecord {
   const [routines] = row.routines;
   return {
+    audience: toAudience(row),
     id: row.id,
     name: row.name,
     status: row.status,
@@ -211,23 +244,82 @@ async function readDays(
     }));
 }
 
+function groupIdsOf(audience: CycleAudienceInput): readonly string[] {
+  return audience.kind === "groups" ? audience.groupIds : [];
+}
+
+/** El ciclo y sus grupos, en una transacción (`create_training_cycle`). */
 async function insertCycle(
   serviceClient: SupabaseClient,
   cycle: Parameters<ClubCyclesGateway["insertCycle"]>[0],
 ): Promise<string> {
-  const { data, error } = await serviceClient
-    .from(CYCLES_TABLE)
-    .insert({
-      ...cycleColumns(cycle),
-      club_id: cycle.clubId,
-      created_by: cycle.createdBy,
-    })
-    .select("id")
-    .single();
+  const columns = cycleColumns(cycle);
+  const { data, error } = await serviceClient.rpc("create_training_cycle", {
+    p_club_id: cycle.clubId,
+    p_name: columns.name,
+    p_weeks: columns.weeks,
+    p_start_date: columns.start_date,
+    p_event_name: columns.event_name,
+    p_event_date: columns.event_date,
+    p_created_by: cycle.createdBy,
+    p_audience: cycle.audience.kind,
+    p_group_ids: groupIdsOf(cycle.audience),
+  });
   if (error) {
     throw failure(`crear el ciclo en el club ${cycle.clubId}`, error.message);
   }
-  return z.object({ id: z.string() }).parse(data).id;
+  return z.string().parse(data);
+}
+
+async function findClubGroupIds(
+  serviceClient: SupabaseClient,
+  clubId: string,
+  groupIds: readonly string[],
+): Promise<readonly string[]> {
+  const { data, error } = await serviceClient
+    .from(GROUPS_TABLE)
+    .select("id")
+    .eq("club_id", clubId)
+    .in("id", [...groupIds]);
+  if (error) {
+    throw failure(`leer los grupos del club ${clubId}`, error.message);
+  }
+  return z
+    .array(z.object({ id: z.string() }))
+    .parse(data)
+    .map(({ id }) => id);
+}
+
+/** Las filas de `activate_training_cycle` y `save_training_cycle_audience`:
+ * `missing`, los `conflict` sin cambiar nada, o los `archived` y el guardado. */
+function toConflictOutcome(data: unknown): CycleConflictOutcome {
+  const rows = conflictRowsSchema.parse(data);
+  const affected = rows.flatMap((row) =>
+    row.outcome === "missing"
+      ? []
+      : [
+          {
+            outcome: row.outcome,
+            cycle: { id: row.affected_cycle_id, name: row.affected_cycle_name },
+          },
+        ],
+  );
+  if (affected.length === 0) {
+    return { kind: "missing" };
+  }
+  const conflicts = affected.filter((row) => row.outcome === "conflict");
+  if (conflicts.length > 0) {
+    return {
+      kind: "conflicts",
+      conflicts: conflicts.map(({ cycle }) => cycle),
+    };
+  }
+  return {
+    kind: "saved",
+    archived: affected
+      .filter((row) => row.outcome === "archived")
+      .map(({ cycle }) => cycle),
+  };
 }
 
 /** El cambio y el borrado de lo que sobra, en una transacción. */
@@ -256,19 +348,45 @@ async function updateCycle(
 async function activateCycle(
   serviceClient: SupabaseClient,
   target: CycleTarget,
-): Promise<{ readonly archivedCycleId: string | null }> {
+  options: { readonly confirm: boolean },
+): Promise<CycleConflictOutcome> {
   const { data, error } = await serviceClient.rpc("activate_training_cycle", {
     p_club_id: target.clubId,
     p_cycle_id: target.cycleId,
+    p_confirm: options.confirm,
   });
   if (error) {
     throw failure(`activar el ciclo ${target.cycleId}`, error.message);
   }
-  const [row] = activationRowsSchema.parse(data);
-  if (row === undefined) {
-    throw failure(`activar el ciclo ${target.cycleId}`, "no es del club");
+  return toConflictOutcome(data);
+}
+
+async function saveAudience(
+  serviceClient: SupabaseClient,
+  request: {
+    readonly target: CycleTarget;
+    readonly audience: CycleAudienceInput;
+    readonly confirm: boolean;
+  },
+): Promise<CycleConflictOutcome> {
+  const { target, audience } = request;
+  const { data, error } = await serviceClient.rpc(
+    "save_training_cycle_audience",
+    {
+      p_club_id: target.clubId,
+      p_cycle_id: target.cycleId,
+      p_audience: audience.kind,
+      p_group_ids: groupIdsOf(audience),
+      p_confirm: request.confirm,
+    },
+  );
+  if (error) {
+    throw failure(
+      `cambiar la audiencia del ciclo ${target.cycleId}`,
+      error.message,
+    );
   }
-  return { archivedCycleId: row.archived_cycle_id };
+  return toConflictOutcome(data);
 }
 
 async function archiveCycle(
@@ -465,9 +583,14 @@ export function createClubCyclesGateways(
         return { weeks, days };
       },
       insertCycle: (cycle) => insertCycle(serviceClient, cycle),
+      findClubGroupIds: (clubId, groupIds) =>
+        findClubGroupIds(serviceClient, clubId, groupIds),
       updateCycle: (target, fields) =>
         updateCycle(serviceClient, target, fields),
-      activateCycle: (target) => activateCycle(serviceClient, target),
+      activateCycle: (target, options) =>
+        activateCycle(serviceClient, target, options),
+      saveAudience: (target, audience, { confirm }) =>
+        saveAudience(serviceClient, { target, audience, confirm }),
       archiveCycle: (target) => archiveCycle(serviceClient, target),
       deleteCycle: (target) => deleteCycle(serviceClient, target),
       duplicateCycle: (target, copy) =>

@@ -10,6 +10,7 @@ import {
   type CycleChangesBody,
   createCycleRoute,
   cycleChangesBodySchema,
+  readConfirm,
 } from "@/lib/training/training-manage-api";
 
 /**
@@ -17,7 +18,10 @@ import {
  * la cuadrícula, y PATCH para cambiar el nombre, las semanas o el evento. Con
  * evento, el inicio se recalcula. Bajar las semanas cuando las que sobran
  * tienen días con rutina es un 409 con cuántos se perderían, salvo con
- * `confirmRemoval: true`. DELETE borra un borrador o un archivado (#935) y
+ * `confirmRemoval: true`. Con `audience` cambia para quién es (#978, D1 y D3
+ * de E38): todo el club, o grupos del club con al menos uno (si no, 422). En
+ * un activo que choca con otros activos es un 409 `cycle_conflicts` con la
+ * lista, salvo con `?confirm=true`, que los archiva. DELETE borra un borrador o un archivado (#935) y
  * responde la lista entera; el activo es un 409 `cycle_is_active`. Un ciclo
  * de otro club responde 404.
  */
@@ -39,13 +43,14 @@ export const PATCH = createCycleRoute<
   CycleChangesBody
 >({
   schema: cycleChangesBodySchema,
-  run: (gateways, { callerId, cycleId, body }) => {
+  run: (gateways, { callerId, cycleId, body, searchParams }) => {
     const { confirmRemoval, ...changes } = body;
     return updateManagedCycle(gateways, {
       callerId,
       cycleId,
       changes,
       confirmRemoval: confirmRemoval === true,
+      confirm: readConfirm(searchParams),
     });
   },
 });

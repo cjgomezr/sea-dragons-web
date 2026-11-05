@@ -24,6 +24,7 @@ const ACTIVE: ManagedCycle = {
   startDate: "2026-10-12",
   event: { name: "UWR Nationals", date: "2027-04-22" },
   ownRoutines: 4,
+  audience: { kind: "club" },
 };
 
 /** Las 12:00 del miércoles 28 de octubre de 2026 en Melbourne: semana 3. */

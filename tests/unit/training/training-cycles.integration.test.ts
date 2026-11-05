@@ -4,6 +4,7 @@ import {
   activateManagedCycle,
   copyManagedCycleWeekOne,
   createManagedCycle,
+  CycleConflictError,
   CycleDaysWouldBeRemovedError,
   duplicateManagedCycle,
   readManagedCycle,
@@ -28,6 +29,10 @@ import {
  * dice: que activar archiva el anterior en la base, que duplicar copia las
  * rutinas propias con sus filas y reapunta la cuadrícula dejando las
  * compartidas, y que el conteo de rutinas propias sale del embebido.
+ *
+ * Desde #978 (E38), también que la audiencia y sus grupos se guardan, se
+ * leen con su nombre y se duplican, y que activar choca sólo con lo que se
+ * solapa y archiva sólo con confirmación.
  *
  * Corre en un club propio y desechable con un Coach.
  */
@@ -58,6 +63,7 @@ async function cleanUpTraining(seed: Seed): Promise<void> {
     "training_routine_items",
     "training_routines",
     "training_cycles",
+    "groups",
     "training_exercises",
     "audit_log",
   ]) {
@@ -183,6 +189,10 @@ async function routineCycleOf(seed: Seed, routineId: string) {
   return data;
 }
 
+async function seedGroup(seed: Seed, name: string): Promise<string> {
+  return insertReturningId(seed, "groups", { name });
+}
+
 const EVENT_SCHEDULE = {
   kind: "event",
   eventName: "Nationals",
@@ -191,7 +201,7 @@ const EVENT_SCHEDULE = {
 
 describeRls("Planificar: los ciclos contra Supabase (#904)", () => {
   it(
-    "crear calcula el inicio y activar archiva el activo anterior",
+    "crear calcula el inicio y activar otro de todo el club pide confirmar antes de archivar",
     async () => {
       await withClub(async (seed) => {
         const gateways = createClubCyclesGateways(seed.serviceClient.client);
@@ -218,10 +228,19 @@ describeRls("Planificar: los ciclos contra Supabase (#904)", () => {
         await activateManagedCycle(gateways, {
           callerId,
           cycleId: winter.cycle.id,
+          confirm: false,
         });
+        await expect(
+          activateManagedCycle(gateways, {
+            callerId,
+            cycleId: summer.cycle.id,
+            confirm: false,
+          }),
+        ).rejects.toThrow(CycleConflictError);
         const result = await activateManagedCycle(gateways, {
           callerId,
           cycleId: summer.cycle.id,
+          confirm: true,
         });
 
         const statuses = Object.fromEntries(
@@ -256,19 +275,23 @@ describeRls("Planificar: los ciclos contra Supabase (#904)", () => {
         await activateManagedCycle(gateways, {
           callerId,
           cycleId: winter.cycle.id,
+          confirm: false,
         });
         await activateManagedCycle(gateways, {
           callerId,
           cycleId: summer.cycle.id,
+          confirm: true,
         });
 
         const reactivated = await activateManagedCycle(gateways, {
           callerId,
           cycleId: winter.cycle.id,
+          confirm: true,
         });
         const unchanged = await activateManagedCycle(gateways, {
           callerId,
           cycleId: winter.cycle.id,
+          confirm: false,
         });
 
         const statusesOf = (cycles: typeof reactivated.cycles) =>
@@ -289,8 +312,8 @@ describeRls("Planificar: los ciclos contra Supabase (#904)", () => {
           throw new Error(`No se pudo leer la bitácora: ${error.message}`);
         }
         expect(data.slice(-2).map((row) => row.metadata)).toEqual([
-          { archivedCycleId: summer.cycle.id },
-          { archivedCycleId: null },
+          { archivedCycleIds: [summer.cycle.id] },
+          { archivedCycleIds: [] },
         ]);
       });
     },
@@ -414,6 +437,7 @@ describeRls("Planificar: los ciclos contra Supabase (#904)", () => {
             cycleId,
             changes: { weeks: 2 },
             confirmRemoval: false,
+            confirm: false,
           }),
         ).rejects.toThrow(CycleDaysWouldBeRemovedError);
         const shortened = await updateManagedCycle(gateways, {
@@ -421,9 +445,100 @@ describeRls("Planificar: los ciclos contra Supabase (#904)", () => {
           cycleId,
           changes: { weeks: 2 },
           confirmRemoval: true,
+          confirm: false,
         });
         expect(shortened.days.map((day) => day.weekNo)).toEqual([1, 2]);
         expect(shortened.cycle.startDate).toBe("2026-11-30");
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "un ciclo de grupos se crea y se lee con sus grupos, choca sólo con lo que solapa y se duplica con ellos (#978)",
+    async () => {
+      await withClub(async (seed) => {
+        const gateways = createClubCyclesGateways(seed.serviceClient.client);
+        const callerId = seed.coach.id;
+        const juniors = await seedGroup(seed, "Juveniles");
+        const masters = await seedGroup(seed, "Masters");
+        const club = await createManagedCycle(gateways, {
+          callerId,
+          input: { name: "Club", weeks: 4, schedule: EVENT_SCHEDULE },
+        });
+        const both = await createManagedCycle(gateways, {
+          callerId,
+          input: {
+            name: "Both",
+            weeks: 4,
+            schedule: EVENT_SCHEDULE,
+            audience: { kind: "groups", groupIds: [masters, juniors] },
+          },
+        });
+        const mastersOnly = await createManagedCycle(gateways, {
+          callerId,
+          input: {
+            name: "Masters only",
+            weeks: 4,
+            schedule: EVENT_SCHEDULE,
+            audience: { kind: "groups", groupIds: [masters] },
+          },
+        });
+
+        expect(club.cycle.audience).toEqual({ kind: "club" });
+        expect(both.cycle.audience).toEqual({
+          kind: "groups",
+          groups: [
+            { id: juniors, name: "Juveniles" },
+            { id: masters, name: "Masters" },
+          ],
+        });
+        await activateManagedCycle(gateways, {
+          callerId,
+          cycleId: club.cycle.id,
+          confirm: false,
+        });
+        await activateManagedCycle(gateways, {
+          callerId,
+          cycleId: both.cycle.id,
+          confirm: false,
+        });
+        await expect(
+          activateManagedCycle(gateways, {
+            callerId,
+            cycleId: mastersOnly.cycle.id,
+            confirm: false,
+          }),
+        ).rejects.toMatchObject({
+          conflicts: [{ id: both.cycle.id, name: "Both" }],
+        });
+        const result = await activateManagedCycle(gateways, {
+          callerId,
+          cycleId: mastersOnly.cycle.id,
+          confirm: true,
+        });
+        expect(
+          Object.fromEntries(
+            result.cycles.map((cycle) => [cycle.name, cycle.status]),
+          ),
+        ).toEqual({
+          Club: "active",
+          Both: "archived",
+          "Masters only": "active",
+        });
+
+        const duplicated = await duplicateManagedCycle(gateways, {
+          callerId,
+          cycleId: both.cycle.id,
+        });
+        const copy = await readManagedCycle(gateways, {
+          callerId,
+          cycleId: duplicated.duplicatedCycleId,
+        });
+        expect(copy.cycle).toMatchObject({
+          status: "draft",
+          audience: both.cycle.audience,
+        });
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
