@@ -8,14 +8,17 @@ import {
   scheduleForDate,
   scheduleForEventName,
 } from "@/lib/training/cycle-planner-view";
+import { PlannerCycleAudience } from "./PlannerCycleAudience";
 import { DATE_REQUIRED_REASON } from "./planner-format";
 import type { PlannerCycles } from "./use-planner-cycles";
+import type { PlannerGroups } from "./use-planner-groups";
 
 /**
  * Los campos de un ciclo en Planificar (#906, RF-7): nombre, evento, su
  * fecha (o la de inicio sin evento) y semanas. Cada uno se guarda al salir
  * de él. Si la API no lo acepta, el campo vuelve a lo que tenía. Bajar las
- * semanas cuando las que sobran tienen días pide confirmar antes.
+ * semanas cuando las que sobran tienen días pide confirmar antes. Debajo,
+ * para quién es, que se guarda con su propio botón (#980).
  *
  * Quien lo pinta le pone de `key` el id del ciclo: otro ciclo trae campos
  * nuevos. Cada respuesta del servidor llena solo los campos que nadie está
@@ -171,10 +174,13 @@ function TextField({
 export function PlannerCycleFields({
   translate,
   cycle,
+  groups,
   planner,
 }: {
   readonly translate: Translator;
   readonly cycle: ManagedCycle;
+  /** Los del club, para el campo For (#980). */
+  readonly groups: PlannerGroups;
   readonly planner: Pick<PlannerCycles, "save" | "showError">;
 }): React.JSX.Element {
   const [drafts, setDrafts] = useState<Drafts>(() => draftsOf(cycle));
@@ -199,6 +205,7 @@ export function PlannerCycleFields({
       cycleId: cycle.id,
       changes,
       confirmRemoval,
+      confirmConflicts: false,
     });
     if (result.kind === "failed") {
       revert(field);
@@ -271,6 +278,12 @@ export function PlannerCycleFields({
           {...fieldProps("weeks")}
         />
       </div>
+      <PlannerCycleAudience
+        translate={translate}
+        cycle={cycle}
+        groups={groups}
+        planner={planner}
+      />
       {pending === null ? null : (
         <RemovalConfirm
           translate={translate}

@@ -5,13 +5,13 @@ import { useState } from "react";
 import { Icon } from "@/components/Icon";
 import type { Translator } from "@/lib/i18n/translator";
 import type { ManagedCycle } from "@/lib/training/club-cycles";
-import { cycleMeta, statusLabel } from "./planner-format";
+import { cycleAudienceLabel, cycleMeta, statusLabel } from "./planner-format";
 
 /**
  * Las tarjetas de los ciclos en el escritorio (#906, §5.1 del handoff): una
  * fila que se desplaza de lado, con el activo y los borradores, y después
  * + New cycle. Los archivados esperan detrás de "Show archived · {n}", salvo
- * el elegido, que siempre se ve.
+ * el elegido, que siempre se ve. Cada tarjeta dice para quién es (#980).
  */
 
 export function CycleStatusPill({
@@ -55,6 +55,9 @@ function CycleCard({
         </span>
         <span className="training-plan-card-meta">
           {cycleMeta(translate, cycle)}
+        </span>
+        <span className="training-plan-card-meta training-plan-audience-label">
+          {cycleAudienceLabel(translate, cycle.audience)}
         </span>
       </button>
     </li>

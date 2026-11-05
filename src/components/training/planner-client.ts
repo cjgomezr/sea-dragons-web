@@ -12,6 +12,7 @@ import {
   trainingManageCycleApiPath,
 } from "@/lib/auth/routes";
 import type {
+  ConflictingCycle,
   CycleChanges,
   CycleDayChange,
   CycleDayRecord,
@@ -30,6 +31,11 @@ import type { ManagedRoutine } from "@/lib/training/club-routines";
 /** El 409 de bajar las semanas cuando las que sobran tienen días (#904). */
 const DAYS_WOULD_BE_REMOVED_REASON = "cycle_days_would_be_removed";
 
+/** El 409 de activar algo que choca con otros activos (#978). */
+const CYCLE_CONFLICTS_REASON = "cycle_conflicts";
+
+const CONFIRM_QUERY = "confirm=true";
+
 const managedCycleSchema: z.ZodType<ManagedCycle> = z.object({
   id: z.string(),
   name: z.string(),
@@ -38,7 +44,7 @@ const managedCycleSchema: z.ZodType<ManagedCycle> = z.object({
   startDate: z.iso.date(),
   event: z.object({ name: z.string(), date: z.iso.date() }).nullable(),
   ownRoutines: z.number().int().nonnegative(),
-  // Para quién es (#978). La pantalla la enseña en el #980.
+  // Para quién es (#978), que Planificar enseña y cambia (#980).
   audience: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("club") }),
     z.object({
@@ -116,6 +122,15 @@ const daysWouldBeRemovedSchema = z.object({
   }),
 });
 
+/** El 409 de activar, o de cambiar los grupos de un activo, cuando choca con
+ * otros activos (#978): qué ciclos se archivarían. */
+const cycleConflictsSchema = z.object({
+  error: z.object({
+    reason: z.literal(CYCLE_CONFLICTS_REASON),
+    conflicts: z.array(z.object({ id: z.string(), name: z.string() })),
+  }),
+});
+
 /** El motivo de cualquier otro error de la convención. */
 const errorReasonSchema = z.object({
   error: z.object({ reason: z.string() }),
@@ -144,10 +159,26 @@ export type DuplicateOutcome = {
   readonly routinesCopied: number;
 };
 
-/** Un cambio puede pedir confirmar antes de quitar días con rutina. */
+/** Los activos que se archivarían al confirmar (D3 de E38). */
+export type CycleConflicts = {
+  readonly kind: "conflicts";
+  readonly conflicts: readonly ConflictingCycle[];
+};
+
+/** Un cambio puede pedir confirmar antes de quitar días con rutina, o antes
+ * de archivar los activos con los que choca. */
 export type CycleUpdateOutcome =
   | PlannerOutcome<ManagedCycle>
-  | { readonly kind: "confirmRemoval"; readonly daysRemoved: number };
+  | { readonly kind: "confirmRemoval"; readonly daysRemoved: number }
+  | CycleConflicts;
+
+export type ActivateOutcome = PlannerOutcome<CycleList> | CycleConflicts;
+
+type CyclePayload = {
+  readonly kind: "payload";
+  readonly isOk: boolean;
+  readonly payload: unknown;
+};
 
 export async function requestAndRead<Value, Read>(
   path: string,
@@ -189,41 +220,31 @@ export function createCycle(
   );
 }
 
-/** Va por su cuenta y no por `requestApi`: del 409 hace falta cuántos días
- * se perderían, que `requestApi` no guarda. */
-export async function updateCycle(
-  cycleId: string,
-  request: {
-    readonly changes: CycleChanges;
-    readonly confirmRemoval: boolean;
-  },
-): Promise<CycleUpdateOutcome> {
-  const body = request.confirmRemoval
-    ? { ...request.changes, confirmRemoval: true }
-    : request.changes;
+/** Va por su cuenta y no por `requestApi`: de un 409 hacen falta sus
+ * detalles (cuántos días se perderían, qué ciclos chocan), que `requestApi`
+ * no guarda. */
+async function sendForPayload(
+  path: string,
+  init: RequestInit,
+): Promise<CyclePayload | PlannerFailure> {
   let response: Response;
   try {
-    response = await fetch(
-      trainingManageCycleApiPath(cycleId),
-      jsonInit("PATCH", body),
-    );
+    response = await fetch(path, init);
   } catch {
     return { kind: "failed", reason: null };
   }
   const payload: unknown = await response.json().catch(() => null);
-  if (response.ok) {
-    const parsed = cycleDetailResponseSchema.safeParse(payload);
-    return parsed.success
-      ? { kind: "ok", value: parsed.data.data.cycle }
-      : { kind: "failed", reason: null };
-  }
-  const removal = daysWouldBeRemovedSchema.safeParse(payload);
-  if (removal.success) {
-    return {
-      kind: "confirmRemoval",
-      daysRemoved: removal.data.error.daysRemoved,
-    };
-  }
+  return { kind: "payload", isOk: response.ok, payload };
+}
+
+function readConflicts(payload: unknown): CycleConflicts | null {
+  const conflicts = cycleConflictsSchema.safeParse(payload);
+  return conflicts.success
+    ? { kind: "conflicts", conflicts: conflicts.data.error.conflicts }
+    : null;
+}
+
+function readFailure(payload: unknown): PlannerFailure {
   const reason = errorReasonSchema.safeParse(payload);
   return {
     kind: "failed",
@@ -231,14 +252,70 @@ export async function updateCycle(
   };
 }
 
-export function activateCycle(
+/** `?confirm=true` archiva los que chocan (#978); sin él, la API sólo dice
+ * cuáles son. */
+function confirmedPath(path: string, confirmConflicts: boolean): string {
+  return confirmConflicts ? `${path}?${CONFIRM_QUERY}` : path;
+}
+
+export async function updateCycle(
   cycleId: string,
-): Promise<PlannerOutcome<CycleList>> {
-  return requestAndRead(
-    trainingManageCycleActionApiPath(cycleId, "activate"),
-    jsonInit("POST"),
-    { schema: cyclesResponseSchema, pick: (response) => response.data.cycles },
+  request: {
+    readonly changes: CycleChanges;
+    readonly confirmRemoval: boolean;
+    readonly confirmConflicts: boolean;
+  },
+): Promise<CycleUpdateOutcome> {
+  const body = request.confirmRemoval
+    ? { ...request.changes, confirmRemoval: true }
+    : request.changes;
+  const sent = await sendForPayload(
+    confirmedPath(
+      trainingManageCycleApiPath(cycleId),
+      request.confirmConflicts,
+    ),
+    jsonInit("PATCH", body),
   );
+  if (sent.kind === "failed") {
+    return sent;
+  }
+  if (sent.isOk) {
+    const parsed = cycleDetailResponseSchema.safeParse(sent.payload);
+    return parsed.success
+      ? { kind: "ok", value: parsed.data.data.cycle }
+      : { kind: "failed", reason: null };
+  }
+  const removal = daysWouldBeRemovedSchema.safeParse(sent.payload);
+  if (removal.success) {
+    return {
+      kind: "confirmRemoval",
+      daysRemoved: removal.data.error.daysRemoved,
+    };
+  }
+  return readConflicts(sent.payload) ?? readFailure(sent.payload);
+}
+
+export async function activateCycle(
+  cycleId: string,
+  confirmConflicts: boolean,
+): Promise<ActivateOutcome> {
+  const sent = await sendForPayload(
+    confirmedPath(
+      trainingManageCycleActionApiPath(cycleId, "activate"),
+      confirmConflicts,
+    ),
+    jsonInit("POST"),
+  );
+  if (sent.kind === "failed") {
+    return sent;
+  }
+  if (sent.isOk) {
+    const parsed = cyclesResponseSchema.safeParse(sent.payload);
+    return parsed.success
+      ? { kind: "ok", value: parsed.data.data.cycles }
+      : { kind: "failed", reason: null };
+  }
+  return readConflicts(sent.payload) ?? readFailure(sent.payload);
 }
 
 export function archiveCycle(

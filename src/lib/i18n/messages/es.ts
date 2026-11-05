@@ -3189,9 +3189,7 @@ export const spanishMessages: MessageCatalog = {
   "training.manage.confirmDeleteEmptyCycle":
     '¿Borrar "{name}"? No se puede deshacer.',
   "training.manage.deleted": "Ciclo borrado.",
-  "training.manage.confirmReactivate":
-    '¿Volver a activar "{name}"? {active} pasará a archivado.',
-  "training.manage.confirmReactivateNoActive": '¿Volver a activar "{name}"?',
+  "training.manage.confirmReactivate": '¿Volver a activar "{name}"?',
   "training.manage.reactivateEnded":
     "Terminó el {end}. Los miembros verán un ciclo terminado.",
   "training.manage.errorCycleIsActive":
@@ -3238,6 +3236,23 @@ export const spanishMessages: MessageCatalog = {
   "training.manage.errorDate": "Elige una fecha.",
   "training.manage.errorSave":
     "No pudimos guardar el cambio. Inténtalo de nuevo.",
+  "training.manage.audienceLegend": "Para",
+  "training.manage.audienceClub": "Todo el club",
+  "training.manage.audienceNoGroups": "Sin grupos: ningún miembro lo ve",
+  "training.manage.audienceGroupsRequired": "Elige al menos un grupo",
+  "training.manage.audienceSave": "Guardar",
+  "training.manage.audienceGroupsLink": "Crea grupos en Grupos",
+  "training.manage.audienceGroupsFailed":
+    "No pudimos cargar los grupos del club.",
+  "training.manage.audienceGroupsLoading": "Cargando los grupos…",
+  "training.manage.optionAudience": "{option} · {audience}",
+  "training.manage.confirmConflicts": {
+    one: "{names} pasará a archivado: está activo para algunos de los mismos miembros.",
+    other:
+      "{names} pasarán a archivado: están activos para algunos de los mismos miembros.",
+  },
+  "training.manage.errorGroupNotInClub":
+    "Uno de esos grupos ya no existe. Recarga e inténtalo de nuevo.",
   "training.manage.tabExercises": "Ejercicios",
   "training.exercises.search": "Buscar ejercicios",
   "training.exercises.filter": "Mostrar",

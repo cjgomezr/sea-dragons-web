@@ -3165,9 +3165,7 @@ export const englishMessages = {
   "training.manage.confirmDeleteEmptyCycle":
     'Delete "{name}"? This can\'t be undone.',
   "training.manage.deleted": "Cycle deleted.",
-  "training.manage.confirmReactivate":
-    'Make "{name}" active again? {active} will be archived.',
-  "training.manage.confirmReactivateNoActive": 'Make "{name}" active again?',
+  "training.manage.confirmReactivate": 'Make "{name}" active again?',
   "training.manage.reactivateEnded":
     "It ended on {end}. Members will see a finished cycle.",
   "training.manage.errorCycleIsActive":
@@ -3213,6 +3211,22 @@ export const englishMessages = {
   "training.manage.errorWeeks": "Weeks go from 1 to 52.",
   "training.manage.errorDate": "Pick a date.",
   "training.manage.errorSave": "We couldn't save that change. Try again.",
+  "training.manage.audienceLegend": "For",
+  "training.manage.audienceClub": "Whole club",
+  "training.manage.audienceNoGroups": "No groups: no member sees it",
+  "training.manage.audienceGroupsRequired": "Choose at least one group",
+  "training.manage.audienceSave": "Save",
+  "training.manage.audienceGroupsLink": "Create groups in Groups",
+  "training.manage.audienceGroupsFailed": "We couldn't load the club's groups.",
+  "training.manage.audienceGroupsLoading": "Loading the groups…",
+  "training.manage.optionAudience": "{option} · {audience}",
+  "training.manage.confirmConflicts": {
+    one: "{names} will be archived: it's active for some of the same members.",
+    other:
+      "{names} will be archived: they're active for some of the same members.",
+  },
+  "training.manage.errorGroupNotInClub":
+    "One of those groups no longer exists. Reload and try again.",
   "training.manage.tabExercises": "Exercises",
   "training.exercises.search": "Search exercises",
   "training.exercises.filter": "Show",
