@@ -407,9 +407,8 @@ funcion create_member_evaluation(acting_club_id uuid, acting_user_id uuid, targe
 funcion create_training_cycle(p_club_id uuid, p_name text, p_weeks integer, p_start_date date, p_event_name text, p_event_date date, p_created_by uuid, p_audience text, p_group_ids uuid[])
 funcion credit_session_pack(user_id uuid, club_id uuid, sessions integer, payment_id uuid)
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
-$text
-funcion delete_rows_older_than(target_table regclass, age_column name, cutoff timestamp with time zone)
 funcion delete_news_post(p_club_id uuid, p_post_id uuid)
+funcion delete_rows_older_than(target_table regclass, age_column name, cutoff timestamp with time zone)
 funcion delete_training_cycle(p_club_id uuid, p_cycle_id uuid)
 funcion delete_training_routine(p_club_id uuid, p_routine_id uuid, p_confirm boolean)
 funcion duplicate_training_cycle(p_club_id uuid, p_cycle_id uuid, p_name text, p_created_by uuid)
