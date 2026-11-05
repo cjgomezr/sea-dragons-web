@@ -71,13 +71,13 @@ flowchart LR
 Los dos flujos no se mezclan: el dinero de los socios nunca pasa por nuestra
 cuenta.
 
-|                        | A. Cuotas de los socios                                                       | B. Suscripción del club |
-| ---------------------- | ----------------------------------------------------------------------------- | ----------------------- |
-| **Paga**               | El socio                                                                      | El club                 |
-| **Recibe**             | El club, en su cuenta Stripe                                                  | Nosotros                |
-| **Herramienta**        | Stripe Connect (cuentas Standard, ver sección 6)                              | Stripe Billing          |
-| **Comisión de Stripe** | La paga el club                                                               | La pagamos nosotros     |
-| **Comisión nuestra**   | 0% en los planes pagos; 1% en el gratis, propuesta sin confirmar (sección 13) | No aplica               |
+|                        | A. Cuotas de los socios                              | B. Suscripción del club |
+| ---------------------- | ---------------------------------------------------- | ----------------------- |
+| **Paga**               | El socio                                             | El club                 |
+| **Recibe**             | El club, en su cuenta Stripe                         | Nosotros                |
+| **Herramienta**        | Stripe Connect (cuentas Standard, ver sección 6)     | Stripe Billing          |
+| **Comisión de Stripe** | La paga el club                                      | La pagamos nosotros     |
+| **Comisión nuestra**   | 0% en los planes pagos; 1% en el gratis (sección 13) | No aplica               |
 
 ### Cómo activa los cobros un club (flujo A)
 
@@ -214,6 +214,21 @@ Todo lo gestiona nuestra app.
   serían unos 10.000, el 10% de lo incluido. Lo que sí pesa es el espacio de
   archivos (fotos, adjuntos, vídeos) y el tamaño del servidor cuando crezca el
   tráfico. Cifras de Supabase por confirmar en su página de precios.
+
+**Lo que nos cuesta al mes para empezar** (noviembre de 2026, precios por
+confirmar en cada página):
+
+| Servicio | Para qué                                                         | Costo                                                                                              |
+| -------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Supabase | La base de datos, las cuentas y los archivos de todos los clubes | Plan Pro, unos 25 USD; el proyecto de desarrollo suma unos 10 USD si vive en la misma organización |
+| Vercel   | La app de todos los clubes y la landing, en el mismo proyecto    | Plan Pro, unos 20 USD por persona del equipo. El plan gratis (Hobby) no permite uso comercial      |
+| Resend   | Los correos                                                      | Unos 20 USD con el plan Pro (sección 17)                                                           |
+| Dominio  | La landing y los subdominios                                     | Unos 15 a 20 USD al año                                                                            |
+| Stripe   | Connect y Billing                                                | Sin cuota mensual: solo comisiones por cobro                                                       |
+
+En total, unos 65 a 75 USD al mes más el dominio. Sube con el uso: el tamaño
+del servidor de Supabase cuando crezca el tráfico, el espacio de archivos y las
+personas del equipo en Vercel.
 
 ## 6. Stripe Connect por debajo
 
@@ -443,6 +458,31 @@ así que toca esa pantalla.
 - **Requisito técnico:** el dominio usa los nameservers de Vercel, porque
   Vercel solo acepta el comodín `*.<dominio>` así. Se configura al comprarlo.
 
+**Dónde se aloja cada club.** En ningún sitio aparte: todos los clubes son la
+misma app, en el mismo proyecto de Vercel.
+
+```mermaid
+flowchart LR
+  A["seadragons.dominio"] --> DNS["DNS comodín<br/>*.dominio apunta a Vercel"]
+  B["otroclub.dominio"] --> DNS
+  W["www.dominio"] --> DNS
+  DNS --> APP["Una sola app en Vercel<br/>lee el subdominio y elige el club"]
+  APP --> DB["Un solo Supabase<br/>datos de cada club por club_id"]
+```
+
+- **Un solo registro DNS** (`*.<dominio>`) manda todos los subdominios, también
+  los que todavía no existen, a la misma app. Vercel emite solo el certificado
+  HTTPS del comodín.
+- **La app lee el subdominio de cada petición** y busca el club con ese slug
+  (E25, RF-1). `www` y la raíz sirven la landing.
+- **Crear un club es crear una fila** en la base con su slug. Su subdominio
+  funciona al instante: no se toca el DNS, no se despliega nada y no hay un
+  servidor por club.
+- **No hace falta un hosting potente.** Vercel ejecuta la app por petición y
+  escala solo; se paga por uso. Lo que crece con los clubes es la base de
+  datos: el servidor de Supabase se sube de tamaño desde su panel cuando el
+  tráfico lo pida.
+
 ## 13. Planes y topes
 
 Decididos el 6 de noviembre de 2026. Los precios son un punto de partida: se
@@ -467,10 +507,19 @@ prueban con 3 a 5 clubes antes de fijarlos.
   bloquea es la API.
 - **El plan gratis convierte a E38 (ciclos por grupo) en una función de pago:**
   con un solo ciclo no hay ciclos por grupo.
-- **Comisión en el plan gratis, propuesta sin confirmar:** un 1% sobre los
-  cobros que el club haga por Stripe Connect, como comisión de plataforma. Así
-  ganamos algo con los clubes que nunca pagan, como hace Spond. Los planes
-  pagos no llevan comisión.
+- **Comisión en el plan gratis (decidida):** un 1% sobre los cobros que el club
+  haga por Stripe Connect, como comisión de plataforma. Así ganamos algo con
+  los clubes que nunca pagan, como hace Spond. Los planes pagos no llevan
+  comisión.
+  - Se suma a la de Stripe. Con una tarjeta australiana, Stripe cobra
+    alrededor de 1,7% + 0,30 AUD (por confirmar), así que el club paga en total
+    cerca de 2,7% + 0,30 AUD. Spond cobra entre 2,5% y 3% más un fijo, con
+    Stripe incluido: quedamos parecidos o por debajo.
+  - En una cuota de 50 AUD, nuestro 1% son 0,50 AUD.
+  - La app le muestra al club cuánto se lleva la comisión al mes, y cuánto se
+    ahorraría con el plan Club. Es otro argumento para subir de plan.
+  - Más adelante, el club podría elegir pasarle la comisión al socio, como
+    deja Spond.
 
 **Competencia (noviembre de 2026, cifras de terceros por confirmar):**
 
@@ -603,9 +652,11 @@ Pro, unos 20 USD al mes por 50.000.
 
 **Propuesta, sin confirmar:**
 
-1. **Resend Pro desde el lanzamiento.** Con varios clubes registrando gente,
-   100 al día no alcanza, y los correos de confirmar cuenta y recuperar
-   contraseña no se pueden quedar sin salir.
+1. **Resend gratis mientras se prueba con 3 a 5 clubes, y Pro desde el
+   lanzamiento público.** En la prueba, 100 correos al día alcanzan si no hay
+   correos masivos. En cuanto la landing esté abierta, cualquier día con
+   muchos registros puede pasar de 100, y los correos de confirmar cuenta y
+   recuperar contraseña no se pueden quedar sin salir.
 2. **Correos de la cuenta y avisos en todos los planes:** confirmación,
    recuperación, invitación, renovación y avisos de la app.
 3. **Correos masivos del directorio solo en los planes pagos,** con un cupo al
@@ -678,20 +729,20 @@ Decidido el 6 de noviembre de 2026: dominio nuevo con landing (sección 12),
 Stripe Connect desde el inicio, planes y topes (sección 13), qué pasa si el
 club deja de pagar (sección 14), una persona en varios clubes (sección 15),
 clientes de otros países con lista (sección 16), soporte (sección 18), datos de
-un club que se va (sección 19), y que los Seadragons no tienen nada que migrar.
+un club que se va (sección 19), que los Seadragons no tienen nada que migrar, y
+la comisión del 1% en el plan gratis (sección 13).
 
 Falta:
 
-1. **Comisión del 1% en el plan gratis:** sí o no (sección 13).
-2. **Correos:** Resend Pro y correos masivos solo en los planes pagos
-   (sección 17).
-3. **Primera lista de países** (sección 16).
-4. **El dominio:** comprarlo, y decidir si es `pacifikcode.com` o uno con el
+1. **Correos:** Resend gratis en la prueba y Pro en el lanzamiento, y correos
+   masivos solo en los planes pagos (sección 17).
+2. **Primera lista de países** (sección 16).
+3. **El dominio:** comprarlo, y decidir si es `pacifikcode.com` o uno con el
    nombre del producto (sección 12).
-5. **Nombre del producto**, para la landing y los correos.
-6. **Legal:** la empresa con ABN y la revisión del abogado (sección 18).
-7. **Tienda:** si hay stock por talla, si hay pedidos en efectivo o
+4. **Nombre del producto**, para la landing y los correos.
+5. **Legal:** la empresa con ABN y la revisión del abogado (sección 18).
+6. **Tienda:** si hay stock por talla, si hay pedidos en efectivo o
    transferencia, si el club cobra GST en lo que vende (Stripe Tax).
-8. **Invitar con planilla:** qué columnas trae y qué pasa con los correos
+7. **Invitar con planilla:** qué columnas trae y qué pasa con los correos
    repetidos.
-9. **E25 con Sebastián:** los cuatro cambios de la sección 11.
+8. **E25 con Sebastián:** los cuatro cambios de la sección 11.
