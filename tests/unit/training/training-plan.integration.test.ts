@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import { createTrainingPlanGateways } from "@/lib/training/supabase-training-plan-gateways";
 import {
+  TrainingCycleNotFoundError,
   TrainingPlanBlockedError,
   readTrainingPlan,
 } from "@/lib/training/training-plan";
@@ -215,6 +216,58 @@ function withActiveCycle<T>(
   );
 }
 
+/** Los grupos A y B del club, el socio en A, y un ciclo activo de cada uno.
+ * Los ciclos se van con sus grupos al borrarlos en cascada. */
+function withGroupCycles<T>(
+  seed: Seed,
+  run: (ids: { cycleOfA: string; cycleOfB: string }) => Promise<T>,
+): Promise<T> {
+  const { serviceClient, clubId } = seed;
+  return withSeededRows(
+    serviceClient,
+    "groups",
+    [
+      { club_id: clubId, name: "Grupo A" },
+      { club_id: clubId, name: "Grupo B" },
+    ],
+    ([groupA, groupB]) =>
+      withSeededRows(
+        serviceClient,
+        "training_cycles",
+        ["Juveniles", "Masters"].map((name) => ({
+          club_id: clubId,
+          name,
+          start_date: CYCLE_START,
+          weeks: 4,
+          status: "active",
+          audience: "groups",
+        })),
+        async ([cycleOfA, cycleOfB]) => {
+          const ids = {
+            cycleOfA: String(cycleOfA?.id),
+            cycleOfB: String(cycleOfB?.id),
+          };
+          await succeed(
+            "sembrar los grupos de los ciclos",
+            serviceClient.client.from("training_cycle_groups").insert([
+              { cycle_id: ids.cycleOfA, group_id: groupA?.id, club_id: clubId },
+              { cycle_id: ids.cycleOfB, group_id: groupB?.id, club_id: clubId },
+            ]),
+          );
+          await succeed(
+            "poner al socio en el grupo A",
+            serviceClient.client.from("group_memberships").insert({
+              group_id: groupA?.id,
+              user_id: seed.player.id,
+              club_id: clubId,
+            }),
+          );
+          return run(ids);
+        },
+      ),
+  );
+}
+
 describeRls("La semana del socio contra Supabase", () => {
   it(
     "sirve un día de dos rutinas con su sección, y cierra la puerta a quien no está al día",
@@ -224,7 +277,12 @@ describeRls("La semana del socio contra Supabase", () => {
         withExerciseAndMark(seed, (ids) =>
           withActiveCycle(seed, ids, async () => {
             const gateways = createTrainingPlanGateways(serviceClient.client);
-            const request = { callerId: seed.player.id, now: NOW, week: null };
+            const request = {
+              callerId: seed.player.id,
+              now: NOW,
+              week: null,
+              cycleId: null,
+            };
 
             const plan = await readTrainingPlan(gateways, request);
 
@@ -306,39 +364,50 @@ describeRls("La semana del socio contra Supabase", () => {
   );
 
   it(
-    "con un ciclo de grupos también activo, sirve el de todo el club hasta que el #979 elija por grupo (#978)",
+    "con dos grupos, el socio de A ve el ciclo de A y el del club, entra en el de A y no encuentra el de B (#979)",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
       await withClubAndPlayer(serviceClient, (seed) =>
         withExerciseAndMark(seed, (ids) =>
           withActiveCycle(seed, ids, () =>
-            withSeededRows(
-              serviceClient,
-              "training_cycles",
-              [
+            withGroupCycles(seed, async ({ cycleOfA, cycleOfB }) => {
+              const gateways = createTrainingPlanGateways(serviceClient.client);
+              const request = {
+                callerId: seed.player.id,
+                now: NOW,
+                week: null,
+                cycleId: null,
+              };
+
+              const plan = await readTrainingPlan(gateways, request);
+
+              expect(plan).toMatchObject({
+                cycle: { id: cycleOfA, name: "Juveniles" },
+                current: { week: 1, phase: "running" },
+              });
+              if (plan.cycle === null) {
+                throw new Error("se esperaba un ciclo activo");
+              }
+              // Por nombre, y sin el de B.
+              expect(plan.cycles).toEqual([
+                expect.objectContaining({
+                  name: "Integración",
+                  audience: { kind: "club" },
+                }),
                 {
-                  club_id: seed.clubId,
-                  name: "Sólo grupos",
-                  start_date: CYCLE_START,
-                  weeks: 4,
-                  status: "active",
-                  audience: "groups",
+                  id: cycleOfA,
+                  name: "Juveniles",
+                  current: { week: 1, phase: "running", today: "2027-03-02" },
+                  audience: {
+                    kind: "groups",
+                    groups: [{ id: expect.any(String), name: "Grupo A" }],
+                  },
                 },
-              ],
-              async () => {
-                const gateways = createTrainingPlanGateways(
-                  serviceClient.client,
-                );
-
-                const plan = await readTrainingPlan(gateways, {
-                  callerId: seed.player.id,
-                  now: NOW,
-                  week: null,
-                });
-
-                expect(plan.cycle).toMatchObject({ name: "Integración" });
-              },
-            ),
+              ]);
+              await expect(
+                readTrainingPlan(gateways, { ...request, cycleId: cycleOfB }),
+              ).rejects.toBeInstanceOf(TrainingCycleNotFoundError);
+            }),
           ),
         ),
       );

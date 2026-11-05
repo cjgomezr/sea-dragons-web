@@ -11,6 +11,7 @@ import {
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { createSupabaseTrainingPlanGateways } from "@/lib/training/supabase-training-plan-gateways";
 import {
+  TrainingCycleNotFoundError,
   type TrainingPlan,
   TrainingPlanBlockedError,
   type TrainingPlanGateways,
@@ -31,6 +32,7 @@ export const dynamic = "force-dynamic";
 export type TrainingPlanResponse = TrainingPlan;
 
 const WEEK_PARAM = "week";
+const CYCLE_PARAM = "cycle";
 const WHOLE_NUMBER = /^\d+$/;
 
 const BLOCKED_MESSAGE =
@@ -63,12 +65,28 @@ function parseWeekParam(searchParams: URLSearchParams): number | null {
   return Number(week);
 }
 
+/** El ciclo pedido, o nulo si no se pidió ninguno. Si lo ve lo decide el
+ * dominio: uno ajeno y uno que no existe dan el mismo 404 (RF-3 de E38). */
+function parseCycleParam(searchParams: URLSearchParams): string | null {
+  const cycleId = searchParams.get(CYCLE_PARAM);
+  if (cycleId === null) {
+    return null;
+  }
+  if (cycleId.trim() === "") {
+    throw new ApiError("validation_error", "Falta el ciclo en ?cycle.");
+  }
+  return cycleId;
+}
+
 function asTrainingPlanApiError(error: unknown): never {
   if (error instanceof TrainingPlanBlockedError) {
     throw new ApiErrorWithDetails("forbidden", BLOCKED_MESSAGE, {
       reason: MEMBERSHIP_NOT_CURRENT_REASON,
       details: { block: error.block, cycle: error.cycle },
     });
+  }
+  if (error instanceof TrainingCycleNotFoundError) {
+    throw new ApiError("not_found", error.message);
   }
   if (error instanceof TrainingWeekOutOfRangeError) {
     throw new ApiError("validation_error", error.message);
@@ -79,13 +97,16 @@ function asTrainingPlanApiError(error: unknown): never {
 const getTrainingPlan = createApiRoute<TrainingPlanResponse>({
   handler: async ({ request, decorateResponse }) => {
     const callerId = await identifyAccountCaller({ request, decorateResponse });
-    const week = parseWeekParam(request.nextUrl.searchParams);
+    const { searchParams } = request.nextUrl;
+    const week = parseWeekParam(searchParams);
+    const cycleId = parseCycleParam(searchParams);
     try {
       return {
         data: await readTrainingPlan(requireTrainingPlanGateways(), {
           callerId,
           now: new Date(),
           week,
+          cycleId,
         }),
       };
     } catch (error) {

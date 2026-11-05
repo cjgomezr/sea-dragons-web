@@ -15,6 +15,11 @@ import {
   cycleWeekAt,
 } from "./cycle-week";
 import type { RoutineLoad, WeekDose } from "./training-load";
+import {
+  type CycleViewer,
+  cyclesVisibleTo,
+  defaultCycleOf,
+} from "./visible-cycles";
 
 /**
  * La semana del ciclo activo que ve el socio (#898, RF-3, RF-4 y RF-6 del PRD
@@ -38,6 +43,17 @@ const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 const YOUTUBE_LINK_PREFIX = "https://";
 const YOUTUBE_SEARCH_URL = "https://www.youtube.com/results?search_query=";
 
+export type CycleGroup = {
+  readonly id: string;
+  readonly name: string;
+};
+
+/** Para quién es un ciclo (D1 de E38). Uno de grupos puede quedarse sin
+ * ninguno al borrarlos (D9): entonces no lo ve ningún socio. */
+export type CycleAudience =
+  | { readonly kind: "club" }
+  | { readonly kind: "groups"; readonly groups: readonly CycleGroup[] };
+
 export type TrainingCycleRecord = {
   readonly id: string;
   readonly name: string;
@@ -47,6 +63,7 @@ export type TrainingCycleRecord = {
   /** YYYY-MM-DD, el lunes de la semana 1. */
   readonly startDate: string;
   readonly weeks: number;
+  readonly audience: CycleAudience;
 };
 
 export type ExerciseRecord = {
@@ -107,7 +124,14 @@ export type TrainingWeekRecord = {
 };
 
 export type TrainingPlanGateway = {
-  findActiveCycle(clubId: string): Promise<TrainingCycleRecord | null>;
+  /** Todos los activos del club, con sus grupos, en una sola consulta: qué
+   * ve cada uno lo decide `visible-cycles.ts`. */
+  findActiveCycles(clubId: string): Promise<readonly TrainingCycleRecord[]>;
+  /** Los grupos del club en los que está el socio. */
+  findMemberGroupIds(query: {
+    readonly clubId: string;
+    readonly userId: string;
+  }): Promise<readonly string[]>;
   findWeek(query: {
     readonly clubId: string;
     readonly cycleId: string;
@@ -128,6 +152,8 @@ export type TrainingPlanRequest = {
   readonly now: Date;
   /** La semana pedida; nula para la actual. */
   readonly week: number | null;
+  /** El ciclo pedido; nulo para el de entrada (D6 de E38). */
+  readonly cycleId: string | null;
 };
 
 export type TrainingCycle = {
@@ -195,7 +221,26 @@ export type ActiveTrainingPlan = {
   readonly week: TrainingWeek;
 };
 
-export type TrainingPlan = { readonly cycle: null } | ActiveTrainingPlan;
+/** Un ciclo de la lista que ve el socio (RF-4 de E38), para elegir otro. */
+export type TrainingCycleOption = {
+  readonly id: string;
+  readonly name: string;
+  /** Dónde cae hoy en ese ciclo. */
+  readonly current: CycleWeekPosition;
+  readonly audience: CycleAudience;
+};
+
+export type ActiveTrainingPlanWithCycles = ActiveTrainingPlan & {
+  /** Los activos que ve, por nombre; el servido es uno de ellos. */
+  readonly cycles: readonly TrainingCycleOption[];
+};
+
+/** La semana que pinta Entrenamiento: sin la lista, que la pantalla no usa
+ * hasta el selector del #981. */
+export type TrainingWeekPlan = { readonly cycle: null } | ActiveTrainingPlan;
+
+export type TrainingPlan =
+  { readonly cycle: null } | ActiveTrainingPlanWithCycles;
 
 /** La puerta cerrada (RF-6): el motivo y la cabecera del ciclo, sin días ni
  * rutinas. */
@@ -208,6 +253,15 @@ export class TrainingPlanBlockedError extends Error {
     this.name = "TrainingPlanBlockedError";
     this.block = block;
     this.cycle = cycle;
+  }
+}
+
+/** El `?cycle` pedido no es un activo que vea: uno de otro grupo responde
+ * igual que uno que no existe (RF-3 de E38). */
+export class TrainingCycleNotFoundError extends Error {
+  constructor(cycleId: string) {
+    super(`No hay un ciclo activo ${cycleId} que puedas ver.`);
+    this.name = "TrainingCycleNotFoundError";
   }
 }
 
@@ -347,34 +401,61 @@ function weekToServe(
   return request.week;
 }
 
-export async function readTrainingPlan(
+function viewerOf(role: Role, groupIds: readonly string[]): CycleViewer {
+  return canPlanTraining(role)
+    ? { kind: "planner" }
+    : { kind: "member", groupIds };
+}
+
+function toCycleOption(
+  record: TrainingCycleRecord,
+  now: Date,
+): TrainingCycleOption {
+  return {
+    id: record.id,
+    name: record.name,
+    current: cycleWeekAt(record, now),
+    audience: record.audience,
+  };
+}
+
+/** El ciclo pedido si lo ve (nulo si no), y el que se enseña: ese, o el de
+ * entrada (D6 de E38). La cabecera de la puerta cerrada nunca enseña uno que
+ * no ve. */
+function chooseCycle(
+  visible: readonly TrainingCycleRecord[],
+  request: {
+    readonly cycleId: string | null;
+    readonly groupIds: readonly string[];
+  },
+): {
+  readonly requested: TrainingCycleRecord | null;
+  readonly shown: TrainingCycleRecord | null;
+} {
+  const requested =
+    visible.find((cycle) => cycle.id === request.cycleId) ?? null;
+  return {
+    requested,
+    shown: requested ?? defaultCycleOf(visible, request.groupIds),
+  };
+}
+
+async function readWeekPlan(
   gateways: TrainingPlanGateways,
-  request: TrainingPlanRequest,
-): Promise<TrainingPlan> {
-  const caller = await gateways.members.findRoleRequestMember(request.callerId);
-  if (caller === null) {
-    throw new MemberNotFoundError(request.callerId);
-  }
-  const [record, block] = await Promise.all([
-    gateways.plan.findActiveCycle(caller.clubId),
-    readBlock(gateways, { ...request, role: caller.role }),
-  ]);
-  if (block !== null) {
-    throw new TrainingPlanBlockedError(
-      block,
-      record === null ? null : toTrainingCycle(record),
-    );
-  }
-  if (record === null) {
-    return { cycle: null };
-  }
+  input: {
+    readonly clubId: string;
+    readonly record: TrainingCycleRecord;
+    readonly request: TrainingPlanRequest;
+  },
+): Promise<ActiveTrainingPlan> {
+  const { clubId, record, request } = input;
   const current = cycleWeekAt(record, request.now);
   const week = weekToServe(record, {
     week: request.week,
     current: current.week,
   });
   const weekRecord = await gateways.plan.findWeek({
-    clubId: caller.clubId,
+    clubId,
     cycleId: record.id,
     week,
   });
@@ -385,5 +466,49 @@ export async function readTrainingPlan(
       { cycle: record, week, record: weekRecord },
       gateways.plan,
     ),
+  };
+}
+
+export async function readTrainingPlan(
+  gateways: TrainingPlanGateways,
+  request: TrainingPlanRequest,
+): Promise<TrainingPlan> {
+  const caller = await gateways.members.findRoleRequestMember(request.callerId);
+  if (caller === null) {
+    throw new MemberNotFoundError(request.callerId);
+  }
+  const [cycles, groupIds, block] = await Promise.all([
+    gateways.plan.findActiveCycles(caller.clubId),
+    gateways.plan.findMemberGroupIds({
+      clubId: caller.clubId,
+      userId: request.callerId,
+    }),
+    readBlock(gateways, { ...request, role: caller.role }),
+  ]);
+  const visible = cyclesVisibleTo(cycles, viewerOf(caller.role, groupIds));
+  const { requested, shown } = chooseCycle(visible, {
+    cycleId: request.cycleId,
+    groupIds,
+  });
+  if (block !== null) {
+    throw new TrainingPlanBlockedError(
+      block,
+      shown === null ? null : toTrainingCycle(shown),
+    );
+  }
+  if (request.cycleId !== null && requested === null) {
+    throw new TrainingCycleNotFoundError(request.cycleId);
+  }
+  if (shown === null) {
+    return { cycle: null };
+  }
+  const plan = await readWeekPlan(gateways, {
+    clubId: caller.clubId,
+    record: shown,
+    request,
+  });
+  return {
+    ...plan,
+    cycles: visible.map((cycle) => toCycleOption(cycle, request.now)),
   };
 }

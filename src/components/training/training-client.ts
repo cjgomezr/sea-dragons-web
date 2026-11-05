@@ -13,7 +13,10 @@ import {
 } from "@/lib/auth/routes";
 import type { MembershipBlock } from "@/lib/membership/membership";
 import type { MemberMarks } from "@/lib/training/member-marks";
-import type { TrainingCycle, TrainingPlan } from "@/lib/training/training-plan";
+import type {
+  TrainingCycle,
+  TrainingWeekPlan,
+} from "@/lib/training/training-plan";
 
 /**
  * Lo que la pantalla de Entrenamiento (#900) le pide a la API v1 (#898) y
@@ -99,11 +102,10 @@ const activePlanSchema = z.object({
   }),
 });
 
-const planResponseSchema: z.ZodType<{ readonly data: TrainingPlan }> = z.object(
-  {
+const planResponseSchema: z.ZodType<{ readonly data: TrainingWeekPlan }> =
+  z.object({
     data: z.union([z.object({ cycle: z.null() }), activePlanSchema]),
-  },
-);
+  });
 
 /** El 403 de quien no está al día (#898): el motivo y la cabecera del ciclo,
  * o nula si el club no tiene ciclo activo. */
@@ -127,7 +129,7 @@ export type TrainingPlanBlock = {
 
 /** El plan, la puerta cerrada de quien no está al día, o un fallo. */
 export type TrainingPlanOutcome =
-  | { readonly kind: "loaded"; readonly plan: TrainingPlan }
+  | { readonly kind: "loaded"; readonly plan: TrainingWeekPlan }
   | ({ readonly kind: "blocked" } & TrainingPlanBlock)
   | { readonly kind: "failed" };
 

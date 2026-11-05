@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Role } from "@/lib/auth/roles";
 import type { MembershipStatus } from "@/lib/membership/membership";
 import {
-  type ActiveTrainingPlan,
+  type ActiveTrainingPlanWithCycles,
   type ExerciseItemRecord,
   type RoutineItemRecord,
   type TrainingCycleRecord,
   TrainingPlanBlockedError,
   type TrainingPlanGateways,
   type TrainingWeekRecord,
+  TrainingCycleNotFoundError,
   TrainingWeekOutOfRangeError,
   readTrainingPlan,
 } from "@/lib/training/training-plan";
@@ -33,6 +34,7 @@ const CYCLE: TrainingCycleRecord = {
   eventDate: "2026-10-31",
   startDate: "2026-09-28",
   weeks: 4,
+  audience: { kind: "club" },
 };
 
 const SQUAT = { id: "mark-squat", name: "Back squat" };
@@ -114,7 +116,8 @@ const WEEK: TrainingWeekRecord = {
 
 let role: Role;
 let membershipStatus: MembershipStatus | null;
-let activeCycle: TrainingCycleRecord | null;
+let activeCycles: TrainingCycleRecord[];
+let memberGroupIds: string[];
 let requestedWeeks: number[];
 
 function gateways(): TrainingPlanGateways {
@@ -145,7 +148,8 @@ function gateways(): TrainingPlanGateways {
             },
     },
     plan: {
-      findActiveCycle: async () => activeCycle,
+      findActiveCycles: async () => activeCycles,
+      findMemberGroupIds: async () => memberGroupIds,
       findWeek: async ({ week }) => {
         requestedWeeks.push(week);
         return WEEK;
@@ -155,11 +159,16 @@ function gateways(): TrainingPlanGateways {
   };
 }
 
-function readPlan(week: number | null = null) {
-  return readTrainingPlan(gateways(), { callerId: CALLER_ID, now: NOW, week });
+function readPlan(week: number | null = null, cycleId: string | null = null) {
+  return readTrainingPlan(gateways(), {
+    callerId: CALLER_ID,
+    now: NOW,
+    week,
+    cycleId,
+  });
 }
 
-async function readActivePlan(): Promise<ActiveTrainingPlan> {
+async function readActivePlan(): Promise<ActiveTrainingPlanWithCycles> {
   const plan = await readPlan();
   if (plan.cycle === null) {
     throw new Error("se esperaba un ciclo activo");
@@ -170,7 +179,8 @@ async function readActivePlan(): Promise<ActiveTrainingPlan> {
 beforeEach(() => {
   role = "Player";
   membershipStatus = "active";
-  activeCycle = CYCLE;
+  activeCycles = [CYCLE];
+  memberGroupIds = [];
   requestedWeeks = [];
 });
 
@@ -302,7 +312,7 @@ describe("readTrainingPlan", () => {
     const base = gateways();
     const plan = await readTrainingPlan(
       { ...base, plan: { ...base.plan, findWeek: async () => week } },
-      { callerId: CALLER_ID, now: NOW, week: null },
+      { callerId: CALLER_ID, now: NOW, week: null, cycleId: null },
     );
 
     if (plan.cycle === null) {
@@ -335,13 +345,13 @@ describe("readTrainingPlan", () => {
   });
 
   it("sin ciclo activo sirve el ciclo nulo", async () => {
-    activeCycle = null;
+    activeCycles = [];
 
     await expect(readPlan()).resolves.toEqual({ cycle: null });
   });
 
   it("un ciclo sin evento no trae evento", async () => {
-    activeCycle = { ...CYCLE, eventName: null, eventDate: null };
+    activeCycles = [{ ...CYCLE, eventName: null, eventDate: null }];
 
     const plan = await readPlan();
 
@@ -349,7 +359,7 @@ describe("readTrainingPlan", () => {
   });
 
   it("antes del inicio sirve la semana 1 y dice que no empezó", async () => {
-    activeCycle = { ...CYCLE, startDate: "2026-10-12" };
+    activeCycles = [{ ...CYCLE, startDate: "2026-10-12" }];
 
     const plan = await readPlan();
 
@@ -360,7 +370,7 @@ describe("readTrainingPlan", () => {
   });
 
   it("después del fin sirve la semana N y dice que terminó", async () => {
-    activeCycle = { ...CYCLE, startDate: "2026-08-31" };
+    activeCycles = [{ ...CYCLE, startDate: "2026-08-31" }];
 
     const plan = await readPlan();
 
@@ -393,7 +403,7 @@ describe("readTrainingPlan", () => {
 
   it("a un socio sin estar al día y sin ciclo activo lo para sin cabecera", async () => {
     membershipStatus = "cancelled";
-    activeCycle = null;
+    activeCycles = [];
 
     await expect(readPlan()).rejects.toMatchObject({
       block: "cancelled",
@@ -426,8 +436,141 @@ describe("readTrainingPlan", () => {
     await expect(
       readTrainingPlan(
         { ...base, members: { findRoleRequestMember: async () => null } },
-        { callerId: CALLER_ID, now: NOW, week: null },
+        { callerId: CALLER_ID, now: NOW, week: null, cycleId: null },
       ),
     ).rejects.toThrow(CALLER_ID);
   });
+});
+
+describe("readTrainingPlan con varios ciclos (E38)", () => {
+  const GROUP_A = { id: "group-a", name: "Juveniles" };
+  const GROUP_B = { id: "group-b", name: "Masters" };
+  const OF_A: TrainingCycleRecord = {
+    ...CYCLE,
+    id: "cycle-a",
+    name: "Juveniles",
+    startDate: "2026-09-21",
+    weeks: 6,
+    audience: { kind: "groups", groups: [GROUP_A] },
+  };
+  const OF_B: TrainingCycleRecord = {
+    ...CYCLE,
+    id: "cycle-b",
+    name: "Masters",
+    audience: { kind: "groups", groups: [GROUP_B] },
+  };
+
+  it("sirve la lista de ciclos que ve, cada uno con su semana en curso y su audiencia", async () => {
+    activeCycles = [OF_B, CYCLE, OF_A];
+    memberGroupIds = [GROUP_A.id];
+
+    const plan = await readActivePlan();
+
+    expect(plan.cycles).toEqual([
+      {
+        id: "cycle-a",
+        name: "Juveniles",
+        current: { week: 3, phase: "running", today: "2026-10-06" },
+        audience: { kind: "groups", groups: [GROUP_A] },
+      },
+      {
+        id: "cycle-1",
+        name: "Nationals build",
+        current: { week: 2, phase: "running", today: "2026-10-06" },
+        audience: { kind: "club" },
+      },
+    ]);
+  });
+
+  it("sin ?cycle sirve el de su grupo antes que el de todo el club, en su semana de hoy", async () => {
+    activeCycles = [CYCLE, OF_A];
+    memberGroupIds = [GROUP_A.id];
+
+    const plan = await readActivePlan();
+
+    expect(plan).toMatchObject({
+      cycle: { id: "cycle-a" },
+      current: { week: 3 },
+      week: { number: 3 },
+    });
+  });
+
+  it("sin ?cycle y en dos grupos con ciclo, sirve el primero por nombre", async () => {
+    activeCycles = [OF_B, OF_A];
+    memberGroupIds = [GROUP_A.id, GROUP_B.id];
+
+    const plan = await readActivePlan();
+
+    expect(plan.cycle.name).toBe("Juveniles");
+  });
+
+  it("con ?cycle de uno que ve y ?week=k sirve la semana k de ese ciclo", async () => {
+    activeCycles = [CYCLE, OF_A];
+    memberGroupIds = [GROUP_A.id];
+
+    const plan = await readPlan(4, "cycle-1");
+
+    expect(plan).toMatchObject({
+      cycle: { id: "cycle-1" },
+      current: { week: 2 },
+      week: { number: 4 },
+    });
+    expect(requestedWeeks).toEqual([4]);
+  });
+
+  it.each([
+    ["de otro grupo", "cycle-b"],
+    ["que no existe", "cycle-missing"],
+  ])("con ?cycle de un ciclo %s no lo encuentra", async (_label, cycleId) => {
+    activeCycles = [CYCLE, OF_A, OF_B];
+    memberGroupIds = [GROUP_A.id];
+
+    await expect(readPlan(null, cycleId)).rejects.toBeInstanceOf(
+      TrainingCycleNotFoundError,
+    );
+    expect(requestedWeeks).toEqual([]);
+  });
+
+  it("sin ningún ciclo que vea, sirve el ciclo nulo", async () => {
+    activeCycles = [OF_B];
+    memberGroupIds = [GROUP_A.id];
+
+    await expect(readPlan()).resolves.toEqual({ cycle: null });
+  });
+
+  it.each<Role>(["Admin", "Coach"])(
+    "a un %s le lista todos los activos del club (D5)",
+    async (plannerRole) => {
+      role = plannerRole;
+      activeCycles = [OF_B, CYCLE, OF_A];
+
+      const plan = await readActivePlan();
+
+      expect(plan.cycles.map((each) => each.id)).toEqual([
+        "cycle-a",
+        "cycle-b",
+        "cycle-1",
+      ]);
+      expect(plan.cycle.id).toBe("cycle-1");
+    },
+  );
+
+  it.each([null, "cycle-b", "cycle-a"])(
+    "a quien no está al día lo para con ?cycle=%s, con la cabecera de un ciclo que ve",
+    async (cycleId) => {
+      membershipStatus = "past_due";
+      activeCycles = [OF_B, CYCLE, OF_A];
+      memberGroupIds = [GROUP_A.id];
+
+      const error = await readPlan(null, cycleId).catch(
+        (caught: unknown) => caught,
+      );
+
+      expect(error).toBeInstanceOf(TrainingPlanBlockedError);
+      expect(error).toMatchObject({
+        block: "past_due",
+        cycle: { id: "cycle-a" },
+      });
+    },
+  );
 });
