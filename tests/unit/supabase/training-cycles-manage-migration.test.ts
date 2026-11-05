@@ -8,7 +8,7 @@ import {
 
 /**
  * `0085_training_cycles_manage.sql` contra un Postgres desechable (#904,
- * RF-7, RF-8, D5 y D7 del PRD de E35): activar archiva el anterior, duplicar
+ * RF-7, RF-8, D5 y D7 del PRD de E35): duplicar
  * copia las rutinas propias y reapunta la cuadrícula, la ranura 2 nunca queda
  * sola y copiar la semana 1 pisa las semanas pedidas.
  */
@@ -79,12 +79,6 @@ function seedDay(
   );
 }
 
-function statusOf(database: TemporaryDatabase, cycleId: string) {
-  return database.query(
-    `select status from public.training_cycles where id = '${cycleId}'`,
-  );
-}
-
 function daysOf(
   database: TemporaryDatabase,
   cycleId: string,
@@ -98,69 +92,6 @@ function daysOf(
       order by d.weekday, d.slot`,
   );
 }
-
-describeConPostgres("activar un ciclo", () => {
-  it("lo activa y archiva el que lo era, y devuelve cuál archivó", async () => {
-    const database = await migratedDatabase();
-    const clubId = await seededClubId(database);
-    const current = await seedCycle(database, clubId, {
-      name: "Winter",
-      status: "active",
-    });
-    const draft = await seedCycle(database, clubId, {
-      name: "Summer",
-      status: "draft",
-    });
-
-    const archived = await database.query(
-      `select archived_cycle_id
-         from public.activate_training_cycle('${clubId}', '${draft}')`,
-    );
-
-    expect(archived).toBe(current);
-    expect(await statusOf(database, draft)).toBe("active");
-    expect(await statusOf(database, current)).toBe("archived");
-  });
-
-  it("sin activo anterior devuelve una fila con nulo", async () => {
-    const database = await migratedDatabase();
-    const clubId = await seededClubId(database);
-    const draft = await seedCycle(database, clubId, {
-      name: "Summer",
-      status: "draft",
-    });
-
-    const rows = await database.query(
-      `select coalesce(archived_cycle_id::text, 'nulo')
-         from public.activate_training_cycle('${clubId}', '${draft}')`,
-    );
-
-    expect(rows).toBe("nulo");
-  });
-
-  it("no toca nada si el ciclo es de otro club", async () => {
-    const database = await migratedDatabase();
-    const clubId = await seededClubId(database);
-    const otherClubId = await createOtherClub(database);
-    const current = await seedCycle(database, clubId, {
-      name: "Winter",
-      status: "active",
-    });
-    const foreign = await seedCycle(database, otherClubId, {
-      name: "Foreign",
-      status: "draft",
-    });
-
-    const rows = await database.query(
-      `select count(*)
-         from public.activate_training_cycle('${clubId}', '${foreign}')`,
-    );
-
-    expect(rows).toBe("0");
-    expect(await statusOf(database, current)).toBe("active");
-    expect(await statusOf(database, foreign)).toBe("draft");
-  });
-});
 
 describeConPostgres("cambiar un ciclo", () => {
   it("cambia el ciclo y quita los días y semanas que sobran, contando los días", async () => {
@@ -495,7 +426,6 @@ describeConPostgres("copiar la semana 1", () => {
 
 describeConPostgres("las funciones de los ciclos", () => {
   it.each([
-    "activate_training_cycle(uuid, uuid)",
     "update_training_cycle(uuid, uuid, text, integer, date, text, date)",
     "duplicate_training_cycle(uuid, uuid, text, uuid)",
     "set_training_cycle_day(uuid, uuid, integer, integer, integer, uuid)",

@@ -304,4 +304,45 @@ describeRls("La semana del socio contra Supabase", () => {
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
+
+  it(
+    "con un ciclo de grupos también activo, sirve el de todo el club hasta que el #979 elija por grupo (#978)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      await withClubAndPlayer(serviceClient, (seed) =>
+        withExerciseAndMark(seed, (ids) =>
+          withActiveCycle(seed, ids, () =>
+            withSeededRows(
+              serviceClient,
+              "training_cycles",
+              [
+                {
+                  club_id: seed.clubId,
+                  name: "Sólo grupos",
+                  start_date: CYCLE_START,
+                  weeks: 4,
+                  status: "active",
+                  audience: "groups",
+                },
+              ],
+              async () => {
+                const gateways = createTrainingPlanGateways(
+                  serviceClient.client,
+                );
+
+                const plan = await readTrainingPlan(gateways, {
+                  callerId: seed.player.id,
+                  now: NOW,
+                  week: null,
+                });
+
+                expect(plan.cycle).toMatchObject({ name: "Integración" });
+              },
+            ),
+          ),
+        ),
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
 });

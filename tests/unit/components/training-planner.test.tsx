@@ -25,6 +25,7 @@ const ACTIVE: ManagedCycle = {
   startDate: "2026-10-12",
   event: { name: "UWR Nationals", date: "2027-04-22" },
   ownRoutines: 4,
+  audience: { kind: "club" },
 };
 
 const DRAFT: ManagedCycle = {
@@ -35,6 +36,7 @@ const DRAFT: ManagedCycle = {
   startDate: "2027-06-07",
   event: null,
   ownRoutines: 1,
+  audience: { kind: "club" },
 };
 
 const ARCHIVED: ManagedCycle = {
@@ -45,6 +47,7 @@ const ARCHIVED: ManagedCycle = {
   startDate: "2026-05-04",
   event: null,
   ownRoutines: 3,
+  audience: { kind: "club" },
 };
 
 /** Las 12:00 del miércoles 28 de octubre de 2026 en Melbourne: la semana 3
@@ -817,6 +820,7 @@ describe("las acciones y su aviso", () => {
       startDate: "2026-10-26",
       event: null,
       ownRoutines: 0,
+      audience: { kind: "club" },
     };
     stubCycles(undefined, () => ok(detailOf(created), 201));
     const user = userEvent.setup();

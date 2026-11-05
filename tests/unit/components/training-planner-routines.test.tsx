@@ -29,6 +29,7 @@ const ACTIVE: ManagedCycle = {
   startDate: "2026-10-12",
   event: null,
   ownRoutines: 1,
+  audience: { kind: "club" },
 };
 
 const DRAFT: ManagedCycle = {
@@ -39,6 +40,7 @@ const DRAFT: ManagedCycle = {
   startDate: "2027-06-07",
   event: null,
   ownRoutines: 0,
+  audience: { kind: "club" },
 };
 
 const ARCHIVED: ManagedCycle = {
@@ -49,6 +51,7 @@ const ARCHIVED: ManagedCycle = {
   startDate: "2026-05-04",
   event: null,
   ownRoutines: 0,
+  audience: { kind: "club" },
 };
 
 const MARK = {

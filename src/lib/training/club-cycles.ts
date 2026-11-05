@@ -33,6 +33,11 @@ import { findTrainingPlanner } from "./training-planner";
  * qué vale y se deja la bitácora.
  *
  * Un ciclo de otro club no existe: responde igual que uno que no hay.
+ *
+ * Desde E38 cada ciclo es de todo el club o de grupos (#978, D1 a D3 y D8 del
+ * PRD de E38), y puede haber varios activos mientras no se solapen. Activar,
+ * o cambiar los grupos de un activo, devuelve los que chocan; con la
+ * confirmación, la base los archiva en la misma transacción.
  */
 
 const CYCLE_ENTITY_TYPE = "training_cycle";
@@ -42,6 +47,32 @@ const FIRST_WEEK = 1;
 export type CycleStatus = "draft" | "active" | "archived";
 
 export type CycleEvent = { readonly name: string; readonly date: string };
+
+export type CycleGroup = { readonly id: string; readonly name: string };
+
+/** Para quién es el ciclo (D1). Uno de grupos puede quedarse sin ninguno si
+ * se borran (D9): sigue siendo de grupos. */
+export type CycleAudience =
+  | { readonly kind: "club" }
+  | { readonly kind: "groups"; readonly groups: readonly CycleGroup[] };
+
+/** La audiencia que se pide: los grupos, por id. */
+export type CycleAudienceInput =
+  | { readonly kind: "club" }
+  | { readonly kind: "groups"; readonly groupIds: readonly string[] };
+
+/** Un activo con el que chocaría el ciclo (D2). */
+export type ConflictingCycle = { readonly id: string; readonly name: string };
+
+/** Qué hizo la base al activar o al cambiar la audiencia: nada si choca y no
+ * se confirmó; si no, lo guardó y archivó los que chocaban. */
+export type CycleConflictOutcome =
+  | { readonly kind: "missing" }
+  | {
+      readonly kind: "conflicts";
+      readonly conflicts: readonly ConflictingCycle[];
+    }
+  | { readonly kind: "saved"; readonly archived: readonly ConflictingCycle[] };
 
 /** Un ciclo tal como lo ve quien planifica. */
 export type ClubCycleRecord = {
@@ -54,6 +85,7 @@ export type ClubCycleRecord = {
   readonly event: CycleEvent | null;
   /** Las rutinas del ciclo, sin las compartidas. */
   readonly ownRoutines: number;
+  readonly audience: CycleAudience;
 };
 
 /** La nota y la dosis de una semana (D6); las dos, opcionales. */
@@ -111,19 +143,32 @@ export type ClubCyclesGateway = {
     readonly weeks: readonly CycleWeekRecord[];
     readonly days: readonly CycleDayRecord[];
   }>;
-  /** En borrador. Devuelve el id. */
+  /** En borrador, con sus grupos, en una transacción. Devuelve el id. */
   insertCycle(
     fields: CycleFields & {
       readonly clubId: string;
       readonly createdBy: string;
+      readonly audience: CycleAudienceInput;
     },
   ): Promise<string>;
+  /** De `groupIds`, los que son grupos del club. */
+  findClubGroupIds(
+    clubId: string,
+    groupIds: readonly string[],
+  ): Promise<readonly string[]>;
   /** Se lleva los días y las semanas que pasen de `fields.weeks`, en la
    * misma transacción. */
   updateCycle(target: CycleTarget, fields: CycleFields): Promise<void>;
   activateCycle(
     target: CycleTarget,
-  ): Promise<{ readonly archivedCycleId: string | null }>;
+    options: { readonly confirm: boolean },
+  ): Promise<CycleConflictOutcome>;
+  /** Sólo un activo puede chocar. */
+  saveAudience(
+    target: CycleTarget,
+    audience: CycleAudienceInput,
+    options: { readonly confirm: boolean },
+  ): Promise<CycleConflictOutcome>;
   archiveCycle(target: CycleTarget): Promise<void>;
   /** Mira el estado y borra en la misma transacción, para que una
    * activación a la vez no se cuele entre los dos. Se lleva las semanas, los
@@ -171,12 +216,44 @@ export type CycleInput = {
   readonly name: string;
   readonly weeks: number;
   readonly schedule: CycleSchedule;
+  /** Sin ella, de todo el club. */
+  readonly audience?: CycleAudienceInput;
 };
 
 /** Lo que no viene se queda como está. */
 export type CycleChanges = Partial<CycleInput>;
 
 type CycleRequest = { readonly callerId: string; readonly cycleId: string };
+
+const CLUB_AUDIENCE: CycleAudienceInput = { kind: "club" };
+
+export type CycleAudienceIssueCode = "groups_required" | "group_not_in_club";
+
+/** Una audiencia que no se puede guardar: sin grupos, o con uno que no es
+ * del club (RF-1). */
+export class CycleAudienceError extends Error {
+  readonly code: CycleAudienceIssueCode;
+
+  constructor(code: CycleAudienceIssueCode) {
+    super(`La audiencia del ciclo no vale: ${code}.`);
+    this.name = "CycleAudienceError";
+    this.code = code;
+  }
+}
+
+/** Guardar dejaría dos activos solapados: se confirma antes de archivar los
+ * que chocan (D3). */
+export class CycleConflictError extends Error {
+  readonly conflicts: readonly ConflictingCycle[];
+
+  constructor(conflicts: readonly ConflictingCycle[]) {
+    super(
+      `Choca con ciclos activos (${conflicts.map(({ name }) => name).join(", ")}): confirma para archivarlos.`,
+    );
+    this.name = "CycleConflictError";
+    this.conflicts = conflicts;
+  }
+}
 
 export class CycleNotFoundError extends Error {
   constructor() {
@@ -296,6 +373,97 @@ function fieldsFor(input: CycleInput): CycleFields {
   };
 }
 
+/** Omitida es de todo el club. Los grupos, sin repetir, todos del club. */
+async function validAudience(
+  gateways: ClubCyclesGateways,
+  clubId: string,
+  audience: CycleAudienceInput | undefined,
+): Promise<CycleAudienceInput> {
+  if (audience === undefined || audience.kind === "club") {
+    return CLUB_AUDIENCE;
+  }
+  const groupIds = [...new Set(audience.groupIds)];
+  if (groupIds.length === 0) {
+    throw new CycleAudienceError("groups_required");
+  }
+  const clubGroupIds = await gateways.cycles.findClubGroupIds(clubId, groupIds);
+  if (clubGroupIds.length !== groupIds.length) {
+    throw new CycleAudienceError("group_not_in_club");
+  }
+  return { kind: "groups", groupIds };
+}
+
+/** Lo que archivó la base al guardar, o el porqué de no guardar. */
+function archivedOrThrow(
+  outcome: CycleConflictOutcome,
+): readonly ConflictingCycle[] {
+  if (outcome.kind === "missing") {
+    throw new CycleNotFoundError();
+  }
+  if (outcome.kind === "conflicts") {
+    throw new CycleConflictError(outcome.conflicts);
+  }
+  return outcome.archived;
+}
+
+/** Un `archived` por cada ciclo que la base archivó al chocar con
+ * `replacedBy`: en la bitácora queda quién lo sacó. */
+async function recordConflictArchives(
+  gateways: ClubCyclesGateways,
+  event: {
+    readonly actor: AuditActor;
+    readonly archived: readonly ConflictingCycle[];
+    readonly replacedBy: string;
+  },
+): Promise<void> {
+  for (const archived of event.archived) {
+    await recordCycleEvent(gateways, {
+      actor: event.actor,
+      action: "training_cycle.archived",
+      cycleId: archived.id,
+      metadata: { reason: "conflict", replacedBy: event.replacedBy },
+    });
+  }
+}
+
+function audienceMetadata(
+  audience: CycleAudienceInput,
+): Record<string, unknown> {
+  return audience.kind === "groups"
+    ? { audience: audience.kind, groupIds: audience.groupIds }
+    : { audience: audience.kind };
+}
+
+/** La audiencia nueva, si viene: en un activo que choca, sin `confirm` no
+ * guarda nada (D3). Devuelve lo que se anota y los que archivó. */
+async function saveAudienceChange(
+  gateways: ClubCyclesGateways,
+  request: {
+    readonly target: CycleTarget;
+    readonly audience: CycleAudienceInput | undefined;
+    readonly confirm: boolean;
+  },
+): Promise<{
+  readonly metadata: Record<string, unknown>;
+  readonly archived: readonly ConflictingCycle[];
+}> {
+  if (request.audience === undefined) {
+    return { metadata: {}, archived: [] };
+  }
+  const archived = archivedOrThrow(
+    await gateways.cycles.saveAudience(request.target, request.audience, {
+      confirm: request.confirm,
+    }),
+  );
+  return {
+    metadata: {
+      ...audienceMetadata(request.audience),
+      archivedCycleIds: archived.map(({ id }) => id),
+    },
+    archived,
+  };
+}
+
 /** Cuántos días con rutina quedan después de la última semana. Un día con
  * dos rutinas cuenta una vez. */
 function countDaysAfter(
@@ -324,34 +492,45 @@ export async function readManagedCycle(
   return readDetail(gateways, target);
 }
 
-/** Nace en borrador (D5). Sin metadata: ni el nombre ni el evento. */
+/** Nace en borrador (D5), de todo el club si no se dice otra cosa (D1). Sin
+ * metadata de contenido: ni el nombre ni el evento, sólo la audiencia. */
 export async function createManagedCycle(
   gateways: ClubCyclesGateways,
   request: { readonly callerId: string; readonly input: CycleInput },
 ): Promise<ManagedCycleDetail> {
   const fields = fieldsFor(request.input);
   const actor = await findTrainingPlanner(gateways.members, request.callerId);
+  const audience = await validAudience(
+    gateways,
+    actor.clubId,
+    request.input.audience,
+  );
   const cycleId = await gateways.cycles.insertCycle({
     ...fields,
     clubId: actor.clubId,
     createdBy: actor.id,
+    audience,
   });
   await recordCycleEvent(gateways, {
     actor,
     action: "training_cycle.created",
     cycleId,
+    metadata: audienceMetadata(audience),
   });
   return readDetail(gateways, { clubId: actor.clubId, cycleId });
 }
 
 /** Con evento, el inicio se recalcula siempre: cambiar las semanas o la
  * fecha mueve el ciclo para que el evento siga en la última (D5). Bajar las
- * semanas con días con rutina en las que sobran pide `confirmRemoval`. */
+ * semanas con días con rutina en las que sobran pide `confirmRemoval`, y
+ * cambiar los grupos de un activo que choca pide `confirm` (D3). Todo se
+ * comprueba antes de guardar nada. */
 export async function updateManagedCycle(
   gateways: ClubCyclesGateways,
   request: CycleRequest & {
     readonly changes: CycleChanges;
     readonly confirmRemoval: boolean;
+    readonly confirm: boolean;
   },
 ): Promise<ManagedCycleDetail> {
   const { actor, target, cycle } = await openCycle(gateways, request);
@@ -360,33 +539,58 @@ export async function updateManagedCycle(
     weeks: request.changes.weeks ?? cycle.weeks,
     schedule: request.changes.schedule ?? scheduleOf(cycle),
   });
+  const audience =
+    request.changes.audience === undefined
+      ? undefined
+      : await validAudience(gateways, actor.clubId, request.changes.audience);
   const plan = await gateways.cycles.readCyclePlan(target);
   const daysRemoved = countDaysAfter(plan.days, fields.weeks);
   if (daysRemoved > 0 && !request.confirmRemoval) {
     throw new CycleDaysWouldBeRemovedError(daysRemoved);
   }
+  const audienceChange = await saveAudienceChange(gateways, {
+    target,
+    audience,
+    confirm: request.confirm,
+  });
+  // Los archivados ya están guardados: se anotan antes del cambio de campos,
+  // que es otra transacción y podría fallar.
+  await recordConflictArchives(gateways, {
+    actor,
+    archived: audienceChange.archived,
+    replacedBy: target.cycleId,
+  });
   await gateways.cycles.updateCycle(target, fields);
   await recordCycleEvent(gateways, {
     actor,
     action: "training_cycle.updated",
     cycleId: target.cycleId,
-    metadata: { daysRemoved },
+    metadata: { daysRemoved, ...audienceChange.metadata },
   });
   return readDetail(gateways, target);
 }
 
-/** El activo anterior pasa a archivado en la misma transacción (D5). */
+/** Sin choque, activa (D2). Con choque, sin `confirm` responde los que chocan
+ * y no cambia nada; con él, la base los archiva en la misma transacción (D3).
+ * La bitácora lleva cada archivado y la activación. */
 export async function activateManagedCycle(
   gateways: ClubCyclesGateways,
-  request: CycleRequest,
+  request: CycleRequest & { readonly confirm: boolean },
 ): Promise<ManagedCycles> {
   const { actor, target } = await openCycle(gateways, request);
-  const { archivedCycleId } = await gateways.cycles.activateCycle(target);
+  const archived = archivedOrThrow(
+    await gateways.cycles.activateCycle(target, { confirm: request.confirm }),
+  );
+  await recordConflictArchives(gateways, {
+    actor,
+    archived,
+    replacedBy: target.cycleId,
+  });
   await recordCycleEvent(gateways, {
     actor,
     action: "training_cycle.activated",
     cycleId: target.cycleId,
-    metadata: { archivedCycleId },
+    metadata: { archivedCycleIds: archived.map(({ id }) => id) },
   });
   return readCycles(gateways, actor.clubId);
 }
@@ -438,8 +642,9 @@ function copyName(name: string): string {
   return `${[...name].slice(0, room).join("").trimEnd()}${COPY_SUFFIX}`;
 }
 
-/** Un borrador con copias de las rutinas propias (RF-7). La bitácora es del
- * ciclo nuevo y dice de cuál sale. */
+/** Un borrador con copias de las rutinas propias (RF-7), la misma audiencia
+ * y los mismos grupos (D8 de E38). La bitácora es del ciclo nuevo y dice de
+ * cuál sale. */
 export async function duplicateManagedCycle(
   gateways: ClubCyclesGateways,
   request: CycleRequest,

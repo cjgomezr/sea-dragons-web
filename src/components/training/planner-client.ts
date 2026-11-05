@@ -38,6 +38,14 @@ const managedCycleSchema: z.ZodType<ManagedCycle> = z.object({
   startDate: z.iso.date(),
   event: z.object({ name: z.string(), date: z.iso.date() }).nullable(),
   ownRoutines: z.number().int().nonnegative(),
+  // Para quién es (#978). La pantalla la enseña en el #980.
+  audience: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("club") }),
+    z.object({
+      kind: z.literal("groups"),
+      groups: z.array(z.object({ id: z.string(), name: z.string() })),
+    }),
+  ]),
 });
 
 const cyclesResponseSchema = z.object({

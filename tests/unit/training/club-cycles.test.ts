@@ -4,10 +4,15 @@ import type { Role } from "@/lib/auth/roles";
 import {
   type ClubCycleRecord,
   type ClubCyclesGateways,
+  type ConflictingCycle,
+  type CycleAudienceInput,
+  type CycleConflictOutcome,
   type CycleDayRecord,
   type CycleFields,
   type CycleWeekRecord,
   type RoutineScope,
+  CycleAudienceError,
+  CycleConflictError,
   CycleIsActiveError,
   CycleNotFoundError,
   activateManagedCycle,
@@ -46,6 +51,13 @@ const OWN_ROUTINE_ID = "a0a0a0a0-0000-4000-8000-000000000001";
 const SHARED_ROUTINE_ID = "a0a0a0a0-0000-4000-8000-000000000002";
 const OTHER_CYCLES_ROUTINE_ID = "a0a0a0a0-0000-4000-8000-000000000003";
 const UNKNOWN_ROUTINE_ID = "a0a0a0a0-0000-4000-8000-0000000000ff";
+const JUNIORS = {
+  id: "6a6a6a6a-0000-4000-8000-000000000001",
+  name: "Juveniles",
+};
+const MASTERS = { id: "6a6a6a6a-0000-4000-8000-000000000002", name: "Masters" };
+const OTHER_CLUBS_GROUP_ID = "6a6a6a6a-0000-4000-8000-0000000000ff";
+const CLUB_GROUPS = [JUNIORS, MASTERS];
 
 let callerRole: Role;
 let cycles: ClubCycleRecord[];
@@ -57,6 +69,7 @@ let savedDays: unknown[];
 let copiedWeeks: (readonly number[])[];
 let clearedWeeks: number[];
 let duplicateNames: string[];
+let savedAudiences: CycleAudienceInput[];
 
 function cycle(
   id: string,
@@ -70,6 +83,7 @@ function cycle(
     startDate: "2026-11-16",
     event: { name: "Nationals", date: "2026-12-13" },
     ownRoutines: 2,
+    audience: { kind: "club" },
     ...overrides,
   };
 }
@@ -82,6 +96,77 @@ const ROUTINE_SCOPES: Readonly<Record<string, RoutineScope>> = {
 
 function findCycle(cycleId: string): ClubCycleRecord | null {
   return cycles.find((candidate) => candidate.id === cycleId) ?? null;
+}
+
+function groupIdsOf(record: ClubCycleRecord): readonly string[] {
+  return record.audience.kind === "groups"
+    ? record.audience.groups.map((group) => group.id)
+    : [];
+}
+
+function audienceInputOf(record: ClubCycleRecord): CycleAudienceInput {
+  return record.audience.kind === "groups"
+    ? { kind: "groups", groupIds: groupIdsOf(record) }
+    : { kind: "club" };
+}
+
+function storedAudience(
+  input: CycleAudienceInput,
+): ClubCycleRecord["audience"] {
+  return input.kind === "groups"
+    ? {
+        kind: "groups",
+        groups: CLUB_GROUPS.filter((group) =>
+          input.groupIds.includes(group.id),
+        ),
+      }
+    : { kind: "club" };
+}
+
+/** La regla de D2, como la aplica la base. */
+function conflictsWith(
+  cycleId: string,
+  audience: CycleAudienceInput,
+): readonly ConflictingCycle[] {
+  return cycles
+    .filter(
+      (candidate) =>
+        candidate.status === "active" &&
+        candidate.id !== cycleId &&
+        (audience.kind === "club"
+          ? candidate.audience.kind === "club"
+          : groupIdsOf(candidate).some((id) => audience.groupIds.includes(id))),
+    )
+    .map(({ id, name }) => ({ id, name }));
+}
+
+function replaceCycle(cycleId: string, change: Partial<ClubCycleRecord>): void {
+  cycles = cycles.map((candidate) =>
+    candidate.id === cycleId ? { ...candidate, ...change } : candidate,
+  );
+}
+
+/** Lo que hacen las dos funciones de la base: sin confirmar, los que chocan;
+ * con confirmación, los archiva y aplica el cambio. */
+function resolveConflicts(request: {
+  readonly cycleId: string;
+  readonly audience: CycleAudienceInput;
+  readonly confirm: boolean;
+  readonly apply: () => void;
+}): CycleConflictOutcome {
+  const target = findCycle(request.cycleId);
+  if (target === null) {
+    return { kind: "missing" };
+  }
+  const conflicts = conflictsWith(request.cycleId, request.audience);
+  if (conflicts.length > 0 && !request.confirm) {
+    return { kind: "conflicts", conflicts };
+  }
+  for (const conflict of conflicts) {
+    replaceCycle(conflict.id, { status: "archived" });
+  }
+  request.apply();
+  return { kind: "saved", archived: conflicts };
 }
 
 function gateways(): ClubCyclesGateways {
@@ -98,32 +183,49 @@ function gateways(): ClubCyclesGateways {
       findCycle: async ({ clubId, cycleId }) =>
         clubId === CLUB_ID ? findCycle(cycleId) : null,
       readCyclePlan: async () => ({ weeks: [...weeks], days: [...days] }),
-      insertCycle: async (fields) => {
-        cycles.push(cycle(NEW_CYCLE_ID, { ...fields, ownRoutines: 0 }));
+      insertCycle: async ({ audience, ...fields }) => {
+        savedAudiences.push(audience);
+        cycles.push(
+          cycle(NEW_CYCLE_ID, {
+            ...fields,
+            ownRoutines: 0,
+            audience: storedAudience(audience),
+          }),
+        );
         return NEW_CYCLE_ID;
       },
+      findClubGroupIds: async (clubId, groupIds) =>
+        clubId === CLUB_ID
+          ? CLUB_GROUPS.map((group) => group.id).filter((id) =>
+              groupIds.includes(id),
+            )
+          : [],
       updateCycle: async ({ cycleId }, fields) => {
         updates.push(fields);
         cycles = cycles.map((candidate) =>
           candidate.id === cycleId ? { ...candidate, ...fields } : candidate,
         );
       },
-      activateCycle: async ({ cycleId }) => {
-        const previous = cycles.find(
-          (candidate) =>
-            candidate.status === "active" && candidate.id !== cycleId,
-        );
-        cycles = cycles.map((candidate) => {
-          if (candidate.id === cycleId) {
-            return { ...candidate, status: "active" };
-          }
-          return candidate.status === "active"
-            ? { ...candidate, status: "archived" }
-            : candidate;
+      activateCycle: async ({ cycleId }, { confirm }) => {
+        const target = findCycle(cycleId);
+        return resolveConflicts({
+          cycleId,
+          audience:
+            target === null ? { kind: "club" } : audienceInputOf(target),
+          confirm,
+          apply: () => replaceCycle(cycleId, { status: "active" }),
         });
-        return {
-          archivedCycleId: previous === undefined ? null : previous.id,
-        };
+      },
+      saveAudience: async ({ cycleId }, audience, { confirm }) => {
+        savedAudiences.push(audience);
+        const apply = () =>
+          replaceCycle(cycleId, { audience: storedAudience(audience) });
+        const target = findCycle(cycleId);
+        if (target !== null && target.status !== "active") {
+          apply();
+          return { kind: "saved", archived: [] };
+        }
+        return resolveConflicts({ cycleId, audience, confirm, apply });
       },
       archiveCycle: async ({ cycleId }) => {
         cycles = cycles.map((candidate) =>
@@ -204,6 +306,7 @@ beforeEach(() => {
   copiedWeeks = [];
   clearedWeeks = [];
   duplicateNames = [];
+  savedAudiences = [];
 });
 
 describe("listManagedCycles", () => {
@@ -396,6 +499,7 @@ describe("updateManagedCycle", () => {
       cycleId: WINTER_ID,
       changes: { name: "Winter block" },
       confirmRemoval: false,
+      confirm: false,
     });
 
     expect(detail.cycle).toMatchObject({
@@ -415,6 +519,7 @@ describe("updateManagedCycle", () => {
       cycleId: WINTER_ID,
       changes: { weeks: 6 },
       confirmRemoval: false,
+      confirm: false,
     });
 
     expect(detail.cycle.startDate).toBe("2026-11-02");
@@ -426,6 +531,7 @@ describe("updateManagedCycle", () => {
       cycleId: SUMMER_ID,
       changes: { weeks: 6 },
       confirmRemoval: false,
+      confirm: false,
     });
 
     expect(detail.cycle.startDate).toBe("2026-11-16");
@@ -443,6 +549,7 @@ describe("updateManagedCycle", () => {
         },
       },
       confirmRemoval: false,
+      confirm: false,
     });
 
     expect(detail.cycle.startDate).toBe("2026-11-23");
@@ -454,6 +561,7 @@ describe("updateManagedCycle", () => {
       cycleId: WINTER_ID,
       changes: { schedule: { kind: "start", startDate: "2026-11-18" } },
       confirmRemoval: false,
+      confirm: false,
     });
 
     expect(detail.cycle).toMatchObject({
@@ -471,6 +579,7 @@ describe("updateManagedCycle", () => {
         cycleId: WINTER_ID,
         changes: { weeks: 2 },
         confirmRemoval: false,
+        confirm: false,
       }),
     ).rejects.toMatchObject({
       name: "CycleDaysWouldBeRemovedError",
@@ -487,6 +596,7 @@ describe("updateManagedCycle", () => {
       cycleId: WINTER_ID,
       changes: { weeks: 2 },
       confirmRemoval: true,
+      confirm: false,
     });
 
     expect(detail.cycle.weeks).toBe(2);
@@ -501,6 +611,7 @@ describe("updateManagedCycle", () => {
       cycleId: WINTER_ID,
       changes: { weeks: 2 },
       confirmRemoval: false,
+      confirm: false,
     });
 
     expect(detail.cycle.weeks).toBe(2);
@@ -513,6 +624,7 @@ describe("updateManagedCycle", () => {
         cycleId: WINTER_ID,
         changes: { weeks: 53 },
         confirmRemoval: false,
+        confirm: false,
       }),
     ).rejects.toMatchObject({ code: "weeks_out_of_range" });
   });
@@ -524,73 +636,107 @@ describe("updateManagedCycle", () => {
         cycleId: UNKNOWN_CYCLE_ID,
         changes: { name: "Nope" },
         confirmRemoval: false,
+        confirm: false,
       }),
     ).rejects.toThrow(CycleNotFoundError);
   });
 });
 
-describe("activateManagedCycle", () => {
-  it("activa el borrador, archiva el anterior y lo anota", async () => {
-    const result = await activateManagedCycle(gateways(), {
+describe("activar un ciclo", () => {
+  function activate(cycleId: string, confirm: boolean) {
+    return activateManagedCycle(gateways(), {
       callerId: COACH_ID,
-      cycleId: SUMMER_ID,
+      cycleId,
+      confirm,
     });
+  }
 
-    expect(result.cycles.map(({ id, status }) => ({ id, status }))).toEqual([
-      { id: WINTER_ID, status: "archived" },
-      { id: SUMMER_ID, status: "active" },
-    ]);
-    expect(lastAudit()).toMatchObject({
-      action: "training_cycle.activated",
-      entity_id: SUMMER_ID,
-      metadata: { archivedCycleId: WINTER_ID },
-    });
-  });
+  function statuses(result: { readonly cycles: readonly ClubCycleRecord[] }) {
+    return result.cycles.map(({ id, status }) => ({ id, status }));
+  }
 
-  it("reactiva un archivado, archiva el activo y lo anota (#952)", async () => {
+  it("sin choque lo activa y lo anota", async () => {
     cycles = [
       cycle(WINTER_ID, { status: "active" }),
-      cycle(SUMMER_ID, { status: "archived" }),
+      cycle(SUMMER_ID, {
+        name: "Summer",
+        audience: { kind: "groups", groups: [JUNIORS] },
+      }),
     ];
 
-    const result = await activateManagedCycle(gateways(), {
-      callerId: COACH_ID,
-      cycleId: SUMMER_ID,
-    });
+    const result = await activate(SUMMER_ID, false);
 
-    expect(result.cycles.map(({ id, status }) => ({ id, status }))).toEqual([
-      { id: WINTER_ID, status: "archived" },
+    expect(statuses(result)).toEqual([
+      { id: WINTER_ID, status: "active" },
       { id: SUMMER_ID, status: "active" },
     ]);
     expect(lastAudit()).toMatchObject({
       action: "training_cycle.activated",
       entity_id: SUMMER_ID,
-      metadata: { archivedCycleId: WINTER_ID },
+      metadata: { archivedCycleIds: [] },
     });
   });
 
-  it("sobre el activo no archiva nada", async () => {
-    const result = await activateManagedCycle(gateways(), {
-      callerId: COACH_ID,
-      cycleId: WINTER_ID,
-    });
+  it("con choque y sin confirmar devuelve los ciclos que chocan y no cambia nada", async () => {
+    const attempt = activate(SUMMER_ID, false);
 
-    expect(result.cycles.map(({ id, status }) => ({ id, status }))).toEqual([
+    await expect(attempt).rejects.toThrow(CycleConflictError);
+    await expect(attempt).rejects.toMatchObject({
+      conflicts: [{ id: WINTER_ID, name: "Winter" }],
+    });
+    expect(findCycle(WINTER_ID)?.status).toBe("active");
+    expect(findCycle(SUMMER_ID)?.status).toBe("draft");
+    expect(auditRows).toEqual([]);
+  });
+
+  it("con confirmación archiva el que choca, activa el nuevo y anota los dos cambios", async () => {
+    const result = await activate(SUMMER_ID, true);
+
+    expect(statuses(result)).toEqual([
+      { id: WINTER_ID, status: "archived" },
+      { id: SUMMER_ID, status: "active" },
+    ]);
+    expect(
+      auditRows.map(({ action, entity_id, metadata }) => ({
+        action,
+        entity_id,
+        metadata,
+      })),
+    ).toEqual([
+      {
+        action: "training_cycle.archived",
+        entity_id: WINTER_ID,
+        metadata: { reason: "conflict", replacedBy: SUMMER_ID },
+      },
+      {
+        action: "training_cycle.activated",
+        entity_id: SUMMER_ID,
+        metadata: { archivedCycleIds: [WINTER_ID] },
+      },
+    ]);
+  });
+
+  it("sobre el activo no choca consigo mismo", async () => {
+    const result = await activate(WINTER_ID, false);
+
+    expect(statuses(result)).toEqual([
       { id: WINTER_ID, status: "active" },
       { id: SUMMER_ID, status: "draft" },
     ]);
-    expect(lastAudit()).toMatchObject({
-      metadata: { archivedCycleId: null },
-    });
   });
 
   it("un ciclo que no es del club no existe", async () => {
-    await expect(
-      activateManagedCycle(gateways(), {
-        callerId: COACH_ID,
-        cycleId: UNKNOWN_CYCLE_ID,
-      }),
-    ).rejects.toThrow(CycleNotFoundError);
+    await expect(activate(UNKNOWN_CYCLE_ID, true)).rejects.toThrow(
+      CycleNotFoundError,
+    );
+  });
+
+  it("a un Player lo rechaza", async () => {
+    callerRole = "Player";
+
+    await expect(activate(SUMMER_ID, true)).rejects.toThrow(
+      TrainingPlannerForbiddenError,
+    );
   });
 });
 
@@ -716,6 +862,233 @@ describe("duplicateManagedCycle", () => {
         cycleId: UNKNOWN_CYCLE_ID,
       }),
     ).rejects.toThrow(CycleNotFoundError);
+  });
+});
+
+describe("la audiencia del ciclo", () => {
+  const SCHEDULE = { kind: "start", startDate: "2026-10-26" } as const;
+
+  function create(audience?: CycleAudienceInput) {
+    return createManagedCycle(gateways(), {
+      callerId: COACH_ID,
+      input: { name: "Juniors", weeks: 8, schedule: SCHEDULE, audience },
+    });
+  }
+
+  function changeAudience(
+    cycleId: string,
+    audience: CycleAudienceInput,
+    confirm = false,
+  ) {
+    return updateManagedCycle(gateways(), {
+      callerId: COACH_ID,
+      cycleId,
+      changes: { audience },
+      confirmRemoval: false,
+      confirm,
+    });
+  }
+
+  it("omitida es de todo el club", async () => {
+    const detail = await create();
+
+    expect(detail.cycle.audience).toEqual({ kind: "club" });
+    expect(savedAudiences).toEqual([{ kind: "club" }]);
+  });
+
+  it("de grupos nace con esos grupos, con su nombre", async () => {
+    const detail = await create({
+      kind: "groups",
+      groupIds: [JUNIORS.id, MASTERS.id],
+    });
+
+    expect(detail.cycle.audience).toEqual({
+      kind: "groups",
+      groups: [JUNIORS, MASTERS],
+    });
+  });
+
+  it("no repite un grupo pedido dos veces", async () => {
+    await create({ kind: "groups", groupIds: [JUNIORS.id, JUNIORS.id] });
+
+    expect(savedAudiences).toEqual([
+      { kind: "groups", groupIds: [JUNIORS.id] },
+    ]);
+  });
+
+  it("de grupos sin grupos da groups_required y no guarda nada", async () => {
+    await expect(
+      create({ kind: "groups", groupIds: [] }),
+    ).rejects.toMatchObject({
+      name: "CycleAudienceError",
+      code: "groups_required",
+    });
+    expect(cycles).toHaveLength(2);
+  });
+
+  it("un grupo de otro club da group_not_in_club y no guarda nada", async () => {
+    await expect(
+      create({ kind: "groups", groupIds: [JUNIORS.id, OTHER_CLUBS_GROUP_ID] }),
+    ).rejects.toThrow(CycleAudienceError);
+    expect(cycles).toHaveLength(2);
+    expect(savedAudiences).toEqual([]);
+  });
+
+  it("editar a grupos sin grupos da groups_required y no guarda nada", async () => {
+    await expect(
+      changeAudience(SUMMER_ID, { kind: "groups", groupIds: [] }),
+    ).rejects.toMatchObject({ code: "groups_required" });
+    expect(savedAudiences).toEqual([]);
+    expect(updates).toEqual([]);
+  });
+
+  it("editar con un grupo de otro club da group_not_in_club y no guarda nada", async () => {
+    await expect(
+      changeAudience(SUMMER_ID, {
+        kind: "groups",
+        groupIds: [OTHER_CLUBS_GROUP_ID],
+      }),
+    ).rejects.toMatchObject({ code: "group_not_in_club" });
+    expect(savedAudiences).toEqual([]);
+    expect(updates).toEqual([]);
+  });
+
+  it("cambiar un borrador guarda la audiencia y la anota", async () => {
+    const detail = await changeAudience(SUMMER_ID, {
+      kind: "groups",
+      groupIds: [MASTERS.id],
+    });
+
+    expect(detail.cycle.audience).toEqual({
+      kind: "groups",
+      groups: [MASTERS],
+    });
+    expect(lastAudit()).toMatchObject({
+      action: "training_cycle.updated",
+      entity_id: SUMMER_ID,
+      metadata: { audience: "groups", groupIds: [MASTERS.id] },
+    });
+  });
+
+  it("sin audiencia en el cambio no la toca", async () => {
+    await updateManagedCycle(gateways(), {
+      callerId: COACH_ID,
+      cycleId: SUMMER_ID,
+      changes: { name: "Summer block" },
+      confirmRemoval: false,
+      confirm: false,
+    });
+
+    expect(savedAudiences).toEqual([]);
+  });
+
+  describe("en un ciclo activo que choca al añadir un grupo", () => {
+    beforeEach(() => {
+      cycles = [
+        cycle(WINTER_ID, {
+          status: "active",
+          audience: { kind: "groups", groups: [JUNIORS] },
+        }),
+        cycle(SUMMER_ID, {
+          name: "Masters block",
+          status: "active",
+          audience: { kind: "groups", groups: [MASTERS] },
+        }),
+      ];
+    });
+
+    it("sin confirmar devuelve el que choca y no cambia nada", async () => {
+      await expect(
+        changeAudience(WINTER_ID, {
+          kind: "groups",
+          groupIds: [JUNIORS.id, MASTERS.id],
+        }),
+      ).rejects.toMatchObject({
+        name: "CycleConflictError",
+        conflicts: [{ id: SUMMER_ID, name: "Masters block" }],
+      });
+      expect(findCycle(WINTER_ID)?.audience).toEqual({
+        kind: "groups",
+        groups: [JUNIORS],
+      });
+      expect(findCycle(SUMMER_ID)?.status).toBe("active");
+      expect(updates).toEqual([]);
+      expect(auditRows).toEqual([]);
+    });
+
+    it("si el cambio de campos falla después, el archivado ya guardado queda anotado", async () => {
+      const working = gateways();
+      const failing: ClubCyclesGateways = {
+        ...working,
+        cycles: {
+          ...working.cycles,
+          updateCycle: async () => {
+            throw new Error("la base no respondió");
+          },
+        },
+      };
+
+      await expect(
+        updateManagedCycle(failing, {
+          callerId: COACH_ID,
+          cycleId: WINTER_ID,
+          changes: {
+            name: "Juniors block",
+            audience: { kind: "groups", groupIds: [JUNIORS.id, MASTERS.id] },
+          },
+          confirmRemoval: false,
+          confirm: true,
+        }),
+      ).rejects.toThrow("la base no respondió");
+      expect(
+        auditRows.map(({ action, entity_id }) => [action, entity_id]),
+      ).toEqual([["training_cycle.archived", SUMMER_ID]]);
+    });
+
+    it("con confirmación archiva el que choca, guarda los grupos y anota los dos", async () => {
+      const detail = await changeAudience(
+        WINTER_ID,
+        { kind: "groups", groupIds: [JUNIORS.id, MASTERS.id] },
+        true,
+      );
+
+      expect(detail.cycle.audience).toEqual({
+        kind: "groups",
+        groups: [JUNIORS, MASTERS],
+      });
+      expect(findCycle(SUMMER_ID)?.status).toBe("archived");
+      expect(
+        auditRows.map(({ action, entity_id }) => [action, entity_id]),
+      ).toEqual([
+        ["training_cycle.archived", SUMMER_ID],
+        ["training_cycle.updated", WINTER_ID],
+      ]);
+      expect(lastAudit()?.metadata).toMatchObject({
+        archivedCycleIds: [SUMMER_ID],
+      });
+    });
+  });
+});
+
+describe("duplicar un ciclo", () => {
+  it("la copia lleva la misma audiencia y los mismos grupos", async () => {
+    cycles = [
+      cycle(WINTER_ID, {
+        status: "active",
+        audience: { kind: "groups", groups: [JUNIORS, MASTERS] },
+      }),
+    ];
+
+    const result = await duplicateManagedCycle(gateways(), {
+      callerId: COACH_ID,
+      cycleId: WINTER_ID,
+    });
+
+    const copy = result.cycles.find(({ id }) => id === NEW_CYCLE_ID);
+    expect(copy?.audience).toEqual({
+      kind: "groups",
+      groups: [JUNIORS, MASTERS],
+    });
   });
 });
 

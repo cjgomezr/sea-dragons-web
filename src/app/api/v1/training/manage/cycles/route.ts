@@ -15,10 +15,13 @@ import {
 
 /**
  * Los ciclos del club en Planificar (#904, RF-7 y D5 del PRD de E35): GET
- * los lista con su estado, fechas, semanas y rutinas propias, y POST crea un
- * borrador. Con evento, la semana 1 empieza el lunes de la semana del evento
- * menos (N − 1) semanas; sin él, el lunes de la fecha de inicio. La frontera
- * lo reserva a Admin y Coach, y el dominio lo vuelve a comprobar.
+ * los lista con su estado, fechas, semanas, rutinas propias y audiencia (todo
+ * el club, o sus grupos con id y nombre), y POST crea un borrador. Con
+ * evento, la semana 1 empieza el lunes de la semana del evento menos (N − 1)
+ * semanas; sin él, el lunes de la fecha de inicio. Sin `audience` el ciclo es
+ * de todo el club; uno de grupos sin grupos, o con uno de otro club, es un
+ * 422 (#978, RF-1 de E38). La frontera lo reserva a Admin y Coach, y el
+ * dominio lo vuelve a comprobar.
  */
 
 // Depende de la sesión de quien llama y de los ciclos del club ahora.

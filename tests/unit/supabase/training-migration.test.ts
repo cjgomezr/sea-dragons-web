@@ -25,6 +25,8 @@ const SEEDED_CLUB = "victoria-seadragons";
 
 const TRAINING_TABLES = [
   "training_cycle_days",
+  // La de `0095` (#978, E38): los grupos de cada ciclo.
+  "training_cycle_groups",
   "training_cycle_weeks",
   "training_cycles",
   "training_exercises",
@@ -219,7 +221,7 @@ function rowsOf(output: string): string[] {
 }
 
 describeConPostgres("las tablas de entrenamiento", () => {
-  it("crea las ocho tablas con RLS activo y club_id, nulo sólo en los ejercicios", async () => {
+  it("cada tabla de entrenamiento tiene RLS activo y club_id, nulo sólo en los ejercicios", async () => {
     const database = await migratedDatabase();
 
     const tables = await database.query(
@@ -284,7 +286,7 @@ describeConPostgres("las tablas de entrenamiento", () => {
     expectRejectedBy(repeated, /training_cycle_days_pkey/);
   });
 
-  it("rechaza un segundo ciclo activo en el club, no en otro club", async () => {
+  it("rechaza un segundo ciclo activo de todo el club, no en otro club (índice de 0095)", async () => {
     const database = await migratedDatabase();
     const clubId = await seededClubId(database);
     const otherClub = await createOtherClub(database);
@@ -298,7 +300,7 @@ describeConPostgres("las tablas de entrenamiento", () => {
        values ('${clubId}', 'Otro', '${CYCLE_START}', 4, 'active')`,
     );
 
-    expectRejectedBy(second, /training_cycles_one_active_per_club/);
+    expectRejectedBy(second, /training_cycles_one_active_club_cycle/);
   });
 
   it("rechaza un ciclo que no empieza en lunes", async () => {

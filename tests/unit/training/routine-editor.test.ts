@@ -48,6 +48,7 @@ function cycle(
     startDate: "2026-11-02",
     event: null,
     ownRoutines: 0,
+    audience: { kind: "club" },
   };
 }
 

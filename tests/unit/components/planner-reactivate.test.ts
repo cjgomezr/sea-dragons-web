@@ -17,6 +17,7 @@ const WINTER: ManagedCycle = {
   startDate: "2026-05-04",
   event: null,
   ownRoutines: 3,
+  audience: { kind: "club" },
 };
 
 /** El lunes 13 de julio de 2026 a las 00:30 en Melbourne (AEST). */

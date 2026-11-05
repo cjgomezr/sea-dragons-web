@@ -25,6 +25,7 @@ const CYCLE: ManagedCycle = {
   startDate: "2026-10-12",
   event: null,
   ownRoutines: 4,
+  audience: { kind: "club" },
 };
 
 const BACK_SQUAT: ManagedMark = {

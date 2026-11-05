@@ -26,6 +26,7 @@ const CYCLE: ManagedCycle = {
   startDate: "2026-11-16",
   event: null,
   ownRoutines: 1,
+  audience: { kind: "club" },
 };
 const ROUTINE_ID = "bbbbbbbb-0000-4000-8000-000000000001";
 const CLEAR_PATH = `/api/v1/training/manage/cycles/${CYCLE.id}/weeks/2/clear`;
