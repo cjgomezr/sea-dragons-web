@@ -284,7 +284,7 @@ describeConPostgres("las tablas de entrenamiento", () => {
     expectRejectedBy(repeated, /training_cycle_days_pkey/);
   });
 
-  it("rechaza un segundo ciclo activo en el club, no en otro club", async () => {
+  it("rechaza un segundo ciclo activo de todo el club, no en otro club (índice de 0095)", async () => {
     const database = await migratedDatabase();
     const clubId = await seededClubId(database);
     const otherClub = await createOtherClub(database);
@@ -298,7 +298,7 @@ describeConPostgres("las tablas de entrenamiento", () => {
        values ('${clubId}', 'Otro', '${CYCLE_START}', 4, 'active')`,
     );
 
-    expectRejectedBy(second, /training_cycles_one_active_per_club/);
+    expectRejectedBy(second, /training_cycles_one_active_club_cycle/);
   });
 
   it("rechaza un ciclo que no empieza en lunes", async () => {

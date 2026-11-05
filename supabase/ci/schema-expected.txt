@@ -308,6 +308,10 @@ columna training_cycle_days.routine_id tipo=uuid null=NO default=-
 columna training_cycle_days.slot tipo=smallint null=NO default=-
 columna training_cycle_days.week_no tipo=smallint null=NO default=-
 columna training_cycle_days.weekday tipo=smallint null=NO default=-
+columna training_cycle_groups.club_id tipo=uuid null=NO default=-
+columna training_cycle_groups.cycle_active tipo=boolean null=NO default=false
+columna training_cycle_groups.cycle_id tipo=uuid null=NO default=-
+columna training_cycle_groups.group_id tipo=uuid null=NO default=-
 columna training_cycle_weeks.club_id tipo=uuid null=NO default=-
 columna training_cycle_weeks.cycle_id tipo=uuid null=NO default=-
 columna training_cycle_weeks.dose_intensity_kind tipo=text null=NO default='none'::text
@@ -317,6 +321,7 @@ columna training_cycle_weeks.dose_sets tipo=smallint null=YES default=-
 columna training_cycle_weeks.dose_text tipo=text null=YES default=-
 columna training_cycle_weeks.note tipo=text null=YES default=-
 columna training_cycle_weeks.week_no tipo=smallint null=NO default=-
+columna training_cycles.audience tipo=text null=NO default='club'::text
 columna training_cycles.club_id tipo=uuid null=NO default=-
 columna training_cycles.created_at tipo=timestamp with time zone null=NO default=now()
 columna training_cycles.created_by tipo=uuid null=YES default=-
@@ -376,11 +381,13 @@ columna training_routines.cycle_id tipo=uuid null=YES default=-
 columna training_routines.id tipo=uuid null=NO default=gen_random_uuid()
 columna training_routines.name tipo=text null=NO default=-
 columna training_routines.updated_at tipo=timestamp with time zone null=NO default=now()
-funcion activate_training_cycle(p_club_id uuid, p_cycle_id uuid)
+funcion activate_training_cycle(p_club_id uuid, p_cycle_id uuid, p_confirm boolean)
 funcion apply_levy_payment(event_id text, event_type text, event_created timestamp with time zone, target_user_id uuid, target_club_id uuid, payment jsonb)
 funcion apply_session_pack_payment(event_id text, event_type text, event_created timestamp with time zone, target_user_id uuid, target_club_id uuid, payment jsonb, pack_sessions integer)
 funcion apply_stripe_event(event_id text, event_type text, event_created timestamp with time zone, target_user_id uuid, target_club_id uuid, membership_changes jsonb, payment jsonb)
+funcion archive_training_cycle_conflicts(p_club_id uuid, p_cycle_id uuid, p_audience text, p_group_ids uuid[])
 funcion are_valid_weekdays(weekdays smallint[])
+funcion assert_training_cycle_audience(p_audience text, p_group_ids uuid[])
 funcion attendance_stats(p_club_id uuid, p_user_ids uuid[])
 funcion change_member_role(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_role text)
 funcion clear_training_cycle_week(p_club_id uuid, p_cycle_id uuid, p_week_no integer)
@@ -397,8 +404,10 @@ funcion create_club_position(acting_club_id uuid, name_en text, name_es text)
 funcion create_evaluation_category(acting_club_id uuid, category_name text)
 funcion create_events(acting_club_id uuid, acting_user_id uuid, schedule jsonb)
 funcion create_member_evaluation(acting_club_id uuid, acting_user_id uuid, target_user_id uuid)
+funcion create_training_cycle(p_club_id uuid, p_name text, p_weeks integer, p_start_date date, p_event_name text, p_event_date date, p_created_by uuid, p_audience text, p_group_ids uuid[])
 funcion credit_session_pack(user_id uuid, club_id uuid, sessions integer, payment_id uuid)
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
+$text
 funcion delete_rows_older_than(target_table regclass, age_column name, cutoff timestamp with time zone)
 funcion delete_news_post(p_club_id uuid, p_post_id uuid)
 funcion delete_training_cycle(p_club_id uuid, p_cycle_id uuid)
@@ -446,6 +455,7 @@ funcion save_attendance_sheet(acting_club_id uuid, acting_user_id uuid, target_e
 funcion save_member_evaluation(acting_club_id uuid, acting_user_id uuid, target_user_id uuid, expected_updated_at timestamp with time zone, ratings jsonb)
 funcion save_member_evaluation_ratings(acting_club_id uuid, acting_user_id uuid, target_user_id uuid, expected_updated_at timestamp with time zone, ratings jsonb)
 funcion save_team_split(acting_club_id uuid, acting_user_id uuid, target_event_id uuid, split jsonb)
+funcion save_training_cycle_audience(p_club_id uuid, p_cycle_id uuid, p_audience text, p_group_ids uuid[], p_confirm boolean)
 funcion search_events(p_club_id uuid, p_text text, p_whole_club boolean, p_group_ids uuid[])
 funcion search_like_pattern(p_text text)
 funcion search_members(p_club_id uuid, p_text text)
@@ -462,6 +472,9 @@ funcion set_event_video(p_club_id uuid, p_event_id uuid, p_url text)
 funcion set_member_status(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_status text)
 funcion set_training_cycle_day(p_club_id uuid, p_cycle_id uuid, p_week_no integer, p_weekday integer, p_slot integer, p_routine_id uuid)
 funcion split_series(acting_club_id uuid, target_series_id uuid, from_event_id uuid, changes jsonb, schedule jsonb)
+funcion training_cycle_conflicts(p_club_id uuid, p_cycle_id uuid, p_audience text, p_group_ids uuid[])
+funcion training_cycle_groups_read_active()
+funcion training_cycles_sync_group_active()
 funcion training_exercise_name_taken(p_club_id uuid, p_name text, p_except_id uuid)
 funcion training_mark_usage(p_club_id uuid)
 funcion training_routine_overview(p_club_id uuid)
@@ -1039,6 +1052,21 @@ grant training_cycle_days service_role SELECT
 grant training_cycle_days service_role TRIGGER
 grant training_cycle_days service_role TRUNCATE
 grant training_cycle_days service_role UPDATE
+grant training_cycle_groups authenticated SELECT
+grant training_cycle_groups postgres DELETE
+grant training_cycle_groups postgres INSERT
+grant training_cycle_groups postgres REFERENCES
+grant training_cycle_groups postgres SELECT
+grant training_cycle_groups postgres TRIGGER
+grant training_cycle_groups postgres TRUNCATE
+grant training_cycle_groups postgres UPDATE
+grant training_cycle_groups service_role DELETE
+grant training_cycle_groups service_role INSERT
+grant training_cycle_groups service_role REFERENCES
+grant training_cycle_groups service_role SELECT
+grant training_cycle_groups service_role TRIGGER
+grant training_cycle_groups service_role TRUNCATE
+grant training_cycle_groups service_role UPDATE
 grant training_cycle_weeks authenticated SELECT
 grant training_cycle_weeks postgres DELETE
 grant training_cycle_weeks postgres INSERT
@@ -1269,10 +1297,13 @@ indice team_splits_pkey CREATE UNIQUE INDEX team_splits_pkey ON public.team_spli
 indice team_splits_published_by_club_id_idx CREATE INDEX team_splits_published_by_club_id_idx ON public.team_splits USING btree (published_by, club_id)
 indice training_cycle_days_pkey CREATE UNIQUE INDEX training_cycle_days_pkey ON public.training_cycle_days USING btree (cycle_id, week_no, weekday, slot)
 indice training_cycle_days_routine_id_idx CREATE INDEX training_cycle_days_routine_id_idx ON public.training_cycle_days USING btree (routine_id)
+indice training_cycle_groups_group_id_club_id_idx CREATE INDEX training_cycle_groups_group_id_club_id_idx ON public.training_cycle_groups USING btree (group_id, club_id)
+indice training_cycle_groups_one_active CREATE UNIQUE INDEX training_cycle_groups_one_active ON public.training_cycle_groups USING btree (group_id) WHERE cycle_active
+indice training_cycle_groups_pkey CREATE UNIQUE INDEX training_cycle_groups_pkey ON public.training_cycle_groups USING btree (cycle_id, group_id)
 indice training_cycle_weeks_pkey CREATE UNIQUE INDEX training_cycle_weeks_pkey ON public.training_cycle_weeks USING btree (cycle_id, week_no)
 indice training_cycles_created_by_club_id_idx CREATE INDEX training_cycles_created_by_club_id_idx ON public.training_cycles USING btree (created_by, club_id)
 indice training_cycles_id_club_id_key CREATE UNIQUE INDEX training_cycles_id_club_id_key ON public.training_cycles USING btree (id, club_id)
-indice training_cycles_one_active_per_club CREATE UNIQUE INDEX training_cycles_one_active_per_club ON public.training_cycles USING btree (club_id) WHERE (status = 'active'::text)
+indice training_cycles_one_active_club_cycle CREATE UNIQUE INDEX training_cycles_one_active_club_cycle ON public.training_cycles USING btree (club_id) WHERE ((status = 'active'::text) AND (audience = 'club'::text))
 indice training_cycles_pkey CREATE UNIQUE INDEX training_cycles_pkey ON public.training_cycles USING btree (id)
 indice training_exercises_library_key_key CREATE UNIQUE INDEX training_exercises_library_key_key ON public.training_exercises USING btree (library_key)
 indice training_exercises_name_per_scope_key CREATE UNIQUE INDEX training_exercises_name_per_scope_key ON public.training_exercises USING btree (COALESCE(club_id, '00000000-0000-0000-0000-000000000000'::uuid), name_normalized)
@@ -1357,6 +1388,7 @@ policy team_splits.team_splits_select_published cmd=SELECT roles={authenticated}
 policy training_cycle_days.training_cycle_days_select cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
    FROM training_cycles c
   WHERE (c.id = training_cycle_days.cycle_id))) check=-
+policy training_cycle_groups.training_cycle_groups_select_planner cmd=SELECT roles={authenticated} using=is_training_planner(club_id) check=-
 policy training_cycle_weeks.training_cycle_weeks_select cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
    FROM training_cycles c
   WHERE (c.id = training_cycle_weeks.cycle_id))) check=-
@@ -1636,6 +1668,10 @@ restriccion training_cycle_days.training_cycle_days_routine_same_club_fkey FOREI
 restriccion training_cycle_days.training_cycle_days_slot_check CHECK ((slot = ANY (ARRAY[1, 2])))
 restriccion training_cycle_days.training_cycle_days_week_no_check CHECK (((week_no >= 1) AND (week_no <= 52)))
 restriccion training_cycle_days.training_cycle_days_weekday_check CHECK (((weekday >= 0) AND (weekday <= 6)))
+restriccion training_cycle_groups.training_cycle_groups_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion training_cycle_groups.training_cycle_groups_cycle_same_club_fkey FOREIGN KEY (cycle_id, club_id) REFERENCES training_cycles(id, club_id) ON DELETE CASCADE
+restriccion training_cycle_groups.training_cycle_groups_group_same_club_fkey FOREIGN KEY (group_id, club_id) REFERENCES groups(id, club_id) ON DELETE CASCADE
+restriccion training_cycle_groups.training_cycle_groups_pkey PRIMARY KEY (cycle_id, group_id)
 restriccion training_cycle_weeks.training_cycle_weeks_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion training_cycle_weeks.training_cycle_weeks_cycle_same_club_fkey FOREIGN KEY (cycle_id, club_id) REFERENCES training_cycles(id, club_id) ON DELETE CASCADE
 restriccion training_cycle_weeks.training_cycle_weeks_dose_intensity_kind_check CHECK ((dose_intensity_kind = ANY (ARRAY['none'::text, 'pct'::text, 'text'::text])))
@@ -1648,6 +1684,7 @@ restriccion training_cycle_weeks.training_cycle_weeks_dose_text_length CHECK ((c
 restriccion training_cycle_weeks.training_cycle_weeks_note_length CHECK ((char_length(note) <= 140))
 restriccion training_cycle_weeks.training_cycle_weeks_pkey PRIMARY KEY (cycle_id, week_no)
 restriccion training_cycle_weeks.training_cycle_weeks_week_no_check CHECK (((week_no >= 1) AND (week_no <= 52)))
+restriccion training_cycles.training_cycles_audience_check CHECK ((audience = ANY (ARRAY['club'::text, 'groups'::text])))
 restriccion training_cycles.training_cycles_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion training_cycles.training_cycles_creator_same_club_fkey FOREIGN KEY (created_by, club_id) REFERENCES members(user_id, club_id) ON DELETE SET NULL (created_by)
 restriccion training_cycles.training_cycles_event_name_length CHECK ((char_length(event_name) <= 80))
@@ -1737,6 +1774,7 @@ tabla stripe_events rls=t
 tabla team_split_members rls=t
 tabla team_splits rls=t
 tabla training_cycle_days rls=t
+tabla training_cycle_groups rls=t
 tabla training_cycle_weeks rls=t
 tabla training_cycles rls=t
 tabla training_exercises rls=t
@@ -1752,3 +1790,5 @@ trigger memberships_refresh_casual_status CREATE TRIGGER memberships_refresh_cas
 trigger news_post_attachments_enforce_max CREATE TRIGGER news_post_attachments_enforce_max BEFORE INSERT OR UPDATE OF post_id ON public.news_post_attachments FOR EACH ROW EXECUTE FUNCTION news_post_attachments_enforce_max()
 trigger news_posts_unpin_withdrawn CREATE TRIGGER news_posts_unpin_withdrawn BEFORE UPDATE OF status ON public.news_posts FOR EACH ROW WHEN ((new.status = 'withdrawn'::text)) EXECUTE FUNCTION news_posts_unpin_withdrawn()
 trigger session_ledger_refresh_status CREATE TRIGGER session_ledger_refresh_status AFTER INSERT OR DELETE ON public.session_ledger FOR EACH ROW EXECUTE FUNCTION session_ledger_refresh_status()
+trigger training_cycle_groups_read_active CREATE TRIGGER training_cycle_groups_read_active BEFORE INSERT OR UPDATE ON public.training_cycle_groups FOR EACH ROW EXECUTE FUNCTION training_cycle_groups_read_active()
+trigger training_cycles_sync_group_active CREATE TRIGGER training_cycles_sync_group_active AFTER UPDATE OF status ON public.training_cycles FOR EACH ROW WHEN ((old.status IS DISTINCT FROM new.status)) EXECUTE FUNCTION training_cycles_sync_group_active()

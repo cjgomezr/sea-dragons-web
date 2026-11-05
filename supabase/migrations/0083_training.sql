@@ -123,10 +123,18 @@ create table if not exists public.training_cycles (
 );
 
 -- Un solo ciclo activo por club (D5): activar otro archiva el anterior en la
--- misma transacción, y si no, esto lo rechaza.
-create unique index if not exists training_cycles_one_active_per_club
-  on public.training_cycles (club_id)
-  where status = 'active';
+-- misma transacción, y si no, esto lo rechaza. `0095` (E38) lo cambia por uno
+-- de todo el club y otro por grupo: con el suyo puesto, este no vuelve, o la
+-- reaplicación fallaría contra un club con un activo de club y uno de grupo.
+do $$
+begin
+  if to_regclass('public.training_cycles_one_active_club_cycle') is null then
+    create unique index if not exists training_cycles_one_active_per_club
+      on public.training_cycles (club_id)
+      where status = 'active';
+  end if;
+end
+$$;
 
 -- Lo que creó cada quien, para el `set null` cuando se va.
 create index if not exists training_cycles_created_by_club_id_idx
