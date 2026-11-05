@@ -420,6 +420,7 @@ funcion health_probe()
 funcion immutable_unaccent(p_text text)
 funcion insert_club_position_names(acting_club_id uuid, target_position_id uuid, name_en text, name_es text)
 funcion is_assigned_to_team_split(target_split_id uuid)
+funcion is_in_training_cycle_groups(target_cycle_id uuid)
 funcion is_member_in_groups(target_user_id uuid, group_ids uuid[])
 funcion is_membership_current(membership_status text, stripe_subscription_id text, trial_end timestamp with time zone, current_period_end timestamp with time zone, waived_until timestamp with time zone, at_time timestamp with time zone)
 funcion is_training_planner(target_club_id uuid)
@@ -1387,11 +1388,14 @@ policy team_splits.team_splits_select_published cmd=SELECT roles={authenticated}
 policy training_cycle_days.training_cycle_days_select cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
    FROM training_cycles c
   WHERE (c.id = training_cycle_days.cycle_id))) check=-
+policy training_cycle_groups.training_cycle_groups_select_member cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
+   FROM training_cycles c
+  WHERE (c.id = training_cycle_groups.cycle_id))) check=-
 policy training_cycle_groups.training_cycle_groups_select_planner cmd=SELECT roles={authenticated} using=is_training_planner(club_id) check=-
 policy training_cycle_weeks.training_cycle_weeks_select cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
    FROM training_cycles c
   WHERE (c.id = training_cycle_weeks.cycle_id))) check=-
-policy training_cycles.training_cycles_select cmd=SELECT roles={authenticated} using=(((status = 'active'::text) AND has_training_access(club_id)) OR is_training_planner(club_id)) check=-
+policy training_cycles.training_cycles_select cmd=SELECT roles={authenticated} using=(((status = 'active'::text) AND has_training_access(club_id) AND ((audience = 'club'::text) OR is_in_training_cycle_groups(id))) OR is_training_planner(club_id)) check=-
 policy training_exercises.training_exercises_select cmd=SELECT roles={authenticated} using=((club_id IS NULL) OR (EXISTS ( SELECT 1
    FROM members m
   WHERE ((m.user_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = training_exercises.club_id) AND (m.account_status <> 'inactive'::text))))) check=-

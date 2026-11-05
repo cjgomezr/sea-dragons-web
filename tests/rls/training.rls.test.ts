@@ -139,6 +139,107 @@ async function visibleRoutineCount(
   return data.length;
 }
 
+/** Los grupos A y B del club, con nombre propio de cada corrida. Al
+ * borrarlos se van sus pertenencias y su lugar en los ciclos. */
+function withGroupsAAndB<T>(
+  serviceClient: ServiceRoleClient,
+  clubId: string,
+  run: (groupIds: { readonly a: string; readonly b: string }) => Promise<T>,
+): Promise<T> {
+  const suffix = crypto.randomUUID();
+  return withSeededRows(
+    serviceClient,
+    "groups",
+    [
+      { club_id: clubId, name: `RLS A ${suffix}` },
+      { club_id: clubId, name: `RLS B ${suffix}` },
+    ],
+    ([a, b]) => run({ a: a?.id as string, b: b?.id as string }),
+  );
+}
+
+/** Un ciclo activo de un grupo, con su semana 1 y un día que la ocupa. */
+function withGroupCycle<T>(
+  serviceClient: ServiceRoleClient,
+  input: { readonly clubId: string; readonly groupId: string },
+  run: (cycleId: string) => Promise<T>,
+): Promise<T> {
+  const { clubId, groupId } = input;
+  return withSeededRows(
+    serviceClient,
+    "training_cycles",
+    [
+      {
+        club_id: clubId,
+        name: `RLS grupo ${groupId}`,
+        start_date: CYCLE_START,
+        weeks: 4,
+        status: "active",
+        audience: "groups",
+      },
+    ],
+    async ([cycle]) => {
+      const cycleId = cycle?.id as string;
+      await insertOrThrow(serviceClient, "training_cycle_groups", {
+        cycle_id: cycleId,
+        group_id: groupId,
+        club_id: clubId,
+      });
+      await insertOrThrow(serviceClient, "training_cycle_weeks", {
+        club_id: clubId,
+        cycle_id: cycleId,
+        week_no: 1,
+        note: "RLS",
+      });
+      const { data: routine, error } = await serviceClient.client
+        .from("training_routines")
+        .insert({
+          club_id: clubId,
+          cycle_id: cycleId,
+          name: "Strength A",
+          color_index: 0,
+        })
+        .select("id")
+        .single();
+      if (error) {
+        throw new Error(`No se pudo sembrar la rutina: ${error.message}`);
+      }
+      await insertOrThrow(serviceClient, "training_cycle_days", {
+        club_id: clubId,
+        cycle_id: cycleId,
+        week_no: 1,
+        weekday: 0,
+        slot: 1,
+        routine_id: routine.id,
+      });
+      return run(cycleId);
+    },
+  );
+}
+
+/** Los ids de `cycleIds` que cada tabla le deja ver a esa sesión. */
+async function visibleCycleIds(
+  rlsClient: RlsClient,
+  table:
+    | "training_cycles"
+    | "training_cycle_weeks"
+    | "training_cycle_days"
+    | "training_cycle_groups",
+  cycleIds: readonly string[],
+): Promise<string[]> {
+  const column = table === "training_cycles" ? "id" : "cycle_id";
+  const { data, error } = await rlsClient.client
+    .from(table)
+    .select(column)
+    .in(column, cycleIds);
+  if (error) {
+    throw new Error(`No se pudo leer ${table}: ${error.message}`);
+  }
+  return data
+    .map((row) => (row as Record<string, string>)[column] ?? "")
+    .sort();
+}
+
 describeRls("RLS de entrenamiento", () => {
   it(
     "las marcas las lee su dueño; otro socio, el Coach y el Admin no",
@@ -328,6 +429,105 @@ describeRls("RLS de entrenamiento", () => {
             expect(write.error?.code).toBe("42501");
           }
         },
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "un socio del grupo A lee el ciclo de todo el club y el de A con sus semanas y grupos, no el de B; el Coach, todos (#979)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const clubId = await seededClubId(serviceClient);
+      await withGroupsAAndB(serviceClient, clubId, (groups) =>
+        withCycle(serviceClient, { clubId, status: "active" }, (clubCycle) =>
+          withGroupCycle(
+            serviceClient,
+            { clubId, groupId: groups.a },
+            (cycleOfA) =>
+              withGroupCycle(
+                serviceClient,
+                { clubId, groupId: groups.b },
+                (cycleOfB) =>
+                  withMember(
+                    serviceClient,
+                    clubId,
+                    { role: "Player", status: "active" },
+                    (member) =>
+                      withMember(
+                        serviceClient,
+                        clubId,
+                        { role: "Coach" },
+                        async (coach) => {
+                          await insertOrThrow(
+                            serviceClient,
+                            "group_memberships",
+                            {
+                              group_id: groups.a,
+                              user_id: member.id,
+                              club_id: clubId,
+                            },
+                          );
+                          const all = [clubCycle, cycleOfA, cycleOfB];
+                          const memberClient =
+                            await authenticatedClientFor(member);
+                          const coachClient =
+                            await authenticatedClientFor(coach);
+
+                          expect(
+                            await visibleCycleIds(
+                              memberClient,
+                              "training_cycles",
+                              all,
+                            ),
+                          ).toEqual([clubCycle, cycleOfA].sort());
+                          expect(
+                            await visibleCycleIds(
+                              memberClient,
+                              "training_cycle_weeks",
+                              all,
+                            ),
+                          ).toEqual([cycleOfA]);
+                          expect(
+                            await visibleCycleIds(
+                              memberClient,
+                              "training_cycle_days",
+                              all,
+                            ),
+                          ).toEqual([cycleOfA]);
+                          expect(
+                            await visibleCycleIds(
+                              memberClient,
+                              "training_cycle_groups",
+                              all,
+                            ),
+                          ).toEqual([cycleOfA]);
+                          expect(
+                            await visibleRoutineCount(memberClient, cycleOfA),
+                          ).toBe(1);
+                          expect(
+                            await visibleRoutineCount(memberClient, cycleOfB),
+                          ).toBe(0);
+                          expect(
+                            await visibleCycleIds(
+                              coachClient,
+                              "training_cycles",
+                              all,
+                            ),
+                          ).toEqual([...all].sort());
+                          expect(
+                            await visibleCycleIds(
+                              coachClient,
+                              "training_cycle_groups",
+                              all,
+                            ),
+                          ).toEqual([cycleOfA, cycleOfB].sort());
+                        },
+                      ),
+                  ),
+              ),
+          ),
+        ),
       );
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
