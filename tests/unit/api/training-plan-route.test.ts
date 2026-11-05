@@ -30,6 +30,7 @@ const CYCLE: TrainingCycleRecord = {
   eventDate: "2026-10-31",
   startDate: "2026-09-28",
   weeks: 4,
+  audience: { kind: "club" },
 };
 
 const EMPTY_WEEK: TrainingWeekRecord = { note: null, dose: null, days: [] };
@@ -75,7 +76,8 @@ const readSessionState = vi.fn();
 const readAuthenticatedUserId = vi.fn();
 let role: Role;
 let membershipStatus: MembershipStatus;
-let activeCycle: TrainingCycleRecord | null;
+let activeCycles: TrainingCycleRecord[];
+let memberGroupIds: string[];
 let weekRecord: TrainingWeekRecord;
 
 function trainingPlanGateways(): TrainingPlanGateways {
@@ -103,7 +105,8 @@ function trainingPlanGateways(): TrainingPlanGateways {
       }),
     },
     plan: {
-      findActiveCycle: async () => activeCycle,
+      findActiveCycles: async () => activeCycles,
+      findMemberGroupIds: async () => memberGroupIds,
       findWeek: async () => weekRecord,
       exercisePhotoUrl: (path) => path,
     },
@@ -163,7 +166,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   readAuthenticatedUserId.mockResolvedValue(USER_ID);
   membershipStatus = "active";
-  activeCycle = CYCLE;
+  activeCycles = [CYCLE];
+  memberGroupIds = [];
   weekRecord = EMPTY_WEEK;
   givenActiveCaller("Player", true);
 });
@@ -228,7 +232,7 @@ describe("GET /api/v1/training/plan", () => {
   );
 
   it("sin ciclo activo responde 200 con el ciclo nulo", async () => {
-    activeCycle = null;
+    activeCycles = [];
 
     const response = await getPlan();
 
@@ -283,5 +287,88 @@ describe("GET /api/v1/training/plan", () => {
     const response = await getPlan();
 
     expect(response.status).toBe(401);
+  });
+});
+
+describe("GET /api/v1/training/plan con ?cycle (E38)", () => {
+  const OF_A: TrainingCycleRecord = {
+    ...CYCLE,
+    id: "cycle-a",
+    name: "Juveniles",
+    audience: {
+      kind: "groups",
+      groups: [{ id: "group-a", name: "Juveniles" }],
+    },
+  };
+  const OF_B: TrainingCycleRecord = {
+    ...CYCLE,
+    id: "cycle-b",
+    name: "Masters",
+    audience: { kind: "groups", groups: [{ id: "group-b", name: "Masters" }] },
+  };
+
+  beforeEach(() => {
+    activeCycles = [CYCLE, OF_A, OF_B];
+    memberGroupIds = ["group-a"];
+  });
+
+  it("sin ?cycle sirve el de su grupo y la lista de los que ve", async () => {
+    const response = await getPlan();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.cycle.id).toBe("cycle-a");
+    expect(body.data.cycles).toEqual([
+      {
+        id: "cycle-a",
+        name: "Juveniles",
+        current: expect.objectContaining({ week: expect.any(Number) }),
+        audience: {
+          kind: "groups",
+          groups: [{ id: "group-a", name: "Juveniles" }],
+        },
+      },
+      expect.objectContaining({ id: "cycle-1", audience: { kind: "club" } }),
+    ]);
+  });
+
+  it("con ?cycle de uno que ve y ?week=k sirve la semana k de ese ciclo", async () => {
+    const response = await getPlan("?cycle=cycle-1&week=3");
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.cycle.id).toBe("cycle-1");
+    expect(body.data.week.number).toBe(3);
+  });
+
+  it.each(["cycle-b", "cycle-missing"])(
+    "con ?cycle=%s, que no ve, responde 404",
+    async (cycleId) => {
+      const response = await getPlan(`?cycle=${cycleId}`);
+
+      expect(response.status).toBe(404);
+      const body = await response.json();
+      expect(body.error.code).toBe("not_found");
+    },
+  );
+
+  it("responde 400 a un ?cycle vacío", async () => {
+    const response = await getPlan("?cycle=");
+
+    expect(response.status).toBe(400);
+  });
+
+  it("a un socio que no está al día le responde 403 también con ?cycle", async () => {
+    givenActiveCaller("Player", false);
+    membershipStatus = "past_due";
+
+    const response = await getPlan("?cycle=cycle-b");
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toMatchObject({
+      reason: MEMBERSHIP_NOT_CURRENT_REASON,
+      cycle: { id: "cycle-a" },
+    });
   });
 });

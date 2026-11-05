@@ -6,6 +6,7 @@ import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type { DoseIntensity, RoutineLoad, WeekDose } from "./training-load";
 import type {
+  CycleAudience,
   RoutineItemRecord,
   ScheduledRoutineRecord,
   TrainingCycleRecord,
@@ -28,12 +29,14 @@ export const TRAINING_EXERCISE_IMAGES_BUCKET = "training-exercise-images";
 
 const ACTIVE_STATUS = "active";
 
-/** Desde E38 (#978) puede haber varios activos, pero sólo uno de todo el
- * club. Hasta que el #979 elija por los grupos del socio, la semana del socio
- * es la de ese: leer "el activo" a secas fallaría con dos. */
-const CLUB_AUDIENCE = "club";
-
-const CYCLE_COLUMNS = "id, name, event_name, event_date, start_date, weeks";
+// Los grupos de cada ciclo van embebidos: la lista entera es una consulta, no
+// una por ciclo (#979). Las claves se nombran porque `club_id` abre otro
+// camino entre estas tablas.
+const CYCLE_COLUMNS = `
+  id, name, event_name, event_date, start_date, weeks, audience,
+  groups:training_cycle_groups!training_cycle_groups_cycle_same_club_fkey (
+    group:groups!training_cycle_groups_group_same_club_fkey ( id, name )
+  )`;
 
 /** Lo de una semana; también lo lee Planificar (#904). */
 export const WEEK_COLUMNS =
@@ -55,14 +58,24 @@ const DAY_COLUMNS = `
     )
   )`;
 
-const cycleRowSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  event_name: z.string().nullable(),
-  event_date: z.string().nullable(),
-  start_date: z.string(),
-  weeks: z.number().int(),
-});
+const cycleRowsSchema = z.array(
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    event_name: z.string().nullable(),
+    event_date: z.string().nullable(),
+    start_date: z.string(),
+    weeks: z.number().int(),
+    audience: z.enum(["club", "groups"]),
+    groups: z.array(
+      z.object({ group: z.object({ id: z.string(), name: z.string() }) }),
+    ),
+  }),
+);
+
+const groupMembershipRowsSchema = z.array(z.object({ group_id: z.string() }));
+
+type CycleRow = z.infer<typeof cycleRowsSchema>[number];
 
 export const weekRowSchema = z.object({
   note: z.string().nullable(),
@@ -210,26 +223,17 @@ export function toWeekDose(row: WeekRow): WeekDose | null {
   return { sets: row.dose_sets, reps: row.dose_reps, intensity };
 }
 
-async function findActiveCycle(
-  serviceClient: SupabaseClient,
-  clubId: string,
-): Promise<TrainingCycleRecord | null> {
-  const { data, error } = await serviceClient
-    .from("training_cycles")
-    .select(CYCLE_COLUMNS)
-    .eq("club_id", clubId)
-    .eq("status", ACTIVE_STATUS)
-    .eq("audience", CLUB_AUDIENCE)
-    .maybeSingle();
-  if (error) {
-    throw new Error(
-      `No se pudo leer el ciclo activo de ${clubId}: ${error.message}`,
-    );
+function toCycleAudience(row: CycleRow): CycleAudience {
+  if (row.audience === "club") {
+    return { kind: "club" };
   }
-  if (data === null) {
-    return null;
-  }
-  const row = cycleRowSchema.parse(data);
+  const groups = row.groups
+    .map(({ group }) => group)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { kind: "groups", groups };
+}
+
+function toCycleRecord(row: CycleRow): TrainingCycleRecord {
   return {
     id: row.id,
     name: row.name,
@@ -237,7 +241,46 @@ async function findActiveCycle(
     eventDate: row.event_date,
     startDate: row.start_date,
     weeks: row.weeks,
+    audience: toCycleAudience(row),
   };
+}
+
+async function findActiveCycles(
+  serviceClient: SupabaseClient,
+  clubId: string,
+): Promise<readonly TrainingCycleRecord[]> {
+  const { data, error } = await serviceClient
+    .from("training_cycles")
+    .select(CYCLE_COLUMNS)
+    .eq("club_id", clubId)
+    .eq("status", ACTIVE_STATUS);
+  if (error) {
+    throw new Error(
+      `No se pudieron leer los ciclos activos de ${clubId}: ${error.message}`,
+    );
+  }
+  return cycleRowsSchema.parse(data).map(toCycleRecord);
+}
+
+type MemberGroupsQuery = Parameters<
+  TrainingPlanGateway["findMemberGroupIds"]
+>[0];
+
+async function findMemberGroupIds(
+  serviceClient: SupabaseClient,
+  query: MemberGroupsQuery,
+): Promise<readonly string[]> {
+  const { data, error } = await serviceClient
+    .from("group_memberships")
+    .select("group_id")
+    .eq("club_id", query.clubId)
+    .eq("user_id", query.userId);
+  if (error) {
+    throw new Error(
+      `No se pudieron leer los grupos del socio ${query.userId}: ${error.message}`,
+    );
+  }
+  return groupMembershipRowsSchema.parse(data).map((row) => row.group_id);
 }
 
 type WeekQuery = Parameters<TrainingPlanGateway["findWeek"]>[0];
@@ -308,7 +351,8 @@ export function createTrainingPlanGateway(
 ): TrainingPlanGateway {
   const bucket = serviceClient.storage.from(TRAINING_EXERCISE_IMAGES_BUCKET);
   return {
-    findActiveCycle: (clubId) => findActiveCycle(serviceClient, clubId),
+    findActiveCycles: (clubId) => findActiveCycles(serviceClient, clubId),
+    findMemberGroupIds: (query) => findMemberGroupIds(serviceClient, query),
     findWeek: (query) => findWeek(serviceClient, query),
     // El bucket es público: la dirección se deduce de la ruta, sin llamar.
     exercisePhotoUrl: (path) => bucket.getPublicUrl(path).data.publicUrl,
