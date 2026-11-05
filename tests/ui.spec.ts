@@ -28600,6 +28600,8 @@ const PLANNER_WEEK_AT_A_TIME_BELOW_PX = 1024;
  * del ciclo activo. */
 const PLANNER_NOW = new Date("2026-10-28T01:00:00.000Z");
 
+// La lista de Planificar trae la audiencia de cada ciclo desde el #978: sin
+// ella el cliente rechaza la respuesta y la pantalla no carga.
 const PLANNER_ACTIVE_CYCLE = {
   id: "aaaaaaaa-0000-4000-8000-000000000001",
   name: "Road to Nationals 2027",
@@ -28608,6 +28610,7 @@ const PLANNER_ACTIVE_CYCLE = {
   startDate: "2026-10-12",
   event: { name: "UWR Nationals", date: "2027-04-22" },
   ownRoutines: 4,
+  audience: { kind: "club" },
 };
 
 const PLANNER_CYCLES = [
@@ -28620,6 +28623,7 @@ const PLANNER_CYCLES = [
     startDate: "2027-06-07",
     event: null,
     ownRoutines: 1,
+    audience: { kind: "club" },
   },
   {
     id: "aaaaaaaa-0000-4000-8000-000000000003",
@@ -28629,6 +28633,7 @@ const PLANNER_CYCLES = [
     startDate: "2026-05-04",
     event: null,
     ownRoutines: 3,
+    audience: { kind: "club" },
   },
 ];
 
