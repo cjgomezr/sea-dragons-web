@@ -223,12 +223,16 @@ confirmar en cada página):
 | Supabase | La base de datos, las cuentas y los archivos de todos los clubes | Plan Pro, unos 25 USD; el proyecto de desarrollo suma unos 10 USD si vive en la misma organización |
 | Vercel   | La app de todos los clubes y la landing, en el mismo proyecto    | Plan Pro, unos 20 USD por persona del equipo. El plan gratis (Hobby) no permite uso comercial      |
 | Resend   | Los correos                                                      | Unos 20 USD con el plan Pro (sección 17)                                                           |
-| Dominio  | La landing y los subdominios                                     | Unos 15 a 20 USD al año                                                                            |
+| Dominio  | La landing y los subdominios                                     | Unos 10 a 12 USD al año (.com)                                                                     |
 | Stripe   | Connect y Billing                                                | Sin cuota mensual: solo comisiones por cobro                                                       |
 
 En total, unos 65 a 75 USD al mes más el dominio. Sube con el uso: el tamaño
 del servidor de Supabase cuando crezca el tráfico, el espacio de archivos y las
 personas del equipo en Vercel.
+
+Vercel se queda por ahora. Las alternativas más baratas (Cloudflare, un
+servidor propio) ahorran unos 15 USD al mes, pero cuestan tiempo de migración,
+y la fábrica usa el despliegue de prueba de Vercel en cada PR.
 
 ## 6. Stripe Connect por debajo
 
