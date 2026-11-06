@@ -29288,6 +29288,27 @@ test.describe("Planificar con muchos ciclos (#988)", () => {
       expect(await hasHorizontalScroll(page)).toBe(false);
     });
   }
+
+  test("keeps the cycle cards in one row that scrolls sideways at 1440px", async ({
+    page,
+  }) => {
+    if (PLANNER_MANY_CYCLES_STATE === undefined) {
+      throw new Error("Falta el estado planificar-ciclo-grupos.");
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlanner(page, PLANNER_MANY_CYCLES_STATE);
+
+    const cards = page.getByRole("list", { name: "Cycles", exact: true });
+    const cardTops = await cards
+      .getByRole("listitem")
+      .evaluateAll((items) =>
+        items.map((item) => item.getBoundingClientRect().top),
+      );
+    expect(new Set(cardTops).size).toBe(1);
+    expect(
+      await cards.evaluate((list) => list.scrollWidth > list.clientWidth),
+    ).toBe(true);
+  });
 });
 
 /* ---------------------------------------------------------------------------
