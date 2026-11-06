@@ -20,8 +20,12 @@ function storageKeyOf(userId: string): string {
   return `${STORAGE_KEY_PREFIX}${userId}`;
 }
 
-/** El `localStorage` del navegador, o nulo si leerlo ya falla. */
+/** El `localStorage` del navegador; nulo en el servidor o si leerlo ya
+ * falla. */
 export function browserCycleChoiceStorage(): CycleChoiceStorage | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
   try {
     return window.localStorage;
   } catch {

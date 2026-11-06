@@ -8,7 +8,11 @@ import {
   readSavedCycleChoice,
   saveCycleChoice,
 } from "@/lib/training/saved-cycle-choice";
-import { type TrainingPlanBlock, loadTrainingPlan } from "./training-client";
+import {
+  type TrainingPlanBlock,
+  type TrainingPlanOutcome,
+  loadTrainingPlan,
+} from "./training-client";
 
 /**
  * El plan que pinta Entrenamiento: qué semana de qué ciclo pedir a la API, y
@@ -42,11 +46,16 @@ type PlanRequest = {
   readonly attempt: number;
 };
 
+/** Un `?cycle=` vacío (un enlace cortado) es como no llevarlo: la API lo
+ * rechazaría con un 400 y la pantalla no tendría salida. */
 function cycleInUrl(): string | null {
   if (typeof window === "undefined") {
     return null;
   }
-  return new URLSearchParams(window.location.search).get(CYCLE_QUERY_PARAM);
+  const cycleId = new URLSearchParams(window.location.search).get(
+    CYCLE_QUERY_PARAM,
+  );
+  return cycleId === null || cycleId.trim() === "" ? null : cycleId;
 }
 
 /** Cambia `?cycle` sin pedir la página otra vez; nulo lo quita. */
@@ -94,6 +103,17 @@ function forgetUnseenCycle(source: CycleSource, userId: string): void {
   }
 }
 
+function planStateOf(
+  outcome: Exclude<TrainingPlanOutcome, { readonly kind: "cycleNotFound" }>,
+): PlanState {
+  if (outcome.kind !== "loaded") {
+    return outcome;
+  }
+  return outcome.plan.cycle === null
+    ? { kind: "noCycle" }
+    : { kind: "ready", plan: outcome.plan };
+}
+
 /** Al cambiar de semana o de ciclo se sigue viendo el anterior hasta que
  * llega el nuevo. */
 export function useTrainingPlan(userId: string): {
@@ -113,21 +133,12 @@ export function useTrainingPlan(userId: string): {
       if (!isCurrent) {
         return;
       }
-      switch (outcome.kind) {
-        case "cycleNotFound":
-          forgetUnseenCycle(request.source, userId);
-          setRequest({ ...request, week: null, cycleId: null, source: "api" });
-          return;
-        case "loaded":
-          setState(
-            outcome.plan.cycle === null
-              ? { kind: "noCycle" }
-              : { kind: "ready", plan: outcome.plan },
-          );
-          return;
-        default:
-          setState(outcome);
+      if (outcome.kind === "cycleNotFound") {
+        forgetUnseenCycle(request.source, userId);
+        setRequest({ ...request, week: null, cycleId: null, source: "api" });
+        return;
       }
+      setState(planStateOf(outcome));
     });
     return () => {
       isCurrent = false;

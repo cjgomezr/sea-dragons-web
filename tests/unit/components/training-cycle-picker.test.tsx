@@ -93,6 +93,19 @@ function stubVisibleCycles(
   visible: readonly TrainingCycle[],
   defaultCycle: TrainingCycle,
 ): void {
+  stubVisibleCyclesListing(visible, { served: visible, defaultCycle });
+}
+
+/** Como `stubVisibleCycles`, pero la lista que manda puede llevar un ciclo
+ * que ya no sirve: el que archivaron entre la lista y la elección. */
+function stubVisibleCyclesListing(
+  listed: readonly TrainingCycle[],
+  options: {
+    readonly served: readonly TrainingCycle[];
+    readonly defaultCycle: TrainingCycle;
+  },
+): void {
+  const { served, defaultCycle } = options;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string) => {
@@ -105,12 +118,17 @@ function stubVisibleCycles(
       }
       planRequests.push(url.searchParams);
       const cycleId = url.searchParams.get("cycle") ?? defaultCycle.id;
-      const cycle = visible.find((candidate) => candidate.id === cycleId);
+      if (cycleId.trim() === "") {
+        return jsonResponse(400, {
+          error: { code: "validation_error", message: "Falta el ciclo." },
+        });
+      }
+      const cycle = served.find((candidate) => candidate.id === cycleId);
       return cycle === undefined
         ? jsonResponse(404, {
             error: { code: "not_found", message: "No ves ese ciclo." },
           })
-        : jsonResponse(200, { data: planOf(cycle, visible) });
+        : jsonResponse(200, { data: planOf(cycle, listed) });
     }),
   );
 }
@@ -286,6 +304,43 @@ describe("un ?cycle que no ve", () => {
     await expectCycleShown(JUNIORS);
     expect(requestedCycles()).toEqual(["cycle-other", null]);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).has("cycle")).toBe(
+      false,
+    );
+  });
+});
+
+describe("un ?cycle vacío", () => {
+  it("se trata como si no estuviera", async () => {
+    window.history.replaceState(null, "", "/entrenamiento?cycle=");
+    stubVisibleCycles([JUNIORS, NATIONALS], JUNIORS);
+
+    await renderScreen();
+
+    await expectCycleShown(JUNIORS);
+    expect(requestedCycles()).toEqual([null]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
+describe("un ciclo elegido que deja de verse antes de llegar", () => {
+  it("entra en el de la API sin error y lo olvida del dispositivo y de la URL", async () => {
+    stubVisibleCycles([JUNIORS, NATIONALS], JUNIORS);
+    await renderScreen();
+    // Lo archivan entre la lista y la elección: la API ya responde 404.
+    stubVisibleCyclesListing([JUNIORS, NATIONALS], {
+      served: [JUNIORS],
+      defaultCycle: JUNIORS,
+    });
+
+    await userEvent.selectOptions(cyclePicker(), NATIONALS.name);
+
+    await waitFor(() => {
+      expect(requestedCycles().slice(-2)).toEqual([NATIONALS.id, null]);
+    });
+    await expectCycleShown(JUNIORS);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
     expect(new URLSearchParams(window.location.search).has("cycle")).toBe(
       false,
     );
