@@ -11,6 +11,7 @@ import {
   sortCycles,
 } from "@/lib/training/cycle-planner-view";
 import {
+  type CycleConflicts,
   type CycleList,
   type PlannerOutcome,
   activateCycle,
@@ -42,7 +43,13 @@ export type PlannerCyclesState =
 export type CycleSaveResult =
   | { readonly kind: "saved" }
   | { readonly kind: "failed" }
-  | { readonly kind: "confirmRemoval"; readonly daysRemoved: number };
+  | { readonly kind: "confirmRemoval"; readonly daysRemoved: number }
+  | CycleConflicts;
+
+/** Lo que pasa al activar: si choca, quien lo pidió pregunta antes de
+ * volver a pedirlo confirmado (D3 de E38). */
+export type CycleActivateResult =
+  { readonly kind: "activated" } | { readonly kind: "failed" } | CycleConflicts;
 
 /** El motivo de un fallo: el `reason` de la API, o nulo si no lo trae. */
 export type PlannerError = { readonly reason: string | null };
@@ -59,12 +66,17 @@ export type PlannerCycles = {
     readonly cycleId: string;
     readonly changes: CycleChanges;
     readonly confirmRemoval: boolean;
+    /** Archiva los activos con los que choca el cambio de audiencia. */
+    readonly confirmConflicts: boolean;
   }) => Promise<CycleSaveResult>;
   /** Nulo borra el que haya. */
   readonly showError: (error: PlannerError | null) => void;
   /** El aviso verde de un cambio que salió bien. */
   readonly announce: (notice: string) => void;
-  readonly activate: (cycle: ManagedCycle) => void;
+  readonly activate: (
+    cycle: ManagedCycle,
+    confirmConflicts: boolean,
+  ) => Promise<CycleActivateResult>;
   readonly archive: (cycle: ManagedCycle) => void;
   readonly duplicate: (cycle: ManagedCycle) => void;
   /** Termina cuando la API responde, para que quien lo pidió sepa cuándo
@@ -193,15 +205,20 @@ export function usePlannerCycles(translate: Translator): PlannerCycles {
           ),
       );
     },
-    save: async ({ cycleId, changes, confirmRemoval }) => {
+    save: async ({ cycleId, changes, confirmRemoval, confirmConflicts }) => {
       // No toca `isBusy`: deshabilitar las acciones en cada salida de un
       // campo le quitaría el foco a quien vuelve a ellas con Tab hacia atrás.
       // Un cambio que se cruza con activar o archivar no estropea nada:
       // éstos traen la lista entera.
       setError(null);
-      const outcome = await updateCycle(cycleId, { changes, confirmRemoval });
+      const outcome = await updateCycle(cycleId, {
+        changes,
+        confirmRemoval,
+        confirmConflicts,
+      });
       switch (outcome.kind) {
         case "confirmRemoval":
+        case "conflicts":
           return outcome;
         case "failed":
           setError({ reason: outcome.reason });
@@ -212,21 +229,35 @@ export function usePlannerCycles(translate: Translator): PlannerCycles {
               ? { ...state, cycles: replaceCycle(state.cycles, outcome.value) }
               : state,
           );
+          // La respuesta trae sólo este ciclo; los que se archivaron llegan
+          // con la lista.
+          if (confirmConflicts) {
+            list.reload();
+          }
           return { kind: "saved" };
       }
     },
     showError: setError,
     announce,
-    activate: (cycle) =>
-      void run(
-        () => activateCycle(cycle.id),
-        (cycles) => {
-          list.setState(withCycles(cycles));
+    activate: async (cycle, confirmConflicts) => {
+      setIsBusy(true);
+      setError(null);
+      const outcome = await activateCycle(cycle.id, confirmConflicts);
+      setIsBusy(false);
+      switch (outcome.kind) {
+        case "conflicts":
+          return outcome;
+        case "failed":
+          setError({ reason: outcome.reason });
+          return { kind: "failed" };
+        case "ok":
+          list.setState(withCycles(outcome.value));
           announce(
             translate("training.manage.activated", { name: cycle.name }),
           );
-        },
-      ),
+          return { kind: "activated" };
+      }
+    },
     archive: (cycle) =>
       void run(
         () => archiveCycle(cycle.id),

@@ -12,8 +12,9 @@ import { CycleStatusPill, PlannerCycleCards } from "./PlannerCycleCards";
 import { PlannerCycleActions } from "./PlannerCycleActions";
 import { PlannerCycleGrid } from "./PlannerCycleGrid";
 import { PlannerCycleFields } from "./PlannerCycleFields";
-import { cycleMeta, summaryLine } from "./planner-format";
+import { cycleAudienceLabel, cycleMeta, summaryLine } from "./planner-format";
 import type { PlannerCycles } from "./use-planner-cycles";
+import type { PlannerGroups } from "./use-planner-groups";
 
 /**
  * La pestaña Ciclo de Planificar (#906, §5.1 y §5.2 del handoff): en el
@@ -27,12 +28,9 @@ type CycleTabProps = {
   readonly planner: PlannerCycles;
   readonly cycles: readonly ManagedCycle[];
   readonly selected: ManagedCycle;
+  /** Los grupos del club, para el campo For (#980). */
+  readonly groups: PlannerGroups;
 };
-
-function activeCycleName(cycles: readonly ManagedCycle[]): string | null {
-  const active = cycles.find((cycle) => cycle.status === "active");
-  return active === undefined ? null : active.name;
-}
 
 function SummaryLine({
   translate,
@@ -76,6 +74,7 @@ export function DesktopCycleTab({
   planner,
   cycles,
   selected,
+  groups,
 }: CycleTabProps): React.JSX.Element {
   return (
     <>
@@ -97,7 +96,6 @@ export function DesktopCycleTab({
           translate={translate}
           cycle={selected}
           planner={planner}
-          activeName={activeCycleName(cycles)}
           isCompact={false}
           className="training-plan-actions"
         />
@@ -106,6 +104,7 @@ export function DesktopCycleTab({
         key={selected.id}
         translate={translate}
         cycle={selected}
+        groups={groups}
         planner={planner}
       />
       <SummaryLine translate={translate} cycle={selected} />
@@ -117,6 +116,25 @@ export function DesktopCycleTab({
       />
     </>
   );
+}
+
+/** "Juniors block · active · Juniors, Masters": el estado y para quién es
+ * (#980), porque puede haber varios activos. */
+function optionLabel(translate: Translator, cycle: ManagedCycle): string {
+  const audience = cycleAudienceLabel(translate, cycle.audience);
+  if (cycle.status === "archived") {
+    return translate("training.manage.optionAudience", {
+      option: cycle.name,
+      audience,
+    });
+  }
+  const option = translate(
+    cycle.status === "active"
+      ? "training.manage.optionActive"
+      : "training.manage.optionDraft",
+    { name: cycle.name },
+  );
+  return translate("training.manage.optionAudience", { option, audience });
 }
 
 function CycleSelect({
@@ -143,19 +161,14 @@ function CycleSelect({
       >
         {current.map((cycle) => (
           <option key={cycle.id} value={cycle.id}>
-            {translate(
-              cycle.status === "active"
-                ? "training.manage.optionActive"
-                : "training.manage.optionDraft",
-              { name: cycle.name },
-            )}
+            {optionLabel(translate, cycle)}
           </option>
         ))}
         {archived.length === 0 ? null : (
           <optgroup label={translate("training.manage.archivedGroup")}>
             {archived.map((cycle) => (
               <option key={cycle.id} value={cycle.id}>
-                {cycle.name}
+                {optionLabel(translate, cycle)}
               </option>
             ))}
           </optgroup>
@@ -171,6 +184,7 @@ function PhoneFields({
   translate,
   planner,
   selected,
+  groups,
 }: Omit<CycleTabProps, "cycles">): React.JSX.Element {
   const [isEditingActive, setIsEditingActive] = useState(false);
   const fields = (
@@ -178,6 +192,7 @@ function PhoneFields({
       key={selected.id}
       translate={translate}
       cycle={selected}
+      groups={groups}
       planner={planner}
     />
   );
@@ -205,6 +220,7 @@ export function PhoneCycleTab({
   planner,
   cycles,
   selected,
+  groups,
 }: CycleTabProps): React.JSX.Element {
   return (
     <>
@@ -218,19 +234,22 @@ export function PhoneCycleTab({
         <p className="training-plan-phone-meta">
           <CycleStatusPill translate={translate} cycle={selected} />
           <span>{cycleMeta(translate, selected)}</span>
+          <span className="training-plan-audience-label">
+            {cycleAudienceLabel(translate, selected.audience)}
+          </span>
         </p>
         <PhoneFields
           key={selected.id}
           translate={translate}
           planner={planner}
           selected={selected}
+          groups={groups}
         />
         <PlannerCycleActions
           key={`actions-${selected.id}`}
           translate={translate}
           cycle={selected}
           planner={planner}
-          activeName={activeCycleName(cycles)}
           isCompact
           className="training-plan-actions training-plan-phone-actions"
         >

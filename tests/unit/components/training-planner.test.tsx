@@ -650,7 +650,9 @@ describe("bajar las semanas", () => {
       { weeks: 20 },
       { weeks: 20, confirmRemoval: true },
     ]);
-    expect(screen.queryByRole("group")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: /^Going down to/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("al cancelar deja las semanas como estaban", async () => {
@@ -901,14 +903,14 @@ describe("en el móvil", () => {
 
     const select = cycleSelect();
     expect([...select.options].map((option) => option.textContent)).toEqual([
-      "Road to Nationals 2027 · active",
-      "Summer base 2027 · draft",
-      "Winter 2026",
+      "Road to Nationals 2027 · active · Whole club",
+      "Summer base 2027 · draft · Whole club",
+      "Winter 2026 · Whole club",
     ]);
     expect(
       within(select).getByRole("group", { name: "Archived" }),
     ).toContainElement(
-      within(select).getByRole("option", { name: "Winter 2026" }),
+      within(select).getByRole("option", { name: "Winter 2026 · Whole club" }),
     );
     expect(select).toHaveValue(ACTIVE.id);
     expect(
@@ -1191,7 +1193,7 @@ describe("volver a activar un archivado", () => {
     await user.click(screen.getByRole("button", { name: "Make active" }));
 
     expect(reactivateGroup()).toHaveTextContent(
-      'Make "Winter 2026" active again? Road to Nationals 2027 will be archived. It ended on 12 Jul. Members will see a finished cycle.',
+      'Make "Winter 2026" active again? It ended on 12 Jul. Members will see a finished cycle.',
     );
     expect(
       within(reactivateGroup()).getByRole("button", { name: "Cancel" }),
@@ -1211,7 +1213,7 @@ describe("volver a activar un archivado", () => {
     await user.click(screen.getByRole("button", { name: "Make active" }));
 
     expect(reactivateGroup()).toHaveAccessibleName(
-      'Make "Winter 2026" active again? Road to Nationals 2027 will be archived.',
+      'Make "Winter 2026" active again?',
     );
   });
 
@@ -1337,7 +1339,7 @@ describe("volver a activar un archivado", () => {
 
     const group = screen.getByRole("group", { name: /^¿Volver a activar "/ });
     expect(group).toHaveTextContent(
-      '¿Volver a activar "Winter 2026"? Road to Nationals 2027 pasará a archivado. Terminó el 12 jul. Los miembros verán un ciclo terminado.',
+      '¿Volver a activar "Winter 2026"? Terminó el 12 jul. Los miembros verán un ciclo terminado.',
     );
     expect(
       within(group).getByRole("button", { name: "Cancelar" }),

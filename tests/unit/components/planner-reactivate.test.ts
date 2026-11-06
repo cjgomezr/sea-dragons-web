@@ -4,8 +4,9 @@ import { createTranslator } from "@/lib/i18n/translator";
 import type { ManagedCycle } from "@/lib/training/club-cycles";
 
 /**
- * El texto de volver a activar un archivado (#952): avisa del activo que se
- * archiva y, si las fechas ya pasaron en Melbourne, de que terminó.
+ * El texto de volver a activar un archivado (#952): si las fechas ya
+ * pasaron en Melbourne, avisa de que terminó. Qué se archiva lo dice la API
+ * al activar (#980).
  */
 
 /** Del lunes 4 de mayo al domingo 12 de julio de 2026. */
@@ -33,53 +34,6 @@ describe("reactivateConfirmText", () => {
   it("si terminó ayer en Melbourne, dice cuándo terminó", () => {
     const text = reactivateConfirmText(english, {
       cycle: WINTER,
-      activeName: "Road to Nationals 2027",
-      now: DAY_AFTER_END,
-    });
-
-    expect(text).toBe(
-      'Make "Winter 2026" active again? Road to Nationals 2027 will be archived. It ended on 12 Jul. Members will see a finished cycle.',
-    );
-  });
-
-  it("si termina hoy en Melbourne, no dice que terminó", () => {
-    const text = reactivateConfirmText(english, {
-      cycle: WINTER,
-      activeName: "Road to Nationals 2027",
-      now: LAST_DAY,
-    });
-
-    expect(text).toBe(
-      'Make "Winter 2026" active again? Road to Nationals 2027 will be archived.',
-    );
-  });
-
-  it("si aún no empezó, no dice que terminó", () => {
-    const text = reactivateConfirmText(english, {
-      cycle: WINTER,
-      activeName: "Road to Nationals 2027",
-      now: BEFORE_START,
-    });
-
-    expect(text).toBe(
-      'Make "Winter 2026" active again? Road to Nationals 2027 will be archived.',
-    );
-  });
-
-  it("sin ciclo activo no nombra a ninguno", () => {
-    const text = reactivateConfirmText(english, {
-      cycle: WINTER,
-      activeName: null,
-      now: LAST_DAY,
-    });
-
-    expect(text).toBe('Make "Winter 2026" active again?');
-  });
-
-  it("sin activo y terminado, sólo añade cuándo terminó", () => {
-    const text = reactivateConfirmText(english, {
-      cycle: WINTER,
-      activeName: null,
       now: DAY_AFTER_END,
     });
 
@@ -88,15 +42,43 @@ describe("reactivateConfirmText", () => {
     );
   });
 
+  it("si termina hoy en Melbourne, no dice que terminó", () => {
+    const text = reactivateConfirmText(english, {
+      cycle: WINTER,
+      now: LAST_DAY,
+    });
+
+    expect(text).toBe('Make "Winter 2026" active again?');
+  });
+
+  it("si aún no empezó, no dice que terminó", () => {
+    const text = reactivateConfirmText(english, {
+      cycle: WINTER,
+      now: BEFORE_START,
+    });
+
+    expect(text).toBe('Make "Winter 2026" active again?');
+  });
+
+  // Qué activo se archiva ya no lo adivina la pantalla: con varios activos
+  // (E38) lo dice el 409 de la API, en su propia confirmación (#980).
+  it("no nombra ningún otro ciclo", () => {
+    const text = reactivateConfirmText(english, {
+      cycle: WINTER,
+      now: DAY_AFTER_END,
+    });
+
+    expect(text).not.toContain("will be archived");
+  });
+
   it("en español", () => {
     const text = reactivateConfirmText(createTranslator("es"), {
       cycle: WINTER,
-      activeName: "Road to Nationals 2027",
       now: DAY_AFTER_END,
     });
 
     expect(text).toBe(
-      '¿Volver a activar "Winter 2026"? Road to Nationals 2027 pasará a archivado. Terminó el 12 jul. Los miembros verán un ciclo terminado.',
+      '¿Volver a activar "Winter 2026"? Terminó el 12 jul. Los miembros verán un ciclo terminado.',
     );
   });
 });

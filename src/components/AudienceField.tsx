@@ -8,8 +8,8 @@ import type { Translator } from "@/lib/i18n/translator";
  * (`ClubAudience`).
  *
  * Nació para publicar noticias (#330) y lo reutiliza el diálogo de eventos
- * (#313). Cada uno pone su propia leyenda: una noticia se "ve" y a un evento
- * se "invita".
+ * (#313) y el campo For de un ciclo en Planificar (#980). Cada uno pone su
+ * propia leyenda: una noticia se "ve" y a un evento se "invita".
  */
 
 export type AudienceChoice = {
@@ -97,6 +97,7 @@ export function AudienceField({
   clubGroups,
   audience,
   issueText,
+  isDisabled = false,
   onChange,
 }: {
   readonly translate: Translator;
@@ -105,6 +106,8 @@ export function AudienceField({
   readonly audience: AudienceChoice;
   /** El aviso de los grupos, o null si no tiene ninguno. */
   readonly issueText: string | null;
+  /** De lectura, como la de un ciclo archivado en Planificar (#980). */
+  readonly isDisabled?: boolean;
   readonly onChange: (audience: AudienceChoice) => void;
 }): React.JSX.Element {
   function toggleGroup(groupId: string, isChosen: boolean): void {
@@ -118,7 +121,10 @@ export function AudienceField({
   }
 
   return (
-    <fieldset className="member-record-groups news-audience">
+    <fieldset
+      className="member-record-groups news-audience"
+      disabled={isDisabled}
+    >
       <legend>{legend}</legend>
       <AudienceOption
         value="club"

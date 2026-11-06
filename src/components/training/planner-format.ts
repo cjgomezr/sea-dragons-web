@@ -3,6 +3,9 @@ import { formatDashboardDay, formatWeekdayName } from "@/lib/i18n/format";
 import type { MessageKey } from "@/lib/i18n/message";
 import type { Translator } from "@/lib/i18n/translator";
 import type {
+  ConflictingCycle,
+  CycleAudience,
+  CycleAudienceIssueCode,
   CycleStatus,
   CycleWeekRecord,
   ManagedCycle,
@@ -75,27 +78,44 @@ export function summaryLine(
   }
 }
 
-/** Lo que pregunta volver a activar un archivado (#952): qué activo se
- * archiva y, si sus fechas ya pasaron en Melbourne, que los miembros verán un
- * ciclo terminado. */
+const NAME_SEPARATOR = ", ";
+
+/** "Whole club", "Juniors, Masters", o el aviso de D9 si ya no le queda
+ * ningún grupo (#980). */
+export function cycleAudienceLabel(
+  translate: Translator,
+  audience: CycleAudience,
+): string {
+  if (audience.kind === "club") {
+    return translate("training.manage.audienceClub");
+  }
+  return audience.groups.length === 0
+    ? translate("training.manage.audienceNoGroups")
+    : audience.groups.map((group) => group.name).join(NAME_SEPARATOR);
+}
+
+/** Los ciclos que la API dice que se archivan si se confirma (D3 de E38). */
+export function conflictsConfirmText(
+  translate: Translator,
+  conflicts: readonly ConflictingCycle[],
+): string {
+  return translate("training.manage.confirmConflicts", {
+    count: conflicts.length,
+    names: conflicts.map((cycle) => cycle.name).join(NAME_SEPARATOR),
+  });
+}
+
+/** Lo que pregunta volver a activar un archivado (#952): si sus fechas ya
+ * pasaron en Melbourne, que los miembros verán un ciclo terminado. Qué se
+ * archiva lo dice después la API, si choca con algo (#980). */
 export function reactivateConfirmText(
   translate: Translator,
-  request: {
-    readonly cycle: ManagedCycle;
-    readonly activeName: string | null;
-    readonly now: Date;
-  },
+  request: { readonly cycle: ManagedCycle; readonly now: Date },
 ): string {
-  const { cycle, activeName, now } = request;
-  const question =
-    activeName === null
-      ? translate("training.manage.confirmReactivateNoActive", {
-          name: cycle.name,
-        })
-      : translate("training.manage.confirmReactivate", {
-          name: cycle.name,
-          active: activeName,
-        });
+  const { cycle, now } = request;
+  const question = translate("training.manage.confirmReactivate", {
+    name: cycle.name,
+  });
   if (cycleWeekAt(cycle, now).phase !== "finished") {
     return question;
   }
@@ -128,9 +148,12 @@ const ERROR_KEYS = {
   dose_pct_out_of_range: "training.manage.errorDosePct",
   [DATE_REQUIRED_REASON]: "training.manage.errorDate",
   [CYCLE_IS_ACTIVE_REASON]: "training.manage.errorCycleIsActive",
+  groups_required: "training.manage.audienceGroupsRequired",
+  group_not_in_club: "training.manage.errorGroupNotInClub",
 } as const satisfies Partial<
   Record<
     | CycleIssueCode
+    | CycleAudienceIssueCode
     | typeof DATE_REQUIRED_REASON
     | typeof CYCLE_IS_ACTIVE_REASON,
     MessageKey

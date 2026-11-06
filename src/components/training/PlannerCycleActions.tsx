@@ -4,11 +4,15 @@ import { Archive } from "@phosphor-icons/react/dist/ssr/Archive";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { Copy } from "@phosphor-icons/react/dist/ssr/Copy";
 import { Trash } from "@phosphor-icons/react/dist/ssr/Trash";
-import { useEffect, useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import type { Translator } from "@/lib/i18n/translator";
-import type { ManagedCycle } from "@/lib/training/club-cycles";
-import { reactivateConfirmText } from "./planner-format";
+import type {
+  ConflictingCycle,
+  ManagedCycle,
+} from "@/lib/training/club-cycles";
+import { PlannerInlineConfirm } from "./PlannerInlineConfirm";
+import { conflictsConfirmText, reactivateConfirmText } from "./planner-format";
 import type { PlannerCycles } from "./use-planner-cycles";
 
 /**
@@ -18,8 +22,10 @@ import type { PlannerCycles } from "./use-planner-cycles";
  * abre debajo de las acciones una confirmación en color de peligro, como la
  * de borrar una marca. Make active sobre un archivado (#952) abre otra igual
  * pero sin ese color, porque no borra nada; un borrador se activa sin
- * preguntar. En el móvil Archive y Delete son solo el icono, con su nombre
- * para quien no lo ve.
+ * preguntar. Si activar choca con otros activos (#980, D3 de E38), la API
+ * responde cuáles y otra confirmación los nombra antes de archivarlos. En el
+ * móvil Archive y Delete son solo el icono, con su nombre para quien no lo
+ * ve.
  */
 
 type CyclePlanner = Pick<
@@ -27,7 +33,19 @@ type CyclePlanner = Pick<
   "activate" | "duplicate" | "archive" | "remove" | "isBusy"
 >;
 
-type OpenConfirm = "none" | "delete" | "reactivate";
+type OpenConfirm =
+  | { readonly kind: "none" }
+  | { readonly kind: "delete" }
+  | { readonly kind: "reactivate" }
+  | {
+      readonly kind: "conflicts";
+      readonly conflicts: readonly ConflictingCycle[];
+    };
+
+const CLOSED: OpenConfirm = { kind: "none" };
+
+const ACTIVATE_CONFIRM_CLASS =
+  "training-plan-action training-plan-action-activate";
 
 function confirmText(translate: Translator, cycle: ManagedCycle): string {
   return cycle.ownRoutines === 0
@@ -38,65 +56,6 @@ function confirmText(translate: Translator, cycle: ManagedCycle): string {
         name: cycle.name,
         count: cycle.ownRoutines,
       });
-}
-
-function InlineConfirm({
-  translate,
-  text,
-  classNames,
-  confirmLabel,
-  isBusy,
-  onCancel,
-  onConfirm,
-}: {
-  readonly translate: Translator;
-  readonly text: string;
-  /** La de la caja y la del botón que confirma. */
-  readonly classNames: { readonly box: string; readonly confirm: string };
-  readonly confirmLabel: string;
-  readonly isBusy: boolean;
-  readonly onCancel: () => void;
-  readonly onConfirm: () => void;
-}): React.JSX.Element {
-  const textId = useId();
-  const cancelRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    cancelRef.current?.focus();
-  }, []);
-
-  return (
-    <div
-      className={`training-plan-confirm ${classNames.box}`}
-      role="group"
-      aria-labelledby={textId}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          onCancel();
-        }
-      }}
-    >
-      <p id={textId}>{text}</p>
-      <div className="training-plan-confirm-actions">
-        <button
-          ref={cancelRef}
-          type="button"
-          className="training-plan-action"
-          onClick={onCancel}
-        >
-          {translate("training.manage.cancel")}
-        </button>
-        <button
-          type="button"
-          className={classNames.confirm}
-          disabled={isBusy}
-          onClick={onConfirm}
-        >
-          {confirmLabel}
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function CycleButtons({
@@ -177,16 +136,17 @@ function OpenedConfirm({
   translate,
   cycle,
   planner,
-  activeName,
   opened,
   onClose,
+  onActivate,
 }: {
   readonly translate: Translator;
   readonly cycle: ManagedCycle;
   readonly planner: CyclePlanner;
-  readonly activeName: string | null;
-  readonly opened: Exclude<OpenConfirm, "none">;
+  readonly opened: Exclude<OpenConfirm, { readonly kind: "none" }>;
   readonly onClose: () => void;
+  /** Vuelve a pedir activar; confirmado, archiva lo que choca. */
+  readonly onActivate: (confirmConflicts: boolean) => void;
 }): React.JSX.Element {
   async function confirmDelete(): Promise<void> {
     await planner.remove(cycle);
@@ -194,50 +154,58 @@ function OpenedConfirm({
     onClose();
   }
 
-  if (opened === "delete") {
-    return (
-      <InlineConfirm
-        translate={translate}
-        text={confirmText(translate, cycle)}
-        classNames={{
-          box: "training-plan-cycle-delete",
-          confirm: "training-plan-danger",
-        }}
-        confirmLabel={translate("training.manage.deleteCycle")}
-        isBusy={planner.isBusy}
-        onCancel={onClose}
-        onConfirm={() => void confirmDelete()}
-      />
-    );
+  const shared = {
+    translate,
+    isBusy: planner.isBusy,
+    onCancel: onClose,
+  };
+  switch (opened.kind) {
+    case "delete":
+      return (
+        <PlannerInlineConfirm
+          {...shared}
+          text={confirmText(translate, cycle)}
+          classNames={{
+            box: "training-plan-cycle-delete",
+            confirm: "training-plan-danger",
+          }}
+          confirmLabel={translate("training.manage.deleteCycle")}
+          onConfirm={() => void confirmDelete()}
+        />
+      );
+    case "reactivate":
+      return (
+        <PlannerInlineConfirm
+          {...shared}
+          text={reactivateConfirmText(translate, { cycle, now: new Date() })}
+          classNames={{
+            box: "training-plan-cycle-reactivate",
+            confirm: ACTIVATE_CONFIRM_CLASS,
+          }}
+          confirmLabel={translate("training.manage.makeActive")}
+          onConfirm={() => onActivate(false)}
+        />
+      );
+    case "conflicts":
+      return (
+        <PlannerInlineConfirm
+          {...shared}
+          text={conflictsConfirmText(translate, opened.conflicts)}
+          classNames={{
+            box: "training-plan-cycle-conflicts",
+            confirm: ACTIVATE_CONFIRM_CLASS,
+          }}
+          confirmLabel={translate("training.manage.makeActive")}
+          onConfirm={() => onActivate(true)}
+        />
+      );
   }
-  return (
-    <InlineConfirm
-      translate={translate}
-      text={reactivateConfirmText(translate, {
-        cycle,
-        activeName,
-        now: new Date(),
-      })}
-      classNames={{
-        box: "training-plan-cycle-reactivate",
-        confirm: "training-plan-action training-plan-action-activate",
-      }}
-      confirmLabel={translate("training.manage.makeActive")}
-      isBusy={planner.isBusy}
-      onCancel={onClose}
-      onConfirm={() => {
-        onClose();
-        planner.activate(cycle);
-      }}
-    />
-  );
 }
 
 export function PlannerCycleActions({
   translate,
   cycle,
   planner,
-  activeName,
   isCompact,
   className,
   children,
@@ -245,8 +213,6 @@ export function PlannerCycleActions({
   readonly translate: Translator;
   readonly cycle: ManagedCycle;
   readonly planner: CyclePlanner;
-  /** El ciclo activo del club, que se archiva al volver a activar éste. */
-  readonly activeName: string | null;
   /** En el móvil, Archive y Delete van como icono. */
   readonly isCompact: boolean;
   /** La de la fila de acciones, que cambia entre el escritorio y el móvil. */
@@ -254,22 +220,29 @@ export function PlannerCycleActions({
   /** Lo que va al final de la fila, como + en el móvil. */
   readonly children?: React.ReactNode;
 }): React.JSX.Element {
-  const [opened, setOpened] = useState<OpenConfirm>("none");
+  const [opened, setOpened] = useState<OpenConfirm>(CLOSED);
   const activateRef = useRef<HTMLButtonElement>(null);
   const deleteRef = useRef<HTMLButtonElement>(null);
 
   function closeConfirm(): void {
-    const returnTo = opened === "delete" ? deleteRef : activateRef;
-    setOpened("none");
+    const returnTo = opened.kind === "delete" ? deleteRef : activateRef;
+    setOpened(CLOSED);
     returnTo.current?.focus();
+  }
+
+  async function requestActivation(confirmConflicts: boolean): Promise<void> {
+    const result = await planner.activate(cycle, confirmConflicts);
+    if (result.kind === "conflicts") {
+      setOpened({ kind: "conflicts", conflicts: result.conflicts });
+    }
   }
 
   function activate(): void {
     if (cycle.status === "archived") {
-      setOpened("reactivate");
+      setOpened({ kind: "reactivate" });
       return;
     }
-    planner.activate(cycle);
+    void requestActivation(false);
   }
 
   return (
@@ -283,18 +256,21 @@ export function PlannerCycleActions({
           activateRef={activateRef}
           deleteRef={deleteRef}
           onActivate={activate}
-          onDelete={() => setOpened("delete")}
+          onDelete={() => setOpened({ kind: "delete" })}
         />
         {children}
       </div>
-      {opened === "none" ? null : (
+      {opened.kind === "none" ? null : (
         <OpenedConfirm
           translate={translate}
           cycle={cycle}
           planner={planner}
-          activeName={activeName}
           opened={opened}
           onClose={closeConfirm}
+          onActivate={(confirmConflicts) => {
+            closeConfirm();
+            void requestActivation(confirmConflicts);
+          }}
         />
       )}
     </>

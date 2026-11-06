@@ -19,6 +19,7 @@ import { PlannerMarksTab } from "./PlannerMarksTab";
 import { PlannerRoutinesTab } from "./PlannerRoutinesTab";
 import { plannerErrorMessage } from "./planner-format";
 import { type PlannerCycles, usePlannerCycles } from "./use-planner-cycles";
+import { usePlannerGroups } from "./use-planner-groups";
 import {
   type PlannerExercises,
   usePlannerExercises,
@@ -245,10 +246,11 @@ function CyclePanelContent({
   readonly selected: ManagedCycle | null;
 }): React.JSX.Element {
   const isPhone = useIsPhone();
+  const groups = usePlannerGroups();
   if (selected === null) {
     return <NoCycles translate={translate} planner={planner} />;
   }
-  const props = { translate, planner, cycles, selected };
+  const props = { translate, planner, cycles, selected, groups };
   return isPhone ? (
     <PhoneCycleTab {...props} />
   ) : (
