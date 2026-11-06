@@ -25880,10 +25880,19 @@ a.dashboard-club-cell-body:focus-visible {
   min-width: 0;
 }
 
+/* La lista se encoge y se desplaza; + New cycle se queda fijo a su lado, a
+   la vista aunque haya muchos ciclos (#988). */
+.training-plan-cards-row {
+  display: flex;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+
 /* Una fila que se desplaza de lado: las tarjetas no bajan de línea. */
 .training-plan-cards {
   display: flex;
   gap: var(--space-2);
+  min-width: 0;
   max-width: 100%;
   margin: 0;
   padding: 0 0 var(--space-1);
@@ -25971,9 +25980,13 @@ a.dashboard-club-cell-body:focus-visible {
   display: inline-flex;
   gap: var(--space-2);
   align-items: center;
+  flex: none;
   justify-content: center;
   width: 150px;
   min-height: 62px;
+  /* El mismo hueco que deja la lista debajo para su barra de desplazamiento:
+     así el botón acaba a la altura de las tarjetas. */
+  margin-bottom: var(--space-1);
   font: inherit;
   font-size: 14px;
   font-weight: 600;

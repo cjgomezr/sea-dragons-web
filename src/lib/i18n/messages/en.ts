@@ -3125,7 +3125,8 @@ export const englishMessages = {
   "training.manage.back": "Back to Training",
   "training.manage.eyebrow": "Training · Manage",
   "training.manage.title": "Plan training",
-  "training.manage.lead": "Members with an active membership see it.",
+  "training.manage.lead":
+    "Each member with an active membership sees the active cycles meant for them.",
   "training.manage.tabs": "Planning sections",
   "training.manage.tabCycle": "Cycle",
   "training.manage.tabCycleCount": "{weeks} wk",

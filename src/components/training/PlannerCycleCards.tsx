@@ -92,31 +92,33 @@ export function PlannerCycleCards({
 
   return (
     <div className="training-plan-cards-area">
-      <ul
-        className="training-plan-cards"
-        aria-label={translate("training.manage.cycles")}
-      >
-        {visible.map((cycle) => (
-          <CycleCard
-            key={cycle.id}
-            translate={translate}
-            cycle={cycle}
-            isSelected={cycle.id === selectedId}
-            onSelect={() => onSelect(cycle.id)}
-          />
-        ))}
-        <li>
-          <button
-            type="button"
-            className="training-plan-new-card"
-            disabled={isBusy}
-            onClick={onCreate}
-          >
-            <Icon glyph={Plus} />
-            {translate("training.manage.newCycle")}
-          </button>
-        </li>
-      </ul>
+      {/* + New cycle queda fuera de la lista que se desplaza para que con
+          muchos ciclos no se corte en el borde (#988). */}
+      <div className="training-plan-cards-row">
+        <ul
+          className="training-plan-cards"
+          aria-label={translate("training.manage.cycles")}
+        >
+          {visible.map((cycle) => (
+            <CycleCard
+              key={cycle.id}
+              translate={translate}
+              cycle={cycle}
+              isSelected={cycle.id === selectedId}
+              onSelect={() => onSelect(cycle.id)}
+            />
+          ))}
+        </ul>
+        <button
+          type="button"
+          className="training-plan-new-card"
+          disabled={isBusy}
+          onClick={onCreate}
+        >
+          <Icon glyph={Plus} />
+          {translate("training.manage.newCycle")}
+        </button>
+      </div>
       {archivedCount === 0 ? null : (
         <button
           type="button"
