@@ -3041,6 +3041,7 @@ export const englishMessages = {
   "search.close": "Close search",
   "training.member.metaTitle": "Training · {club}",
   "training.member.eyebrow": "Training",
+  "training.member.cyclePicker": "Cycle",
   "training.member.eventOn": "{event} · {date}",
   "training.member.endsOn": "Ends {date}",
   "training.member.weeksToGo": {

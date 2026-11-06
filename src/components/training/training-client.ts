@@ -13,16 +13,16 @@ import {
 } from "@/lib/auth/routes";
 import type { MembershipBlock } from "@/lib/membership/membership";
 import type { MemberMarks } from "@/lib/training/member-marks";
-import type {
-  TrainingCycle,
-  TrainingWeekPlan,
-} from "@/lib/training/training-plan";
+import type { TrainingCycle, TrainingPlan } from "@/lib/training/training-plan";
 
 /**
  * Lo que la pantalla de Entrenamiento (#900) le pide a la API v1 (#898) y
  * cómo reduce la respuesta a algo que pintar. Nada habla con la base: la
  * aplicación nativa de Release 2 va a usar este mismo camino (CON-002).
  */
+
+/** Lo que responde la API a un `?cycle` que el socio no ve (#979). */
+const HTTP_NOT_FOUND = 404;
 
 const markRefSchema = z.object({ id: z.string(), name: z.string() });
 
@@ -81,13 +81,29 @@ const cycleSchema = z.object({
   weeks: z.number().int().positive(),
 });
 
+const currentSchema = z.object({
+  week: z.number().int().positive(),
+  phase: z.enum(["not_started", "running", "finished"]),
+  today: z.iso.date(),
+});
+
+/** Un ciclo de los que ve el socio (#979), para el selector (#981). */
+const cycleOptionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  current: currentSchema,
+  audience: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("club") }),
+    z.object({
+      kind: z.literal("groups"),
+      groups: z.array(z.object({ id: z.string(), name: z.string() })),
+    }),
+  ]),
+});
+
 const activePlanSchema = z.object({
   cycle: cycleSchema,
-  current: z.object({
-    week: z.number().int().positive(),
-    phase: z.enum(["not_started", "running", "finished"]),
-    today: z.iso.date(),
-  }),
+  current: currentSchema,
   week: z.object({
     number: z.number().int().positive(),
     note: z.string().nullable(),
@@ -100,12 +116,14 @@ const activePlanSchema = z.object({
       }),
     ),
   }),
+  cycles: z.array(cycleOptionSchema),
 });
 
-const planResponseSchema: z.ZodType<{ readonly data: TrainingWeekPlan }> =
-  z.object({
+const planResponseSchema: z.ZodType<{ readonly data: TrainingPlan }> = z.object(
+  {
     data: z.union([z.object({ cycle: z.null() }), activePlanSchema]),
-  });
+  },
+);
 
 /** El 403 de quien no está al día (#898): el motivo y la cabecera del ciclo,
  * o nula si el club no tiene ciclo activo. */
@@ -127,11 +145,33 @@ export type TrainingPlanBlock = {
   readonly cycle: TrainingCycle | null;
 };
 
-/** El plan, la puerta cerrada de quien no está al día, o un fallo. */
+/** El plan, la puerta cerrada de quien no está al día, un ciclo pedido que
+ * no ve (archivado, de otro grupo, o de un enlace ajeno), o un fallo. */
 export type TrainingPlanOutcome =
-  | { readonly kind: "loaded"; readonly plan: TrainingWeekPlan }
+  | { readonly kind: "loaded"; readonly plan: TrainingPlan }
   | ({ readonly kind: "blocked" } & TrainingPlanBlock)
+  | { readonly kind: "cycleNotFound" }
   | { readonly kind: "failed" };
+
+/** Qué pedirle al plan: la semana y el ciclo, nulos para los de entrada. */
+export type TrainingPlanQuery = {
+  readonly week: number | null;
+  readonly cycleId: string | null;
+};
+
+function trainingPlanPath(query: TrainingPlanQuery): string {
+  const params = new URLSearchParams();
+  if (query.cycleId !== null) {
+    params.set("cycle", query.cycleId);
+  }
+  if (query.week !== null) {
+    params.set("week", String(query.week));
+  }
+  const search = params.toString();
+  return search === ""
+    ? TRAINING_PLAN_API_PATH
+    : `${TRAINING_PLAN_API_PATH}?${search}`;
+}
 
 function toBlockedOutcome(payload: unknown): TrainingPlanOutcome {
   const parsed = blockedResponseSchema.safeParse(payload);
@@ -142,24 +182,24 @@ function toBlockedOutcome(payload: unknown): TrainingPlanOutcome {
   return { kind: "blocked", block, cycle };
 }
 
-/** La semana `week` del ciclo activo, o la de hoy si es nula.
+/** La semana pedida del ciclo pedido; sin semana, la de hoy, y sin ciclo, el
+ * de entrada (D6 de E38).
  *
  * Va por su cuenta y no por `requestApi`: del 403, además del motivo, hacen
  * falta el de la membresía y la cabecera del ciclo (#902). */
 export async function loadTrainingPlan(
-  week: number | null,
+  query: TrainingPlanQuery,
 ): Promise<TrainingPlanOutcome> {
-  const path =
-    week === null
-      ? TRAINING_PLAN_API_PATH
-      : `${TRAINING_PLAN_API_PATH}?week=${week}`;
   let response: Response;
   try {
-    response = await fetch(path);
+    response = await fetch(trainingPlanPath(query));
   } catch {
     return { kind: "failed" };
   }
   const payload: unknown = await response.json().catch(() => null);
+  if (response.status === HTTP_NOT_FOUND && query.cycleId !== null) {
+    return { kind: "cycleNotFound" };
+  }
   if (!response.ok) {
     return toBlockedOutcome(payload);
   }

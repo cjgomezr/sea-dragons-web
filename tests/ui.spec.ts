@@ -27890,16 +27890,37 @@ const TRAINING_WEEK_3_ROUTINES: readonly (readonly unknown[])[] = [
   [],
 ];
 
+const TRAINING_CURRENT_WEEK = {
+  week: 3,
+  phase: "running",
+  today: "2026-10-27",
+} as const;
+
+/** Un ciclo de la lista que la API manda con el plan (#979): con uno solo,
+ * la pantalla no enseña selector (#981). */
+function trainingCycleOption(id: string, name: string): unknown {
+  return {
+    id,
+    name,
+    current: TRAINING_CURRENT_WEEK,
+    audience: { kind: "club" },
+  };
+}
+
+const TRAINING_NATIONALS_ID = "cccccccc-0000-4000-8000-00000000000c";
+const TRAINING_NATIONALS_NAME = "Road to Nationals 2027";
+
 const TRAINING_ACTIVE_PLAN = {
   cycle: {
-    id: "cccccccc-0000-4000-8000-00000000000c",
-    name: "Road to Nationals 2027",
+    id: TRAINING_NATIONALS_ID,
+    name: TRAINING_NATIONALS_NAME,
     event: { name: "UWR Nationals", date: "2027-04-22" },
     startDate: "2026-10-12",
     endDate: "2027-04-25",
     weeks: 28,
   },
-  current: { week: 3, phase: "running", today: "2026-10-27" },
+  current: TRAINING_CURRENT_WEEK,
+  cycles: [trainingCycleOption(TRAINING_NATIONALS_ID, TRAINING_NATIONALS_NAME)],
   week: {
     number: 3,
     note: "Training Camp week: pool sessions run long.",
@@ -28081,6 +28102,44 @@ const TRAINING_CLUB_WITHOUT_YOUTUBE_PLAN = {
   },
 };
 
+/* El selector de ciclo (#981, RF-6 de E38): el socio ve el de su grupo y el
+   de todo el club. Con un nombre largo, el selector cerrado lo recorta. */
+const TRAINING_JUNIORS_ID = "cccccccc-0000-4000-8000-0000000000d1";
+const TRAINING_JUNIORS_NAME = "Juniors · State League";
+const TRAINING_LONG_CYCLE_NAME =
+  "Juniors and Development Squad · State League preparation block 2027";
+
+function trainingPlanWithTwoCycles(
+  shownName: string,
+): typeof TRAINING_ACTIVE_PLAN {
+  return {
+    ...TRAINING_ACTIVE_PLAN,
+    cycle: {
+      ...TRAINING_ACTIVE_PLAN.cycle,
+      id: TRAINING_JUNIORS_ID,
+      name: shownName,
+    },
+    cycles: [
+      trainingCycleOption(TRAINING_JUNIORS_ID, shownName),
+      trainingCycleOption(TRAINING_NATIONALS_ID, TRAINING_NATIONALS_NAME),
+    ],
+  };
+}
+
+const TRAINING_TWO_CYCLES_PLAN = trainingPlanWithTwoCycles(
+  TRAINING_JUNIORS_NAME,
+);
+const TRAINING_LONG_CYCLE_PLAN = trainingPlanWithTwoCycles(
+  TRAINING_LONG_CYCLE_NAME,
+);
+
+async function waitForTrainingCyclePicker(page: Page): Promise<void> {
+  await waitForTrainingWeek(page);
+  await expect(
+    page.getByRole("combobox", { name: /^(Cycle|Ciclo)$/ }),
+  ).toBeVisible();
+}
+
 /** Abre las dos filas del club sin YouTube: la de los consejos y la que no
  * tiene nada que enseñar. */
 async function openTrainingClubRows(page: Page): Promise<void> {
@@ -28206,6 +28265,20 @@ const TRAINING_STATES: readonly TrainingState[] = [
     storageState: E2E_STORAGE_STATE_PATH,
     isSpanish: true,
     ready: waitForTrainingWeek,
+  },
+  // El selector de ciclo cerrado con dos (#981), y con un nombre largo que
+  // recorta sin ensanchar la página.
+  {
+    name: "entrenamiento-dos-ciclos",
+    plan: TRAINING_TWO_CYCLES_PLAN,
+    storageState: E2E_STORAGE_STATE_PATH,
+    ready: waitForTrainingCyclePicker,
+  },
+  {
+    name: "entrenamiento-ciclo-nombre-largo",
+    plan: TRAINING_LONG_CYCLE_PLAN,
+    storageState: E2E_STORAGE_STATE_PATH,
+    ready: waitForTrainingCyclePicker,
   },
   // El martes con dos rutinas, secciones, kilos, una marca que falta y la
   // fila del back squat abierta (#901).
@@ -28437,6 +28510,77 @@ test.describe("entrenamiento en el navegador", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Road to Nationals 2027" }),
     ).toBeVisible();
+  });
+
+  // #981: el ciclo elegido va a la URL y, al volver sin ella, se recuerda.
+  test("elige otro ciclo y lo recuerda al volver", async ({ page }) => {
+    const requestedCycles: (string | null)[] = [];
+    await stubTrainingMarksAndPhotos(page);
+    await page.route(
+      (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
+      (route, request) => {
+        const cycle = new URL(request.url()).searchParams.get("cycle");
+        requestedCycles.push(cycle);
+        return route.fulfill(
+          jsonBody(
+            cycle === TRAINING_NATIONALS_ID
+              ? {
+                  ...TRAINING_TWO_CYCLES_PLAN,
+                  cycle: TRAINING_ACTIVE_PLAN.cycle,
+                }
+              : TRAINING_TWO_CYCLES_PLAN,
+          ),
+        );
+      },
+    );
+    await page.goto(`${APP_URL}${TRAINING_SCREEN_PATH}`);
+    await waitForTrainingCyclePicker(page);
+
+    await page
+      .getByRole("combobox", { name: "Cycle" })
+      .selectOption({ label: TRAINING_NATIONALS_NAME });
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: TRAINING_NATIONALS_NAME }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(
+      new RegExp(`${TRAINING_SCREEN_PATH}\\?cycle=${TRAINING_NATIONALS_ID}$`),
+    );
+    requestedCycles.length = 0;
+
+    await page.goto(`${APP_URL}${TRAINING_SCREEN_PATH}`);
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: TRAINING_NATIONALS_NAME }),
+    ).toBeVisible();
+    expect(new Set(requestedCycles)).toEqual(new Set([TRAINING_NATIONALS_ID]));
+  });
+
+  // #981: el cerrado recorta con "…"; la lista abierta lleva el nombre
+  // entero, que la captura no ve porque la pinta el navegador.
+  test("recorta un nombre de ciclo largo en el selector cerrado", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await stubTrainingMarksAndPhotos(page);
+    await page.route(
+      (url) => url.pathname === TRAINING_PLAN_ENDPOINT,
+      (route) => route.fulfill(jsonBody(TRAINING_LONG_CYCLE_PLAN)),
+    );
+    await page.goto(`${APP_URL}${TRAINING_SCREEN_PATH}`);
+    await waitForTrainingCyclePicker(page);
+
+    const picker = page.getByRole("combobox", { name: "Cycle" });
+    await expect(picker).toHaveCSS("text-overflow", "ellipsis");
+    expect(
+      await picker.evaluate(
+        (select) => select.getBoundingClientRect().right <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await expect(
+      picker.getByRole("option", { name: TRAINING_LONG_CYCLE_NAME }),
+    ).toHaveText(TRAINING_LONG_CYCLE_NAME);
+    expect(await hasHorizontalScroll(page)).toBe(false);
   });
 
   // §4.2 del handoff: filas de 64 px, el campo de la marca de 44 px con texto

@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useIsPhone } from "@/components/use-is-phone";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import type { MemberMark } from "@/lib/training/member-marks";
 import type { MarkValues } from "@/lib/training/routine-row-view";
-import type { ActiveTrainingPlan } from "@/lib/training/training-plan";
+import type { ActiveTrainingPlanWithCycles } from "@/lib/training/training-plan";
 import { defaultSelectedWeekday } from "@/lib/training/training-week-view";
-import { type TrainingPlanBlock, loadTrainingPlan } from "./training-client";
+import type { TrainingPlanBlock } from "./training-client";
+import { TrainingCyclePicker } from "./TrainingCyclePicker";
 import { TrainingDayPanel } from "./TrainingDayPanel";
 import { TrainingDayPills, TrainingDayRows } from "./TrainingDayList";
 import {
@@ -20,6 +21,7 @@ import { TrainingLockCard } from "./TrainingLockCard";
 import { TrainingMyMarks } from "./TrainingMyMarks";
 import { TrainingWeekNav } from "./TrainingWeekNav";
 import { TrainingWeekStrip } from "./TrainingWeekStrip";
+import { type PlanState, useTrainingPlan } from "./use-training-plan";
 import {
   type MemberMarksState,
   type SaveMark,
@@ -35,68 +37,14 @@ import {
  * de la API v1 (#898), la misma que usará la aplicación nativa (CON-002).
  */
 
-type PlanState =
-  | { readonly kind: "loading" }
-  | { readonly kind: "failed" }
-  | ({ readonly kind: "blocked" } & TrainingPlanBlock)
-  | { readonly kind: "noCycle" }
-  | { readonly kind: "ready"; readonly plan: ActiveTrainingPlan };
-
 /** El plan junto a las marcas del socio, que la pantalla espera a la vez. */
 type ScreenState =
   | Exclude<PlanState, { readonly kind: "ready" }>
   | {
       readonly kind: "ready";
-      readonly plan: ActiveTrainingPlan;
+      readonly plan: ActiveTrainingPlanWithCycles;
       readonly memberMarks: readonly MemberMark[];
     };
-
-/** El plan de la semana pedida; nula es la de hoy. Al cambiar de semana se
- * sigue viendo la anterior hasta que llega la nueva. */
-function useTrainingPlan(): {
-  readonly state: PlanState;
-  readonly showWeek: (week: number) => void;
-  readonly retry: () => void;
-} {
-  const [state, setState] = useState<PlanState>({ kind: "loading" });
-  const [request, setRequest] = useState<{
-    readonly week: number | null;
-    readonly attempt: number;
-  }>({ week: null, attempt: 0 });
-
-  useEffect(() => {
-    let isCurrent = true;
-    void loadTrainingPlan(request.week).then((outcome) => {
-      if (!isCurrent) {
-        return;
-      }
-      if (outcome.kind !== "loaded") {
-        setState(outcome);
-        return;
-      }
-      const { plan } = outcome;
-      setState(
-        plan.cycle === null ? { kind: "noCycle" } : { kind: "ready", plan },
-      );
-    });
-    return () => {
-      isCurrent = false;
-    };
-  }, [request]);
-
-  return {
-    state,
-    showWeek: (week) =>
-      setRequest((previous) => ({ week, attempt: previous.attempt })),
-    retry: () => {
-      setState({ kind: "loading" });
-      setRequest((previous) => ({
-        ...previous,
-        attempt: previous.attempt + 1,
-      }));
-    },
-  };
-}
 
 function PlainHeader({
   translate,
@@ -181,14 +129,16 @@ function TrainingWeekView({
   canPlan,
   marks,
   onChooseWeek,
+  onChooseCycle,
 }: {
   readonly translate: Translator;
-  readonly plan: ActiveTrainingPlan;
+  readonly plan: ActiveTrainingPlanWithCycles;
   readonly canPlan: boolean;
   readonly marks: MarksForRows & {
     readonly memberMarks: readonly MemberMark[];
   };
   readonly onChooseWeek: (week: number) => void;
+  readonly onChooseCycle: (cycleId: string) => void;
 }): React.JSX.Element {
   const isPhone = useIsPhone();
   const [selection, setSelection] = useState<{
@@ -222,6 +172,12 @@ function TrainingWeekView({
 
   return (
     <>
+      <TrainingCyclePicker
+        translate={translate}
+        cycles={plan.cycles}
+        selectedId={plan.cycle.id}
+        onChoose={onChooseCycle}
+      />
       <TrainingHeader
         translate={translate}
         plan={plan}
@@ -297,11 +253,13 @@ function combinedState(plan: PlanState, marks: MemberMarksState): ScreenState {
 function TrainingContent({
   translate,
   canPlan,
+  userId,
 }: {
   readonly translate: Translator;
   readonly canPlan: boolean;
+  readonly userId: string;
 }): React.JSX.Element {
-  const plan = useTrainingPlan();
+  const plan = useTrainingPlan(userId);
   const marks = useMemberMarks();
   const state = combinedState(plan.state, marks.state);
   const retry = (): void => {
@@ -326,8 +284,10 @@ function TrainingContent({
     case "noCycle":
       return <NoPlan translate={translate} canPlan={canPlan} />;
     case "ready":
+      // Otro ciclo empieza con el día que toca, no con el elegido en el otro.
       return (
         <TrainingWeekView
+          key={state.plan.cycle.id}
           translate={translate}
           plan={state.plan}
           canPlan={canPlan}
@@ -336,7 +296,8 @@ function TrainingContent({
             markValues: marks.markValues,
             onSaveMark: marks.saveMark,
           }}
-          onChooseWeek={plan.showWeek}
+          onChooseWeek={(week) => plan.showWeek(week, state.plan.cycle.id)}
+          onChooseCycle={plan.chooseCycle}
         />
       );
   }
@@ -345,15 +306,22 @@ function TrainingContent({
 export function TrainingScreen({
   locale,
   canPlan,
+  userId,
 }: {
   readonly locale: Locale;
   /** Admin y Coach (D3): ven el enlace a Planificar. */
   readonly canPlan: boolean;
+  /** Para recordar en el dispositivo el ciclo que elige cada cuenta (#981). */
+  readonly userId: string;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   return (
     <div className="training">
-      <TrainingContent translate={translate} canPlan={canPlan} />
+      <TrainingContent
+        translate={translate}
+        canPlan={canPlan}
+        userId={userId}
+      />
     </div>
   );
 }

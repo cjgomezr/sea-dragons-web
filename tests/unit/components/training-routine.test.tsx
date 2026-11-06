@@ -16,11 +16,16 @@ import type {
 } from "@/lib/training/training-load";
 import type {
   ActiveTrainingPlan,
+  ActiveTrainingPlanWithCycles,
   TrainingCycle,
   TrainingRoutine,
   TrainingRoutineItem,
 } from "@/lib/training/training-plan";
 import { stubScreenWidth } from "../../support/screen-width";
+import {
+  TRAINING_USER_ID,
+  withOnlyItsCycle,
+} from "../../support/training-cycle-options";
 
 /**
  * La rutina del día con sus kilos (#901, RF-4, D9 y D10 del PRD de E35). La
@@ -190,12 +195,14 @@ const TEXT_DOSE: WeekDose = {
 
 /** Semana 3: el martes (hoy) Gym A y Pool, el miércoles una rutina vacía, el
  * jueves descanso. */
-function week3Plan(dose: WeekDose | null = PCT_DOSE): ActiveTrainingPlan {
+function week3Plan(
+  dose: WeekDose | null = PCT_DOSE,
+): ActiveTrainingPlanWithCycles {
   const routinesByDay: Readonly<Record<number, TrainingRoutine[]>> = {
     1: [GYM_A, POOL],
     2: [EMPTY_ROUTINE],
   };
-  return {
+  return withOnlyItsCycle({
     cycle: CYCLE,
     current: { week: 3, phase: "running", today: "2026-10-27" },
     week: {
@@ -208,12 +215,12 @@ function week3Plan(dose: WeekDose | null = PCT_DOSE): ActiveTrainingPlan {
         routines: routinesByDay[weekday] ?? [],
       })),
     },
-  };
+  });
 }
 
 /** Semana 6, la del evento: el lunes Pool y desde el jueves el evento. */
-function week6Plan(): ActiveTrainingPlan {
-  return {
+function week6Plan(): ActiveTrainingPlanWithCycles {
+  return withOnlyItsCycle({
     cycle: CYCLE,
     current: { week: 6, phase: "running", today: "2026-11-16" },
     week: {
@@ -226,7 +233,7 @@ function week6Plan(): ActiveTrainingPlan {
         routines: weekday === 0 ? [POOL] : [],
       })),
     },
-  };
+  });
 }
 
 function mark(ref: TrainingMarkRef, value: number | null): MemberMark {
@@ -307,7 +314,13 @@ afterEach(() => {
 });
 
 async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
-  render(<TrainingScreen locale={locale} canPlan={false} />);
+  render(
+    <TrainingScreen
+      locale={locale}
+      canPlan={false}
+      userId={TRAINING_USER_ID}
+    />,
+  );
   await screen.findByRole("heading", { level: 1 });
 }
 
@@ -828,7 +841,9 @@ describe("cuando las marcas no cargan", () => {
       ),
     );
 
-    render(<TrainingScreen locale="en" canPlan={false} />);
+    render(
+      <TrainingScreen locale="en" canPlan={false} userId={TRAINING_USER_ID} />,
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't load the training plan.",

@@ -3064,6 +3064,7 @@ export const spanishMessages: MessageCatalog = {
   "search.close": "Cerrar la búsqueda",
   "training.member.metaTitle": "Entrenamiento · {club}",
   "training.member.eyebrow": "Entrenamiento",
+  "training.member.cyclePicker": "Ciclo",
   "training.member.eventOn": "{event} · {date}",
   "training.member.endsOn": "Termina el {date}",
   "training.member.weeksToGo": {

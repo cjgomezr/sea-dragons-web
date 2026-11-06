@@ -235,10 +235,6 @@ export type ActiveTrainingPlanWithCycles = ActiveTrainingPlan & {
   readonly cycles: readonly TrainingCycleOption[];
 };
 
-/** La semana que pinta Entrenamiento: sin la lista, que la pantalla no usa
- * hasta el selector del #981. */
-export type TrainingWeekPlan = { readonly cycle: null } | ActiveTrainingPlan;
-
 export type TrainingPlan =
   { readonly cycle: null } | ActiveTrainingPlanWithCycles;
 
