@@ -29064,6 +29064,11 @@ async function openPlannerAudience(
   await expect(
     page.getByRole("radio", { name: "Specific groups" }),
   ).toBeVisible();
+  // El ciclo elegido pide su cuadrícula: la captura la espera cargada.
+  await expect(page.getByText("Loading the weeks…")).toHaveCount(0);
+  await expect(
+    page.getByRole("combobox", { name: /^Week 1, / }).first(),
+  ).toBeVisible();
   if (audience.isConfirmingConflicts === true) {
     await page.getByRole("button", { name: "Make active" }).click();
     await expect(
@@ -29173,9 +29178,10 @@ async function openCycleReactivateConfirm(page: Page): Promise<void> {
 
 /** La captura de página entera pasa la ventana por 1 × 1 px un momento: la
  * pestaña cruza al móvil, se vuelve a montar y la semana abierta o la
- * confirmación de borrar se cierran. Con una de las dos abierta, la ventana
- * crece hasta la página y se captura tal cual. Devuelve si la captura tiene
- * que ser de página entera. */
+ * confirmación de borrar se cierran; al volver, la cuadrícula del ciclo
+ * elegido (#980) se pide otra vez y sale a medio cargar. Con algo de eso en
+ * pantalla, la ventana crece hasta la página y se captura tal cual. Devuelve
+ * si la captura tiene que ser de página entera. */
 async function plannerCaptureFullPage(
   page: Page,
   state: PlannerState,
@@ -29183,7 +29189,7 @@ async function plannerCaptureFullPage(
   const hasOpenConfirm =
     state.isConfirmingDelete === true ||
     state.isConfirmingReactivate === true ||
-    state.audience?.isConfirmingConflicts === true;
+    state.audience !== undefined;
   if (state.openWeek === undefined && !hasOpenConfirm) {
     return true;
   }
