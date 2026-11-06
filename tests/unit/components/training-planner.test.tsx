@@ -181,7 +181,9 @@ describe("la cabecera y las pestañas", () => {
       screen.getByRole("heading", { level: 1, name: "Plan training" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Members with an active membership see it."),
+      screen.getByText(
+        "Each member with an active membership sees the active cycles meant for them.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -250,7 +252,9 @@ describe("la cabecera y las pestañas", () => {
       screen.getByRole("link", { name: "Volver a Entrenamiento" }),
     ).toHaveAttribute("href", TRAINING_PATH);
     expect(
-      screen.getByText("Lo ven los miembros con la membresía activa."),
+      screen.getByText(
+        "Cada miembro con la membresía activa ve los ciclos activos que le tocan.",
+      ),
     ).toBeInTheDocument();
   });
 });

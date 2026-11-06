@@ -3150,7 +3150,8 @@ export const spanishMessages: MessageCatalog = {
   "training.manage.back": "Volver a Entrenamiento",
   "training.manage.eyebrow": "Entrenamiento · Gestión",
   "training.manage.title": "Planificar",
-  "training.manage.lead": "Lo ven los miembros con la membresía activa.",
+  "training.manage.lead":
+    "Cada miembro con la membresía activa ve los ciclos activos que le tocan.",
   "training.manage.tabs": "Secciones de la planificación",
   "training.manage.tabCycle": "Ciclo",
   "training.manage.tabCycleCount": "{weeks} sem",

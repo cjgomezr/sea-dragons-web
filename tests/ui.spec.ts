@@ -29399,6 +29399,62 @@ for (const state of PLANNER_STATES) {
   });
 }
 
+/** Con los cuatro ciclos de `planificar-ciclo-grupos` la fila de tarjetas ya
+ * no cabe en el escritorio; + New cycle se queda fuera de ella y entero a la
+ * vista sin desplazarla (#988). */
+const PLANNER_MANY_CYCLES_STATE = PLANNER_STATES.find(
+  (state) => state.name === "planificar-ciclo-grupos",
+);
+
+test.describe("Planificar con muchos ciclos (#988)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const width of [375, 768, 1440] as const) {
+    test(`shows the whole New cycle button at ${width}px`, async ({ page }) => {
+      if (PLANNER_MANY_CYCLES_STATE === undefined) {
+        throw new Error("Falta el estado planificar-ciclo-grupos.");
+      }
+      await page.setViewportSize({ width, height: 900 });
+      await goToPlanner(page, PLANNER_MANY_CYCLES_STATE);
+      const newCycle = page.getByRole("button", {
+        name: "New cycle",
+        exact: true,
+      });
+      // Sólo la página baja hasta el botón: la fila de tarjetas no se toca.
+      // En el móvil el botón vive en las acciones, más abajo del pliegue.
+      await newCycle.evaluate((button) =>
+        window.scrollBy(0, button.getBoundingClientRect().top - 100),
+      );
+
+      await expect(newCycle).toBeInViewport({ ratio: 1 });
+      expect(await hasHorizontalScroll(page)).toBe(false);
+    });
+  }
+
+  test("keeps the cycle cards in one row that scrolls sideways at 1440px", async ({
+    page,
+  }) => {
+    if (PLANNER_MANY_CYCLES_STATE === undefined) {
+      throw new Error("Falta el estado planificar-ciclo-grupos.");
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPlanner(page, PLANNER_MANY_CYCLES_STATE);
+
+    const cards = page.getByRole("list", { name: "Cycles", exact: true });
+    const cardTops = await cards
+      .getByRole("listitem")
+      .evaluateAll((items) =>
+        items.map((item) => item.getBoundingClientRect().top),
+      );
+    expect(new Set(cardTops).size).toBe(1);
+    expect(
+      await cards.evaluate((list) => list.scrollWidth > list.clientWidth),
+    ).toBe(true);
+  });
+});
+
 /* ---------------------------------------------------------------------------
    Planificar → Marcas (#911, RF-11 y D11 del PRD de E35), contra §5.1 "Tab
    Marks" y §5.2 del handoff (d06-coach-marks.png y m07-coach-marks.png).
