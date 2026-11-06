@@ -24708,6 +24708,43 @@ a.dashboard-club-cell-body:focus-visible {
   overflow-wrap: break-word;
 }
 
+/* El selector de ciclo (#981), encima de la cabecera cuando el socio ve más
+   de uno. El cerrado recorta un nombre largo con "…" en vez de ensanchar la
+   página; la lista abierta, que pinta el navegador, lo enseña entero. */
+.training-cycle-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  /* En escritorio no se estira hasta la cuenta atrás: cabe un nombre
+     corriente entero y el largo recorta. */
+  max-width: 420px;
+}
+
+.training-cycle-picker label {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.training-cycle-picker select {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  overflow: hidden;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
 .training-eyebrow {
   margin: 0 0 var(--space-1);
   font-family: var(--font-family-mono);

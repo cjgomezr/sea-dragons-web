@@ -4,11 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrainingScreen } from "@/components/training/TrainingScreen";
 import type {
   ActiveTrainingPlan,
+  ActiveTrainingPlanWithCycles,
   TrainingCycle,
   TrainingRoutine,
   TrainingWeek,
 } from "@/lib/training/training-plan";
 import { stubScreenWidth } from "../../support/screen-width";
+import {
+  TRAINING_USER_ID,
+  withOnlyItsCycle,
+} from "../../support/training-cycle-options";
 
 /**
  * La semana del socio en Entrenamiento (#900, RF-3 y RF-12 del PRD de E35).
@@ -144,8 +149,8 @@ function planFor(
     today: "2026-10-27",
   },
   cycle: TrainingCycle = CYCLE,
-): ActiveTrainingPlan {
-  return { cycle, current, week };
+): ActiveTrainingPlanWithCycles {
+  return withOnlyItsCycle({ cycle, current, week });
 }
 
 function jsonResponse(status: number, payload: unknown): Response {
@@ -202,6 +207,7 @@ async function renderScreen(
     <TrainingScreen
       locale={options.locale ?? "en"}
       canPlan={options.canPlan ?? false}
+      userId={TRAINING_USER_ID}
     />,
   );
   await screen.findByRole("heading", { level: 1 });
@@ -635,7 +641,9 @@ describe("cuando la API no da la semana", () => {
           : jsonResponse(200, { data: planFor(WEEK_3) });
       }),
     );
-    render(<TrainingScreen locale="en" canPlan={false} />);
+    render(
+      <TrainingScreen locale="en" canPlan={false} userId={TRAINING_USER_ID} />,
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't load the training plan.",

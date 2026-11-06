@@ -5,11 +5,14 @@ import { TrainingScreen } from "@/components/training/TrainingScreen";
 import type { MemberMark } from "@/lib/training/member-marks";
 import type { TrainingMarkRef } from "@/lib/training/training-load";
 import type {
-  ActiveTrainingPlan,
   TrainingCycle,
   TrainingRoutine,
 } from "@/lib/training/training-plan";
 import { stubScreenWidth } from "../../support/screen-width";
+import {
+  TRAINING_USER_ID,
+  withOnlyItsCycle,
+} from "../../support/training-cycle-options";
 
 /**
  * La tarjeta Mis marcas (#902, RF-5 y D11 del PRD de E35, §4.1 y §4.2 del
@@ -68,7 +71,7 @@ const GYM_A: TrainingRoutine = {
   })),
 };
 
-const PLAN: ActiveTrainingPlan = {
+const PLAN = withOnlyItsCycle({
   cycle: CYCLE,
   current: { week: 3, phase: "running", today: "2026-10-27" },
   week: {
@@ -81,7 +84,7 @@ const PLAN: ActiveTrainingPlan = {
       routines: weekday === 1 ? [GYM_A] : [],
     })),
   },
-};
+});
 
 function mark(ref: TrainingMarkRef, value: number | null): MemberMark {
   return { ...ref, unit: "kg", value };
@@ -200,6 +203,7 @@ async function renderScreen(
     <TrainingScreen
       locale={options.locale ?? "en"}
       canPlan={options.canPlan ?? false}
+      userId={TRAINING_USER_ID}
     />,
   );
   await screen.findByRole("heading", { level: 1 });
@@ -484,7 +488,9 @@ describe("la pantalla bloqueada", () => {
       ),
     );
 
-    render(<TrainingScreen locale="en" canPlan={false} />);
+    render(
+      <TrainingScreen locale="en" canPlan={false} userId={TRAINING_USER_ID} />,
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't load the training plan.",
@@ -511,7 +517,9 @@ describe("la pantalla bloqueada", () => {
       ),
     );
 
-    render(<TrainingScreen locale="en" canPlan={false} />);
+    render(
+      <TrainingScreen locale="en" canPlan={false} userId={TRAINING_USER_ID} />,
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't load the training plan.",

@@ -9,16 +9,27 @@ import type { Role } from "@/lib/auth/roles";
  */
 
 const callerRole = { current: "Player" as Role };
+const CALLER_ID = "aaaaaaaa-0000-4000-8000-0000000000a1";
 
 vi.mock("@/lib/i18n/request-locale", () => ({
   readRequestLocale: async () => "en",
 }));
 vi.mock("@/lib/auth/caller-role", () => ({
   readCallerRole: async () => callerRole.current,
+  readCallerId: async () => CALLER_ID,
 }));
 vi.mock("@/components/training/TrainingScreen", () => ({
-  TrainingScreen: ({ canPlan }: { readonly canPlan: boolean }) => (
-    <p>{canPlan ? "offers planning" : "member only"}</p>
+  TrainingScreen: ({
+    canPlan,
+    userId,
+  }: {
+    readonly canPlan: boolean;
+    readonly userId: string;
+  }) => (
+    <>
+      <p>{canPlan ? "offers planning" : "member only"}</p>
+      <p>remembers for {userId}</p>
+    </>
   ),
 }));
 
@@ -37,5 +48,11 @@ describe("Entrenamiento", () => {
     render(await TrainingPage());
 
     expect(screen.getByText(expected)).toBeInTheDocument();
+  });
+
+  it("le pasa a la pantalla la cuenta de quien la pide, para recordar su ciclo", async () => {
+    render(await TrainingPage());
+
+    expect(screen.getByText(`remembers for ${CALLER_ID}`)).toBeInTheDocument();
   });
 });
